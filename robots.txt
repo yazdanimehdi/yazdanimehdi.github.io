@@ -1,4 +1,4 @@
 User-agent: *
 Disallow:
 
-Sitemap: https://yazdanimehdi.github.io/sitemap.xml
+Sitemap: https://yazdanimehdi.com/sitemap.xml
