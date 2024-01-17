@@ -38,16 +38,25 @@
     {
       "name": "Quantitative Research",
       "level": "",
-      "keywords": ["Machine Learning Methods", "Artificial Intelligence", "Graph Neural Networks", "Convolutional Neural Networks", "Transformers", "Recurrent Neural Networks", "LSTMs", "Mathematical Optimization", "Mathematical Modeling"]
+      "keywords": [
+        "Machine Learning Methods",
+        "Artificial Intelligence",
+        "Graph Neural Networks",
+        "Convolutional Neural Networks",
+        "Transformers",
+        "Recurrent Neural Networks",
+        "LSTMs",
+        "Mathematical Optimization",
+        "Mathematical Modeling"
+      ]
     }
   ],
-  "interests": [{
-    "name": "Wildlife",
-    "keywords": [
-      "Ferrets",
-      "Unicorns"
-    ]
-  }],
+  "interests": [
+    {
+      "name": "Wildlife",
+      "keywords": ["Ferrets", "Unicorns"]
+    }
+  ],
 
   "work": [
     {
@@ -128,8 +137,8 @@
       "gpa": "3.58/4"
     }
   ],
- 
-    "languages": [
+
+  "languages": [
     {
       "language": "English",
       "fluency": "Fluent"
@@ -165,7 +174,7 @@
       "name": "Controlling the misinformation diffusion in social media by the effect of different classes of agents",
       "publisher": "The Computational Social Science Society of the Americas Annual Conference",
       "releaseDate": "2023",
-      "url":""
+      "url": ""
     },
     {
       "name": "Agent-Based Modeling of C. Difficile Spread in Hospitals",
@@ -178,7 +187,6 @@
       "publisher": "AAAI 2023 Workshop on Representation Learning for Responsible Human-Centric AI and HCII conference 2023 Oral Presentation",
       "releaseDate": "2023",
       "url": "https://link.springer.com/chapter/10.1007/978-3-031-35891-3_27"
-
     },
     {
       "name": "BindingSiteAugmented DTA to enable A Next-Generation Pipeline for Interpretable Prediction Models in Drug-Repurposing",
@@ -331,4 +339,3 @@
     }
   ]
 }
-

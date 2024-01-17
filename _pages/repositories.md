@@ -8,8 +8,8 @@ nav_order: 4
 ---
 
 #### Explore my contributions to Artificial Intelligence on GitHub!
-The repositories represent my ongoing commitment to contributing valuable resources to the scientific community, particularly in the realms of computational drug discovery and bioinformatics. Each project is a testament to the power of combining cutting-edge technology with scientific inquiry to address complex challenges in applied artificial intelligence. For more details, please visit my GitHub profile. I invite you to explore these repositories and look forward to any collaboration opportunities or discussions they might inspire.
 
+The repositories represent my ongoing commitment to contributing valuable resources to the scientific community, particularly in the realms of computational drug discovery and bioinformatics. Each project is a testament to the power of combining cutting-edge technology with scientific inquiry to address complex challenges in applied artificial intelligence. For more details, please visit my GitHub profile. I invite you to explore these repositories and look forward to any collaboration opportunities or discussions they might inspire.
 
 {% if site.data.repositories.github_users %}
 
