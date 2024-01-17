@@ -1,12 +1,8 @@
 github_users:
-  - torvalds
-  - alshedivat
+  - yazdanimehdi
 
 github_repos:
-  - alshedivat/al-folio
-  - twbs/bootstrap
-  - jekyll/jekyll
-  - jquery/jquery
-  - FortAwesome/Font-Awesome
-  - jpswalsh/academicons
-  - mathjax/MathJax
+ - yazdanimehdi/DeepDrugDomain
+ - yazdanimehdi/AttentionSiteDTI
+ - yazdanimehdi/FragXsiteDTI
+ - yazdanimehdi/Distraction_Fairness
