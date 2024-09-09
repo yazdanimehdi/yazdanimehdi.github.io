@@ -5,7 +5,7 @@
     "email": "yazdani@ucf.edu",
     "phone": "(407) 810-4467",
     "url": "http://yazdanimehdi.com",
-    "summary": "An AI Ph.D. Researcher with a focus on Transformers, Drug Discovery, Computer Vision, Graph Neural Networks, and Algorithmic Fairness.",
+    "summary": "An AI Ph.D. Researcher with a focus on Transformers, Graph Neural Networks, Computational Drug Discovery, Large Language Models, Attention’s Alternative Architecture, and Algorithmic Fairness.",
     "location": {
       "city": "Orlando",
       "region": "Florida",
@@ -65,6 +65,13 @@
       "startDate": "2021",
       "endDate": "Present",
       "summary": "Researching drug target interaction, computer vision, and algorithmic fairness."
+    },
+     {
+      "company": "Johnson and Johnson",
+      "position": "Data Science Intern, AI/ML for Drug Discovery",
+      "startDate": "2024",
+      "endDate": "2024",
+      "summary": "Computational Drug Discovery, Geometric Learning, Genomics Sequence Modeling, Distributed Training, Training Large Language Models, and Generative AI"
     },
     {
       "company": "ZTech Team",
