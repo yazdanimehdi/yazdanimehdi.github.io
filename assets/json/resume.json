@@ -183,7 +183,7 @@
       "name": "DeepDrugDomain: Easy-to-use drug-target affinity/interaction prediction package for architecture design",
       "publisher": "GitHub",
       "releaseDate": "2024",
-      "summary": "A Python package for drug-target affinity/interaction prediction using deep learning methods."
+      "summary": "A Python package for drug-target affinity/interaction prediction using deep learning methods.",
       "url": "https://github.com/yazdanimehdi/DeepDrugDomain"
     },
     {
@@ -215,12 +215,6 @@
       "publisher": "Briefings in Bioinformatics",
       "releaseDate": "2023",
       "url": "https://academic.oup.com/bib/article/24/3/bbad136/7140297"
-    },
-    {
-      "name": "Distraction is All You Need for Fairness",
-      "publisher": "Under Review in IEEE Transactions on Neural Networks and Learning Systems",
-      "releaseDate": "2022",
-      "url": "https://arxiv.org/abs/2203.07593"
     },
     {
       "name": "AttentionSiteDTI: Attention Based Model for Predicting Drug-Target Interaction Using 3D Structure of Protein Binding Sites",
