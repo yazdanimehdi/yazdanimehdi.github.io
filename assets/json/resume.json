@@ -5,7 +5,7 @@
     "email": "yazdani@ucf.edu",
     "phone": "(407) 810-4467",
     "url": "http://yazdanimehdi.com",
-    "summary": "An AI Ph.D. Researcher with a focus on Transformers, Graph Neural Networks, Computational Drug Discovery, Large Language Models, Attention’s Alternative Architecture, and Algorithmic Fairness.",
+    "summary": "AI Research Scientist and Ph.D. candidate specializing in computational drug discovery and machine learning, with proven expertise in developing novel architectures for Transformers and Graph Neural Networks. Led groundbreaking research at Johnson & Johnson, developing HELM, the first mRNA antibody language model. Published extensively in top-tier venues with focus on algorithmic fairness, drug-target interaction prediction and innovative AI methodologies. Demonstrated track record of translating complex research into practical applications, combining deep technical knowledge with strong collaborative abilities across academic and industry settings. Proficient in large-scale distributed systems and experienced in implementing production-ready AI solutions.",
     "location": {
       "city": "Orlando",
       "region": "Florida",
@@ -162,8 +162,14 @@
   ],
   "publications": [
     {
+      "name": "BoKDiff: Best-of-K Diffusion Alignment for Target-Specific 3D Molecule Generation",
+      "publisher": "Submitted to ISMB 2025",
+      "releaseDate": "2025",
+      "url": "https://arxiv.org/abs/2501.15631"
+    },
+    {
       "name": "HELM: Hierarchical Encoding for mRNA Language Modeling",
-      "publisher": "Submitted to ICLR 2024, Neurips 2024 Workshop on AI for New Drug Modalities",
+      "publisher": "ICLR 2024, Neurips 2024 Workshop on AI for New Drug Modalities",
       "releaseDate": "2024",
       "url": "https://arxiv.org/abs/2410.12459"
     },
