@@ -61,6 +61,13 @@
   ],
   "work": [
     {
+      "company": "Microsoft",
+      "position": "Microsoft Research Intern",
+      "startDate": "2025",
+      "endDate": "2025",
+      "summary": "Agentic AI"
+    },
+    {
       "company": "University of Central Florida",
       "position": "Graduate Research Assistant",
       "startDate": "2021",
