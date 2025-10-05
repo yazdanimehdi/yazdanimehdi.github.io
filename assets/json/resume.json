@@ -169,6 +169,12 @@
   ],
   "publications": [
     {
+      "name": "Equi-mRNA: Protein Translation Equivariant Encoding for mRNA Language Models",
+      "publisher": "Neurips 2025",
+      "releaseDate": "2025",
+      "url": "https://arxiv.org/abs/2508.15103"
+    },
+    {
       "name": "BoKDiff: Best-of-K Diffusion Alignment for Target-Specific 3D Molecule Generation",
       "publisher": "Submitted to ISMB 2025",
       "releaseDate": "2025",
