@@ -1,0 +1,31 @@
+---
+import { getSiteConfig } from '../../lib/config';
+
+const config = getSiteConfig();
+const topBar = config.topBar;
+
+const show = topBar?.enabled ?? false;
+---
+
+{
+  show && topBar && (
+    <div class="h-8 w-full bg-primary-600 text-xs text-white dark:bg-dm-alt dark:text-dm-muted">
+      <div class="mx-auto flex h-full max-w-[930px] items-center justify-between px-4 sm:px-6">
+        <span class="hidden truncate sm:inline">{topBar.text}</span>
+        {topBar.links?.length > 0 && (
+          <div class="ms-auto flex items-center gap-3">
+            {topBar.links.map((link) => (
+              <a
+                href={link.href}
+                class="whitespace-nowrap text-white/90 transition-colors hover:text-white dark:text-dm-text dark:hover:text-white"
+                {...(link.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+              >
+                {link.label}
+              </a>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

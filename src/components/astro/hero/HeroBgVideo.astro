@@ -1,0 +1,26 @@
+---
+import type { HeroVideoConfig } from '../../../lib/types';
+
+interface Props {
+  video: HeroVideoConfig;
+}
+
+const { video } = Astro.props;
+---
+
+<video
+  autoplay
+  muted
+  loop
+  playsinline
+  preload="auto"
+  width="1920"
+  height="600"
+  class="absolute inset-0 h-full w-full object-cover"
+  poster={video.poster || undefined}
+>
+  <source src={video.src} type="video/mp4" />
+</video>
+
+{/* Overlay for text readability */}
+<div class="absolute inset-0 bg-white/60 dark:bg-dm/70"></div>

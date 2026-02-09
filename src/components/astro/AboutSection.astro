@@ -1,0 +1,41 @@
+---
+import { getSiteConfig, isPersonalMode } from '../../lib/config';
+import { getImageShapeClass } from '../../lib/imageShape';
+
+const config = getSiteConfig();
+const about = config.about;
+const personal = isPersonalMode();
+const show = !!about?.enabled;
+const title = about?.title ?? (personal ? 'About Me' : 'About Our Lab');
+const hasImage = !!about?.image;
+const shapeClass = getImageShapeClass();
+---
+
+{
+  show && (
+    <section class="border-b border-surface-200 bg-surface-50 dark:border-dm-border dark:bg-dm">
+      <div class="mx-auto max-w-[930px] px-4 py-10 sm:px-6 sm:py-14">
+        <h2 class="mb-6 font-serif text-2xl font-normal text-surface-900 sm:text-3xl dark:text-dm-heading">{title}</h2>
+        <div class:list={['flex flex-col gap-8', hasImage && 'md:flex-row']}>
+          <div class:list={[hasImage ? 'md:flex-1' : 'w-full']}>
+            <p class="text-base leading-relaxed text-surface-600 dark:text-dm-muted">{about!.text}</p>
+          </div>
+          {hasImage && (
+            <div class="flex-shrink-0 md:w-[280px]">
+              <img
+                src={about!.image}
+                alt={title}
+                width="280"
+                height="280"
+                class:list={['w-full object-cover', shapeClass]}
+                loading="eager"
+                fetchpriority="high"
+                decoding="async"
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  )
+}

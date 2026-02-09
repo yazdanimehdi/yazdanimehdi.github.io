@@ -1,0 +1,54 @@
+---
+interface Props {
+  title: string;
+  link: string;
+  date: string;
+  source: string;
+  excerpt?: string;
+  author?: string;
+}
+
+const { title, link, date, source, excerpt, author } = Astro.props;
+---
+
+<a
+  href={link}
+  target="_blank"
+  rel="noopener noreferrer"
+  class="group block border-b border-surface-100 py-3 last:border-b-0 dark:border-dm-border"
+>
+  <div class="flex items-start gap-4">
+    <!-- Thumbnail placeholder -->
+    <div class="hidden h-16 w-20 shrink-0 overflow-hidden rounded bg-surface-100 sm:block dark:bg-dm-alt">
+      <div class="flex h-full w-full items-center justify-center text-surface-300 dark:text-dm-border-alt">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
+          <path
+            d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.813a4.5 4.5 0 00-6.364-6.364L4.5 8.25"
+          ></path>
+        </svg>
+      </div>
+    </div>
+
+    <div class="min-w-0 flex-1">
+      <h3
+        class="text-sm leading-snug font-medium text-surface-900 transition-colors group-hover:text-primary-600 dark:text-dm-heading dark:group-hover:text-accent-400"
+      >
+        {title}
+        <svg
+          class="ms-0.5 inline h-3 w-3 text-surface-500"
+          fill="none"
+          viewBox="0 0 24 24"
+          stroke="currentColor"
+          stroke-width="2"
+          ><path d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg
+        >
+      </h3>
+      {excerpt && <p class="mt-1 line-clamp-2 text-xs text-surface-500 dark:text-dm-muted">{excerpt}</p>}
+      <div class="mt-1 flex items-center gap-2 text-xs text-surface-500 dark:text-dm-muted">
+        <span>{source}</span>
+        <span>&middot;</span>
+        <span>{date}</span>
+      </div>
+    </div>
+  </div>
+</a>

@@ -1,0 +1,244 @@
+---
+import PageLayout from '../layouts/PageLayout.astro';
+import HeroSection from '../components/astro/HeroSection.astro';
+import AboutSection from '../components/astro/AboutSection.astro';
+import SectionHeading from '../components/astro/SectionHeading.astro';
+import AnnouncementCard from '../components/astro/AnnouncementCard.astro';
+import PublicationEntry from '../components/astro/PublicationEntry.astro';
+import PostCard from '../components/astro/PostCard.astro';
+import FeedItem from '../components/astro/FeedItem.astro';
+import SEO from '../components/astro/SEO.astro';
+import { getCollection } from 'astro:content';
+import { getImage } from 'astro:assets';
+import { getSiteConfig, getSiteName, isPersonalMode, getHomepageSections } from '../lib/config';
+
+const config = getSiteConfig();
+const personal = isPersonalMode();
+const siteName = getSiteName();
+
+const sections = getHomepageSections();
+
+const GRID_IDS = ['publications', 'blog'] as const;
+const enabledGridSections = sections.filter((id) => (GRID_IDS as readonly string[]).includes(id));
+const firstGridId = enabledGridSections[0] ?? null;
+const bottomGridClass = enabledGridSections.length >= 2 ? 'md:grid-cols-2' : '';
+
+// Only fetch data for enabled sections
+const announcements = sections.includes('news')
+  ? (await getCollection('announcements'))
+      .sort((a, b) => {
+        if (a.data.pinned && !b.data.pinned) return -1;
+        if (!a.data.pinned && b.data.pinned) return 1;
+        return b.data.date.getTime() - a.data.date.getTime();
+      })
+      .slice(0, 4)
+  : [];
+
+const publicationsRaw = sections.includes('publications')
+  ? (await getCollection('publications'))
+      .sort((a, b) => {
+        if (a.data.featured && !b.data.featured) return -1;
+        if (!a.data.featured && b.data.featured) return 1;
+        return b.data.year - a.data.year;
+      })
+      .slice(0, 4)
+  : [];
+
+const publications = await Promise.all(
+  publicationsRaw.map(async (pub) => {
+    let imageUrl: string | undefined;
+    if (pub.data.image) {
+      const resolved = await getImage({ src: pub.data.image, width: 80 });
+      imageUrl = resolved.src;
+    }
+    return { ...pub, imageUrl };
+  }),
+);
+
+// Resolve announcement images
+const announcementData = await Promise.all(
+  announcements.map(async (a) => {
+    let imageUrl: string | undefined;
+    if (a.data.image) {
+      const resolved = await getImage({ src: a.data.image, width: 200 });
+      imageUrl = resolved.src;
+    }
+    return { ...a, imageUrl };
+  }),
+);
+
+const posts = sections.includes('blog')
+  ? (await getCollection('posts'))
+      .filter((p) => !p.data.draft)
+      .sort((a, b) => b.data.date.getTime() - a.data.date.getTime())
+      .slice(0, 3)
+  : [];
+
+const feeds = sections.includes('blog')
+  ? (await getCollection('feeds'))
+      .sort((a, b) => new Date(b.data.date).getTime() - new Date(a.data.date).getTime())
+      .slice(0, 2)
+  : [];
+---
+
+<PageLayout title={config.title} fullWidth>
+  <SEO type="website" title={config.title} />
+
+  {
+    sections.map((id) => {
+      if (id === 'hero') {
+        return (
+          <HeroSection
+            title={siteName}
+            subtitle={config.description}
+            ctaText={personal ? 'View Publications' : 'Explore Research'}
+            ctaHref={personal ? '/publications' : '/research'}
+            secondaryCtaText={personal ? 'CV' : 'Join the Lab'}
+            secondaryCtaHref={personal ? '/cv' : '/join'}
+          />
+        );
+      }
+
+      if (id === 'about') {
+        return <AboutSection />;
+      }
+
+      // Announcements: full-width row below About
+      if (id === 'news' && announcementData.length > 0) {
+        return (
+          <div class="mx-auto max-w-[1100px] px-4 py-8 sm:px-6">
+            <SectionHeading
+              title={personal ? 'Recent Updates' : 'Latest Announcements'}
+              viewAllHref="/news"
+            />
+            <div class="mt-3 space-y-0">
+              {announcementData.map((a) => (
+                <AnnouncementCard
+                  id={a.id}
+                  title={a.data.title}
+                  date={a.data.date}
+                  category={a.data.category}
+                  excerpt={a.data.excerpt}
+                  pinned={a.data.pinned}
+                  image={a.imageUrl}
+                  emoji={a.data.emoji}
+                />
+              ))}
+            </div>
+          </div>
+        );
+      }
+
+      // Publications + Blog: wider 2-column grid
+      if (id === firstGridId && enabledGridSections.length > 0) {
+        return (
+          <div class="mx-auto max-w-[1100px] px-4 py-8 sm:px-6">
+            <div class={`grid grid-cols-1 ${bottomGridClass} gap-8`}>
+              {enabledGridSections.map((gridId) => {
+                if (gridId === 'publications') {
+                  return (
+                    <div>
+                      <SectionHeading
+                        title={personal ? 'Latest Publications' : 'Recent Publications'}
+                        viewAllHref="/publications"
+                      />
+                      <div class="mt-3 divide-y divide-surface-100 dark:divide-dm-border">
+                        {publications.map((pub) => (
+                          <div class="py-2">
+                            <a
+                              href={pub.data.url || '#'}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              class="group flex items-start gap-3"
+                            >
+                              {pub.imageUrl ? (
+                                <img
+                                  src={pub.imageUrl}
+                                  alt=""
+                                  class="mt-0.5 h-10 w-10 shrink-0 rounded object-cover"
+                                  loading="lazy"
+                                />
+                              ) : (
+                                <span class="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded bg-surface-100 dark:bg-dm-border">
+                                  <span class="text-[10px] leading-none font-semibold text-surface-500 uppercase dark:text-dm-muted">
+                                    {pub.data.type === 'journal'
+                                      ? 'J'
+                                      : pub.data.type === 'conference'
+                                        ? 'C'
+                                        : pub.data.type === 'preprint'
+                                          ? 'P'
+                                          : pub.data.type === 'workshop'
+                                            ? 'W'
+                                            : pub.data.type === 'thesis'
+                                              ? 'T'
+                                              : 'B'}
+                                  </span>
+                                </span>
+                              )}
+                              <div class="min-w-0">
+                                <h3 class="line-clamp-2 text-sm leading-snug font-medium text-surface-900 transition-colors group-hover:text-primary-600 dark:text-dm-heading dark:group-hover:text-accent-400">
+                                  {pub.data.featured && <span class="me-1 text-xs text-primary-600 dark:text-accent-400">📌</span>}
+                                  {pub.data.title}
+                                </h3>
+                                <p class="mt-0.5 text-xs text-surface-500 dark:text-dm-muted">
+                                  {pub.data.venue}, {pub.data.year}
+                                </p>
+                                <div class="mt-1 flex items-center gap-1.5">
+                                  <span class="inline-block rounded bg-surface-100 px-1.5 py-0.5 text-[10px] font-medium text-surface-600 uppercase dark:bg-dm-border dark:text-dm-muted">
+                                    {pub.data.type}
+                                  </span>
+                                  {pub.data.pdf && (
+                                    <span class="text-xs text-primary-600 dark:text-accent-400">PDF</span>
+                                  )}
+                                  {pub.data.bibtex && (
+                                    <span class="text-xs text-surface-500 dark:text-dm-muted">BibTeX</span>
+                                  )}
+                                </div>
+                              </div>
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (gridId === 'blog') {
+                  return (
+                    <div>
+                      <SectionHeading title={personal ? 'Recent Posts' : 'From Our Blog'} viewAllHref="/blog" />
+                      <div class="mt-3">
+                        {posts.map((post) => (
+                          <PostCard
+                            id={post.id}
+                            title={post.data.title}
+                            date={post.data.date}
+                            excerpt={post.data.excerpt}
+                            tags={post.data.tags}
+                            author={post.data.author}
+                          />
+                        ))}
+                        {feeds.slice(0, 1).map((feed) => (
+                          <FeedItem
+                            title={feed.data.title}
+                            link={feed.data.link}
+                            date={feed.data.date}
+                            source={feed.data.source}
+                            excerpt={feed.data.excerpt}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+              })}
+            </div>
+          </div>
+        );
+      }
+
+      // Subsequent grid IDs already rendered above
+      return null;
+    })
+  }
+</PageLayout>

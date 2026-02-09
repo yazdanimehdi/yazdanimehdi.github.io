@@ -1,0 +1,58 @@
+name: Sync Scholar Publications
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Every Monday 6am UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-scholar
+  cancel-in-progress: true
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    if: ${{ !github.event.repository.is_template }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Sync publications from Scholar
+        id: sync
+        continue-on-error: true
+        run: python3 scripts/sync-scholar.py
+
+      - name: Check for changes
+        id: diff
+        run: |
+          changed=false
+          if ! git diff --quiet src/content/publications/ 2>/dev/null; then
+            changed=true
+          fi
+          if [ -n "$(git ls-files --others --exclude-standard src/content/publications/)" ]; then
+            changed=true
+          fi
+          echo "changed=$changed" >> "$GITHUB_OUTPUT"
+
+      - name: Commit and push
+        if: steps.diff.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add src/content/publications/
+          git commit -m "chore: sync scholar publications"
+          git pull --rebase
+          git push
