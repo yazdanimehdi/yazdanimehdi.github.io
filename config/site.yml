@@ -1,30 +1,51 @@
-# Site Configuration
-# Migrated from al-folio
-
 siteMode: personal
 lang: en
 direction: ltr
 defaultTheme: system
+title: Mehdi Yazdani-Jahromi
+description: PhD in Computer Science
+author: Mehdi Yazdani-Jahromi
+labName: ''
+university: ''
+department: ''
+siteUrl: https://yazdanimehdi.com
+imageShape: rectangular
 topBar:
   enabled: false
-  text: ""
+  text: ''
   links: []
 hero:
-  type: pattern
+  type: animation
   light:
-    bgColor: "#ffffff"
-    bgImage: ""
+    bgColor: '#ffffff'
+    bgImage: ''
   dark:
-    bgColor: "#0d1117"
-    bgImage: ""
+    bgColor: '#0d1117'
+    bgImage: ''
   video:
-    src: ""
-    poster: ""
+    src: ''
+    poster: ''
   pattern:
     name: hexagons
   animation:
-    preset: wave-lines
-    customScript: ""
+    preset: particles
+    customScript: ''
+about:
+  enabled: true
+  title: About Mehdi Yazdani-Jahromi
+  text: AI research scientist and PhD in Computer Science specializing in representation learning, with primary applications in computational biology and drug discovery. Industry experience at Johnson and Johnson and Microsoft, where I developed language models for mRNA and machine learning systems for large scale biomedical data. Strong programming background in Python, and JavaScript, with deep experience in PyTorch, Transformers and graph neural networks. Published in NeurIPS, ICLR and Briefings in Bioinformatics, with work spanning mRNA modeling, drug target interaction prediction and algorithmic fairness.
+  image: /images/people/profile.jpg
+homepageSections:
+  - id: hero
+    enabled: true
+  - id: about
+    enabled: true
+  - id: news
+    enabled: true
+  - id: publications
+    enabled: true
+  - id: blog
+    enabled: true
 fonts:
   families:
     sans: Roboto
@@ -39,46 +60,18 @@ fonts:
     h3: 1.5rem
 colors:
   light:
-    primary: "#2c5282"
-    secondary: "#06b6d4"
+    primary: '#2c5282'
+    secondary: '#06b6d4'
   dark:
-    primary: "#22d3ee"
-    secondary: "#2c5282"
+    primary: '#22d3ee'
+    secondary: '#2c5282'
 background:
   light:
-    color: "#ffffff"
-    image: ""
+    color: '#ffffff'
+    image: ''
   dark:
-    color: "#0d1117"
-    image: ""
-imageShape: rectangular
-about:
-  enabled: true
-  title: About Mehdi Yazdani-Jahromi
-  text: >-
-    AI research scientist and PhD in Computer Science specializing in representation learning, with primary applications
-    in computational biology and drug discovery. Industry experience at Johnson and Johnson and Microsoft, where I
-    developed language models for mRNA and machine learning systems for large scale biomedical data.
-  image: /images/people/profile.jpg
-homepageSections:
-  - id: hero
-    enabled: true
-  - id: about
-    enabled: true
-  - id: news
-    enabled: true
-  - id: publications
-    enabled: true
-  - id: blog
-    enabled: true
-title: Mehdi Yazdani-Jahromi
-description: |
-  Graduate Research Assistant at the University of Central Florida.
-author: Mehdi Yazdani-Jahromi
-labName: ""
-university: ""
-department: ""
-siteUrl: https://yazdanimehdi.com
+    color: '#0d1117'
+    image: ''
 nav:
   - label: Blog
     href: /blog
@@ -88,6 +81,11 @@ nav:
     href: /repositories
   - label: CV
     href: /cv
+socials:
+  email: yazdani@ucf.edu
+  github: https://github.com/yazdanimehdi
+  scholar: https://scholar.google.com/citations?user=iLu_fEcAAAAJ
+  linkedin: https://www.linkedin.com/in/yazdanimehdi
 github:
   username: yazdanimehdi
   stats: true
@@ -97,33 +95,24 @@ github:
     - AttentionSiteDTI
     - FragXsiteDTI
     - FairBiNN
-socials:
-  email: yazdani@ucf.edu
-  github: https://github.com/yazdanimehdi
-  scholar: https://scholar.google.com/citations?user=iLu_fEcAAAAJ
-  linkedin: https://www.linkedin.com/in/yazdanimehdi
 analytics:
   googleAnalytics: G-6LCTWY4M84
-  googleTagManager: ""
-  cronitor: ""
-  openpanel: ""
-  pirsch: ""
-  microsoftClarity: ""
+  googleTagManager: ''
+  cronitor: ''
+  openpanel: ''
+  pirsch: ''
+  microsoftClarity: ''
 web3forms:
-  accessKey: ""
+  accessKey: ''
 newsletter:
   enabled: false
-  accessKey: ""
+  accessKey: ''
   heading: Stay Updated
   text: Subscribe to get notified about new publications and news.
 seo:
-  keywords: "fairness, interaction, drug discovery, fair, drug-target, mitigating, prediction, drug, encoding, mrna, language, research, international, conference, bias, learning, interpretable, models, artificial intelligence, transformers, discovery, dti, dta, fragxsitedti, human-computer, arxiv, briefings, bioinformatics, bilevel, neural"
-  googleSiteVerification: ""
-  bingSiteVerification: ""
-adminPath: admin
-adminUsers:
-  - mehdi-yazdani-jahromi
-cookieConsent: false
+  keywords: fairness, interaction, drug discovery, fair, drug-target, mitigating, prediction, drug, encoding, mrna, language, research, international, conference, bias, learning, interpretable, models, artificial intelligence, transformers, discovery, dti, dta, fragxsitedti, human-computer, arxiv, briefings, bioinformatics, bilevel, neural
+  googleSiteVerification: ''
+  bingSiteVerification: ''
 footer:
   text: Built with <a href="https://scholaros.com">ScholarOS</a>
   links:
@@ -131,4 +120,8 @@ footer:
       href: /privacy
     - label: Sitemap
       href: /sitemap-index.xml
-alfolioRepo: ""
+adminPath: admin
+adminUsers:
+  - yazdanimehdi
+cookieConsent: false
+alfolioRepo: ''
