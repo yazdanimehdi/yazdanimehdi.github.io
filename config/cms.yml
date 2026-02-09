@@ -3,7 +3,7 @@
 
 backend:
   name: github
-  repo: 'your-username/your-repo' # <-- CHANGE THIS (auto-configured on template init)
+  repo: 'yazdanimehdi/yazdanimehdi.github.io' # <-- CHANGE THIS (auto-configured on template init)
   branch: main
   # base_url: ""                    # <-- Cloudflare Worker URL for OAuth login
   #     Deploy cloudflare-auth/ then set this to your Worker URL
