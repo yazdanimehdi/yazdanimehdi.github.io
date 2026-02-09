@@ -172,7 +172,7 @@ newsletter:
 
 # SEO
 seo:
-  keywords: 'language, learning, natural, multimodal, multilingual, models, vision, robustness, nlp, computer, safety, 2024, processing, computer vision, multimodal learning, ai safety, research, training, benchmark, fairness, reinforcement, natural language, language processing, language models, multilingual nlp, text generation, vision multimodal, vision-language models, image understanding, multimodal reasoning' # comma-separated keywords
+  keywords: "language, learning, natural, multimodal, multilingual, models, vision, robustness, nlp, computer, safety, 2024, processing, computer vision, multimodal learning, ai safety, research, training, benchmark, fairness, reinforcement, natural language, language processing, language models, multilingual nlp, text generation, vision multimodal, vision-language models, image understanding, multimodal reasoning"
   googleSiteVerification: '' # Google Search Console verification code
   bingSiteVerification: '' # Bing Webmaster verification code
 
