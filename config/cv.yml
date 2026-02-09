@@ -1,87 +1,227 @@
 # CV Configuration
-# Edit this file to update your CV. Changes trigger PDF regeneration via GitHub Actions.
-# Fields use camelCase for CMS compatibility; the render script converts to RenderCV format.
+# Migrated from al-folio resume.json
 
 cv:
-  name: 'Prof. Jane Smith'
-  location: 'City, Country'
-  email: 'jane.smith@example.com'
-  phone: '+1-555-0100'
-  website: 'https://example.com'
-
+  name: Mehdi Yazdani-Jahromi
+  location: Orlando, Florida, US
+  email: yazdani@ucf.edu
+  phone: (407) 810-4467
+  website: http://yazdanimehdi.com
   socialNetworks:
-    - network: 'LinkedIn'
-      username: 'janesmith'
-    - network: 'GitHub'
-      username: 'janesmith'
-
+    - network: GitHub
+      username: yazdanimehdi
   sections:
     education:
-      - institution: 'University of Example'
-        area: 'Computer Science'
-        degree: 'Ph.D.'
-        location: 'City, Country'
-        startDate: '2010-09'
-        endDate: '2015-05'
-        highlights:
-          - 'Thesis: Adaptive Methods for Low-Resource NLP'
-          - 'Advisor: Prof. John Doe'
-      - institution: 'University of Example'
-        area: 'Computer Science'
-        degree: 'M.S.'
-        location: 'City, Country'
-        startDate: '2008-09'
-        endDate: '2010-05'
+      - institution: University of Central Florida
+        area: Computer Science
+        degree: Doctorate
+        location: ""
+        startDate: "2021"
+        endDate: present
         highlights: []
-      - institution: 'Another University'
-        area: 'Mathematics'
-        degree: 'B.S.'
-        location: 'City, Country'
-        startDate: '2004-09'
-        endDate: '2008-05'
+      - institution: University of Central Florida
+        area: Computer Science
+        degree: Masters
+        location: ""
+        startDate: "2021"
+        endDate: "2023"
         highlights: []
-
+      - institution: Sharif University of Technology
+        area: Industrial Engineering
+        degree: Masters
+        location: ""
+        startDate: "2017"
+        endDate: "2019"
+        highlights: []
+      - institution: Isfahan University of Technology
+        area: Industrial Engineering
+        degree: Bachelor
+        location: ""
+        startDate: "2013"
+        endDate: "2017"
+        highlights: []
     experience:
-      - company: 'University of Technology'
-        position: 'Associate Professor'
-        location: 'City, Country'
-        startDate: '2020-01'
-        endDate: 'present'
+      - company: Microsoft
+        position: Microsoft Research Intern
+        location: ""
+        startDate: "2025"
+        endDate: "2025"
         highlights:
-          - 'Leading research group of 10+ members in NLP and multimodal learning'
-          - 'Teaching graduate courses in NLP and Machine Learning'
-      - company: 'Previous University'
-        position: 'Assistant Professor'
-        location: 'City, Country'
-        startDate: '2015-09'
-        endDate: '2019-12'
+          - Agentic AI
+      - company: University of Central Florida
+        position: Graduate Research Assistant
+        location: ""
+        startDate: "2021"
+        endDate: Present
         highlights:
-          - 'Established NLP research lab'
-          - 'Secured $500K+ in research funding'
-
+          - Researching drug target interaction, computer vision, and algorithmic fairness.
+      - company: Johnson and Johnson
+        position: Data Science Intern, AI/ML for Drug Discovery
+        location: ""
+        startDate: "2024"
+        endDate: "2024"
+        highlights:
+          - >-
+            Computational Drug Discovery, Geometric Learning, Genomics Sequence Modeling, Distributed Training, Training
+            Large Language Models, and Generative AI
+      - company: ZTech Team
+        position: Blockchain Developer
+        location: ""
+        startDate: "2020"
+        endDate: "2020"
+        highlights:
+          - Developing Blockchain applications on the Ethereum network using Solidity.
+      - company: COVID TEST
+        position: Developer
+        location: ""
+        startDate: "2020"
+        endDate: "2020"
+        highlights:
+          - An open-source project for COVID-19 data collection and screening.
+      - company: BerimCafe
+        position: Founder and Chief Technology Officer
+        location: ""
+        startDate: "2019"
+        endDate: "2020"
+        highlights:
+          - Developed software for cafe and restaurant managements with Django and Flutter.
+      - company: TAEPO
+        position: Founder and Chief Technology Officer
+        location: ""
+        startDate: "2019"
+        endDate: "2020"
+        highlights:
+          - Created TOEFL Online Practice and Exam Platform using Django, Vue.js, and Electron.js.
+      - company: MrZoro.ir
+        position: Founder and Chief Technology Officer
+        location: ""
+        startDate: "2018"
+        endDate: "2019"
+        highlights:
+          - Developed an automated solution for reserving meals in university, a Django based project.
     publications:
-      - title: 'Equi-mRNA: Protein Translation Equivariant Encoding for mRNA Language Models'
-        authors: ['**Mehdi Yazdani-Jahromi**', 'Ali Khodabandeh Yalabadi', 'Ozlem Ozmen Garibay']
-        journal: 'Neurips 2025'
-        date: 2025
-        doi: '10.48550/arXiv.2508.15103'
-
+      - title: "Equi-mRNA: Protein Translation Equivariant Encoding for mRNA Language Models"
+        authors:
+          - Mehdi Yazdani-Jahromi
+        journal: Neurips 2025
+        date: "2025"
+        url: https://arxiv.org/abs/2508.15103
+      - title: "BoKDiff: Best-of-K Diffusion Alignment for Target-Specific 3D Molecule Generation"
+        authors:
+          - Mehdi Yazdani-Jahromi
+        journal: Submitted to ISMB 2025
+        date: "2025"
+        url: https://arxiv.org/abs/2501.15631
+      - title: "HELM: Hierarchical Encoding for mRNA Language Modeling"
+        authors:
+          - Mehdi Yazdani-Jahromi
+        journal: ICLR 2024, Neurips 2024 Workshop on AI for New Drug Modalities
+        date: "2024"
+        url: https://arxiv.org/abs/2410.12459
+      - title: "Fair Bilevel Neural Network (FairBiNN): On Balancing fairness and accuracy via Stackelberg Equilibrium"
+        authors:
+          - Mehdi Yazdani-Jahromi
+        journal: Neurips 2024
+        date: "2024"
+        url: https://arxiv.org/abs/2410.16432
+      - title: "Learning Fair Representations: Mitigating Statistical Dependencies"
+        authors:
+          - Mehdi Yazdani-Jahromi
+        journal: HCII conference 2023 Oral Presentation
+        date: "2024"
+        url: https://link.springer.com/chapter/10.1007/978-3-031-60611-3_8
+      - title: "DeepDrugDomain: Easy-to-use drug-target affinity/interaction prediction package for architecture design"
+        authors:
+          - Mehdi Yazdani-Jahromi
+        journal: GitHub
+        date: "2024"
+        url: https://github.com/yazdanimehdi/DeepDrugDomain
+      - title: "FragXsiteDTI: an interpretable transformer-based model for drug-target interaction prediction"
+        authors:
+          - Mehdi Yazdani-Jahromi
+        journal: Recomb 2024 Oral Presentation, Neurips 2023 Workshop on New Frontiers of AI for Drug Discovery and Development
+        date: "2024"
+        url: https://arxiv.org/abs/2311.02326
+      - title: Controlling the misinformation diffusion in social media by the effect of different classes of agents
+        authors:
+          - Mehdi Yazdani-Jahromi
+        journal: The Computational Social Science Society of the Americas Annual Conference
+        date: "2023"
+        url: https://arxiv.org/abs/2401.11524
+      - title: >-
+          Agent-Based Modeling of C. Difficile Spread in Hospitals: Assessing Contribution of High-Touch vs. Low-Touch
+          Surfaces and Inoculations' Containment Impact
+        authors:
+          - Mehdi Yazdani-Jahromi
+        journal: The Computational Social Science Society of the Americas Annual Conference
+        date: "2023"
+        url: https://arxiv.org/abs/2401.11656
+      - title: "Through a fair looking-glass: on mitigating bias in image datasets"
+        authors:
+          - Mehdi Yazdani-Jahromi
+        journal: >-
+          AAAI 2023 Workshop on Representation Learning for Responsible Human-Centric AI and HCII conference 2023 Oral
+          Presentation
+        date: "2023"
+        url: https://link.springer.com/chapter/10.1007/978-3-031-35891-3_27
+      - title: >-
+          BindingSiteAugmented DTA to enable A Next-Generation Pipeline for Interpretable Prediction Models in
+          Drug-Repurposing
+        authors:
+          - Mehdi Yazdani-Jahromi
+        journal: Briefings in Bioinformatics
+        date: "2023"
+        url: https://academic.oup.com/bib/article/24/3/bbad136/7140297
+      - title: >-
+          AttentionSiteDTI: Attention Based Model for Predicting Drug-Target Interaction Using 3D Structure of Protein
+          Binding Sites
+        authors:
+          - Mehdi Yazdani-Jahromi
+        journal: Briefings in Bioinformatics
+        date: "2022"
+        url: https://academic.oup.com/bib/article/23/4/bbac272/6640006?login=false
+      - title: "UnbiasedDTI: Mitigating Real-World Bias of Drug-Target Interaction Prediction"
+        authors:
+          - Mehdi Yazdani-Jahromi
+        journal: MDPI Molecules
+        date: "2022"
+        url: https://www.mdpi.com/1420-3049/27/9/2980
     awards:
-      - label: 'Best Paper Award, ACL 2023'
-        details: '2023'
-      - label: 'NSF CAREER Award'
-        details: '2022'
-      - label: 'Outstanding Dissertation Award'
-        details: '2016'
-
+      - label: 30000$ Amazon Research Credit Award for CoViT project
+        details: "2023"
+      - label: Nominated for Order of Pegasus award
+        details: "2023"
+      - label: Invited to Golden Key International Honor Society
+        details: "2022"
+      - label: Outstanding Graduate Fellowship University of Central Florida
+        details: "2021"
+      - label: Ranked 1st in Iranian national entrance exam for M.Sc. of industrial engineering
+        details: "2017"
+      - label: Ranked in top 10 percent among 70 students of Industrial Engineering at Isfahan University of Technology
+        details: "2017"
+      - label: Ranked 5th among 70 students of Industrial Engineering at Sharif University of Technology
+        details: "2015"
+      - label: Ranked in 1 percent among 251000 competitors Iranian National University Entrance Exam
+        details: "2013"
+      - label: Ranked 2nd in “Kharazmi” national Prize for Programming
+        details: "2012"
+      - label: Ranked 6th in PYPT (Persian Young Physicists Tournament)
+        details: "2012"
+      - label: Ranked 4th in PYPT (Persian Young Physicists Tournament)
+        details: "2011"
     skills:
-      - label: 'Languages'
-        details: 'Python, TypeScript, C++'
-      - label: 'Frameworks'
-        details: 'PyTorch, TensorFlow, Hugging Face Transformers'
-      - label: 'Research Areas'
-        details: 'NLP, Multimodal Learning, AI Safety, Low-Resource Languages'
-
-# RenderCV theme and design options
+      - label: Programming Languages
+        details: C++, Python, C#, Dart, JavaScript, SQL, Solidity, MATLAB
+      - label: Python Packages
+        details: Pytorch, Numpy, Pandas, Keras, TensorFlow, Scikit-learn, Scipy, Networkx, iGraph, dgl, matplotlib, seaborn
+      - label: JavaScript Frameworks
+        details: Vue.js, Electron, NativeScript
+      - label: Tools
+        details: Kubernetes, Docker, Git, HTML, CSS, LATEX, AWS, Distributed Training
+      - label: Quantitative Research
+        details: >-
+          Machine Learning Methods, Artificial Intelligence, Large Language Models, Generative AI, Genomics Sequence
+          Modeling, Graph Neural Networks, Convolutional Neural Networks, Transformers, Recurrent Neural Networks,
+          LSTMs, Mathematical Optimization, Mathematical Modeling
 design:
-  theme: 'classic'
+  theme: classic

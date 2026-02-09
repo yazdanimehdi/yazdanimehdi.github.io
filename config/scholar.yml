@@ -1,8 +1,5 @@
 authors:
-  - name: 'Jane Smith'
-    scholar_id: 'XXXXXXXXXX' # Google Scholar author ID
-  - name: 'John Doe'
-    scholar_id: 'YYYYYYYYYY'
-
-syncInterval: 'weekly'
+  - name: Mehdi Yazdani-Jahromi
+    scholar_id: iLu_fEcAAAAJ
+syncInterval: weekly
 maxResults: 100
