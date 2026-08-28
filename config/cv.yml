@@ -37,6 +37,11 @@ cv:
       institution: Sharif University of Technology
       startDate: 2017-09
     researchExperience:
+    - company: DeepBio Scientific
+      startDate: 2026-07
+      position: Senior Research Scientist
+      highlights:
+      - Developed new benchmarking methods and protocol for agents in biology, which is the shortcoming of current protein generation/folding.
     - company: University of Central Florida
       endDate: 2025-12
       highlights:
