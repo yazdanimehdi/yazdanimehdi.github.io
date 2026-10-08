@@ -145,3 +145,13 @@ export async function changeOwnPassword(sql: Sql, username: string, current: unk
     where username = ${user} returning session_version as v`;
   return updated.v;
 }
+
+/** Account routes run in Postgres mode only; a missing migration answers 503 with the fix. */
+export async function withAccounts<T>(run: () => Promise<T>): Promise<T> {
+  try {
+    return await run();
+  } catch (e) {
+    if (e instanceof MigrationMissingError) throw new HttpError(503, MIGRATION_MESSAGE);
+    throw e;
+  }
+}

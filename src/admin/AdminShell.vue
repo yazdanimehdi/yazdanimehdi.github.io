@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import { api, session, toasts } from './api';
 import type { AdminCtx } from './types';
 
@@ -23,11 +23,12 @@ const CONTENT = [
   ['talks', 'Talks'],
   ['positions', 'Positions'],
 ] as const;
-const BOTTOM = [
+const BOTTOM = computed(() => [
   ['pages', 'Pages'],
   ['media', 'Media'],
+  ...(props.ctx.mode === 'postgres' ? [['users', 'Users'] as const] : []),
   ['settings', 'Settings'],
-] as const;
+]);
 const href = (path: string) => (path ? `${base}/${path}` : base);
 
 onMounted(async () => {

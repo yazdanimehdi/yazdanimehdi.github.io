@@ -3,7 +3,7 @@
 export interface AdminCtx {
   adminPath: string;
   siteName: string;
-  user: { login: string; name: string; avatar: string } | null;
+  user: { login: string; name: string; avatar: string; provider?: 'github' | 'password' } | null;
   mode: 'static' | 'git' | 'postgres';
   /** MEDIUM_TOKEN is set: "Also publish to Medium" posts through the API. */
   mediumToken?: boolean;

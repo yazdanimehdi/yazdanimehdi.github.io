@@ -8,6 +8,7 @@ import Pages from '../Pages.vue';
 import PostEditor from '../PostEditor.vue';
 import Posts from '../Posts.vue';
 import Settings from '../Settings.vue';
+import Users from '../Users.vue';
 import { getMode } from '../../lib/mode';
 import { readConfig } from '../../lib/admin/content';
 import { getStore } from '../../lib/admin/get-store';
@@ -20,10 +21,11 @@ export const prerender = false;
 
 const { adminPath, siteName } = adminSettings();
 const [screen = '', arg = ''] = (Astro.params.path ?? '').split('/');
-const SCREENS = new Set(['', 'login', 'media', 'posts', 'publications', 'content', 'cv', 'pages', 'settings']);
+const SCREENS = new Set(['', 'login', 'media', 'posts', 'publications', 'content', 'cv', 'pages', 'settings', 'users']);
 const CONTENT = ['announcements', 'people', 'projects', 'talks', 'positions'];
 if (!SCREENS.has(screen)) return new Response('Not found', { status: 404 });
 if (screen === 'content' && !CONTENT.includes(arg)) return new Response('Not found', { status: 404 });
+if (screen === 'users' && getMode() !== 'postgres') return new Response('Not found', { status: 404 });
 
 // The post editor's "Import to Medium" needs the public site URL. Read from the store like the medium API route, so
 // it is current in both modes (git: GitHub; Postgres: the database, where site.yml lives); unreadable → the editor
@@ -86,6 +88,7 @@ if (screen === 'login' && error === 'denied') Astro.response.status = 403;
     {screen === 'media' && <Media client:only="vue" ctx={ctx} />}
     {screen === 'pages' && <Pages client:only="vue" ctx={ctx} />}
     {screen === 'settings' && <Settings client:only="vue" ctx={ctx} />}
+    {screen === 'users' && <Users client:only="vue" ctx={ctx} />}
     {screen === 'cv' && <Cv client:only="vue" ctx={ctx} />}
     {screen === '' && <Dashboard client:only="vue" ctx={ctx} />}
     {screen === 'posts' && !arg && <Posts client:only="vue" ctx={ctx} />}
