@@ -2,6 +2,7 @@
 import Collection from '../Collection.vue';
 import Cv from '../Cv.vue';
 import Dashboard from '../Dashboard.vue';
+import Login from '../Login.vue';
 import Media from '../Media.vue';
 import Pages from '../Pages.vue';
 import PostEditor from '../PostEditor.vue';
@@ -36,20 +37,23 @@ if (screen === 'posts' && arg && user) {
     // the editor still opens; its API calls report the store error
   }
 }
+const mode = getMode();
 const ctx = {
   adminPath,
   siteName,
   user: user ?? null,
-  mode: getMode(),
+  mode,
   mediumToken: !!process.env.MEDIUM_TOKEN,
   siteUrl,
 };
-const error = Astro.url.searchParams.get('error');
-if (screen === 'login' && error === 'denied') Astro.response.status = 403;
 const LOGIN_ERRORS: Record<string, string> = {
   denied: "That GitHub account isn't on this site's admin list (adminUsers in config/site.yml).",
   expired: 'Sign-in expired or was interrupted. Please try again.',
 };
+const error = Astro.url.searchParams.get('error');
+const githubLogin = mode !== 'postgres' || !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET);
+const loginError = error ? (Object.hasOwn(LOGIN_ERRORS, error) ? LOGIN_ERRORS[error] : LOGIN_ERRORS.expired) : '';
+if (screen === 'login' && error === 'denied') Astro.response.status = 403;
 ---
 
 <!doctype html>
@@ -69,18 +73,14 @@ const LOGIN_ERRORS: Record<string, string> = {
   <body class="adm">
     {
       screen === 'login' && (
-        <main class="adm-login">
-          <h1>{siteName}</h1>
-          <p class="adm-muted">Site admin</p>
-          <a class="adm-btn adm-btn-primary" href="/api/admin/auth/login">
-            Sign in with GitHub
-          </a>
-          {error && (
-            <p class="adm-error" role="alert">
-              {Object.hasOwn(LOGIN_ERRORS, error) ? LOGIN_ERRORS[error] : LOGIN_ERRORS.expired}
-            </p>
-          )}
-        </main>
+        <Login
+          client:only="vue"
+          adminPath={adminPath}
+          siteName={siteName}
+          password={mode === 'postgres'}
+          github={githubLogin}
+          error={loginError}
+        />
       )
     }
     {screen === 'media' && <Media client:only="vue" ctx={ctx} />}
