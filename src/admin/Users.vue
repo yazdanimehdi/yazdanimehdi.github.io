@@ -107,6 +107,9 @@ onMounted(load);
                 <button type="button" class="adm-btn adm-btn-small adm-btn-primary" @click="reset">Save</button>
                 <button type="button" class="adm-btn adm-btn-small" @click="resetting = null">Cancel</button>
               </template>
+              <span v-else-if="a.username === ctx.user?.login && ctx.user?.provider === 'password'" class="adm-muted"
+                >you</span
+              >
               <template v-else-if="confirmDelete === a.username">
                 <span>Delete {{ a.username }}?</span>
                 <button type="button" class="adm-btn adm-btn-small" @click="remove(a.username)">Delete</button>

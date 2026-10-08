@@ -4,14 +4,16 @@ import { migrate } from '../db-migrate';
 import { pgliteSql } from '../pglite-sql';
 import { setSqlForTests, type Sql } from '../db';
 import { createAccount, resetPassword } from './accounts';
-import { isAllowed } from './access';
+import { isAllowed, sessionVersion } from './access';
 
 let sql: Sql;
+let v: number;
 const saved = { VERCEL: process.env.VERCEL, DATABASE_URL: process.env.DATABASE_URL };
 before(async () => {
   sql = pgliteSql();
   await migrate(sql);
   await createAccount(sql, 'jane', 'Jane', 'a long enough password');
+  v = (await sessionVersion(sql, 'jane'))!;
   setSqlForTests(sql);
   Object.assign(process.env, { VERCEL: '1', DATABASE_URL: 'postgres://test' });
 });
@@ -32,12 +34,12 @@ const pw = (login: string, version: number) => ({
 const gh = (login: string) => ({ login, name: login, avatar: '', provider: 'github' as const });
 
 test('password sessions: allowed while the account exists and the version matches', async () => {
-  assert.equal(await isAllowed(pw('jane', 1), []), true);
-  assert.equal(await isAllowed(pw('jane', 0), []), false);
+  assert.equal(await isAllowed(pw('jane', v), []), true);
+  assert.equal(await isAllowed(pw('jane', v - 1), []), false);
   assert.equal(await isAllowed(pw('ghost', 1), []), false);
   await resetPassword(sql, 'jane', 'a different long password');
-  assert.equal(await isAllowed(pw('jane', 1), []), false, 'a reset ends older sessions');
-  assert.equal(await isAllowed(pw('jane', 2), []), true);
+  assert.equal(await isAllowed(pw('jane', v), []), false, 'a reset ends older sessions');
+  assert.equal(await isAllowed(pw('jane', v + 1), []), true);
 });
 
 test('providers never vouch for each other', async () => {
@@ -53,7 +55,7 @@ test('providers never vouch for each other', async () => {
 test('git mode: password sessions are never allowed', async () => {
   delete process.env.DATABASE_URL;
   try {
-    assert.equal(await isAllowed(pw('jane', 2), []), false);
+    assert.equal(await isAllowed(pw('jane', v + 1), []), false);
   } finally {
     process.env.DATABASE_URL = 'postgres://test';
   }

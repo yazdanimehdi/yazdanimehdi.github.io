@@ -31,7 +31,7 @@ async function tables<T>(run: () => Promise<T>): Promise<T> {
 
 export function normalizeUsername(raw: unknown): string {
   const username = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
-  if (!USERNAME.test(username)) {
+  if (!USERNAME.test(username) || /^\.+$/.test(username)) {
     throw new HttpError(400, 'Usernames are 1–40 lowercase letters, digits, dots, dashes or underscores');
   }
   return username;
@@ -55,22 +55,25 @@ export async function createAccount(sql: Sql, username: unknown, name: unknown, 
   const hash = await hashPassword(assertPasswordPolicy(password));
   const rows = await tables(
     () => sql<{ created_at: Date }>`
-      insert into admin_users (username, name, password_hash) values (${user}, ${displayName(name, user)}, ${hash})
+      insert into admin_users (username, name, password_hash, session_version)
+      values (${user}, ${displayName(name, user)}, ${hash}, 1 + floor(random() * 1000000000)::int)
       on conflict (username) do nothing returning created_at`,
   );
   if (rows.length === 0) throw new HttpError(409, 'That username is taken');
   return { username: user, name: displayName(name, user), created_at: new Date(rows[0].created_at).toISOString() };
 }
 
-/** New password + a new session version: every existing session of the account ends. */
+/** New password + a new session version: every existing session of the account ends, and its lockout lifts. */
 export async function resetPassword(sql: Sql, username: string, password: unknown): Promise<void> {
+  const user = normalizeUsername(username);
   const hash = await hashPassword(assertPasswordPolicy(password));
   const rows = await tables(
     () => sql`
       update admin_users set password_hash = ${hash}, session_version = session_version + 1, updated_at = now()
-      where username = ${normalizeUsername(username)} returning username`,
+      where username = ${user} returning username`,
   );
   if (rows.length === 0) throw new HttpError(404, 'Not found');
+  await sql`delete from login_attempts where username = ${user}`;
 }
 
 export async function deleteAccount(

@@ -24,7 +24,7 @@ beforeEach(async () => {
 
 test('usernames: trimmed and lowercased; invalid ones refused', () => {
   assert.equal(normalizeUsername('  Jane.Smith '), 'jane.smith');
-  for (const bad of ['', 'has space', 'x'.repeat(41), 'semi;colon', 7]) {
+  for (const bad of ['', 'has space', 'x'.repeat(41), 'semi;colon', 7, '.', '..', ' ... ']) {
     assert.throws(() => normalizeUsername(bad), /Usernames are 1–40/);
   }
 });
@@ -38,7 +38,8 @@ test('create → list; duplicate (any case) is 409; sign-in works with any spell
     [['jane', 'Jane Smith']],
   );
   const ok = await signIn(sql, ' JANE ', PW);
-  assert.deepEqual(ok, { ok: true, account: { username: 'jane', name: 'Jane Smith', version: 1 } });
+  const version = await sessionVersion(sql, 'jane');
+  assert.deepEqual(ok, { ok: true, account: { username: 'jane', name: 'Jane Smith', version } });
   assert.deepEqual(await signIn(sql, 'jane', 'wrong password 1'), { ok: false, reason: 'wrong' });
   assert.deepEqual(await signIn(sql, 'nobody', PW), { ok: false, reason: 'wrong' });
   assert.deepEqual(await signIn(sql, 'bad name!', PW), { ok: false, reason: 'wrong' });
@@ -57,12 +58,12 @@ test('throttle: the 11th try within 15 minutes is refused even with the right pa
 
 test('reset bumps the session version; change-own checks the current password', async () => {
   await createAccount(sql, 'jane', 'Jane', PW);
-  assert.equal(await sessionVersion(sql, 'jane'), 1);
+  const v = (await sessionVersion(sql, 'jane'))!;
   await resetPassword(sql, 'jane', 'a brand new password');
-  assert.equal(await sessionVersion(sql, 'jane'), 2);
+  assert.equal(await sessionVersion(sql, 'jane'), v + 1);
   assert.equal((await signIn(sql, 'jane', PW)).ok, false);
   await assert.rejects(changeOwnPassword(sql, 'jane', PW, 'another new password'), /Your current password is wrong/);
-  assert.equal(await changeOwnPassword(sql, 'jane', 'a brand new password', 'another new password'), 3);
+  assert.equal(await changeOwnPassword(sql, 'jane', 'a brand new password', 'another new password'), v + 2);
   assert.equal((await signIn(sql, 'jane', 'another new password')).ok, true);
   await assert.rejects(resetPassword(sql, 'nobody', PW), /Not found/);
   assert.equal(await sessionVersion(sql, 'nobody'), null);
@@ -103,4 +104,22 @@ test('concurrent deletes leave one account', async () => {
     deleteAccount(sql, 'bo', { provider: 'password', login: 'jane' }),
   ]);
   assert.equal((await listAccounts(sql)).length, 1);
+});
+
+test('a deleted and re-created account starts at a new session version: old cookies stay dead', async () => {
+  await createAccount(sql, 'jane', 'Jane', PW);
+  await createAccount(sql, 'bo', 'Bo', PW);
+  const before = await sessionVersion(sql, 'bo');
+  await deleteAccount(sql, 'bo', { provider: 'password', login: 'jane' });
+  await createAccount(sql, 'bo', 'Bo', PW);
+  assert.notEqual(await sessionVersion(sql, 'bo'), before);
+});
+
+test('a password reset lifts the sign-in lockout', async () => {
+  await createAccount(sql, 'jane', 'Jane', PW);
+  const t0 = new Date();
+  for (let i = 0; i < 10; i++) await signIn(sql, 'jane', 'wrong password 1', t0);
+  assert.deepEqual(await signIn(sql, 'jane', PW, t0), { ok: false, reason: 'throttled' });
+  await resetPassword(sql, 'jane', 'a brand new password');
+  assert.equal((await signIn(sql, 'jane', 'a brand new password', t0)).ok, true);
 });

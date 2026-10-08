@@ -81,12 +81,13 @@ test('list, create (201, 409 on duplicate), reset bumps the version, delete', as
     (await call(create, { method: 'POST', body: { username: 'cy', name: 'C', password: 'short' } })).res.status,
     400,
   );
+  const bo = (await sessionVersion(sql, 'bo'))!;
   assert.equal(
     (await call(reset, { method: 'PUT', params: { username: 'bo' }, body: { password: 'a new long password' } })).res
       .status,
     200,
   );
-  assert.equal(await sessionVersion(sql, 'bo'), 2);
+  assert.equal(await sessionVersion(sql, 'bo'), bo + 1);
   assert.equal(
     (await call(remove, { method: 'DELETE', params: { username: 'jane' } })).res.status,
     409,
@@ -102,13 +103,14 @@ test('change own password: wrong current 400; success re-seals this session with
       .res.status,
     400,
   );
+  const before = (await sessionVersion(sql, 'jane'))!;
   const { res, cookie } = await call(changeOwn, {
     method: 'POST',
     body: { current: PW, next: 'another long password' },
   });
   assert.equal(res.status, 200);
   const session = await openSession(cookie!, process.env.SESSION_SECRET!);
-  assert.equal(session?.version, 2);
+  assert.equal(session?.version, before + 1);
   assert.equal((await signIn(sql, 'jane', 'another long password')).ok, true);
 });
 

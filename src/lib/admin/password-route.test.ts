@@ -4,6 +4,7 @@ import { migrate } from '../db-migrate';
 import { pgliteSql } from '../pglite-sql';
 import { setSqlForTests, type Sql } from '../db';
 import { createAccount } from './accounts';
+import { sessionVersion } from './access';
 import { SESSION_COOKIE, openSession } from './session';
 import { POST as signIn } from '../../admin/routes/api/auth/password';
 
@@ -44,7 +45,7 @@ test('right password: 200 and a password session for the account', async () => {
     name: 'Jane Smith',
     avatar: '',
     provider: 'password',
-    version: 1,
+    version: await sessionVersion(sql, 'jane'),
   });
 });
 
