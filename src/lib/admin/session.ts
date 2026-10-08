@@ -2,6 +2,10 @@ export interface SessionUser {
   login: string;
   name: string;
   avatar: string;
+  /** How the session was opened; cookies from before password sign-in existed have none and mean GitHub. */
+  provider: 'github' | 'password';
+  /** Password sessions: the account's session_version at sign-in (a reset or password change ends the session). */
+  version?: number;
 }
 
 export const SESSION_COOKIE = 'scholaros_session';
@@ -30,12 +34,22 @@ async function sessionKey(secret: string): Promise<CryptoKey> {
   );
 }
 
-/** `base64url(iv ‖ AES-GCM(JSON { login, name, avatar, exp }))`. */
+/** `base64url(iv ‖ AES-GCM(JSON { login, name, avatar, provider, version?, exp }))`. */
 export async function sealSession(user: SessionUser, secret: string, now = Date.now()): Promise<string> {
   const key = await sessionKey(secret);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const exp = Math.floor(now / 1000) + SESSION_TTL;
-  const payload = encoder.encode(JSON.stringify({ login: user.login, name: user.name, avatar: user.avatar, exp }));
+  const provider = user.provider ?? 'github';
+  const payload = encoder.encode(
+    JSON.stringify({
+      login: user.login,
+      name: user.name,
+      avatar: user.avatar,
+      provider,
+      ...(provider === 'password' ? { version: user.version } : {}),
+      exp,
+    }),
+  );
   const sealed = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, key, payload));
   return Buffer.concat([iv, sealed]).toString('base64url');
 }
@@ -50,13 +64,19 @@ export async function openSession(token: string, secret: string, now = Date.now(
       login: unknown;
       name: unknown;
       avatar: unknown;
+      provider: unknown;
+      version: unknown;
       exp: unknown;
     };
     if (typeof p.exp !== 'number' || p.exp * 1000 <= now || typeof p.login !== 'string') return null;
+    const provider = p.provider === 'password' ? 'password' : 'github';
+    if (provider === 'password' && (typeof p.version !== 'number' || !Number.isInteger(p.version))) return null;
     return {
       login: p.login,
       name: typeof p.name === 'string' ? p.name : p.login,
       avatar: typeof p.avatar === 'string' ? p.avatar : '',
+      provider,
+      ...(provider === 'password' ? { version: p.version as number } : {}),
     };
   } catch {
     return null;

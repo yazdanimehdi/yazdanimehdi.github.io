@@ -7,7 +7,12 @@ import { onRequest } from './middleware';
 process.env.SESSION_SECRET = 'm'.repeat(32);
 const ORIGIN = 'https://site.test';
 const admin = `/${adminSettings().adminPath}`;
-const user = { login: adminLogin(adminSettings().adminUsers[0]), name: 'Jane', avatar: '' };
+const user = {
+  login: adminLogin(adminSettings().adminUsers[0]),
+  name: 'Jane',
+  avatar: '',
+  provider: 'github' as const,
+};
 
 function context(path: string, opts: { method?: string; cookie?: string; origin?: string } = {}) {
   const url = new URL(path, ORIGIN);
@@ -86,4 +91,33 @@ test('the cron route skips the session check (it checks CRON_SECRET itself); its
   assert.equal((await run(context('/api/admin/cronx'))).status, 401);
   assert.equal((await run(context('/api/admin/collections/posts'))).status, 401);
   assert.equal((await run(context('/api/admin/jobs/run', { method: 'POST', origin: ORIGIN }))).status, 401);
+});
+
+test('a password session whose database check fails answers 503, not 401', async () => {
+  const { setSqlForTests } = await import('./lib/db');
+  const saved = { VERCEL: process.env.VERCEL, DATABASE_URL: process.env.DATABASE_URL };
+  Object.assign(process.env, { VERCEL: '1', DATABASE_URL: 'postgres://test' });
+  setSqlForTests((async () => {
+    throw Object.assign(new Error('down'), { code: 'ECONNREFUSED' });
+  }) as never);
+  /* eslint-disable no-console */
+  const consoleError = console.error;
+  console.error = () => {};
+  try {
+    const cookie = await sealSession(
+      { login: 'jane', name: 'Jane', avatar: '', provider: 'password', version: 1 },
+      process.env.SESSION_SECRET!,
+    );
+    const api = await run(context('/api/admin/me', { cookie }));
+    assert.equal(api.status, 503);
+    const page = await run(context(`${admin}/cv`, { cookie }));
+    assert.equal(page.status, 503);
+  } finally {
+    console.error = consoleError;
+    /* eslint-enable no-console */
+    setSqlForTests(null);
+    for (const [k, v] of Object.entries(saved))
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+  }
 });

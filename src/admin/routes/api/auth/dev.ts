@@ -10,7 +10,7 @@ export const GET: APIRoute = async ({ cookies, redirect, url }) => {
   const login = url.searchParams.get('login') ?? adminLogin(adminSettings().adminUsers[0] ?? 'dev');
   cookies.set(
     SESSION_COOKIE,
-    await sealSession({ login, name: 'Dev User', avatar: '' }, sessionSecret()),
+    await sealSession({ login, name: 'Dev User', avatar: '', provider: 'github' }, sessionSecret()),
     SESSION_COOKIE_OPTIONS,
   );
   return redirect(`/${adminSettings().adminPath}`);

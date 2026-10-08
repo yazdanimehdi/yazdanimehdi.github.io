@@ -48,7 +48,7 @@ export const GET: APIRoute = async ({ cookies, redirect, url }) => {
   if (!isAdminUser(gh.login, adminUsers)) return fail('denied');
 
   const session = await sealSession(
-    { login: gh.login, name: gh.name || gh.login, avatar: gh.avatar_url ?? '' },
+    { login: gh.login, name: gh.name || gh.login, avatar: gh.avatar_url ?? '', provider: 'github' },
     sessionSecret(),
   );
   cookies.set(SESSION_COOKIE, session, SESSION_COOKIE_OPTIONS);

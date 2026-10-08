@@ -1,9 +1,10 @@
 import type { MiddlewareHandler } from 'astro';
 import { SESSION_COOKIE, openSession, sessionSecret } from './lib/admin/session';
-import { adminSettings, isAdminUser } from './lib/admin/settings';
+import { isAllowed } from './lib/admin/access';
+import { adminSettings } from './lib/admin/settings';
 import { cacheTagHeader } from './lib/cache-tags';
 import { loadSiteFiles, newContext, runWithContext } from './lib/content/context';
-import { getSql } from './lib/db';
+import { getSql, isUnreachable } from './lib/db';
 import { getMode } from './lib/mode';
 
 const MUTATING = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
@@ -85,8 +86,19 @@ export const onRequest: MiddlewareHandler = async (ctx, next) => {
   } else {
     const token = ctx.cookies.get(SESSION_COOKIE)?.value;
     const user = token ? await openSession(token, sessionSecret()) : null;
-    // Removing someone from adminUsers ends their session at the next request.
-    if (user && isAdminUser(user.login, adminUsers)) {
+    let allowed = false;
+    let down: Response | undefined;
+    try {
+      allowed = !!user && (await isAllowed(user, adminUsers));
+    } catch (e) {
+      if (!isUnreachable(e)) throw e;
+      // eslint-disable-next-line no-console
+      console.error('[middleware] database unreachable while checking a password session', e);
+      down = api ? jsonError(503, 'The database is unreachable. Try again in a moment.') : unavailable();
+    }
+    if (down) {
+      res = down;
+    } else if (user && allowed) {
       ctx.locals.user = user;
       res = await next();
     } else {
