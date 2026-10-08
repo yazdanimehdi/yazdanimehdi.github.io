@@ -4,7 +4,7 @@ import AdminShell from './AdminShell.vue';
 import DocBanners from './DocBanners.vue';
 import FormFields from './FormFields.vue';
 import { vDialog } from './dialog';
-import { api, report, toast } from './api';
+import { api, committed, report, toast } from './api';
 import {
   CV_BLANK,
   CV_FIELDS,
@@ -288,6 +288,12 @@ function closeImport() {
   importText.value = '';
 }
 
+/** History restore and conflict reload: the document and the PDF info both changed. */
+async function reloadCv() {
+  await doc.reload();
+  void checkPdf();
+}
+
 // ── PDF (GitHub Actions: render-cv.yml) ──
 async function checkPdf() {
   if (props.ctx.mode === 'postgres') {
@@ -312,8 +318,12 @@ async function generatePdf() {
   if (props.ctx.mode === 'postgres') {
     generating.value = true;
     try {
-      pdfMeta.value = (await api<{ pdf: CvMetadata }>('cv/pdf', { method: 'POST' })).pdf;
-      toast('PDF updated', pdfMeta.value.pdfPath);
+      const result = await api<{ pdf: CvMetadata; warning?: 'cache-purge-failed'; tags?: string[] }>('cv/pdf', {
+        method: 'POST',
+      });
+      pdfMeta.value = result.pdf;
+      if (result.warning) committed(result);
+      else toast('PDF updated', pdfMeta.value.pdfPath);
     } catch (e) {
       report(e);
     } finally {
@@ -368,7 +378,7 @@ async function generatePdf() {
       :stale="doc.draftStale ? doc.draftChanges : null"
       @restore="doc.restore()"
       @discard="discardDraft"
-      @reload="doc.reload()"
+      @reload="reloadCv"
     />
 
     <div v-if="doc.current" class="adm-cols3">

@@ -90,7 +90,8 @@ export async function commitChanges(
   const result = await store.commit(changes, message, base);
   if (!(store instanceof PostgresStore) || !affectsCvPdf(changes.map((c) => c.path))) return result;
   try {
-    await generateCvPdf(store);
+    const pdf = await generateCvPdf(store);
+    if (pdf.purgeFailed && !result.warning) return { ...result, warning: 'cache-purge-failed', tags: pdf.purgeFailed };
     return result;
   } catch (e) {
     // eslint-disable-next-line no-console

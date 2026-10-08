@@ -30,7 +30,7 @@ function setUp(): void {
       bolditalics: font('IBMPlexSans-SemiBold.ttf'),
     },
   });
-  pdfmake.setLocalAccessPolicy((p) => p.startsWith(FONTS + path.sep));
+  pdfmake.setLocalAccessPolicy((p) => path.resolve(p).startsWith(FONTS + path.sep));
   pdfmake.setUrlAccessPolicy(() => false);
   ready = true;
 }

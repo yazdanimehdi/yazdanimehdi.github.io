@@ -23,3 +23,9 @@ test('postgres mode: "Published"; a failed purge offers Retry refresh', () => {
   assert.match(toasts[1].text, /could not be refreshed/);
   assert.equal(toasts[1].action?.label, 'Retry refresh');
 });
+
+test('a PDF failure after a save says the save stands', () => {
+  session.mode = 'postgres';
+  committed({ warning: 'pdf-failed', detail: 'quota exceeded' });
+  assert.equal(toasts[0].text, 'Saved; PDF generation failed: quota exceeded');
+});

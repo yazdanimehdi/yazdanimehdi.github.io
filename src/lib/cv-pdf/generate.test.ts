@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- the tests silence expected error logs */
 import test, { beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -6,6 +7,7 @@ import { pgliteSql } from '../pglite-sql';
 import type { Sql } from '../db';
 import { setStoreForTests } from '../admin/get-store';
 import { MemoryStore } from '../admin/memory-store';
+import { ConflictError } from '../admin/store';
 import { PostgresStore, type PostgresDeps } from '../admin/postgres-store';
 import { CV_JSON } from '../admin/paths';
 import { GET as getConfig, PUT as putConfig } from '../../admin/routes/api/config/[file]';
@@ -27,9 +29,11 @@ let blobs: Map<string, Buffer>;
 let deleted: string[];
 let purged: string[][];
 let putFails: boolean;
+let purgeFails: (tags: string[]) => boolean;
 
 const deps = (): PostgresDeps => ({
   purge: async (tags) => {
+    if (purgeFails(tags)) throw new Error('purge down');
     purged.push(tags);
   },
   put: async (pathname, body) => {
@@ -47,7 +51,7 @@ beforeEach(async () => {
   await migrate(sql);
   for (const path of SEED)
     await sql`insert into documents (path, content) values (${path}, ${fs.readFileSync(path, 'utf8')})`;
-  [blobs, deleted, purged, putFails] = [new Map(), [], [], false];
+  [blobs, deleted, purged, putFails, purgeFails] = [new Map(), [], [], false, () => false];
   store = new PostgresStore(sql, { name: 'Jane', email: 'j@x' }, deps());
   setStoreForTests((author) => new PostgresStore(sql, author, deps()));
 });
@@ -80,7 +84,7 @@ const saveCv = async () => {
 };
 
 test('generateCvPdf: uploads cv/cv-<hash>.pdf, records it in src/data/cv.json, refreshes the CV page', async () => {
-  const result = await generateCvPdf(store, new Date('2026-10-07T00:00:00Z'));
+  const result = (await generateCvPdf(store, new Date('2026-10-07T00:00:00Z'))).meta;
   const [name] = [...blobs.keys()];
   assert.match(name, /^cv\/cv-[0-9a-f]{8}\.pdf$/);
   assert.equal(blobs.get(name)!.subarray(0, 5).toString(), '%PDF-');
@@ -95,9 +99,9 @@ test('generateCvPdf: uploads cv/cv-<hash>.pdf, records it in src/data/cv.json, r
 
 test('generateCvPdf: the previous Blob PDF is deleted; a non-Blob previous path is left alone', async () => {
   await sql`insert into documents (path, content) values (${CV_JSON}, ${'{"lastGenerated":null,"pdfPath":"/cv.pdf","pdfSize":0}'})`;
-  const first = await generateCvPdf(store, new Date('2026-10-07T00:00:00Z'));
+  const first = (await generateCvPdf(store, new Date('2026-10-07T00:00:00Z'))).meta;
   assert.deepEqual(deleted, []);
-  const second = await generateCvPdf(store, new Date('2026-10-08T00:00:00Z'));
+  const second = (await generateCvPdf(store, new Date('2026-10-08T00:00:00Z'))).meta;
   assert.notEqual(second.pdfPath, first.pdfPath);
   assert.deepEqual(deleted, [first.pdfPath]);
 });
@@ -105,7 +109,7 @@ test('generateCvPdf: the previous Blob PDF is deleted; a non-Blob previous path 
 test('generateCvPdf: a previous URL the media library does not know is logged, not fatal', async () => {
   await sql`insert into documents (path, content) values
     (${CV_JSON}, ${'{"lastGenerated":null,"pdfPath":"https://elsewhere.example/cv.pdf","pdfSize":0}'})`;
-  const result = await quiet(() => generateCvPdf(store));
+  const result = (await quiet(() => generateCvPdf(store))).meta;
   assert.match(result.pdfPath, /^https:\/\/b\.public/);
   assert.deepEqual(deleted, []);
 });
@@ -161,7 +165,69 @@ test('git stores never render a PDF', async () => {
 test('a seeded cv.json without a PDF yet reads as no PDF; generation still works', async () => {
   await sql`insert into documents (path, content) values (${CV_JSON}, ${'{"lastGenerated":null,"pdfPath":null,"pdfSize":0}'})`;
   assert.deepEqual(await (await call(pdfStatus)).json(), { run: null, pdf: null });
-  const result = await generateCvPdf(store);
+  const result = (await generateCvPdf(store)).meta;
   assert.match(result.pdfPath, /^https:\/\/b\.public/);
   assert.deepEqual(deleted, []);
+});
+
+test('site.yml saves regenerate the PDF (the author is bold in it)', async () => {
+  const { data, version } = await (await call(getConfig, { params: { file: 'site' } })).json();
+  assert.equal(
+    (await call(putConfig, { method: 'PUT', params: { file: 'site' }, body: { data, version } })).status,
+    200,
+  );
+  assert.ok(await store.read(CV_JSON));
+});
+
+test('a cv-upload.yml-only save regenerates the PDF', async () => {
+  const { data, version } = await (await call(getConfig, { params: { file: 'cv-upload' } })).json();
+  assert.equal(
+    (await call(putConfig, { method: 'PUT', params: { file: 'cv-upload' }, body: { data, version } })).status,
+    200,
+  );
+  assert.ok(await store.read(CV_JSON));
+});
+
+test('a failed purge of the save itself wins over a PDF failure', async () => {
+  purgeFails = () => true;
+  putFails = true;
+  const res = await quiet(saveCv);
+  const body = await res.json();
+  assert.equal(body.warning, 'cache-purge-failed');
+});
+
+test('a failed purge of cv.json is reported as the save’s warning', async () => {
+  purgeFails = (tags) => tags.includes('data:cv');
+  const body = await (await quiet(saveCv)).json();
+  assert.equal(body.warning, 'cache-purge-failed');
+  assert.deepEqual(body.tags, ['data:cv']);
+});
+
+test('if cv.json can’t be saved after the upload, the new PDF is deleted — never one the site already links to', async () => {
+  const first = (await generateCvPdf(store, new Date('2026-10-07T00:00:00Z'))).meta;
+  const failing = new PostgresStore(sql, { name: 'Jane', email: 'j@x' }, deps());
+  failing.commit = async () => {
+    throw new Error('db down');
+  };
+  await assert.rejects(
+    quiet(() => generateCvPdf(failing, new Date('2026-10-08T00:00:00Z'))),
+    /db down/,
+  );
+  assert.equal(deleted.length, 1, 'the just-uploaded PDF');
+  assert.notEqual(deleted[0], first.pdfPath);
+  deleted.length = 0;
+  await assert.rejects(
+    quiet(() => generateCvPdf(failing, new Date('2026-10-07T00:00:00Z'))),
+    /db down/,
+  );
+  assert.deepEqual(deleted, [], 'same bytes, same name: the stored PDF stays');
+});
+
+test('cv/pdf: a concurrent save answers 409, not 502', async () => {
+  const racing = new PostgresStore(sql, { name: 'Jane', email: 'j@x' }, deps());
+  racing.commit = async () => {
+    throw new ConflictError(CV_JSON);
+  };
+  setStoreForTests(() => racing);
+  assert.equal((await quiet(() => call(generatePdf, { method: 'POST' }))).status, 409);
 });
