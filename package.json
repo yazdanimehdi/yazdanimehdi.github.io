@@ -6,6 +6,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "astro dev",
+    "dev:postgres": "tsx scripts/dev-postgres.ts",
     "start": "astro dev",
     "build": "astro build",
     "preview": "astro preview",
@@ -19,6 +20,7 @@
     "db:migrate": "tsx scripts/db-migrate.ts",
     "db:setup": "tsx scripts/db-setup.ts",
     "db:export": "tsx scripts/db-export.ts",
+    "admin:create-user": "tsx scripts/admin-create-user.ts",
     "lint": "eslint . && prettier --check .",
     "lint:fix": "eslint --fix . && prettier --write .",
     "format": "prettier --write .",
