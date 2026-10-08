@@ -74,9 +74,12 @@ test('crossPost: a rejected token is a MediumError naming the 401', async () => 
 // ── the route ──
 let store: MemoryStore;
 const user = { login: 'jane', name: 'Jane', avatar: '' };
-const call = (slug: string) =>
+const call = (slug: string, body?: unknown) =>
   medium({
-    request: new Request('https://site.test/api/admin/posts/x/medium', { method: 'POST' }),
+    request: new Request('https://site.test/api/admin/posts/x/medium', {
+      method: 'POST',
+      body: body === undefined ? undefined : JSON.stringify(body),
+    }),
     url: new URL('https://site.test/api/admin/posts/x/medium'),
     params: { slug },
     locals: { user },
@@ -134,6 +137,71 @@ test('route: no token → 400; drafts → 400; unknown → 404; Medium failure �
   } finally {
     process.env.MEDIUM_TOKEN = saved.token;
     if (saved.token === undefined) delete process.env.MEDIUM_TOKEN;
+    globalThis.fetch = saved.fetch;
+  }
+});
+
+test('absoluteUrls: code spans and fenced blocks untouched; balanced parentheses in targets', () => {
+  const md = 'See [x](/a) and `[y](/b)`.\n\n```\n![z](/c)\n```\n\n[wiki](/w/Foo_(bar))';
+  const out = absoluteUrls(md, 'https://example.com/blog/p/');
+  assert.match(out, /\[x\]\(https:\/\/example\.com\/a\)/);
+  assert.match(out, /`\[y\]\(\/b\)`/);
+  assert.match(out, /```\n!\[z\]\(\/c\)\n```/);
+  assert.match(out, /\[wiki\]\(https:\/\/example\.com\/w\/Foo_\(bar\)\)/);
+});
+
+test('route: scheduled posts are refused until their date', async () => {
+  const saved = { token: process.env.MEDIUM_TOKEN };
+  process.env.MEDIUM_TOKEN = 'tok';
+  try {
+    await seed('later', 'title: Later\ndate: 2999-01-01');
+    const res = await call('later');
+    assert.equal(res.status, 400);
+    assert.match((await res.json()).error, /once it is live \(2999-01-01\)/);
+  } finally {
+    if (saved.token === undefined) delete process.env.MEDIUM_TOKEN;
+    else process.env.MEDIUM_TOKEN = saved.token;
+  }
+});
+
+test('route: MDX posts 409; a version that never shows up 409 "still saving"', async () => {
+  const saved = { token: process.env.MEDIUM_TOKEN };
+  process.env.MEDIUM_TOKEN = 'tok';
+  try {
+    await store.commit(
+      [{ path: 'src/content/posts/old.mdx', content: '---\ntitle: Old\ndate: 2024-01-01\n---\n' }],
+      's',
+      {},
+    );
+    assert.equal((await call('old')).status, 409);
+    await seed('hello', 'title: Hello\ndate: 2024-06-01');
+    const res = await call('hello', { version: 'not-the-version' });
+    assert.equal(res.status, 409);
+    assert.match((await res.json()).error, /still saving/);
+  } finally {
+    if (saved.token === undefined) delete process.env.MEDIUM_TOKEN;
+    else process.env.MEDIUM_TOKEN = saved.token;
+  }
+});
+
+test('route: without siteUrl the canonical URL uses the request origin', async () => {
+  const saved = { token: process.env.MEDIUM_TOKEN, fetch: globalThis.fetch };
+  process.env.MEDIUM_TOKEN = 'tok';
+  const seen: Request[] = [];
+  globalThis.fetch = fakeFetch(OK, seen);
+  try {
+    const site = (await store.read('config/site.yml'))!;
+    await store.commit(
+      [{ path: 'config/site.yml', content: site.content.replace(/^siteUrl:.*$/m, "siteUrl: ''") }],
+      's',
+      { 'config/site.yml': site.version },
+    );
+    await seed('hello', 'title: Hello\ndate: 2024-06-01');
+    assert.equal((await call('hello')).status, 200);
+    assert.equal((await seen[1].json()).canonicalUrl, 'https://site.test/blog/hello/');
+  } finally {
+    if (saved.token === undefined) delete process.env.MEDIUM_TOKEN;
+    else process.env.MEDIUM_TOKEN = saved.token;
     globalThis.fetch = saved.fetch;
   }
 });

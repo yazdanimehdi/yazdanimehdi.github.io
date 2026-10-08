@@ -5,7 +5,7 @@ import AdminShell from './AdminShell.vue';
 import DocBanners from './DocBanners.vue';
 import FormFields from './FormFields.vue';
 import MarkdownEditor from './MarkdownEditor.vue';
-import { api, report, toast } from './api';
+import { ApiError, api, report, toast } from './api';
 import { resolveOptions, setIn, type FieldDef, type Option } from './fields';
 import { useDocument } from './useDocument';
 import type { AdminCtx, CommitResult, Entry } from './types';
@@ -71,6 +71,7 @@ async function sendToMedium() {
   try {
     const result = await api<CommitResult & { medium: { id: string; url: string } }>(`posts/${target}/medium`, {
       method: 'POST',
+      body: { version: doc.version },
     });
     if (doc.current) doc.current.data.medium = result.medium;
     doc.version = result.versions[`src/content/posts/${target}.md`] ?? doc.version;
@@ -78,6 +79,14 @@ async function sendToMedium() {
     doc.discard(); // the link is committed, not an unsaved edit
     toast('Sent to Medium as a draft', result.medium.url);
   } catch (e) {
+    const url = e instanceof ApiError ? (e.details as { url?: string } | undefined)?.url : undefined;
+    if (e instanceof ApiError && e.status === 409 && url) {
+      await doc.reload(); // it is already linked: show the stored link
+      return toast('Already on Medium', url);
+    }
+    if (e instanceof ApiError && e.status === 502 && url) {
+      return toast(`${e.message}`, url); // sent, but not recorded: no Retry (it would make a second draft)
+    }
     toast(`Published; Medium cross-post failed: ${e instanceof Error ? e.message : String(e)}`, undefined, {
       label: 'Retry',
       run: () => void sendToMedium(),
@@ -200,10 +209,11 @@ function setSubtitle(e: Event) {
           </fieldset>
           <div class="adm-field">
             <a v-if="onMedium" :href="onMedium" target="_blank" rel="noopener">Already on Medium ↗</a>
-            <label v-else class="adm-check">
+            <label v-else-if="!scheduled" class="adm-check">
               <input v-model="alsoMedium" type="checkbox" :disabled="doc.readonly" />
               Also publish to Medium
             </label>
+            <small v-else class="adm-muted">Medium cross-posting is available once the post is live.</small>
             <button v-if="importReady && !onMedium" type="button" class="adm-btn" @click="importToMedium">
               Import to Medium
             </button>

@@ -97,3 +97,19 @@ test('withoutCrossPosted: hides feed copies of cross-posted site posts by link (
     'link match, title match; a same-titled post without a Medium URL hides nothing',
   );
 });
+
+test('withoutCrossPosted: http/https and www. are the same link; empty titles never match', () => {
+  const item = (link: string, title: string) => ({ id: link, data: { link, title } });
+  const posts = [
+    { data: { title: 'Hello', medium: { url: 'https://medium.com/@jane/hello-1' } } },
+    { data: { title: '!!!', medium: { url: 'https://medium.com/@jane/bang-2' } } },
+  ];
+  const kept = withoutCrossPosted(
+    [item('http://www.medium.com/@jane/hello-1', 'Different title'), item('https://x.test/a', '???')],
+    posts,
+  );
+  assert.deepEqual(
+    kept.map((i) => i.data.title),
+    ['???'],
+  );
+});

@@ -15,11 +15,27 @@ const absolute = (target: string, base: string) => (KEEP.test(target) ? target :
 
 // ponytail: git-mode posts reference content images by repo path (../../assets/…), which no URL resolves; Medium shows
 // those broken. Postgres-mode images are Blob URLs already.
-/** Relative Markdown link/image targets and HTML src/href values made absolute against `base` (the post URL). */
+const CODE = /(```[\s\S]*?```|~~~[\s\S]*?~~~|`[^`\n]*`)/g;
+const TARGET = /(\]\(\s*)((?:[^()\s]|\([^()\s]*\))+)/g;
+
+/**
+ * Relative Markdown link/image targets and HTML src/href values made absolute against `base` (the post URL). Code
+ * spans and fenced blocks are left exactly as written; targets may contain one level of balanced parentheses.
+ */
 export function absoluteUrls(markdown: string, base: string): string {
   return markdown
-    .replace(/(\]\(\s*)([^)\s]+)/g, (_, open: string, target: string) => open + absolute(target, base))
-    .replace(/(\s(?:src|href)=")([^"]+)"/g, (_, open: string, target: string) => `${open}${absolute(target, base)}"`);
+    .split(CODE)
+    .map((part, i) =>
+      i % 2
+        ? part
+        : part
+            .replace(TARGET, (_, open: string, target: string) => open + absolute(target, base))
+            .replace(
+              /(\s(?:src|href)=")([^"]+)"/g,
+              (_, open: string, target: string) => `${open}${absolute(target, base)}"`,
+            ),
+    )
+    .join('');
 }
 
 /** The Medium API body for a site post: canonical link back to the site, at most 5 tags, always a draft. */

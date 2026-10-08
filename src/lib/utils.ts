@@ -148,10 +148,12 @@ const normalTitle = (s: string) =>
     .replace(/[^\p{L}\p{N}\s]/gu, '')
     .replace(/\s+/g, ' ')
     .trim();
-/** Medium's RSS links carry ?source=…: compare without query, fragment, trailing slash or case. */
+/** Medium's RSS links carry ?source=…: compare without scheme, www., query, fragment, trailing slash or case. */
 const normalLink = (s: string) =>
   s
     .trim()
+    .replace(/^[a-z][a-z0-9+.-]*:\/\//i, '')
+    .replace(/^www\./i, '')
     .replace(/[?#].*$/, '')
     .replace(/\/+$/, '')
     .toLowerCase();
@@ -163,6 +165,9 @@ export function withoutCrossPosted<T extends { data: { link: string; title: stri
 ): T[] {
   const crossPosted = posts.filter((p) => p.data.medium?.url);
   const links = new Set(crossPosted.map((p) => normalLink(p.data.medium!.url!)));
-  const titles = new Set(crossPosted.map((p) => normalTitle(p.data.title)));
-  return items.filter((i) => !links.has(normalLink(i.data.link)) && !titles.has(normalTitle(i.data.title)));
+  const titles = new Set(crossPosted.map((p) => normalTitle(p.data.title)).filter(Boolean));
+  return items.filter((i) => {
+    const t = normalTitle(i.data.title);
+    return !links.has(normalLink(i.data.link)) && !(t && titles.has(t));
+  });
 }
