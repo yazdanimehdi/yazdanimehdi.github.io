@@ -12,8 +12,6 @@ export interface BackupResult {
   ok: boolean;
   changed?: number;
   commit?: string;
-  skipped?: string;
-  error?: string;
 }
 
 /**

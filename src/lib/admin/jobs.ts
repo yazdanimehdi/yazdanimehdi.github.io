@@ -25,12 +25,30 @@ export type Steps = Record<JobName, (previous: JobsRecord, now: Date) => Promise
 const DAY = 24 * 60 * 60 * 1000;
 const BACKUP_AUTHOR = { name: 'ScholarOS backup', email: 'scholaros-backup@users.noreply.github.com' };
 
+const isStep = (v: unknown): v is StepResult => {
+  const s = v as Partial<StepResult> | null;
+  return (
+    typeof s === 'object' &&
+    s !== null &&
+    typeof s.ok === 'boolean' &&
+    typeof s.at === 'string' &&
+    !Number.isNaN(Date.parse(s.at)) &&
+    (s.detail === undefined || typeof s.detail === 'string') &&
+    (s.url === undefined || typeof s.url === 'string')
+  );
+};
+
+/** jobs.json, keeping only well-formed step records (it is on the admin's write allowlist, so it may be hand-edited). */
 export function parseJobs(text: string | undefined): JobsRecord {
+  let raw: unknown;
   try {
-    return text ? (JSON.parse(text) as JobsRecord) : {};
+    raw = text ? JSON.parse(text) : {};
   } catch {
     return {};
   }
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const record = raw as Record<string, unknown>;
+  return Object.fromEntries(JOBS.filter((name) => isStep(record[name])).map((name) => [name, record[name]]));
 }
 
 /** Runs every step in order; a failing step is recorded and the next one still runs. Results go to jobs.json. */

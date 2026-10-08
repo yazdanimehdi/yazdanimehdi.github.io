@@ -313,6 +313,14 @@ test('a corrupt feeds.json: the dashboard still loads; a sync rewrites it', asyn
   const feeds = 'src/data/feeds.json';
   const old = await store.read(feeds);
   await store.commit([{ path: feeds, content: '{ not json' }], 'corrupt', { [feeds]: old?.version ?? null });
+  const cfg = await store.read('config/feeds.yml');
+  await store.commit(
+    [{ path: 'config/feeds.yml', content: "feeds:\n  - name: 'F'\n    url: 'https://example.com/feed'\n" }],
+    'feed',
+    {
+      'config/feeds.yml': cfg?.version ?? null,
+    },
+  );
   const res = await call(dashboard);
   assert.equal(res.status, 200);
   const d = await res.json();

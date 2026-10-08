@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- the tests silence expected error logs */
 import test, { after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { migrate } from '../db-migrate';
@@ -7,7 +8,7 @@ import { setStoreForTests } from './get-store';
 import { MemoryStore } from './memory-store';
 import { PostgresStore } from './postgres-store';
 import { JOBS_JSON } from './paths';
-import { releaseScheduled, releaseSince, runJobs, type Steps } from './jobs';
+import { parseJobs, releaseScheduled, releaseSince, runJobs, type Steps } from './jobs';
 import { GET as cron } from '../../admin/routes/api/cron/daily';
 import { POST as runNow } from '../../admin/routes/api/jobs/run';
 
@@ -209,4 +210,60 @@ test('cron after a failed scheduled run: looks a week back, so a post due 3 days
 test('cron after a successful run: only posts due since that run are released', async () => {
   await cronWith({ scheduled: { ok: true, at: ago(48) } }, { fresh: ago(30), old: ago(72) });
   assert.deepEqual(postPurges(), [['col:posts', 'doc:posts/fresh']]);
+});
+
+test('parseJobs keeps only well-formed step records', () => {
+  const at = '2026-10-07T03:00:00.000Z';
+  assert.deepEqual(
+    parseJobs(
+      JSON.stringify({
+        scheduled: { ok: true, at, detail: 'nothing due' },
+        feeds: { ok: 'yes', at },
+        backup: { ok: true, at: 'not a date' },
+        extra: { ok: true, at },
+      }),
+    ),
+    { scheduled: { ok: true, at, detail: 'nothing due' } },
+  );
+  assert.deepEqual(parseJobs('[1,2]'), {});
+  assert.deepEqual(parseJobs('{'), {});
+});
+
+test('releaseScheduled: a post dated exactly `since` is not released; one dated exactly `now` is', async () => {
+  await sql`insert into documents (path, content) values
+    ('src/content/posts/at-since.md', ${post('2026-10-06T03:00:00Z')}),
+    ('src/content/posts/at-now.md', ${post('2026-10-07T03:00:00Z')})`;
+  const due = await releaseScheduled(store(), new Date('2026-10-06T03:00:00Z'), new Date('2026-10-07T03:00:00Z'));
+  assert.deepEqual(due, ['at-now']);
+});
+
+test('cron answers 502 when a step fails; Run now writes jobs.json', async () => {
+  const restore = env({ CRON_SECRET: 's3cret', VERCEL: '1', DATABASE_URL: 'postgres://test', GITHUB_TOKEN: undefined });
+  const realFetch = globalThis.fetch;
+  globalThis.fetch = (async () => {
+    throw new Error('offline');
+  }) as typeof fetch;
+  await sql`insert into documents (path, content) values ('config/feeds.yml', ${"feeds:\n  - name: 'X'\n    url: 'https://x.test/feed'\n"})`;
+  const original = console.error;
+  console.error = () => {};
+  try {
+    const res = await cron({
+      request: new Request('https://site.test/x', { headers: { authorization: 'Bearer s3cret' } }),
+    } as never);
+    assert.equal(res.status, 502);
+    assert.equal((await res.json()).feeds.ok, false);
+    await sql`delete from documents where path = ${JOBS_JSON}`;
+    const run = await runNow({
+      request: new Request('https://site.test/api/admin/jobs/run', { method: 'POST' }),
+      url: new URL('https://site.test/api/admin/jobs/run'),
+      params: {},
+      locals: { user: { login: 'jane', name: 'Jane', avatar: '', provider: 'github' } },
+    } as never);
+    assert.equal(run.status, 200);
+    assert.ok(await store().read(JOBS_JSON), 'Run now recorded jobs.json');
+  } finally {
+    console.error = original;
+    globalThis.fetch = realFetch;
+    restore();
+  }
 });
