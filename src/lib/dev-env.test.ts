@@ -32,3 +32,26 @@ test('databaseFor / hostOf / confirmsProduction', () => {
   assert.equal(confirmsProduction(' Jane ', 'jane'), true);
   assert.equal(confirmsProduction('jan', 'jane'), false);
 });
+
+test('devEnv: GITHUB_TOKEN never reaches dev (the daily backup only mirrors production)', () => {
+  const env = devEnv({ DEV_DATABASE_URL: DEV, GITHUB_TOKEN: 'file-tok' }, { GITHUB_TOKEN: 'shell-tok' });
+  assert.equal('GITHUB_TOKEN' in env, false);
+});
+
+test('devEnv / databaseFor: a DEV_DATABASE_URL on the production host is refused, pooler or not', () => {
+  const pooler = PROD.replace('ep-main-999', 'ep-main-999-pooler');
+  for (const dev of [PROD, pooler]) {
+    assert.throws(() => devEnv({ DATABASE_URL: PROD, DEV_DATABASE_URL: dev }, {}), /same database as DATABASE_URL/);
+    assert.throws(() => databaseFor({ DATABASE_URL: PROD, DEV_DATABASE_URL: dev }, false), /same database/);
+  }
+  assert.throws(() => devEnv({ DATABASE_URL: pooler, DEV_DATABASE_URL: PROD }, {}), /same database/);
+  assert.equal(devEnv({ DATABASE_URL: PROD, DEV_DATABASE_URL: DEV }, {}).DATABASE_URL, DEV);
+  assert.equal(databaseFor({ DATABASE_URL: PROD, DEV_DATABASE_URL: PROD }, true), PROD);
+  assert.equal(devEnv({ DATABASE_URL: 'not a url', DEV_DATABASE_URL: DEV }, {}).DATABASE_URL, DEV);
+});
+
+test('hostOf: an unparseable URL never echoes the password', () => {
+  const out = hostOf("psql 'postgres://u:secret@h/db'");
+  assert.equal(out.includes('secret'), false);
+  assert.equal(out, '(unparseable URL)');
+});

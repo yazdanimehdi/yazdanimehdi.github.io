@@ -569,9 +569,10 @@ URLs), commit, remove `DATABASE_URL` from the project, redeploy.
 In Postgres mode you can sign in with a username and password instead of GitHub (GitHub sign-in keeps working when
 `GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` are set).
 
-1. Apply the migration once: `pnpm db:migrate` (uses `DATABASE_URL` from `.env.local`, i.e. production).
-2. Create the first account: `pnpm admin:create-user <username> --production` (asks for a display name and a
-   password of at least 12 characters; you confirm by typing the username again).
+1. Apply the migration once: `DATABASE_URL='<production connection string>' pnpm db:migrate` (a `DATABASE_URL`
+   in the shell overrides `.env.local`, which holds the preview pull from local development below).
+2. Create the first account: `DATABASE_URL='<production connection string>' pnpm admin:create-user <username> --production`
+   (asks for a display name and a password of at least 12 characters; you confirm by typing the username again).
 3. Sign in at `https://<your-domain>/<adminPath>/login`.
 
 The **Users** screen adds accounts, resets passwords and deletes accounts; everyone can change their own password
@@ -586,7 +587,8 @@ username within 15 minutes, that username is refused until the window passes.
 4. `pnpm admin:create-user <username>` (on the dev branch), then `pnpm dev:postgres`.
 
 `pnpm dev:postgres` runs the site in Postgres mode against the dev branch only: it never uses the `DATABASE_URL`
-from `.env.local` (production). Uploads (images, the CV PDF) go to your Blob store.
+from `.env.local` (production). Uploads (images, the CV PDF) go to the shared Blob store; deletes are skipped
+locally so the live site's files are never removed.
 
 ### Scheduled posts
 

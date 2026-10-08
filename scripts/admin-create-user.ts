@@ -10,6 +10,7 @@ import readline from 'node:readline';
 import { parseEnv } from 'node:util';
 import postgres from 'postgres';
 import { createAccount, resetPassword } from '../src/lib/admin/accounts';
+import { assertPasswordPolicy } from '../src/lib/admin/passwords';
 import { migrate } from '../src/lib/db-migrate';
 import type { Sql } from '../src/lib/db';
 import { confirmsProduction, databaseFor, hostOf } from '../src/lib/dev-env';
@@ -55,6 +56,12 @@ if (production && !confirmsProduction(await ask(`Type the username (${username})
 }
 const name = resetting ? '' : await ask('Display name: ');
 const password = await ask('Password (12+ characters): ', true);
+try {
+  assertPasswordPolicy(password);
+} catch (e) {
+  console.error(`${(e as Error).message}; nothing written.`);
+  process.exit(1);
+}
 if ((await ask('Password again: ', true)) !== password) {
   console.error('The passwords don’t match; nothing written.');
   process.exit(1);

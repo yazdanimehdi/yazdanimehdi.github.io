@@ -37,7 +37,12 @@ const defaultDeps: PostgresDeps = {
   purge: (tags) => dangerouslyDeleteByTag(tags),
   put: (pathname, body, contentType) =>
     put(pathname, body, { access: 'public', contentType, addRandomSuffix: false, allowOverwrite: true }),
-  del: (url) => del(url),
+  // `astro dev` shares the live Blob store (and the dev branch holds live URLs): never delete from it locally.
+  // ponytail: dev leaves orphan blobs in the shared store; a separate dev Blob store would avoid it.
+  del: async (url) => {
+    if (import.meta.env?.DEV) return console.warn('[dev] Blob delete skipped', url);
+    await del(url);
+  },
 };
 
 const blobFailure = (e: unknown) =>
