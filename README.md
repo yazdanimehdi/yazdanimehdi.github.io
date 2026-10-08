@@ -546,7 +546,9 @@ publish. Git stays a safety net: every save keeps a revision (History in the adm
 content to the `content-backup` branch.
 
 1. In the Vercel project: **Storage → Marketplace → Neon** (sets `DATABASE_URL`) and **Storage → Blob**
-   (sets `BLOB_READ_WRITE_TOKEN`). Add `CRON_SECRET` (`openssl rand -base64 48`). Vercel Cron calls `/api/admin/cron/daily` at 03:00 UTC: it syncs feeds, releases scheduled posts and backs up to git; the dashboard shows each result and has **Run now**. Keep `GITHUB_TOKEN` for the backup.
+   (sets `BLOB_READ_WRITE_TOKEN`). Add `CRON_SECRET` (`openssl rand -base64 48`). Vercel Cron calls
+   `/api/admin/cron/daily` at 03:00 UTC: it syncs feeds, releases scheduled posts and backs up to git; the dashboard
+   shows each result and has **Run now**. Keep `GITHUB_TOKEN` for the backup.
 2. Locally: `vercel env pull .env.local --environment=production`, then `pnpm db:setup`. It creates the tables, copies `config/`,
    `src/content/` and `src/data/` into the database, uploads `src/assets/images` and `public/images` to Blob, and
    rewrites image references to Blob URLs. It lists any file it could not copy. On a database that already has
@@ -561,6 +563,30 @@ the daily job syncs feeds, and **Check now** syncs them at once.
 
 **Back to git mode:** `pnpm db:export` (writes the database's files into the repo; image references stay Blob
 URLs), commit, remove `DATABASE_URL` from the project, redeploy.
+
+### Admin accounts (Postgres mode)
+
+In Postgres mode you can sign in with a username and password instead of GitHub (GitHub sign-in keeps working when
+`GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` are set).
+
+1. Apply the migration once: `pnpm db:migrate` (uses `DATABASE_URL` from `.env.local`, i.e. production).
+2. Create the first account: `pnpm admin:create-user <username> --production` (asks for a display name and a
+   password of at least 12 characters; you confirm by typing the username again).
+3. Sign in at `https://<your-domain>/<adminPath>/login`.
+
+The **Users** screen adds accounts, resets passwords and deletes accounts; everyone can change their own password
+there. Resetting or changing a password signs that account out on its other devices. After 10 failed sign-ins for a
+username within 15 minutes, that username is refused until the window passes.
+
+### Local development against Neon
+
+1. In the Neon console, create a branch named `dev` from `main` (a copy of your live content).
+2. `vercel link`, then `vercel env pull .env.local --environment=preview`.
+3. Add `DEV_DATABASE_URL=<the dev branch's connection string>` to `.env.local`.
+4. `pnpm admin:create-user <username>` (on the dev branch), then `pnpm dev:postgres`.
+
+`pnpm dev:postgres` runs the site in Postgres mode against the dev branch only: it never uses the `DATABASE_URL`
+from `.env.local` (production). Uploads (images, the CV PDF) go to your Blob store.
 
 ### Scheduled posts
 

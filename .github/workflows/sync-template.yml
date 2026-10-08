@@ -93,11 +93,11 @@ jobs:
 
           if [ -n "$LAST_SHA" ] && git cat-file -t "$LAST_SHA" &>/dev/null; then
             # Incremental sync: patch only what changed in the template
-            git diff "$LAST_SHA" "$TEMPLATE_SHA" -- . "${EXCLUDE[@]}" > /tmp/template.patch || true
+            git diff --binary "$LAST_SHA" "$TEMPLATE_SHA" -- . "${EXCLUDE[@]}" > /tmp/template.patch || true
           else
             # First sync or SHA lost: diff full template tree (excluding user paths)
             EMPTY_TREE=$(git hash-object -t tree /dev/null)
-            git diff "$EMPTY_TREE" "$TEMPLATE_SHA" -- . "${EXCLUDE[@]}" > /tmp/template.patch || true
+            git diff --binary "$EMPTY_TREE" "$TEMPLATE_SHA" -- . "${EXCLUDE[@]}" > /tmp/template.patch || true
           fi
 
           if [ ! -s /tmp/template.patch ]; then
