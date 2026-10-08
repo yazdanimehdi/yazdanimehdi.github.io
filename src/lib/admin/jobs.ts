@@ -87,6 +87,9 @@ export async function syncFeedsFile(store: ContentStore): Promise<{
   } catch {
     // A corrupt file counts as empty: the sync below rewrites it with valid JSON.
   }
+  // A fresh site has no feeds: nothing to sync is not an error.
+  if (feedSources(config.data as FeedsConfig).length === 0)
+    return { changed: false, count: existing.length, failed: [] };
   let result;
   try {
     result = await syncFeeds(config.data as FeedsConfig, existing);

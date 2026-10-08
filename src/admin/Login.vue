@@ -21,7 +21,8 @@ async function submit() {
       location.href = `/${props.adminPath}`;
       return;
     }
-    message.value = ((await res.json().catch(() => null)) as { error?: string } | null)?.error ?? res.statusText;
+    message.value =
+      ((await res.json().catch(() => null)) as { error?: string } | null)?.error || `Sign-in failed (${res.status})`;
   } catch {
     message.value = 'Could not reach the site. Try again.';
   } finally {

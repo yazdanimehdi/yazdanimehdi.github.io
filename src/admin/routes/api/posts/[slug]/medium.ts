@@ -7,7 +7,10 @@ import { isPublished } from '../../../../../lib/utils';
 
 export const prerender = false;
 
-/** Git mode: GitHub can serve the file from just before the editor's save; wait briefly for that save's version. */
+/**
+ * Git mode: GitHub can serve the file from just before the editor's save (or not at all, for a brand-new post); wait
+ * briefly for that save's version. Still missing after the wait → null (404).
+ */
 async function readEntryAt(
   store: ContentStore,
   slug: string,
@@ -16,8 +19,11 @@ async function readEntryAt(
 ) {
   for (let i = 0; ; i++) {
     const entry = await readEntry(store, 'posts', slug);
-    if (!entry || version === undefined || entry.version === version) return entry;
-    if (i === tries - 1) throw new HttpError(409, 'The post is still saving; try again in a moment');
+    if (version === undefined || entry?.version === version) return entry;
+    if (i === tries - 1) {
+      if (!entry) return entry;
+      throw new HttpError(409, 'The post is still saving; try again in a moment');
+    }
     await new Promise((r) => setTimeout(r, delayMs));
   }
 }

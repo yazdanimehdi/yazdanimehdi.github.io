@@ -403,3 +403,17 @@ test('collections: a post with broken front matter names the file instead of a b
     /^src\/content\/posts\/bad\.md has invalid front matter: .+\. Fix it in the repository\.$/,
   );
 });
+
+test('feeds/sync with no feeds configured: 200, nothing changed, nothing committed', async () => {
+  const cfg = await store.read('config/feeds.yml');
+  await store.commit([{ path: 'config/feeds.yml', content: 'feeds: []\n' }], 'no feeds', {
+    'config/feeds.yml': cfg?.version ?? null,
+  });
+  const commits = store.log.length;
+  const res = await call(syncFeedsRoute, { method: 'POST' });
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.changed, false);
+  assert.deepEqual(body.failed, []);
+  assert.equal(store.log.length, commits);
+});

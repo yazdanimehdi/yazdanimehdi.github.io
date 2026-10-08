@@ -136,7 +136,7 @@ async function save(draft: boolean) {
     doc.retarget(`posts/${target}`, loadPost(target));
     history.replaceState(null, '', `/${props.ctx.adminPath}/posts/${target}`);
   }
-  if (!draft && alsoMedium.value && !onMedium.value) {
+  if (!draft && alsoMedium.value && !onMedium.value && !scheduled.value) {
     alsoMedium.value = false;
     if (props.ctx.mediumToken) await sendToMedium();
     else importReady.value = true;

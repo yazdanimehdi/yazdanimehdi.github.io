@@ -2,6 +2,7 @@ import test, { beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { setStoreForTests } from './get-store';
 import { MemoryStore } from './memory-store';
+import { gitBlobSha } from './store';
 import { MediumError, absoluteUrls, crossPost, mediumPayload } from './medium';
 import { POST as medium } from '../../admin/routes/api/posts/[slug]/medium';
 
@@ -202,6 +203,23 @@ test('route: without siteUrl the canonical URL uses the request origin', async (
   } finally {
     if (saved.token === undefined) delete process.env.MEDIUM_TOKEN;
     else process.env.MEDIUM_TOKEN = saved.token;
+    globalThis.fetch = saved.fetch;
+  }
+});
+
+test('route: a brand-new post that is not readable yet is waited for; one that never appears is 404', async () => {
+  const saved = { token: process.env.MEDIUM_TOKEN, fetch: globalThis.fetch };
+  process.env.MEDIUM_TOKEN = 'tok';
+  globalThis.fetch = fakeFetch(OK);
+  try {
+    const content = '---\ntitle: Fresh\ndate: 2024-06-01\n---\n\nBody\n';
+    const pending = call('fresh', { version: gitBlobSha(content) });
+    setTimeout(() => store.commit([{ path: 'src/content/posts/fresh.md', content }], 'save', {}), 100);
+    assert.equal((await pending).status, 200);
+    assert.equal((await call('never', { version: 'v' })).status, 404);
+  } finally {
+    process.env.MEDIUM_TOKEN = saved.token;
+    if (saved.token === undefined) delete process.env.MEDIUM_TOKEN;
     globalThis.fetch = saved.fetch;
   }
 });
