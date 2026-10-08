@@ -6,7 +6,7 @@ import { pgliteSql } from './pglite-sql';
 
 test('migrate creates the tables once; a second run applies nothing', async () => {
   const sql = pgliteSql();
-  assert.deepEqual(await migrate(sql), ['001_init.sql']);
+  assert.deepEqual(await migrate(sql), ['001_init.sql', '002_admin_users.sql']);
   assert.deepEqual(await migrate(sql), []);
   await sql`insert into documents (path, content) values ('config/site.yml', 'title: A')`;
   const [row] = await sql<{ version: number; updated_by: string | null }>`select version, updated_by from documents`;
@@ -17,7 +17,7 @@ test('migrate creates the tables once; a second run applies nothing', async () =
   }>`select table_name as name from information_schema.tables where table_schema = 'public' order by 1`;
   assert.deepEqual(
     tables.map((t) => t.name),
-    ['documents', 'media', 'revisions', 'schema_migrations'],
+    ['admin_users', 'documents', 'login_attempts', 'media', 'revisions', 'schema_migrations'],
   );
 });
 
