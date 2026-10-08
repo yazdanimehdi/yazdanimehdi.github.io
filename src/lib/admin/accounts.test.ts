@@ -82,3 +82,25 @@ test('before the migration: MigrationMissingError; sessionVersion answers null',
   await assert.rejects(signIn(bare, 'jane', PW), MigrationMissingError);
   assert.equal(await sessionVersion(bare, 'jane'), null);
 });
+
+test('throttle holds under concurrency: 40 parallel wrong tries plus the right one', async () => {
+  await createAccount(sql, 'jane', 'Jane', PW);
+  const t0 = new Date('2026-10-07T12:00:00Z');
+  const results = await Promise.all([
+    ...Array.from({ length: 40 }, () => signIn(sql, 'jane', 'wrong password 1', t0)),
+    signIn(sql, 'jane', PW, t0),
+  ]);
+  const throttled = results.filter((r) => !r.ok && r.reason === 'throttled').length;
+  assert.ok(throttled >= 30, `throttled ${throttled}`);
+  assert.ok(results.filter((r) => r.ok).length <= 1);
+});
+
+test('concurrent deletes leave one account', async () => {
+  await createAccount(sql, 'jane', 'Jane', PW);
+  await createAccount(sql, 'bo', 'Bo', PW);
+  await Promise.allSettled([
+    deleteAccount(sql, 'jane', { provider: 'password', login: 'bo' }),
+    deleteAccount(sql, 'bo', { provider: 'password', login: 'jane' }),
+  ]);
+  assert.equal((await listAccounts(sql)).length, 1);
+});

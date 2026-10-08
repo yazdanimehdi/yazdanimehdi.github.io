@@ -83,10 +83,10 @@ export async function deleteAccount(
     throw new HttpError(409, "You can't delete your own account");
   await tables(() =>
     sql.begin(async (tx) => {
-      const [{ n }] = await tx<{ n: number }>`select count(*)::int as n from admin_users`;
-      const rows = await tx`select username from admin_users where username = ${user} for update`;
-      if (rows.length === 0) throw new HttpError(404, 'Not found');
-      if (n <= 1) throw new HttpError(409, "You can't delete the last account");
+      // Lock every row first, so two concurrent deletes can't both see "another account remains".
+      const all = await tx<{ username: string }>`select username from admin_users order by username for update`;
+      if (!all.some((r) => r.username === user)) throw new HttpError(404, 'Not found');
+      if (all.length <= 1) throw new HttpError(409, "You can't delete the last account");
       await tx`delete from admin_users where username = ${user}`;
     }),
   );
@@ -109,19 +109,21 @@ export async function signIn(
   const since = new Date(now.getTime() - WINDOW_MS).toISOString();
   return tables(async () => {
     await sql`delete from login_attempts where at < ${new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()}::timestamptz`;
+    // Record this attempt first, then count: parallel requests can't all slip under the limit.
+    await sql`insert into login_attempts (username, at) values (${typed}, ${now.toISOString()}::timestamptz)`;
     const [{ n }] = await sql<{ n: number }>`
       select count(*)::int as n from login_attempts where username = ${typed} and at > ${since}::timestamptz`;
-    if (n >= MAX_FAILURES) return { ok: false, reason: 'throttled' } as const;
+    if (n > MAX_FAILURES) {
+      await sql`delete from login_attempts where ctid in (select ctid from login_attempts where username = ${typed} and at = ${now.toISOString()}::timestamptz limit 1)`;
+      return { ok: false, reason: 'throttled' } as const;
+    }
     const [row] = USERNAME.test(typed)
       ? await sql<{ name: string; password_hash: string; session_version: number }>`
           select name, password_hash, session_version from admin_users where username = ${typed}`
       : [];
     const good =
       typeof password === 'string' && (await verifyPassword(password, row?.password_hash ?? (await dummyHash())));
-    if (!row || !good) {
-      await sql`insert into login_attempts (username, at) values (${typed}, ${now.toISOString()}::timestamptz)`;
-      return { ok: false, reason: 'wrong' } as const;
-    }
+    if (!row || !good) return { ok: false, reason: 'wrong' } as const;
     await sql`delete from login_attempts where username = ${typed}`;
     return { ok: true, account: { username: typed, name: row.name, version: row.session_version } } as const;
   });
