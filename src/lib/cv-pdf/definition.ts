@@ -1,4 +1,4 @@
-import type { Content, TDocumentDefinitions } from 'pdfmake/interfaces';
+import type { Content, ContentColumns, TDocumentDefinitions } from 'pdfmake/interfaces';
 import { cvEntryView, cvSections, isPublicationEntry, sectionTitle, type CvEntryView } from '../cv';
 import { isOwner } from '../editorial';
 import type { CvData } from '../types';
@@ -49,7 +49,7 @@ function publication(p: CvPublication, owner: string): Content {
   };
 }
 
-const row = (key: string, label: string, body: Content[]): Content => ({
+const row = (key: string, label: string, body: Content[]): ContentColumns & { id: string } => ({
   id: `section-${key}`,
   columns: [
     { width: '25%', text: label.toUpperCase(), style: 'label' },
