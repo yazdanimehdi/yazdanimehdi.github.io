@@ -22,11 +22,12 @@ export const SESSION_COOKIE_OPTIONS = {
 
 const encoder = new TextEncoder();
 
-async function sessionKey(secret: string): Promise<CryptoKey> {
+/** An AES-GCM key derived from SESSION_SECRET; each use (sessions, stored secrets) has its own salt. */
+export async function sessionKey(secret: string, salt = 'scholaros-session'): Promise<CryptoKey> {
   if (!secret || secret.length < 32) throw new Error('SESSION_SECRET must be at least 32 characters');
   const base = await crypto.subtle.importKey('raw', encoder.encode(secret), 'HKDF', false, ['deriveKey']);
   return crypto.subtle.deriveKey(
-    { name: 'HKDF', hash: 'SHA-256', salt: encoder.encode('scholaros-session'), info: encoder.encode('v1') },
+    { name: 'HKDF', hash: 'SHA-256', salt: encoder.encode(salt), info: encoder.encode('v1') },
     base,
     { name: 'AES-GCM', length: 256 },
     false,
