@@ -2,6 +2,7 @@
 import Ai from '../Ai.vue';
 import Collection from '../Collection.vue';
 import Cv from '../Cv.vue';
+import Editor from '../Editor.vue';
 import Dashboard from '../Dashboard.vue';
 import Login from '../Login.vue';
 import Media from '../Media.vue';
@@ -34,6 +35,7 @@ const SCREENS = new Set([
   'settings',
   'users',
   'ai',
+  'editor',
 ]);
 const CONTENT = ['announcements', 'people', 'projects', 'talks', 'positions'];
 if (!SCREENS.has(screen)) return new Response('Not found', { status: 404 });
@@ -102,6 +104,7 @@ if (screen === 'login' && error === 'denied') Astro.response.status = 403;
     {screen === 'pages' && <Pages client:only="vue" ctx={ctx} />}
     {screen === 'settings' && <Settings client:only="vue" ctx={ctx} />}
     {screen === 'ai' && <Ai client:only="vue" ctx={ctx} />}
+    {screen === 'editor' && <Editor client:only="vue" ctx={ctx} />}
     {screen === 'users' && <Users client:only="vue" ctx={ctx} />}
     {screen === 'cv' && <Cv client:only="vue" ctx={ctx} />}
     {screen === '' && <Dashboard client:only="vue" ctx={ctx} />}

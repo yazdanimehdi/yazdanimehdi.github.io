@@ -637,3 +637,37 @@
   white-space: pre-wrap;
   font-size: 13px;
 }
+.adm-editor-line {
+  margin: 0;
+  font-weight: 500;
+}
+.adm-editor-log,
+.adm-editor-diff {
+  max-height: 40vh;
+  overflow: auto;
+  padding: 12px;
+  background: var(--adm-tint);
+  border-radius: 6px;
+}
+.adm-editor-frame {
+  display: block;
+  width: 100%;
+  height: 70vh;
+  margin-top: 12px;
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+  background: #fff;
+}
+.adm-editor-frame.is-phone {
+  width: min(390px, 100%);
+  margin-inline: auto;
+}
+.adm-editor-files {
+  margin: 0;
+  padding-left: 18px;
+  font-size: 14px;
+}
+.adm-btn[aria-pressed='true'] {
+  border-color: var(--adm-accent);
+  color: var(--adm-accent);
+}
