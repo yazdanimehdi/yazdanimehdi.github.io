@@ -119,6 +119,8 @@ export interface HomepageSectionEntry {
 
 export interface SeoConfig {
   keywords?: string;
+  /** Default social card for pages that pass no image of their own. */
+  ogImage?: string;
   googleSiteVerification?: string;
   bingSiteVerification?: string;
 }

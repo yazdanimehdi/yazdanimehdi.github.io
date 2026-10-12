@@ -15,6 +15,7 @@ tags:
   - 'Open Source'
 startDate: 2023-01-15
 excerpt: 'An open-source Python library for efficient NLP model training and evaluation.'
+image: '../../assets/images/projects/nlp-toolkit.webp'
 ---
 
 ## Overview

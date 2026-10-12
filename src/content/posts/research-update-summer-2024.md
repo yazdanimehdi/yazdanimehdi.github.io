@@ -10,6 +10,7 @@ tags:
 draft: false
 subtitle: 'Three papers, a toolkit release and two new lab members.'
 relatedPublication: 'smith2024adaptive'
+coverImage: '../../assets/images/posts/research-update-summer-2024.webp'
 ---
 
 As we reach the midpoint of 2024, it's a great time to reflect on what our lab has accomplished and share a preview of what's coming next.

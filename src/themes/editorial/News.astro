@@ -1,0 +1,114 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import Layout from './Layout.astro';
+import { resolveImage } from '../../lib/content/image';
+import { imageFacts } from '../../lib/inkArt';
+import { formatNewsDate } from '../../lib/utils';
+import './timeline.css';
+
+interface Props {
+  title: string;
+  description: string;
+  heading: string;
+  intro: string;
+  items: CollectionEntry<'announcements'>[];
+  categories: string[];
+  /** The category page being shown; unset on /news. */
+  current?: string;
+}
+
+const { title, description, heading, intro, items, categories, current } = Astro.props;
+
+const rows = await Promise.all(
+  items.map(async (entry) => {
+    const image = entry.data.image;
+    if (!image) return { entry };
+    const facts = await imageFacts(image);
+    const size = typeof image === 'string' ? { width: facts.width, height: facts.height } : image;
+    return {
+      entry,
+      thumb: { src: (await resolveImage(image, 240)).src, ink: facts.ink, width: size.width, height: size.height },
+    };
+  }),
+);
+
+const pinned = rows.filter((r) => r.entry.data.pinned);
+const years = new Map<number, typeof rows>();
+for (const row of rows.filter((r) => !r.entry.data.pinned)) {
+  const year = row.entry.data.date.getUTCFullYear();
+  years.set(year, [...(years.get(year) ?? []), row]);
+}
+const groups = [
+  ...(pinned.length ? [{ key: 'pinned', heading: 'Pinned', rows: pinned }] : []),
+  ...[...years].map(([year, rows]) => ({ key: String(year), heading: String(year), rows })),
+];
+---
+
+<Layout title={title} description={description}>
+  <div class="ed-wrap ed-main ed-main--narrow">
+    <div class="ed-stack">
+      <h1 class="ed-h1">{heading}</h1>
+      <p class="ed-intro">{intro}</p>
+    </div>
+
+    {
+      categories.length > 0 && (
+        <nav class="ed-filterbar" aria-label="Filter news by category">
+          <div class="ed-tabs ed-tl-tabs">
+            <a href="/news" class="ed-tab" aria-current={current ? undefined : 'page'}>
+              All
+            </a>
+            {categories.map((cat) => (
+              <a href={`/news/category/${cat}`} class="ed-tab" aria-current={cat === current ? 'page' : undefined}>
+                {cat}
+              </a>
+            ))}
+          </div>
+        </nav>
+      )
+    }
+
+    {items.length === 0 && <p class="ed-tl-empty">No news yet.</p>}
+
+    {
+      groups.map((g) => (
+        <section class="ed-year ed-tl-year" aria-labelledby={`news-${g.key}`}>
+          <h2 id={`news-${g.key}`} class:list={[g.key === 'pinned' ? 'ed-tl-pinned' : 'num']}>
+            {g.heading}
+          </h2>
+          <ol class="ed-tl-list">
+            {g.rows.map(({ entry, thumb }) => (
+              <li class="row ed-tl-row">
+                <time class="ed-tl-date num" datetime={entry.data.date.toISOString()}>
+                  {formatNewsDate(entry.data.date, entry.data.datePrecision)}
+                </time>
+                <div class="ed-tl-body">
+                  <a href={`/news/${entry.id}`} class="ed-tl-title">
+                    {entry.data.title}
+                  </a>
+                  {entry.data.excerpt && <p class="ed-tl-excerpt">{entry.data.excerpt}</p>}
+                  <div class="ed-tl-meta">
+                    <span class="ed-note">{entry.data.category}</span>
+                  </div>
+                </div>
+                {thumb && (
+                  <span class="ed-tl-thumb" aria-hidden="true">
+                    <img
+                      src={thumb.src}
+                      alt=""
+                      width={thumb.width}
+                      height={thumb.height}
+                      class:list={[thumb.ink && 'ed-ink']}
+                      loading="lazy"
+                      decoding="async"
+                    />
+                  </span>
+                )}
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))
+    }
+  </div>
+</Layout>

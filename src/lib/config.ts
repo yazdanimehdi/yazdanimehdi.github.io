@@ -5,11 +5,16 @@ import type { SiteConfig, HomepageSectionId, HomepageSectionEntry, ThemeName } f
 
 let _siteConfig: SiteConfig | null = null;
 
-/** '' or missing → 'classic' (the CMS writes '' for untouched fields); any other unknown value is a config error. */
+/**
+ * '' or missing → 'classic' (the CMS writes '' for untouched fields, and older forks have no key).
+ * 'journal' is the merged theme's name; it is the editorial theme, so both names resolve to 'editorial'.
+ * Any other unknown value is a config error.
+ */
 export function normalizeTheme(value: unknown, source: string): ThemeName {
   if (value === undefined || value === null || value === '') return 'classic';
-  if (value === 'classic' || value === 'editorial') return value;
-  throw new Error(`${source}: theme must be 'classic' or 'editorial', got '${String(value)}'`);
+  if (value === 'journal' || value === 'editorial') return 'editorial';
+  if (value === 'classic') return value;
+  throw new Error(`${source}: theme must be 'journal' or 'classic', got '${String(value)}'`);
 }
 
 function readConfigFile(filename: string): string {

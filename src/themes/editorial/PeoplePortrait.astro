@@ -1,0 +1,40 @@
+---
+import { Image } from 'astro:assets';
+import type { CollectionEntry } from 'astro:content';
+import { getSiteConfig } from '../../lib/config';
+import { isInkArt } from '../../lib/inkArt';
+
+interface Props {
+  person: CollectionEntry<'people'>;
+  /** Rendered width in px (2x the column it fills). */
+  width: number;
+  alt?: string;
+  eager?: boolean;
+}
+
+const { person, width, alt = '', eager = false } = Astro.props;
+const { name, photo } = person.data;
+const shape = getSiteConfig().imageShape ?? 'rectangular';
+const height = shape === 'rectangular' ? Math.round((width * 5) / 4) : width;
+// The template's stock silhouette is a placeholder, not a portrait: show initials instead.
+const fsPath = photo && typeof photo !== 'string' ? (photo as { fsPath?: string }).fsPath : undefined;
+const real =
+  photo && !/placeholder-avatar/.test(fsPath ?? (typeof photo === 'string' ? photo : photo.src)) ? photo : null;
+const ink = await isInkArt(real);
+const initials = name
+  .split(' ')
+  .map((n) => n[0])
+  .join('');
+---
+
+<div class="ed-ppl-photo" data-shape={shape}>
+  {
+    real ? (
+      <Image src={real} {alt} {width} {height} loading={eager ? 'eager' : 'lazy'} class:list={[{ 'ed-ink': ink }]} />
+    ) : (
+      <span class="ed-ppl-initials" aria-hidden="true">
+        {initials}
+      </span>
+    )
+  }
+</div>

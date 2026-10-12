@@ -21,7 +21,12 @@
   --ed-footer-text: #c9cedc;
   --ed-footer-muted: #9aa0b4;
   --ed-footer-rule: #2c3248;
+  --ed-paper: #fff;
+  --ed-on-accent: #fff;
+  --ed-code: #2a2f45;
+  --ed-band-strong: #fff;
   --ed-pad: 32px;
+  color-scheme: light;
 
   /* Classic Tailwind tokens → editorial palette, so undesigned pages match without redesigns. */
   --color-primary-50: var(--ed-hover);
@@ -46,7 +51,7 @@
   --color-surface-900: var(--ed-ink);
 
   & body {
-    background: #fff;
+    background: var(--ed-paper);
     color: var(--ed-ink);
     font-family: var(--font-sans);
     font-size: 16px;
@@ -93,7 +98,7 @@
     transition: background-color 0.2s ease;
   }
   & .row:hover {
-    background: var(--ed-hover);
+    background-color: var(--ed-hover);
   }
   & .arr {
     display: inline-block;
@@ -103,8 +108,35 @@
   & .ul:hover .arr {
     transform: translateX(4px);
   }
+  /* Right-to-left: arrows point the reading direction and nudge that way. */
+  /* `translate` composes before `scale`, so the nudge is not mirrored back. */
+  &[dir='rtl'] .arr {
+    scale: -1 1;
+    transition: translate 0.2s ease;
+  }
+  &[dir='rtl'] .row:hover .arr,
+  &[dir='rtl'] .ul:hover .arr {
+    transform: none;
+    translate: -4px 0;
+  }
   & .num {
     font-variant-numeric: tabular-nums;
+  }
+  & .ed-arrow {
+    flex: none;
+    vertical-align: -0.15em;
+  }
+  /* Headlines and bios break into balanced lines, never a one-word last line. */
+  & .ed-hero-name,
+  & .ed-h1,
+  & .ed-h2,
+  & .ed-article-title {
+    text-wrap: balance;
+  }
+  & .ed-bio p,
+  & .ed-tagline,
+  & .ed-intro {
+    text-wrap: pretty;
   }
   & .ed-eyebrow {
     margin: 0;
@@ -116,7 +148,23 @@
     text-transform: uppercase;
     color: var(--ed-accent);
   }
+  /* Meta lines carry what a kicker would: role, tags, owner. They sit under the heading, never above it. */
+  & .ed-role {
+    margin: -10px 0 0;
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--ed-body-2);
+  }
+  & .ed-meta {
+    margin: 0;
+    font-size: 14px;
+    color: var(--ed-caption);
+  }
+  & .ed-meta-cap {
+    text-transform: capitalize;
+  }
   & .ed-label {
+    font-family: var(--font-sans);
     font-size: 12px;
     font-weight: 600;
     letter-spacing: 1.4px;
@@ -162,6 +210,7 @@
     font-weight: 600;
   }
   & .ed-navlinks {
+    margin-inline-start: auto;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -262,13 +311,13 @@
     padding: 0 20px;
     border-radius: 4px;
     background: var(--ed-accent);
-    color: #fff;
+    color: var(--ed-on-accent);
     font-size: 15px;
     font-weight: 500;
   }
   & .ed-btn:hover {
     background: var(--ed-accent-hover);
-    color: #fff;
+    color: var(--ed-on-accent);
   }
   & .ed-btn-outline {
     display: inline-flex;
@@ -284,6 +333,90 @@
   & .ed-btn-outline:hover {
     background: var(--ed-hover);
     color: var(--ed-ink);
+  }
+
+  /* ── Hero band and backdrop (hero.type) ── */
+  & .ed-hero-band {
+    position: relative;
+    isolation: isolate;
+    overflow: clip;
+  }
+  & .ed-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+  /* Hairline pattern in ink, strongest behind the figure side and fading out toward the text and the fold. */
+  & .ed-backdrop--pattern {
+    background: var(--ed-ink);
+    opacity: 0.07;
+    mask-image: var(--ed-pattern), radial-gradient(ellipse 70% 90% at 82% 40%, #000 0%, transparent 72%);
+    mask-composite: intersect;
+    -webkit-mask-composite: source-in;
+  }
+  &[dir='rtl'] .ed-backdrop--pattern {
+    mask-image: var(--ed-pattern), radial-gradient(ellipse 70% 90% at 18% 40%, #000 0%, transparent 72%);
+  }
+  & .ed-backdrop--pattern[data-pattern='dots'] {
+    --ed-pattern: url('data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2722%27 height=%2722%27><circle cx=%2711%27 cy=%2711%27 r=%271.1%27/></svg>');
+  }
+  & .ed-backdrop--pattern[data-pattern='grid'] {
+    --ed-pattern: url('data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2728%27 height=%2728%27><path fill=%27none%27 stroke=%27black%27 stroke-width=%271%27 d=%27M28 .5H.5V28%27/></svg>');
+  }
+  & .ed-backdrop--pattern[data-pattern='diagonal'] {
+    --ed-pattern: url('data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2718%27 height=%2718%27><path fill=%27none%27 stroke=%27black%27 stroke-width=%271%27 d=%27M-2 20 20-2%27/></svg>');
+  }
+  & .ed-backdrop--pattern[data-pattern='waves'] {
+    --ed-pattern: url('data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2716%27><path fill=%27none%27 stroke=%27black%27 stroke-width=%271%27 d=%27M0 8c6-6 18-6 24 0s18 6 24 0%27/></svg>');
+  }
+  & .ed-backdrop--pattern[data-pattern='hexagons'] {
+    --ed-pattern: url('data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2728%27 height=%2748%27><path fill=%27none%27 stroke=%27black%27 stroke-width=%271%27 d=%27M14 0v8L0 16v16l14 8 14-8V16L14 8M14 48v-8%27/></svg>');
+  }
+  & .ed-backdrop--image {
+    background: var(--ed-hero-img) center / cover no-repeat;
+  }
+  & .ed-backdrop--image::after,
+  & .ed-backdrop--video::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--ed-paper);
+    opacity: 0.86;
+  }
+  & .ed-backdrop--video video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* ── Mode toggle ── */
+  & .ed-mode {
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin-inline-end: -13px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--ed-body-2);
+    cursor: pointer;
+    transition: color 0.15s ease;
+  }
+  & .ed-mode:hover {
+    color: var(--ed-ink);
+  }
+  & .ed-mode-half {
+    transform-origin: 12px 12px;
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  & .ed-mode[data-mode='dark'] .ed-mode-half {
+    transform: rotate(180deg);
+  }
+  & .ed-mode[data-mode='system'] .ed-mode-half {
+    transform: rotate(90deg);
   }
 
   /* ── Home ── */
@@ -355,8 +488,8 @@
     color: var(--ed-ink);
   }
   & .ed-figure {
-    flex: 1 1 360px;
-    max-width: 440px;
+    flex: 1 1 420px;
+    max-width: 500px;
     margin: 0;
     display: flex;
     flex-direction: column;
@@ -496,7 +629,9 @@
     gap: 16px 32px;
     margin: 0 -16px;
     padding: 26px 16px;
-    border-bottom: 1px solid var(--ed-rule);
+    --ed-row-rule: var(--ed-rule);
+    /* The row's hover tint bleeds 16px past the column; its rule does not, so every rule shares the column edge. */
+    background: linear-gradient(var(--ed-row-rule), var(--ed-row-rule)) center bottom / calc(100% - 32px) 1px no-repeat;
     border-radius: 6px;
     scroll-margin-top: 24px;
   }
@@ -506,7 +641,7 @@
     flex-wrap: nowrap;
     gap: 6px;
     padding-block: 20px;
-    border-bottom-color: var(--ed-rule-soft);
+    --ed-row-rule: var(--ed-rule-soft);
   }
   & .ed-venue-tile {
     flex: 0 0 140px;
@@ -585,11 +720,12 @@
     padding-top: 4px;
     font-size: 14px;
   }
+  /* Venues are set as the journal sets them: italic serif (Plex has no true small caps to fake). */
   & .ed-venue {
-    font-weight: 600;
+    font-family: var(--font-serif);
+    font-size: 15px;
+    font-style: italic;
     color: var(--ed-ink);
-    font-variant: small-caps;
-    letter-spacing: 0.3px;
   }
   & .ed-paper--list .ed-venue {
     font-family: var(--font-serif);
@@ -635,8 +771,48 @@
     font-family: var(--font-mono);
     font-size: 12.5px;
     line-height: 1.6;
-    color: #2a2f45;
+    color: var(--ed-code);
     white-space: pre;
+  }
+  & .ed-bib-body {
+    position: relative;
+  }
+  & .ed-bib-body pre {
+    padding-inline-end: 84px;
+  }
+  /* Copy sits in the block's top corner, quiet until hovered. */
+  & .ed-bib-copy {
+    position: absolute;
+    top: 6px;
+    inset-inline-end: 6px;
+    min-height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--ed-rule);
+    border-radius: 4px;
+    background: var(--ed-paper);
+    color: var(--ed-body-2);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease;
+  }
+  & .ed-bib-copy:hover {
+    border-color: var(--ed-accent-border);
+    color: var(--ed-accent);
+  }
+  & .ed-cover {
+    margin: 0;
+  }
+  /* Tall art never pushes the article below the fold. */
+  & .ed-cover img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 420px;
+    object-fit: contain;
   }
 
   /* ── News and writing rows ── */
@@ -730,7 +906,7 @@
     font-size: clamp(28px, 5vw, 36px);
     line-height: 1.2;
     font-weight: 500;
-    color: #fff;
+    color: var(--ed-band-strong);
   }
   & .ed-contact p {
     margin: 0;
@@ -740,15 +916,15 @@
   & .ed-btn-light {
     padding: 14px 22px;
     border-radius: 4px;
-    background: #fff;
-    color: var(--ed-ink);
+    background: var(--ed-band-strong);
+    color: var(--ed-footer);
     font-size: 15px;
     font-weight: 500;
     overflow-wrap: anywhere;
   }
   & .ed-btn-light:hover {
     background: var(--ed-selection);
-    color: var(--ed-ink);
+    color: var(--ed-footer);
   }
   & .ed-contact-bottom {
     display: flex;
@@ -769,10 +945,10 @@
     color: var(--ed-footer-text);
   }
   & .ed-contact-links a:hover {
-    color: #fff;
+    color: var(--ed-band-strong);
   }
   & .ed-contact :focus-visible {
-    outline-color: #fff;
+    outline-color: var(--ed-band-strong);
   }
 
   /* ── Research ── */
@@ -845,10 +1021,10 @@
     font-weight: 600;
     color: var(--ed-ink);
   }
+  /* A result is set between hairlines, like a ruled pull-quote, not boxed or side-tabbed. */
   & .ed-result {
-    padding: 14px 18px;
-    border-left: 2px solid var(--ed-accent);
-    background: var(--ed-hover);
+    padding: 14px 0;
+    border-block: 1px solid var(--ed-rule);
     font-size: 14px;
     line-height: 1.6;
     color: var(--ed-body-2);
@@ -871,7 +1047,8 @@
     gap: 12px;
     margin: 0 -8px;
     padding: 10px 8px;
-    border-top: 1px solid var(--ed-rule);
+    /* Shared Edge: the hover tint bleeds 8px, the rule stays on the column. */
+    background: linear-gradient(var(--ed-rule), var(--ed-rule)) center top / calc(100% - 16px) 1px no-repeat;
     border-radius: 4px;
     color: var(--ed-ink);
     font-size: 15px;
@@ -1147,9 +1324,8 @@
     display: flex;
     flex-direction: column;
     gap: 4px;
-    padding: 20px 24px;
-    background: var(--ed-tint);
-    border-left: 3px solid var(--ed-accent);
+    padding-top: 16px;
+    border-top: 2px solid var(--ed-ink);
   }
   & .ed-aside-label {
     font-size: 13px;
@@ -1208,7 +1384,7 @@
   }
   & .ed-prose ul,
   & .ed-prose ol {
-    padding-left: 1.4em;
+    padding-inline-start: 1.4em;
   }
   & .ed-prose ul {
     list-style: disc;
@@ -1220,8 +1396,8 @@
     margin-top: 6px;
   }
   & .ed-prose blockquote {
-    padding-left: 18px;
-    border-left: 3px solid var(--ed-rule);
+    padding-inline-start: 18px;
+    border-inline-start: 1px solid var(--ed-caption);
     font-style: italic;
     color: var(--ed-body-2);
   }
@@ -1256,7 +1432,7 @@
   & .ed-prose th {
     padding: 10px 12px;
     border-bottom: 1px solid var(--ed-ink);
-    text-align: left;
+    text-align: start;
     font-weight: 500;
   }
   & .ed-prose td {
@@ -1365,7 +1541,7 @@
     flex-direction: column;
     gap: 4px;
     margin: 6px 0 0;
-    padding-left: 18px;
+    padding-inline-start: 18px;
     list-style: disc;
   }
   & .ed-cv-points li {
@@ -1374,9 +1550,53 @@
     color: var(--ed-body-2);
   }
 
+  /* ── Ink figures ── */
+  /* Line art ships as dark ink on transparency; in dark mode it is inverted to light ink. */
+  & .ed-ink {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
   /* ── Phones ── */
   @media (max-width: 640px) {
     --ed-pad: 16px;
+
+    /* Brand and mode toggle share the first line; the links become one row that scrolls sideways. */
+    & .ed-nav {
+      flex-wrap: wrap;
+      row-gap: 2px;
+      padding-block: 10px 0;
+    }
+    & .ed-mode {
+      order: 1;
+      margin-inline-start: auto;
+    }
+    & .ed-navlinks {
+      order: 2;
+      flex: 1 0 100%;
+      flex-wrap: nowrap;
+      gap: 0 22px;
+      margin-inline: calc(-1 * var(--ed-pad));
+      padding-inline: var(--ed-pad);
+      overflow-x: auto;
+      overscroll-behavior-inline: contain;
+      scrollbar-width: none;
+      mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    }
+    &[dir='rtl'] .ed-navlinks {
+      mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent);
+    }
+    & .ed-navlinks::-webkit-scrollbar {
+      display: none;
+    }
+    & .ed-navlinks a {
+      flex: none;
+      padding-block: 12px;
+    }
+    & .ed-navlinks a[aria-current='page'] {
+      padding-bottom: 10px;
+    }
 
     & .ed-hero {
       gap: 40px;
@@ -1414,5 +1634,63 @@
     & *::after {
       transition: none !important;
     }
+  }
+}
+
+/*
+ * Dark mode: neutral charcoal (classic's palette) under the journal's language. `.dark` comes from
+ * DarkModeScript; the accent follows colors.dark.primary (lib/colors.ts → editorialAccentCss).
+ * The classic dm-* tokens stay live, so undesigned pages using Tailwind `dark:` variants match.
+ */
+html.dark:root[data-theme='editorial'] {
+  --ed-ink: #e6edf3;
+  --ed-body-2: #c9d1d9;
+  --ed-muted: #a5aeb8;
+  --ed-caption: #8b949e;
+  --ed-rule: #21262d;
+  --ed-rule-soft: #1c2128;
+  --ed-tint: #161b22;
+  --ed-hover: #1c2128;
+  --ed-accent: #22d3ee;
+  --ed-accent-hover: #67e8f9;
+  --ed-accent-border: color-mix(in oklch, var(--ed-accent), #0d1117 60%);
+  --ed-selection: color-mix(in oklch, var(--ed-accent), #0d1117 72%);
+  --ed-footer: #161b22;
+  --ed-footer-text: #c9d1d9;
+  --ed-footer-muted: #8b949e;
+  --ed-footer-rule: #30363d;
+  --ed-paper: #0d1117;
+  --ed-on-accent: #0d1117;
+  --ed-code: #c9d1d9;
+  --ed-band-strong: #e6edf3;
+  color-scheme: dark;
+
+  /* Classic Tailwind tokens → dark journal palette on undesigned pages. */
+  --color-surface-50: var(--ed-hover);
+  --color-surface-100: var(--ed-tint);
+  --color-surface-200: var(--ed-rule);
+  --color-surface-300: var(--ed-caption);
+  --color-surface-400: var(--ed-caption);
+  --color-surface-500: var(--ed-caption);
+  --color-surface-600: var(--ed-muted);
+  --color-surface-700: var(--ed-body-2);
+  --color-surface-800: var(--ed-ink);
+  --color-surface-900: var(--ed-ink);
+  /* Bare links and classic accent utilities use the accent ramp in dark mode. */
+  --color-accent-300: var(--ed-accent-hover);
+  --color-accent-400: var(--ed-accent);
+
+  & .ed-contact {
+    border-top: 1px solid var(--ed-rule);
+  }
+  & .ed-backdrop--image {
+    background-image: var(--ed-hero-img-dark);
+  }
+  & .ed-backdrop--pattern {
+    opacity: 0.1;
+  }
+  & .ed-ink {
+    filter: invert(1) hue-rotate(180deg);
+    opacity: 0.88;
   }
 }

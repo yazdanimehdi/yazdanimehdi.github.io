@@ -1,0 +1,727 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-12T13:04:24.277Z",
+  "title": "Design System: ScholarOS",
+  "extensions": {
+    "colorMeta": {
+      "accent": {
+        "role": "primary",
+        "displayName": "Journal Navy (owner-selectable)",
+        "canonical": "oklch(38.2% 0.132 264.9)",
+        "tonalRamp": [
+          "oklch(15% 0.132 264.9)",
+          "oklch(26% 0.132 264.9)",
+          "oklch(37% 0.132 264.9)",
+          "oklch(48% 0.132 264.9)",
+          "oklch(59% 0.132 264.9)",
+          "oklch(70% 0.132 264.9)",
+          "oklch(82% 0.132 264.9)",
+          "oklch(95% 0.132 264.9)"
+        ]
+      },
+      "accent-hover": {
+        "role": "primary",
+        "displayName": "Navy Pressed",
+        "canonical": "oklch(30.5% 0.105 264.9)",
+        "tonalRamp": [
+          "oklch(15% 0.105 264.9)",
+          "oklch(26% 0.105 264.9)",
+          "oklch(37% 0.105 264.9)",
+          "oklch(48% 0.105 264.9)",
+          "oklch(59% 0.105 264.9)",
+          "oklch(70% 0.105 264.9)",
+          "oklch(82% 0.105 264.9)",
+          "oklch(95% 0.105 264.9)"
+        ]
+      },
+      "accent-border": {
+        "role": "primary",
+        "displayName": "Navy Wash",
+        "canonical": "oklch(85.8% 0.032 267.9)",
+        "tonalRamp": [
+          "oklch(15% 0.032 267.9)",
+          "oklch(26% 0.032 267.9)",
+          "oklch(37% 0.032 267.9)",
+          "oklch(48% 0.032 267.9)",
+          "oklch(59% 0.032 267.9)",
+          "oklch(70% 0.032 267.9)",
+          "oklch(82% 0.032 267.9)",
+          "oklch(95% 0.032 267.9)"
+        ]
+      },
+      "selection": {
+        "role": "primary",
+        "displayName": "Selection Wash",
+        "canonical": "oklch(91.6% 0.026 268.8)",
+        "tonalRamp": [
+          "oklch(15% 0.026 268.8)",
+          "oklch(26% 0.026 268.8)",
+          "oklch(37% 0.026 268.8)",
+          "oklch(48% 0.026 268.8)",
+          "oklch(59% 0.026 268.8)",
+          "oklch(70% 0.026 268.8)",
+          "oklch(82% 0.026 268.8)",
+          "oklch(95% 0.026 268.8)"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Ink",
+        "canonical": "oklch(21.9% 0.036 273.5)",
+        "tonalRamp": [
+          "oklch(15% 0.036 273.5)",
+          "oklch(26% 0.036 273.5)",
+          "oklch(37% 0.036 273.5)",
+          "oklch(48% 0.036 273.5)",
+          "oklch(59% 0.036 273.5)",
+          "oklch(70% 0.036 273.5)",
+          "oklch(82% 0.036 273.5)",
+          "oklch(95% 0.036 273.5)"
+        ]
+      },
+      "body": {
+        "role": "neutral",
+        "displayName": "Body Slate",
+        "canonical": "oklch(38.6% 0.035 271.7)",
+        "tonalRamp": [
+          "oklch(15% 0.035 271.7)",
+          "oklch(26% 0.035 271.7)",
+          "oklch(37% 0.035 271.7)",
+          "oklch(48% 0.035 271.7)",
+          "oklch(59% 0.035 271.7)",
+          "oklch(70% 0.035 271.7)",
+          "oklch(82% 0.035 271.7)",
+          "oklch(95% 0.035 271.7)"
+        ]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted Slate",
+        "canonical": "oklch(43.6% 0.04 273.7)",
+        "tonalRamp": [
+          "oklch(15% 0.04 273.7)",
+          "oklch(26% 0.04 273.7)",
+          "oklch(37% 0.04 273.7)",
+          "oklch(48% 0.04 273.7)",
+          "oklch(59% 0.04 273.7)",
+          "oklch(70% 0.04 273.7)",
+          "oklch(82% 0.04 273.7)",
+          "oklch(95% 0.04 273.7)"
+        ]
+      },
+      "caption": {
+        "role": "neutral",
+        "displayName": "Caption Gray (text floor)",
+        "canonical": "oklch(54.8% 0.034 272.7)",
+        "tonalRamp": [
+          "oklch(15% 0.034 272.7)",
+          "oklch(26% 0.034 272.7)",
+          "oklch(37% 0.034 272.7)",
+          "oklch(48% 0.034 272.7)",
+          "oklch(59% 0.034 272.7)",
+          "oklch(70% 0.034 272.7)",
+          "oklch(82% 0.034 272.7)",
+          "oklch(95% 0.034 272.7)"
+        ]
+      },
+      "code": {
+        "role": "neutral",
+        "displayName": "Code Ink",
+        "canonical": "oklch(31.1% 0.04 274)",
+        "tonalRamp": [
+          "oklch(15% 0.04 274)",
+          "oklch(26% 0.04 274)",
+          "oklch(37% 0.04 274)",
+          "oklch(48% 0.04 274)",
+          "oklch(59% 0.04 274)",
+          "oklch(70% 0.04 274)",
+          "oklch(82% 0.04 274)",
+          "oklch(95% 0.04 274)"
+        ]
+      },
+      "rule": {
+        "role": "neutral",
+        "displayName": "Rule",
+        "canonical": "oklch(92.8% 0.01 267.4)",
+        "tonalRamp": [
+          "oklch(15% 0.01 267.4)",
+          "oklch(26% 0.01 267.4)",
+          "oklch(37% 0.01 267.4)",
+          "oklch(48% 0.01 267.4)",
+          "oklch(59% 0.01 267.4)",
+          "oklch(70% 0.01 267.4)",
+          "oklch(82% 0.01 267.4)",
+          "oklch(95% 0.01 267.4)"
+        ]
+      },
+      "rule-soft": {
+        "role": "neutral",
+        "displayName": "Rule Soft",
+        "canonical": "oklch(95.5% 0.006 264.5)",
+        "tonalRamp": [
+          "oklch(15% 0.006 264.5)",
+          "oklch(26% 0.006 264.5)",
+          "oklch(37% 0.006 264.5)",
+          "oklch(48% 0.006 264.5)",
+          "oklch(59% 0.006 264.5)",
+          "oklch(70% 0.006 264.5)",
+          "oklch(82% 0.006 264.5)",
+          "oklch(95% 0.006 264.5)"
+        ]
+      },
+      "tint": {
+        "role": "neutral",
+        "displayName": "Tint",
+        "canonical": "oklch(97% 0.007 268.5)",
+        "tonalRamp": [
+          "oklch(15% 0.007 268.5)",
+          "oklch(26% 0.007 268.5)",
+          "oklch(37% 0.007 268.5)",
+          "oklch(48% 0.007 268.5)",
+          "oklch(59% 0.007 268.5)",
+          "oklch(70% 0.007 268.5)",
+          "oklch(82% 0.007 268.5)",
+          "oklch(95% 0.007 268.5)"
+        ]
+      },
+      "hover": {
+        "role": "neutral",
+        "displayName": "Hover",
+        "canonical": "oklch(97.9% 0.006 264.5)",
+        "tonalRamp": [
+          "oklch(15% 0.006 264.5)",
+          "oklch(26% 0.006 264.5)",
+          "oklch(37% 0.006 264.5)",
+          "oklch(48% 0.006 264.5)",
+          "oklch(59% 0.006 264.5)",
+          "oklch(70% 0.006 264.5)",
+          "oklch(82% 0.006 264.5)",
+          "oklch(95% 0.006 264.5)"
+        ]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Paper",
+        "canonical": "oklch(100% 0 0)",
+        "tonalRamp": [
+          "oklch(15% 0 0)",
+          "oklch(26% 0 0)",
+          "oklch(37% 0 0)",
+          "oklch(48% 0 0)",
+          "oklch(59% 0 0)",
+          "oklch(70% 0 0)",
+          "oklch(82% 0 0)",
+          "oklch(95% 0 0)"
+        ]
+      },
+      "band": {
+        "role": "neutral",
+        "displayName": "Contact Band",
+        "canonical": "oklch(21.9% 0.036 273.5)",
+        "tonalRamp": [
+          "oklch(15% 0.036 273.5)",
+          "oklch(26% 0.036 273.5)",
+          "oklch(37% 0.036 273.5)",
+          "oklch(48% 0.036 273.5)",
+          "oklch(59% 0.036 273.5)",
+          "oklch(70% 0.036 273.5)",
+          "oklch(82% 0.036 273.5)",
+          "oklch(95% 0.036 273.5)"
+        ]
+      },
+      "band-text": {
+        "role": "neutral",
+        "displayName": "Band Text",
+        "canonical": "oklch(85.2% 0.02 270.2)",
+        "tonalRamp": [
+          "oklch(15% 0.02 270.2)",
+          "oklch(26% 0.02 270.2)",
+          "oklch(37% 0.02 270.2)",
+          "oklch(48% 0.02 270.2)",
+          "oklch(59% 0.02 270.2)",
+          "oklch(70% 0.02 270.2)",
+          "oklch(82% 0.02 270.2)",
+          "oklch(95% 0.02 270.2)"
+        ]
+      },
+      "band-muted": {
+        "role": "neutral",
+        "displayName": "Band Muted",
+        "canonical": "oklch(70.7% 0.03 272.4)",
+        "tonalRamp": [
+          "oklch(15% 0.03 272.4)",
+          "oklch(26% 0.03 272.4)",
+          "oklch(37% 0.03 272.4)",
+          "oklch(48% 0.03 272.4)",
+          "oklch(59% 0.03 272.4)",
+          "oklch(70% 0.03 272.4)",
+          "oklch(82% 0.03 272.4)",
+          "oklch(95% 0.03 272.4)"
+        ]
+      },
+      "band-rule": {
+        "role": "neutral",
+        "displayName": "Band Rule",
+        "canonical": "oklch(32.2% 0.04 272.2)",
+        "tonalRamp": [
+          "oklch(15% 0.04 272.2)",
+          "oklch(26% 0.04 272.2)",
+          "oklch(37% 0.04 272.2)",
+          "oklch(48% 0.04 272.2)",
+          "oklch(59% 0.04 272.2)",
+          "oklch(70% 0.04 272.2)",
+          "oklch(82% 0.04 272.2)",
+          "oklch(95% 0.04 272.2)"
+        ]
+      },
+      "danger": {
+        "role": "error",
+        "displayName": "Danger (admin only)",
+        "canonical": "oklch(47.3% 0.156 25.4)",
+        "tonalRamp": [
+          "oklch(15% 0.156 25.4)",
+          "oklch(26% 0.156 25.4)",
+          "oklch(37% 0.156 25.4)",
+          "oklch(48% 0.156 25.4)",
+          "oklch(59% 0.156 25.4)",
+          "oklch(70% 0.156 25.4)",
+          "oklch(82% 0.156 25.4)",
+          "oklch(95% 0.156 25.4)"
+        ]
+      },
+      "dark-paper": {
+        "role": "neutral",
+        "displayName": "Charcoal",
+        "canonical": "oklch(17.6% 0.014 258.4)",
+        "tonalRamp": [
+          "oklch(15% 0.014 258.4)",
+          "oklch(26% 0.014 258.4)",
+          "oklch(37% 0.014 258.4)",
+          "oklch(48% 0.014 258.4)",
+          "oklch(59% 0.014 258.4)",
+          "oklch(70% 0.014 258.4)",
+          "oklch(82% 0.014 258.4)",
+          "oklch(95% 0.014 258.4)"
+        ]
+      },
+      "dark-tint": {
+        "role": "neutral",
+        "displayName": "Charcoal Tint",
+        "canonical": "oklch(22% 0.016 256.8)",
+        "tonalRamp": [
+          "oklch(15% 0.016 256.8)",
+          "oklch(26% 0.016 256.8)",
+          "oklch(37% 0.016 256.8)",
+          "oklch(48% 0.016 256.8)",
+          "oklch(59% 0.016 256.8)",
+          "oklch(70% 0.016 256.8)",
+          "oklch(82% 0.016 256.8)",
+          "oklch(95% 0.016 256.8)"
+        ]
+      },
+      "dark-hover": {
+        "role": "neutral",
+        "displayName": "Charcoal Hover",
+        "canonical": "oklch(24.6% 0.015 256.8)",
+        "tonalRamp": [
+          "oklch(15% 0.015 256.8)",
+          "oklch(26% 0.015 256.8)",
+          "oklch(37% 0.015 256.8)",
+          "oklch(48% 0.015 256.8)",
+          "oklch(59% 0.015 256.8)",
+          "oklch(70% 0.015 256.8)",
+          "oklch(82% 0.015 256.8)",
+          "oklch(95% 0.015 256.8)"
+        ]
+      },
+      "dark-ink": {
+        "role": "neutral",
+        "displayName": "Dark Ink",
+        "canonical": "oklch(94.3% 0.011 243.7)",
+        "tonalRamp": [
+          "oklch(15% 0.011 243.7)",
+          "oklch(26% 0.011 243.7)",
+          "oklch(37% 0.011 243.7)",
+          "oklch(48% 0.011 243.7)",
+          "oklch(59% 0.011 243.7)",
+          "oklch(70% 0.011 243.7)",
+          "oklch(82% 0.011 243.7)",
+          "oklch(95% 0.011 243.7)"
+        ]
+      },
+      "dark-body": {
+        "role": "neutral",
+        "displayName": "Dark Body",
+        "canonical": "oklch(85.7% 0.014 248)",
+        "tonalRamp": [
+          "oklch(15% 0.014 248)",
+          "oklch(26% 0.014 248)",
+          "oklch(37% 0.014 248)",
+          "oklch(48% 0.014 248)",
+          "oklch(59% 0.014 248)",
+          "oklch(70% 0.014 248)",
+          "oklch(82% 0.014 248)",
+          "oklch(95% 0.014 248)"
+        ]
+      },
+      "dark-muted": {
+        "role": "neutral",
+        "displayName": "Dark Muted",
+        "canonical": "oklch(74.7% 0.018 250.9)",
+        "tonalRamp": [
+          "oklch(15% 0.018 250.9)",
+          "oklch(26% 0.018 250.9)",
+          "oklch(37% 0.018 250.9)",
+          "oklch(48% 0.018 250.9)",
+          "oklch(59% 0.018 250.9)",
+          "oklch(70% 0.018 250.9)",
+          "oklch(82% 0.018 250.9)",
+          "oklch(95% 0.018 250.9)"
+        ]
+      },
+      "dark-caption": {
+        "role": "neutral",
+        "displayName": "Dark Caption (text floor)",
+        "canonical": "oklch(66.2% 0.018 250.9)",
+        "tonalRamp": [
+          "oklch(15% 0.018 250.9)",
+          "oklch(26% 0.018 250.9)",
+          "oklch(37% 0.018 250.9)",
+          "oklch(48% 0.018 250.9)",
+          "oklch(59% 0.018 250.9)",
+          "oklch(70% 0.018 250.9)",
+          "oklch(82% 0.018 250.9)",
+          "oklch(95% 0.018 250.9)"
+        ]
+      },
+      "dark-rule": {
+        "role": "neutral",
+        "displayName": "Dark Rule",
+        "canonical": "oklch(26.7% 0.015 256.8)",
+        "tonalRamp": [
+          "oklch(15% 0.015 256.8)",
+          "oklch(26% 0.015 256.8)",
+          "oklch(37% 0.015 256.8)",
+          "oklch(48% 0.015 256.8)",
+          "oklch(59% 0.015 256.8)",
+          "oklch(70% 0.015 256.8)",
+          "oklch(82% 0.015 256.8)",
+          "oklch(95% 0.015 256.8)"
+        ]
+      },
+      "dark-rule-strong": {
+        "role": "neutral",
+        "displayName": "Dark Rule Strong",
+        "canonical": "oklch(33% 0.015 252.3)",
+        "tonalRamp": [
+          "oklch(15% 0.015 252.3)",
+          "oklch(26% 0.015 252.3)",
+          "oklch(37% 0.015 252.3)",
+          "oklch(48% 0.015 252.3)",
+          "oklch(59% 0.015 252.3)",
+          "oklch(70% 0.015 252.3)",
+          "oklch(82% 0.015 252.3)",
+          "oklch(95% 0.015 252.3)"
+        ]
+      },
+      "dark-accent": {
+        "role": "primary",
+        "displayName": "Signal Cyan (dark accent, owner-selectable)",
+        "canonical": "oklch(79.7% 0.134 211.5)",
+        "tonalRamp": [
+          "oklch(15% 0.134 211.5)",
+          "oklch(26% 0.134 211.5)",
+          "oklch(37% 0.134 211.5)",
+          "oklch(48% 0.134 211.5)",
+          "oklch(59% 0.134 211.5)",
+          "oklch(70% 0.134 211.5)",
+          "oklch(82% 0.134 211.5)",
+          "oklch(95% 0.134 211.5)"
+        ]
+      },
+      "dark-accent-hover": {
+        "role": "primary",
+        "displayName": "Pale Cyan",
+        "canonical": "oklch(86.5% 0.115 207.1)",
+        "tonalRamp": [
+          "oklch(15% 0.115 207.1)",
+          "oklch(26% 0.115 207.1)",
+          "oklch(37% 0.115 207.1)",
+          "oklch(48% 0.115 207.1)",
+          "oklch(59% 0.115 207.1)",
+          "oklch(70% 0.115 207.1)",
+          "oklch(82% 0.115 207.1)",
+          "oklch(95% 0.115 207.1)"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "The owner's or lab's name in the home hero. Once per site."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Page titles; CV and article titles use their own clamps."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Home section heads and the contact band heading."
+      },
+      "stat": {
+        "displayName": "Stat",
+        "purpose": "Publication counts."
+      },
+      "initials": {
+        "displayName": "Initials",
+        "purpose": "Portrait placeholder."
+      },
+      "numeral": {
+        "displayName": "Numeral",
+        "purpose": "Accent research-area numbers and year headings."
+      },
+      "prose-h2": {
+        "displayName": "Prose H2",
+        "purpose": "Headings inside articles; h3 is 21px."
+      },
+      "tagline": {
+        "displayName": "Tagline",
+        "purpose": "Italic hero tagline."
+      },
+      "title-sm": {
+        "displayName": "Title Small",
+        "purpose": "Paper, post, talk, news, person and project titles (18–21px)."
+      },
+      "prose": {
+        "displayName": "Prose",
+        "purpose": "Long reading at a 680px measure."
+      },
+      "bio": {
+        "displayName": "Bio",
+        "purpose": "Hero bio; the 17px step also carries the hero role line."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Interface prose and intros."
+      },
+      "ui": {
+        "displayName": "UI",
+        "purpose": "Nav, buttons, tabs, authors, descriptions."
+      },
+      "meta": {
+        "displayName": "Meta",
+        "purpose": "Meta lines under headings, bylines, date columns."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Figure captions, post dates, stat labels."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase section labels that are the heading itself; definition terms."
+      },
+      "note": {
+        "displayName": "Note",
+        "purpose": "Outlined notes, deadline label, affiliations band label."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "BibTeX and inline code."
+      }
+    },
+    "shadows": [
+      {
+        "name": "admin-float",
+        "value": "0 6px 20px rgb(21 25 43 / 0.12)",
+        "purpose": "Floating admin UI only."
+      }
+    ],
+    "motion": [
+      {
+        "name": "underline-draw",
+        "value": "background-size 0.25s ease",
+        "purpose": "Link underline drawing in on hover/focus."
+      },
+      {
+        "name": "row-tint",
+        "value": "background-color 0.2s ease",
+        "purpose": "Row hover tint."
+      },
+      {
+        "name": "arrow-nudge",
+        "value": "transform 0.2s ease, translateX(4px)",
+        "purpose": "Arrow nudge in the reading direction (mirrored in RTL)."
+      },
+      {
+        "name": "color-shift",
+        "value": "color 0.15s ease",
+        "purpose": "Nav links and mode toggle."
+      },
+      {
+        "name": "mode-turn",
+        "value": "transform 0.35s cubic-bezier(0.22, 1, 0.36, 1)",
+        "purpose": "Mode toggle's half-disc rotation."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "phone",
+        "value": "640px"
+      },
+      {
+        "name": "profile-stack",
+        "value": "760px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Solid Accent action, 44px, 4px corners; hover deepens, no transform.",
+      "html": "<a class=\"ds-btn\" href=\"#\">View publications</a>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; min-height: 44px; padding: 0 20px; border-radius: 4px; background: var(--ed-accent, #1f3c88); color: var(--ed-on-accent, #fff); font: 500 15px/1.6 'IBM Plex Sans', system-ui, sans-serif; text-decoration: none; transition: background-color 0.15s ease; } .ds-btn:hover { background: var(--ed-accent-hover, #142a63); } .ds-btn:focus-visible { outline: 2px solid var(--ed-accent, #1f3c88); outline-offset: 2px; }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "1px Ink stroke, Ink text; hover fills with Hover.",
+      "html": "<a class=\"ds-btn-outline\" href=\"#\">Download PDF</a>",
+      "css": ".ds-btn-outline { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border: 1px solid var(--ed-ink, #15192b); border-radius: 4px; color: var(--ed-ink, #15192b); font: 500 15px/1.6 'IBM Plex Sans', system-ui, sans-serif; text-decoration: none; } .ds-btn-outline:hover { background: var(--ed-hover, #f6f8fc); } .ds-btn-outline:focus-visible { outline: 2px solid var(--ed-accent, #1f3c88); outline-offset: 2px; }"
+    },
+    {
+      "name": "Navigation",
+      "kind": "nav",
+      "refersTo": null,
+      "description": "Brand mark and serif name at the start, 15px sans links with a 2px Accent active underline, mode toggle at the end.",
+      "html": "<nav class=\"ds-nav\"><a class=\"ds-brand\" href=\"#\"><span class=\"ds-mark\"></span>Ada Lovelace</a><div class=\"ds-links\"><a href=\"#\" aria-current=\"page\">Research</a><a href=\"#\">Publications</a><a href=\"#\">CV</a></div><button class=\"ds-mode\" aria-label=\"Color theme: system\"><svg viewBox=\"0 0 24 24\" width=\"18\" height=\"18\"><circle cx=\"12\" cy=\"12\" r=\"8.25\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/><path class=\"ds-half\" d=\"M12 3.75a8.25 8.25 0 0 1 0 16.5z\" fill=\"currentColor\"/></svg></button></nav>",
+      "css": ".ds-nav { display: flex; align-items: center; gap: 12px 24px; padding: 18px 0; border-bottom: 1px solid var(--ed-rule, #e4e7ee); font-family: 'IBM Plex Sans', system-ui, sans-serif; } .ds-brand { display: flex; align-items: center; gap: 10px; color: var(--ed-ink, #15192b); font: 600 19px 'Source Serif 4', Georgia, serif; text-decoration: none; } .ds-mark { width: 10px; height: 10px; background: var(--ed-accent, #1f3c88); transform: rotate(45deg); } .ds-links { margin-inline-start: auto; display: flex; gap: 28px; font-size: 15px; } .ds-links a { padding: 8px 0; color: var(--ed-body-2, #3d4357); text-decoration: none; transition: color 0.15s ease; } .ds-links a:hover { color: var(--ed-ink, #15192b); } .ds-links a[aria-current='page'] { padding-bottom: 6px; border-bottom: 2px solid var(--ed-accent, #1f3c88); color: var(--ed-ink, #15192b); font-weight: 500; } .ds-mode { display: inline-grid; place-items: center; width: 44px; height: 44px; border: 0; border-radius: 4px; background: transparent; color: var(--ed-body-2, #3d4357); cursor: pointer; } .ds-mode:hover { color: var(--ed-ink, #15192b); } .ds-half { transform-origin: 12px 12px; transform: rotate(90deg); transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1); } .ds-mode:hover .ds-half { transform: rotate(180deg); } .ds-mode:focus-visible { outline: 2px solid var(--ed-accent, #1f3c88); outline-offset: 2px; }"
+    },
+    {
+      "name": "Note",
+      "kind": "chip",
+      "refersTo": "note",
+      "description": "Outlined uppercase tag for paper distinctions. No fills, no pills.",
+      "html": "<span class=\"ds-note\">Oral</span>",
+      "css": ".ds-note { display: inline-block; padding: 2px 6px; border: 1px solid var(--ed-accent-border, #c7d0e6); border-radius: 3px; color: var(--ed-accent, #1f3c88); font: 600 11px 'IBM Plex Sans', system-ui, sans-serif; letter-spacing: 1.2px; text-transform: uppercase; }"
+    },
+    {
+      "name": "Paper Row",
+      "kind": "custom",
+      "refersTo": "venue-tile",
+      "description": "Venue tile beside a serif title, authors, italic venue and notes; tint bleeds 16px, the rule stays on the column edge.",
+      "html": "<div class=\"ds-paper\"><div class=\"ds-tile\"><span class=\"ds-short\">EMNLP</span><span class=\"ds-year\">2024</span></div><div class=\"ds-body\"><a class=\"ds-title\" href=\"#\">Cross-lingual transfer without parallel data</a><span class=\"ds-authors\"><strong>A. Lovelace</strong>, C. Babbage</span><span class=\"ds-venue\">Proceedings of EMNLP</span><span><span class=\"ds-note\">Oral</span></span></div></div>",
+      "css": ".ds-paper { display: flex; flex-wrap: wrap; gap: 16px 32px; margin: 0 -16px; padding: 26px 16px; border-radius: 6px; background: linear-gradient(var(--ed-rule, #e4e7ee), var(--ed-rule, #e4e7ee)) center bottom / calc(100% - 32px) 1px no-repeat; transition: background-color 0.2s ease; font-family: 'IBM Plex Sans', system-ui, sans-serif; } .ds-paper:hover { background-color: var(--ed-hover, #f6f8fc); } .ds-tile { flex: 0 0 140px; height: 92px; box-sizing: border-box; display: flex; flex-direction: column; justify-content: space-between; padding: 12px 14px; background: var(--ed-tint, #f3f5fa); border: 1px solid var(--ed-rule, #e4e7ee); border-radius: 4px; } .ds-short { font: 600 20px/1.1 'Source Serif 4', Georgia, serif; color: var(--ed-accent, #1f3c88); } .ds-year { font-size: 12px; color: var(--ed-caption, #6a7085); font-variant-numeric: tabular-nums; } .ds-body { flex: 1 1 320px; display: flex; flex-direction: column; gap: 6px; } .ds-title { font: 500 20px/1.4 'Source Serif 4', Georgia, serif; color: var(--ed-ink, #15192b); text-decoration: none; } .ds-title:hover { color: var(--ed-accent, #1f3c88); } .ds-authors { font-size: 15px; color: var(--ed-muted, #4a5068); } .ds-authors strong { font-weight: 600; color: var(--ed-ink, #15192b); } .ds-venue { font: italic 15px 'Source Serif 4', Georgia, serif; color: var(--ed-ink, #15192b); } .ds-note { padding: 2px 6px; border: 1px solid var(--ed-accent-border, #c7d0e6); border-radius: 3px; color: var(--ed-accent, #1f3c88); font-size: 11px; font-weight: 600; letter-spacing: 1.2px; text-transform: uppercase; }"
+    },
+    {
+      "name": "Open Project Card",
+      "kind": "card",
+      "refersTo": "project-cover",
+      "description": "A 2px Ink top rule with the Tint cover plate hanging straight from it; serif title and sans details below.",
+      "html": "<article class=\"ds-pj\"><div class=\"ds-cover\"><svg viewBox=\"0 0 120 80\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1\"><rect x=\"10\" y=\"20\" width=\"30\" height=\"20\"/><rect x=\"80\" y=\"40\" width=\"30\" height=\"20\"/><path d=\"M40 30h20v20h20\"/></svg></div><h3 class=\"ds-pj-title\"><a href=\"#\">NLP Toolkit</a></h3><p class=\"ds-pj-desc\">Modular components for multilingual pipelines.</p></article>",
+      "css": ".ds-pj { display: flex; flex-direction: column; gap: 12px; max-width: 340px; border-top: 2px solid var(--ed-ink, #15192b); font-family: 'IBM Plex Sans', system-ui, sans-serif; } .ds-cover { aspect-ratio: 3 / 2; padding: 16px; background: var(--ed-tint, #f3f5fa); color: var(--ed-ink, #15192b); display: grid; place-items: center; } .ds-cover svg { width: 100%; height: 100%; } .ds-pj-title { margin: 0; font: 500 21px/1.35 'Source Serif 4', Georgia, serif; } .ds-pj-title a { color: var(--ed-ink, #15192b); text-decoration: none; transition: color 0.2s ease; } .ds-pj-title a:hover { color: var(--ed-accent, #1f3c88); } .ds-pj-desc { margin: 0; font-size: 15px; line-height: 1.65; color: var(--ed-muted, #4a5068); }"
+    },
+    {
+      "name": "Post Row with drawn Arrow",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Serif title over a 13px meta line; the standalone arrow is the drawn 16px, 1.5px-stroke Arrow and nudges 4px on hover.",
+      "html": "<a class=\"ds-post\" href=\"#\"><span><span class=\"ds-post-title\">Welcome to our lab</span><span class=\"ds-post-meta\">Mar 2024 · 4 min read</span></span><svg class=\"ds-arr\" viewBox=\"0 0 16 16\" width=\"16\" height=\"16\"><path d=\"M3 8h10M9 4l4 4-4 4\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></a>",
+      "css": ".ds-post { display: flex; justify-content: space-between; gap: 16px; margin: 0 -12px; padding: 14px 12px; border-radius: 6px; color: var(--ed-ink, #15192b); text-decoration: none; transition: background-color 0.2s ease; font-family: 'IBM Plex Sans', system-ui, sans-serif; } .ds-post:hover { background: var(--ed-hover, #f6f8fc); } .ds-post-title { display: block; font: 500 19px/1.35 'Source Serif 4', Georgia, serif; } .ds-post-meta { display: block; margin-top: 4px; font-size: 13px; color: var(--ed-caption, #6a7085); } .ds-arr { flex: none; color: var(--ed-accent, #1f3c88); transition: transform 0.2s ease; } .ds-post:hover .ds-arr { transform: translateX(4px); } .ds-post:focus-visible { outline: 2px solid var(--ed-accent, #1f3c88); outline-offset: 2px; }"
+    },
+    {
+      "name": "Section Label Heading",
+      "kind": "custom",
+      "refersTo": null,
+      "description": "Uppercase tracked text that is the heading itself, over a Rule with a tabular count. Never placed above another heading.",
+      "html": "<h2 class=\"ds-label\">PhD students <span class=\"ds-count\">6</span></h2>",
+      "css": ".ds-label { display: flex; justify-content: space-between; align-items: baseline; margin: 0; padding-bottom: 10px; border-bottom: 1px solid var(--ed-rule, #e4e7ee); font: 600 12px/1.6 'IBM Plex Sans', system-ui, sans-serif; letter-spacing: 1.4px; text-transform: uppercase; color: var(--ed-caption, #6a7085); } .ds-count { letter-spacing: 0; font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Admin Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "White field, 1px Rule stroke, 6px radius, 14px sans; Accent focus ring.",
+      "html": "<label class=\"ds-field\"><span>Title</span><input type=\"text\" value=\"Paper accepted at EMNLP\"></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 6px; font: 14px 'IBM Plex Sans', system-ui, sans-serif; color: #15192b; } .ds-field span { font-size: 13px; font-weight: 500; } .ds-field input { padding: 8px 10px; border: 1px solid #e4e7ee; border-radius: 6px; background: #fff; color: #15192b; font: inherit; } .ds-field input:focus-visible { outline: 2px solid #1f3c88; outline-offset: 2px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Quiet Journal",
+    "overview": "A ScholarOS site reads like a well-edited journal page: white paper, one ink-dark voice for text, one accent color, and hairline rules doing the work that boxes and shadows do elsewhere. Authority comes from typesetting rather than decoration. Names, titles and long reading are set in a serif; interface and metadata in a clean grotesque sans. Tabular numerals keep dates and counts aligned. Structure is announced by headings, meta lines and 1px rules, never by colored panels or cards stacked on cards.\n\nThe system is quiet so the research is loud. Density is moderate: generous vertical rhythm between sections (56–104px), tight scannable rows within them (paper lists, news, talks, posts, CV entries, alumni). Motion is limited to small acknowledgements: a link underline that draws in, a row tint on hover, an arrow that nudges 4px, the mode toggle's half-disc turning. All transitions stop under `prefers-reduced-motion`, and the hero video stays on its poster.\n\nThe public theme ships as `journal` (code id `editorial`, the default in `config/site.yml`); `classic` remains as a frozen legacy theme. It is one system with many shapes: personal and lab sites, light and dark, LTR and RTL, and any owner-chosen accent or font pairing all read as the same journal. Everything the owner configures (accent per mode, font families, hero backdrop, image shape, home blocks) is a variable inside this language, never an exit from it.",
+    "keyCharacteristics": [
+      "Serif for identity and reading (Source Serif 4), sans for interface (IBM Plex Sans), mono for code, BibTeX and package names (IBM Plex Mono).",
+      "One accent per mode, owner-selectable, used sparingly for links, primary actions, the active nav underline, venue short-names, numerals and the brand mark.",
+      "Rules, not boxes: 1px hairlines separate content, 2px Ink rules mark open-card top edges, aside tops and active tabs.",
+      "Flat surfaces. Depth comes from tint and tone; the only shadow is on floating admin UI.",
+      "Light and dark modes; dark is neutral charcoal with a cyan accent. Ink line-art plates invert with the mode.",
+      "1080px content measure, 680px reading measure, 32px gutters (16px on phones)."
+    ],
+    "rules": [
+      {
+        "name": "The One Voice Rule",
+        "body": "There is exactly one accent hue on any screen. No secondary brand color, no teal-plus-navy pairing in the same mode, and no colored section backgrounds.",
+        "section": "colors"
+      },
+      {
+        "name": "The Caption Floor Rule",
+        "body": "No text is lighter than Caption Gray in light mode or dark-caption in dark mode. An owner-chosen accent must also clear 4.5:1 against Paper in its mode.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Band Rule",
+        "body": "Only one inverted region exists per page: the contact band at the bottom of the home page. Heroes, sections and callouts stay on Paper; the affiliations strip is Tint, not inverted.",
+        "section": "colors"
+      },
+      {
+        "name": "The Serif Speaks, Sans Serves Rule",
+        "body": "Names, page/paper/post titles, venues, quotes and reading text are serif. Navigation, buttons, metadata, labels, form fields and compact card headings are sans. Never set long reading in sans or interface in serif.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Dates Rule",
+        "body": "Every date, year, count and statistic uses `font-variant-numeric: tabular-nums` so columns of numbers align.",
+        "section": "typography"
+      },
+      {
+        "name": "The Heading-Is-The-Label Rule",
+        "body": "Nothing sits above a heading. There are no eyebrow or kicker labels over titles. Uppercase tracked text survives only where it _is_ the heading (`h2` section labels: home News and Blog, research Software, people groups, project status groups, positions and join groups, CV sections, contact and repository groups) or the affiliations band's own label. What a kicker used to carry (role, category, owner, tags) lives in a meta line under the heading: the role line under the hero name, the 14px Caption meta line, bylines.",
+        "section": "typography"
+      },
+      {
+        "name": "The Shared Edge Rule",
+        "body": "Every row rule sits on the column edge. A row's hover tint may bleed 12–16px past the column (negative inline margin, 6px radius), but its divider does not: it is drawn as a 1px centered gradient at `calc(100% − 2 × bleed)`, or on the unbled list item. Rules from different lists, heads and sections all start and end on the same vertical line.",
+        "section": "layout"
+      },
+      {
+        "name": "The Paper Rule",
+        "body": "If it isn't floating above other content, it has no shadow. Cards, tiles, buttons, plates and heroes are flat.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do separate content with 1px Rule hairlines and reserve 2px for open-card tops, aside tops and active underlines.",
+      "Do keep every row rule on the column edge while the hover tint bleeds past it.",
+      "Do put role, category and tag information in a meta line under the heading.",
+      "Do set every date, year and count in tabular numerals.",
+      "Do draw standalone arrows with the 16px, 1.5px round-stroke Arrow; keep inline → ↗ ← as typeset text in the link.",
+      "Do ship line art as ink on transparency and let the build mark it for dark-mode inversion; keep photos as photos.",
+      "Do keep text at Caption or darker in light mode and dark-caption or lighter in dark mode.",
+      "Do give every interactive element a 44px minimum target and the 2px Accent focus ring.",
+      "Do use logical CSS properties so RTL sites mirror cleanly.",
+      "Do stop all transitions under `prefers-reduced-motion`."
+    ],
+    "donts": [
+      "Don't put an eyebrow or kicker label above a heading. Uppercase tracked text is only ever the heading itself or the affiliations band label.",
+      "Don't use gradients, glows or colored section backgrounds. The hero backdrop stays an Ink hairline pattern or an image under a Paper wash.",
+      "Don't use pill-shaped buttons or tags, or radii above 8px (circular or oval portraits and the mode toggle's disc excepted).",
+      "Don't put shadows on public-page elements. Shadows are for floating admin UI only.",
+      "Don't introduce a second accent hue. Teal/cyan appears only as the dark-mode accent.",
+      "Don't use emoji or icon-font glyphs as icons.",
+      "Don't set navigation, buttons or form fields in the serif, or long reading text in the sans.",
+      "Don't let configurable options (hero type, home blocks, accent, fonts) introduce a layout that exists only in one mode. Personal, lab, light, dark, LTR and RTL share every component."
+    ]
+  }
+}

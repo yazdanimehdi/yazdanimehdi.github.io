@@ -1,0 +1,145 @@
+---
+import Layout from './Layout.astro';
+import './projects.css';
+
+/** A github-readme-stats card in its light and dark variants. */
+interface Shot {
+  light: string;
+  dark: string;
+  alt: string;
+}
+
+interface Props {
+  personal: boolean;
+  username: string;
+  stats: Shot[];
+  trophies?: Shot;
+  repos: { name: string; href: string; description?: string }[];
+  members: {
+    id: string;
+    name: string;
+    caption: string;
+    githubUsername: string | null;
+    githubUrl: string;
+    stats: Shot[];
+  }[];
+}
+
+const { personal, username, stats, trophies, repos, members } = Astro.props;
+const description = personal
+  ? 'My open-source projects and GitHub activity.'
+  : 'Our open-source projects and GitHub activity.';
+---
+
+<Layout title="Repositories" description={description}>
+  <div class="ed-wrap ed-main">
+    <div class="ed-stack">
+      <h1 class="ed-h1">Repositories</h1>
+      <p class="ed-intro">{description}</p>
+    </div>
+
+    {
+      repos.length > 0 && (
+        <section class="ed-pj-group" aria-labelledby="rp-pinned">
+          <h2 id="rp-pinned" class="ed-label ed-pj-group-head">
+            Pinned repositories
+          </h2>
+          <ul class="ed-pj-repos">
+            {repos.map((r) => (
+              <li>
+                <a href={r.href} class="row ed-pj-repo" rel="noopener noreferrer">
+                  <span class="ed-pj-repo-text">
+                    <span class="ed-pj-repo-name">
+                      {username}/{r.name}
+                    </span>
+                    {r.description && <span class="ed-pj-repo-desc">{r.description}</span>}
+                  </span>
+                  <span class="arr" aria-hidden="true">
+                    ↗
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+
+    {
+      stats.length > 0 && (
+        <section class="ed-pj-group" aria-labelledby="rp-stats">
+          <h2 id="rp-stats" class="ed-label ed-pj-group-head">
+            GitHub activity
+          </h2>
+          <div class="ed-pj-shots">
+            {stats.map((s) => (
+              <div class="ed-pj-shot">
+                <img class="ed-pj-shot-light" src={s.light} alt={s.alt} loading="lazy" decoding="async" />
+                <img class="ed-pj-shot-dark" src={s.dark} alt={s.alt} loading="lazy" decoding="async" />
+              </div>
+            ))}
+          </div>
+        </section>
+      )
+    }
+
+    {
+      trophies && (
+        <section class="ed-pj-group" aria-labelledby="rp-trophies">
+          <h2 id="rp-trophies" class="ed-label ed-pj-group-head">
+            Trophies
+          </h2>
+          <div class="ed-pj-shot ed-pj-shot--wide">
+            <img class="ed-pj-shot-light" src={trophies.light} alt={trophies.alt} loading="lazy" decoding="async" />
+            <img class="ed-pj-shot-dark" src={trophies.dark} alt={trophies.alt} loading="lazy" decoding="async" />
+          </div>
+        </section>
+      )
+    }
+
+    {
+      members.length > 0 && (
+        <section class="ed-pj-group" aria-labelledby="rp-members">
+          <h2 id="rp-members" class="ed-label ed-pj-group-head">
+            Team members
+          </h2>
+          <ul class="ed-pj-members">
+            {members.map((m) => (
+              <li>
+                <p class="ed-pj-member">
+                  <a href={`/people/${m.id}`} class="ed-pj-member-name">
+                    {m.name}
+                  </a>
+                  <span class="ed-pj-role">{m.caption}</span>
+                  <a href={m.githubUrl} class="ul ed-pj-mono" rel="noopener noreferrer">
+                    @{m.githubUsername}
+                  </a>
+                </p>
+                <div class="ed-pj-shots">
+                  {m.stats.map((s) => (
+                    <div class="ed-pj-shot">
+                      <img class="ed-pj-shot-light" src={s.light} alt={s.alt} loading="lazy" decoding="async" />
+                      <img class="ed-pj-shot-dark" src={s.dark} alt={s.alt} loading="lazy" decoding="async" />
+                    </div>
+                  ))}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+
+    {
+      repos.length === 0 && stats.length === 0 && !trophies && members.length === 0 && (
+        <p class="ed-pj-empty">Nothing to show here yet.</p>
+      )
+    }
+
+    <p class="ed-pj-text">
+      <a href={`https://github.com/${username}`} class="ul" rel="noopener noreferrer">
+        View the full profile on GitHub <span class="arr" aria-hidden="true">↗</span>
+      </a>
+    </p>
+  </div>
+</Layout>

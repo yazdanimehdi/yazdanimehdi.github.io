@@ -1,6 +1,5 @@
 ---
 import Layout from './Layout.astro';
-import Eyebrow from './Eyebrow.astro';
 import { formatNewsDate } from '../../lib/utils';
 import type { BlogData } from './data';
 
@@ -23,7 +22,6 @@ const tabs = [
 <Layout title={label} description={description}>
   <div class="ed-wrap ed-main ed-main--narrow">
     <div class="ed-stack">
-      <Eyebrow>{label}</Eyebrow>
       <h1 class="ed-h1">Essays &amp; notes</h1>
       <p class="ed-intro">{description}</p>
     </div>

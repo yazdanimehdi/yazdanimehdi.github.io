@@ -9,6 +9,7 @@ excerpt: 'Our paper on adaptive language model fine-tuning has been accepted at 
 people:
   - 'jane-smith'
   - 'alex-chen'
+image: '../../assets/images/news/paper-accepted-emnlp.webp'
 ---
 
 We are thrilled to announce that our paper **"Adaptive Fine-Tuning Strategies for Large Language Models in Low-Resource Domains"** has been accepted at EMNLP 2024!

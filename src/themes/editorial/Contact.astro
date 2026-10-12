@@ -1,0 +1,105 @@
+---
+import Layout from './Layout.astro';
+import ContactForm from '../../components/vue/ContactForm.vue';
+import ObfuscatedEmail from '../../components/astro/ObfuscatedEmail.astro';
+import { socialLinks } from '../../lib/editorial';
+import type { SiteConfig } from '../../lib/types';
+import './projects.css';
+
+interface Props {
+  config: SiteConfig;
+  siteName: string;
+  personal: boolean;
+  web3formsKey?: string;
+}
+
+const { config, siteName, personal, web3formsKey } = Astro.props;
+const email = config.socials?.email;
+const affiliation = [config.department, config.university].filter(Boolean);
+const profiles = socialLinks(config.socials);
+const intro =
+  config.editorial?.contact?.text ||
+  (personal
+    ? 'Have a question about my research or interested in collaborating? Get in touch.'
+    : 'Have questions about our research or interested in collaboration? Get in touch.');
+---
+
+<Layout title="Contact" description={personal ? 'Get in touch.' : 'Get in touch with our research lab.'}>
+  <div class="ed-wrap ed-main">
+    <div class="ed-stack">
+      <h1 class="ed-h1">{config.editorial?.contact?.heading || 'Get in touch'}</h1>
+      <p class="ed-intro">{intro}</p>
+    </div>
+
+    <div class="ed-pj-contact">
+      <section class="ed-pj-contact-main" aria-labelledby="ct-message">
+        <h2 id="ct-message" class="ed-label ed-pj-group-head">Send a message</h2>
+        {
+          web3formsKey ? (
+            <div class="ed-pj-form">
+              <ContactForm client:visible accessKey={web3formsKey} />
+            </div>
+          ) : email ? (
+            <p class="ed-pj-text">
+              The quickest way to reach {personal ? 'me' : 'us'} is by email:{' '}
+              <ObfuscatedEmail email={email} class="ul" />
+            </p>
+          ) : (
+            <p class="ed-pj-empty">No contact form is set up yet.</p>
+          )
+        }
+      </section>
+
+      <section class="ed-pj-contact-info" aria-labelledby="ct-info">
+        <h2 id="ct-info" class="ed-label ed-pj-group-head">
+          {personal ? 'Contact information' : 'Lab information'}
+        </h2>
+        <dl class="ed-pj-facts ed-pj-facts--stack">
+          <div>
+            <dt>{personal ? 'Name' : 'Lab'}</dt>
+            <dd>{siteName}</dd>
+          </div>
+          {
+            affiliation.length > 0 && (
+              <div>
+                <dt>Affiliation</dt>
+                <dd>
+                  {affiliation.map((a, i) => (
+                    <>
+                      {i > 0 && <br />}
+                      {a}
+                    </>
+                  ))}
+                </dd>
+              </div>
+            )
+          }
+          {
+            email && (
+              <div>
+                <dt>Email</dt>
+                <dd>
+                  <ObfuscatedEmail email={email} class="ul" />
+                </dd>
+              </div>
+            )
+          }
+          {
+            profiles.length > 0 && (
+              <div>
+                <dt>Elsewhere</dt>
+                <dd class="ed-pj-links">
+                  {profiles.map((l) => (
+                    <a href={l.href} class="ul" rel="noopener noreferrer">
+                      {l.label}
+                    </a>
+                  ))}
+                </dd>
+              </div>
+            )
+          }
+        </dl>
+      </section>
+    </div>
+  </div>
+</Layout>

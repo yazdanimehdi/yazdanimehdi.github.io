@@ -1,4 +1,5 @@
 ---
+import Arrow from './Arrow.astro';
 import type { WritingItem } from '../../lib/editorial';
 import { formatNewsDate } from '../../lib/utils';
 
@@ -19,6 +20,6 @@ const meta = [formatNewsDate(item.date, 'month'), external ? item.source : `${it
       <span class="ed-post-title">{item.title}</span>
       <span class="ed-post-meta">{meta}</span>
     </span>
-    <span class="arr" aria-hidden="true">{external ? '↗' : '→'}</span>
+    <Arrow external={external} />
   </a>
 </li>

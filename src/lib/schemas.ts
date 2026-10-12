@@ -206,7 +206,7 @@ export const siteSchema = z
     siteMode: z.enum(['personal', 'lab']),
     title: z.string().min(1),
     author: z.string(),
-    theme: z.enum(['classic', 'editorial', '']).optional(),
+    theme: z.enum(['journal', 'classic', 'editorial', '']).optional(),
     adminPath: z
       .string()
       .regex(/^[a-z0-9-]*$/, 'Use lowercase letters, digits and dashes')

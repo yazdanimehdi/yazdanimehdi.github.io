@@ -1,6 +1,5 @@
 ---
 import Layout from './Layout.astro';
-import Eyebrow from './Eyebrow.astro';
 import type { CvPageData } from './data';
 import { slugify } from '../../lib/utils';
 
@@ -13,8 +12,8 @@ const { name, sections, pdfHref, updated } = Astro.props;
   <div class="ed-wrap ed-main ed-main--narrow ed-main--flush">
     <div class="ed-cv-head">
       <div class="ed-stack">
-        <Eyebrow>{name}</Eyebrow>
         <h1 class="ed-cv-title">Curriculum Vitae</h1>
+        <p class="ed-meta">{name}</p>
         {
           updated && (
             <span class="ed-cv-updated">

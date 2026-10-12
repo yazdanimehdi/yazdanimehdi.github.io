@@ -1,11 +1,12 @@
 ---
 import EntryBody from '../../components/astro/EntryBody.astro';
 import Layout from './Layout.astro';
-import Eyebrow from './Eyebrow.astro';
 import SEO from '../../components/astro/SEO.astro';
 import ProseEnhancements from '../../components/astro/ProseEnhancements.astro';
 import { paperLink } from '../../lib/editorial';
 import { formatNewsDate } from '../../lib/utils';
+import { resolveImage } from '../../lib/content/image';
+import { isInkArt } from '../../lib/inkArt';
 import type { PostData } from './data';
 
 type Props = PostData & { ogImage?: string };
@@ -13,6 +14,10 @@ type Props = PostData & { ogImage?: string };
 const { config, post, author, minutes, related, newer, older, ogImage } = Astro.props;
 const label = config.nav.find((n) => n.href === '/blog')?.label ?? 'Writing';
 const tags = post.data.tags ?? [];
+const cover = post.data.coverImage;
+const coverSrc = cover ? (await resolveImage(cover, 1360)).src : undefined;
+const coverInk = await isInkArt(cover);
+const coverSize = cover && typeof cover !== 'string' ? { width: cover.width, height: cover.height } : {};
 ---
 
 <Layout title={post.data.title} description={post.data.excerpt} ogImage={ogImage} keywords={post.data.keywords}>
@@ -27,15 +32,22 @@ const tags = post.data.tags ?? [];
   <article class="ed-article">
     <a href="/blog" class="ed-back">← {label}</a>
     <header class="ed-article-head">
-      {tags.length > 0 && <Eyebrow>{tags.join(' · ')}</Eyebrow>}
       <h1 class="ed-article-title">{post.data.title}</h1>
       {post.data.subtitle && <p class="ed-subtitle">{post.data.subtitle}</p>}
       <span class="ed-byline">
         {author} · <time datetime={post.data.date.toISOString()}>{formatNewsDate(post.data.date, 'day')}</time> · {
           minutes
-        } min read
+        } min read{tags.length > 0 && ` · ${tags.join(', ')}`}
       </span>
     </header>
+
+    {
+      coverSrc && (
+        <figure class="ed-cover ed-figure-box">
+          <img src={coverSrc} alt="" {...coverSize} class:list={[coverInk && 'ed-ink']} decoding="async" />
+        </figure>
+      )
+    }
 
     <div class="ed-prose"><EntryBody entry={post} /></div>
     <ProseEnhancements />

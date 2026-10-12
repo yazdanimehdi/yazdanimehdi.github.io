@@ -1,0 +1,111 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import EntryBody from '../../components/astro/EntryBody.astro';
+import ProseEnhancements from '../../components/astro/ProseEnhancements.astro';
+import Layout from './Layout.astro';
+import { getSiteConfig } from '../../lib/config';
+import { resolveImage } from '../../lib/content/image';
+import { isInkArt } from '../../lib/inkArt';
+import { formatNewsDate, getRoleName } from '../../lib/utils';
+import './projects.css';
+
+interface Props {
+  project: CollectionEntry<'projects'>;
+  team: CollectionEntry<'people'>[];
+  ogImage?: string;
+}
+
+const { project, team, ogImage } = Astro.props;
+const { data } = project;
+const label = getSiteConfig().nav.find((n) => n.href === '/projects')?.label ?? 'Projects';
+const cover = data.image;
+const coverSrc = cover ? (await resolveImage(cover, 1360)).src : undefined;
+const coverInk = await isInkArt(cover);
+const coverSize = cover && typeof cover !== 'string' ? { width: cover.width, height: cover.height } : {};
+
+const start = data.startDate && formatNewsDate(data.startDate, 'year');
+const end = data.endDate && formatNewsDate(data.endDate, 'year');
+const years = start && end ? (start === end ? start : `${start}–${end}`) : start ? `Since ${start}` : end;
+const links = [
+  { label: 'Website', href: data.url },
+  { label: 'Code', href: data.repoUrl },
+  { label: 'Paper', href: data.paperUrl },
+].filter((l) => l.href);
+---
+
+<Layout title={data.title} description={data.excerpt} ogImage={ogImage}>
+  <article class="ed-article">
+    <a href="/projects" class="ed-back">← {label}</a>
+    <header class="ed-article-head">
+      <h1 class="ed-article-title">{data.title}</h1>
+      {data.excerpt && <p class="ed-subtitle">{data.excerpt}</p>}
+      {data.tags && data.tags.length > 0 && <p class="ed-meta">{data.tags.join(' · ')}</p>}
+    </header>
+
+    {
+      coverSrc && (
+        <figure class="ed-cover ed-figure-box">
+          <img src={coverSrc} alt="" {...coverSize} class:list={[coverInk && 'ed-ink']} decoding="async" />
+        </figure>
+      )
+    }
+
+    <dl class="ed-pj-facts">
+      <div>
+        <dt>Status</dt>
+        <dd class="ed-pj-cap">{data.status}</dd>
+      </div>
+      <div>
+        <dt>Type</dt>
+        <dd class="ed-pj-cap">{data.type}</dd>
+      </div>
+      {
+        years && (
+          <div>
+            <dt>Years</dt>
+            <dd class="num">{years}</dd>
+          </div>
+        )
+      }
+      {
+        team.length > 0 && (
+          <div>
+            <dt>Team</dt>
+            <dd>
+              <ul class="ed-pj-team">
+                {team.map((m) => (
+                  <li>
+                    <a href={`/people/${m.id}`} class="ul">
+                      {m.data.name}
+                    </a>{' '}
+                    <span class="ed-pj-role">{m.data.title || getRoleName(m.data.role)}</span>
+                  </li>
+                ))}
+              </ul>
+            </dd>
+          </div>
+        )
+      }
+      {
+        links.length > 0 && (
+          <div>
+            <dt>Links</dt>
+            <dd class="ed-pj-links">
+              {links.map((l) => (
+                <a href={l.href} class="ul" rel="noopener noreferrer">
+                  {l.label}{' '}
+                  <span class="arr" aria-hidden="true">
+                    ↗
+                  </span>
+                </a>
+              ))}
+            </dd>
+          </div>
+        )
+      }
+    </dl>
+
+    <div class="ed-prose"><EntryBody entry={project} /></div>
+    <ProseEnhancements />
+  </article>
+</Layout>

@@ -14,6 +14,7 @@ tags:
   - 'Dataset'
 startDate: 2024-03-01
 excerpt: 'A comprehensive benchmark for evaluating multilingual NLP models across 50+ languages.'
+image: '../../assets/images/projects/multilingual-benchmark.webp'
 ---
 
 ## Overview

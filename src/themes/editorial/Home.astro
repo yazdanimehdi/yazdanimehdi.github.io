@@ -4,7 +4,9 @@ import Eyebrow from './Eyebrow.astro';
 import PaperRow from './PaperRow.astro';
 import NewsList from './NewsList.astro';
 import PostRow from './PostRow.astro';
+import HeroBackdrop from './HeroBackdrop.astro';
 import { jsonLd, socialLinks } from '../../lib/editorial';
+import { imageFacts } from '../../lib/inkArt';
 import type { HomeData } from './data';
 
 type Props = HomeData;
@@ -30,6 +32,7 @@ const email = config.socials?.email;
 const links = socialLinks(config.socials);
 const blogLabel = config.nav.find((n) => n.href === '/blog')?.label ?? 'Writing';
 const hasUpdates = (showNews && news.length > 0) || (showWriting && writing.length > 0);
+const figure = ed.figure?.image ? await imageFacts(ed.figure.image) : null;
 
 const ld =
   config.siteMode === 'personal'
@@ -59,47 +62,57 @@ const ld =
     blocks.map((block) => {
       if (block === 'hero') {
         return (
-          <section class="ed-wrap ed-hero">
-            <div class="ed-hero-text">
-              {ed.eyebrow && <Eyebrow>{ed.eyebrow}</Eyebrow>}
-              <h1 class="ed-hero-name">{name}</h1>
-              {ed.tagline && <p class="ed-tagline">{ed.tagline}</p>}
-              {showBio && bioHtml && <div class="ed-bio" set:html={bioHtml} />}
-              <div class="ed-actions">
-                <a href="/publications" class="ed-btn">
-                  View publications
-                </a>
-                <a href="/cv" class="ul ed-more">
-                  Curriculum vitae <span class="arr">→</span>
-                </a>
-              </div>
-              {(links.length > 0 || email) && (
-                <div class="ed-links">
-                  {links.map((l) => (
-                    <a href={l.href} class="ul">
-                      {l.label}
-                    </a>
-                  ))}
-                  {email && (
-                    <a href={`mailto:${email}`} class="ul">
-                      {email}
-                    </a>
-                  )}
+          <section class="ed-hero-band">
+            <HeroBackdrop hero={config.hero} />
+            <div class="ed-wrap ed-hero">
+              <div class="ed-hero-text">
+                <h1 class="ed-hero-name">{name}</h1>
+                {ed.eyebrow && <p class="ed-role">{ed.eyebrow}</p>}
+                {ed.tagline && <p class="ed-tagline">{ed.tagline}</p>}
+                {showBio && bioHtml && <div class="ed-bio" set:html={bioHtml} />}
+                <div class="ed-actions">
+                  <a href="/publications" class="ed-btn">
+                    View publications
+                  </a>
+                  <a href="/cv" class="ul ed-more">
+                    Curriculum vitae <span class="arr">→</span>
+                  </a>
                 </div>
+                {(links.length > 0 || email) && (
+                  <div class="ed-links">
+                    {links.map((l) => (
+                      <a href={l.href} class="ul">
+                        {l.label}
+                      </a>
+                    ))}
+                    {email && (
+                      <a href={`mailto:${email}`} class="ul">
+                        {email}
+                      </a>
+                    )}
+                  </div>
+                )}
+              </div>
+              {ed.figure?.image && (
+                <figure class="ed-figure">
+                  <div class="ed-figure-box">
+                    <img
+                      src={ed.figure.image}
+                      alt={ed.figure.alt ?? ''}
+                      width={figure?.width}
+                      height={figure?.height}
+                      class:list={[figure?.ink && 'ed-ink']}
+                      decoding="async"
+                    />
+                  </div>
+                  {ed.figure.caption && (
+                    <figcaption class="ed-figcaption">
+                      <b>Fig. 1.</b> {ed.figure.caption}
+                    </figcaption>
+                  )}
+                </figure>
               )}
             </div>
-            {ed.figure?.image && (
-              <figure class="ed-figure">
-                <div class="ed-figure-box">
-                  <img src={ed.figure.image} alt={ed.figure.alt ?? ''} width="360" height="320" decoding="async" />
-                </div>
-                {ed.figure.caption && (
-                  <figcaption class="ed-figcaption">
-                    <b>Fig. 1.</b> {ed.figure.caption}
-                  </figcaption>
-                )}
-              </figure>
-            )}
           </section>
         );
       }
@@ -121,14 +134,7 @@ const ld =
         return (
           <section class="ed-wrap ed-home-section">
             <div class="ed-section-head">
-              {researchHeadline ? (
-                <div class="ed-stack">
-                  <Eyebrow>Research</Eyebrow>
-                  <h2 class="ed-h2">{researchHeadline}</h2>
-                </div>
-              ) : (
-                <h2 class="ed-h2">Research</h2>
-              )}
+              {researchHeadline ? <h2 class="ed-h2">{researchHeadline}</h2> : <h2 class="ed-h2">Research</h2>}
               <a href="/research" class="ul ed-more">
                 Research overview <span class="arr">→</span>
               </a>
@@ -157,10 +163,7 @@ const ld =
         return (
           <section class="ed-wrap ed-home-section ed-home-section--papers">
             <div class="ed-section-head">
-              <div class="ed-stack">
-                <Eyebrow>Publications</Eyebrow>
-                <h2 class="ed-h2">Selected papers</h2>
-              </div>
+              <h2 class="ed-h2">Selected papers</h2>
               <a href="/publications" class="ul ed-more">
                 All {pubCount} publications <span class="arr">→</span>
               </a>

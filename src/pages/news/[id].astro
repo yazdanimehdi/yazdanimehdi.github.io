@@ -1,4 +1,6 @@
 ---
+import EditorialNewsEntry from '../../themes/editorial/NewsEntry.astro';
+import { getTheme } from '../../lib/config';
 import MarkdownLayout from '../../layouts/MarkdownLayout.astro';
 import EntryBody from '../../components/astro/EntryBody.astro';
 import { entryHeadings, getEntries, staticProps } from '../../lib/content';
@@ -22,14 +24,21 @@ if (entry.data.image) {
   const resolved = await resolveImage(entry.data.image, 1200);
   ogImage = resolved.src;
 }
+const journal = getTheme() === 'editorial';
 ---
 
-<MarkdownLayout
-  title={entry.data.title}
-  description={entry.data.excerpt}
-  ogImage={ogImage}
-  date={entry.data.date}
-  headings={headings}
->
-  <EntryBody entry={entry} />
-</MarkdownLayout>
+{
+  journal ? (
+    <EditorialNewsEntry {entry} {ogImage} />
+  ) : (
+    <MarkdownLayout
+      title={entry.data.title}
+      description={entry.data.excerpt}
+      ogImage={ogImage}
+      date={entry.data.date}
+      headings={headings}
+    >
+      <EntryBody entry={entry} />
+    </MarkdownLayout>
+  )
+}

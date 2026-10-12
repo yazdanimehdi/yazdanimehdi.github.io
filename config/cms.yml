@@ -506,16 +506,16 @@ collections:
           - label: 'Visual Theme'
             name: 'theme'
             widget: 'select'
-            default: 'classic'
+            default: 'journal'
             options:
-              - { label: 'Classic', value: 'classic' }
-              - { label: 'Editorial', value: 'editorial' }
+              - { label: 'Journal', value: 'journal' }
+              - { label: 'Classic (legacy)', value: 'classic' }
           - label: 'Editorial Theme Content'
             name: 'editorial'
             widget: 'object'
             required: false
             collapsed: true
-            hint: 'Used only by the editorial theme. Name, email and links come from Author and Socials.'
+            hint: 'Used only by the journal theme. Name, email and links come from Author and Socials.'
             fields:
               - {
                   label: 'Eyebrow',
@@ -1074,6 +1074,13 @@ collections:
                   widget: 'string',
                   required: false,
                   hint: 'Comma-separated keywords for meta tags',
+                }
+              - {
+                  label: 'Default Social Image',
+                  name: 'ogImage',
+                  widget: 'image',
+                  required: false,
+                  hint: 'Shown when a page is shared and has no image of its own (1200×630 works best)',
                 }
               - {
                   label: 'Google Site Verification',

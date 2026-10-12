@@ -1,0 +1,4 @@
+{
+  "prompt": "Generated with Higgsfield gpt_image_2 (quality high, 2k). Prompt: Monochrome scientific line illustration in the manner of a quiet academic journal plate. Fine dark ink hairlines only, near-black navy ink (#15192B), on a fully transparent background. No color, no fills except tiny solid dots, no shading, no gradients, no text, no letters, no numbers, no labels, no logos. Generous empty space around the drawing, precise geometric construction, calm and restrained. Subject: a long row of small word tokens drawn as tiny open rectangles along the bottom; from three of them, slender curved arcs rise and converge on a single small circle above, like attention concentrating on a few tokens of a long input.\nPost-processed: luminance to alpha (cut 222), strokes dilated 7px for display weight, ink #15192B, cropped, WebP.\n",
+  "createdAt": "2026-10-12T12:58:13.377Z"
+}

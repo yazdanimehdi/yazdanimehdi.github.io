@@ -29,7 +29,7 @@ const colorCSS = generateColorOverrides(config) + (theme === 'editorial' ? edito
     <BaseHead title={title} description={description} ogImage={ogImage} keywords={keywords} />
     {colorCSS && <style set:html={colorCSS} />}
     <ClientRouter />
-    {theme === 'classic' && <DarkModeScript />}
+    <DarkModeScript />
   </head>
   <body class="flex min-h-screen flex-col">
     <a href="#main-content" class="skip-link">Skip to main content</a>

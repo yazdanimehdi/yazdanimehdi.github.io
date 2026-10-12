@@ -1,0 +1,237 @@
+/* People index + profile (journal theme). Scoped like editorial.css so it stays inert on classic pages. */
+:root[data-theme='editorial'] {
+  /* ── Group heading: Label over a Rule, with a tabular count ── */
+  & .ed-ppl-group,
+  & .ed-ppl-section {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  & .ed-ppl-section {
+    gap: 4px;
+  }
+  & .ed-ppl-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    margin: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--ed-rule);
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.6;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: var(--ed-caption);
+  }
+  & .ed-ppl-head .num {
+    letter-spacing: 0;
+  }
+  & .ed-ppl-empty {
+    margin: 0;
+    font-size: 15px;
+    color: var(--ed-caption);
+  }
+
+  /* ── Portrait (honours imageShape) ── */
+  & .ed-ppl-photo {
+    display: grid;
+    place-items: center;
+    aspect-ratio: 4 / 5;
+    overflow: hidden;
+    background: var(--ed-tint);
+    border-radius: 4px;
+  }
+  & .ed-ppl-photo[data-shape='circular'] {
+    aspect-ratio: 1;
+    border-radius: 50%;
+  }
+  & .ed-ppl-photo[data-shape='oval'] {
+    aspect-ratio: 1;
+    border-radius: 40%;
+  }
+  & .ed-ppl-photo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  & .ed-ppl-initials {
+    font-family: var(--font-serif);
+    font-size: 32px;
+    color: var(--ed-caption);
+  }
+
+  /* ── Current members: fluid portrait grid ── */
+  & .ed-ppl-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr));
+    gap: 40px 28px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  /* No portrait yet: a small initials square, not a large empty tile. */
+  & .ed-ppl-card .ed-ppl-photo:has(> .ed-ppl-initials) {
+    width: 96px;
+    aspect-ratio: 1;
+  }
+  & .ed-ppl-card .ed-ppl-photo[data-shape='rectangular']:has(> .ed-ppl-initials) {
+    border-radius: 4px;
+  }
+  /* The name's link covers the whole card, so the portrait is a target too. */
+  & .ed-ppl-card {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 0;
+  }
+  & .ed-ppl-text {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  & .ed-ppl-name {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: 19px;
+    font-weight: 500;
+    line-height: 1.3;
+  }
+  & .ed-ppl-name a,
+  & .ed-ppl-alum-name {
+    color: var(--ed-ink);
+    transition: color 0.2s ease;
+  }
+  & .ed-ppl-name a::after,
+  & .ed-ppl-alum-name::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+  }
+  & .ed-ppl-card:hover .ed-ppl-name a,
+  & .ed-ppl-alum:hover .ed-ppl-alum-name {
+    color: var(--ed-accent);
+  }
+  & .ed-ppl-role {
+    font-size: 14px;
+    color: var(--ed-caption);
+  }
+  /* Interests wrap to two whole lines rather than stopping mid-word. */
+  & .ed-ppl-focus {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    font-size: 14px;
+    color: var(--ed-muted);
+  }
+
+  /* ── Alumni: date-column rows ── */
+  & .ed-ppl-alumni {
+    margin: -24px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  & .ed-ppl-alum {
+    position: relative;
+    display: flex;
+    gap: 20px;
+    margin-inline: -12px;
+    padding: 14px 12px;
+    --ed-row-rule: var(--ed-rule-soft);
+    /* The row's hover tint bleeds 12px past the column; its rule does not, so every rule shares the column edge. */
+    background: linear-gradient(var(--ed-row-rule), var(--ed-row-rule)) center bottom / calc(100% - 24px) 1px no-repeat;
+    border-radius: 6px;
+  }
+  & .ed-ppl-years {
+    flex: 0 0 96px;
+    padding-top: 3px;
+    font-size: 14px;
+    text-align: end;
+    color: var(--ed-caption);
+  }
+  & .ed-ppl-alum-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px 14px;
+  }
+  & .ed-ppl-alum-name {
+    font-family: var(--font-serif);
+    font-size: 18px;
+    font-weight: 500;
+  }
+
+  /* ── Profile ── */
+  & .ed-ppl-detail {
+    display: grid;
+    grid-template-columns: 260px minmax(0, 680px);
+    align-items: start;
+    gap: 56px;
+  }
+  & .ed-ppl-main {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    min-width: 0;
+  }
+  & .ed-ppl-meta {
+    margin: 0;
+    font-size: 15px;
+    color: var(--ed-caption);
+  }
+  & .ed-ppl-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 22px;
+    margin: -12px 0 0;
+    padding: 0;
+    list-style: none;
+    font-size: 15px;
+  }
+  & .ed-ppl-links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    background-position: 0 calc(50% + 0.75em);
+  }
+  & .ed-ppl-interests {
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 15px;
+    color: var(--ed-body-2);
+  }
+  /* DESIGN.md: bios use 17px at 1.72, max 580px. */
+  & .ed-prose.ed-ppl-bio {
+    max-width: 580px;
+    font-size: 17px;
+    line-height: 1.72;
+  }
+  & .ed-ppl-rows {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  & .ed-ppl-section .ed-posts li:first-child {
+    border-top: 0;
+  }
+
+  @media (max-width: 760px) {
+    & .ed-ppl-detail {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 32px;
+    }
+    & .ed-ppl-detail > .ed-ppl-photo {
+      width: min(220px, 100%);
+    }
+  }
+}

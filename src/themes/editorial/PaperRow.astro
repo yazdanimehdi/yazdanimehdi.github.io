@@ -76,7 +76,12 @@ const list = variant === 'list';
         list ? (
           <details class="ed-bib">
             <summary class="ul">Cite</summary>
-            <pre>{bibtexFor(p)}</pre>
+            <div class="ed-bib-body">
+              <pre>{bibtexFor(p)}</pre>
+              <button type="button" class="ed-bib-copy" data-bib-copy>
+                Copy
+              </button>
+            </div>
           </details>
         ) : (
           <a href={`/publications#${pub.id}`} class="ul">

@@ -12,8 +12,8 @@ areas:
 
       Our benchmarks measure what that transfer costs, language by language.
     result: 'Adaptive fine-tuning matches full fine-tuning on six low-resource benchmarks while updating under 2% of the parameters (EMNLP 2024).'
-    figure: '/images/research-figure.svg'
-    caption: 'Only the small adapters (accent) are trained; the pretrained layers stay frozen.'
+    figure: '/images/research-nlp.webp'
+    caption: 'Word alignments between a high-resource and a low-resource sentence; transfer follows the strongest links.'
     publications:
       - 'smith2024adaptive'
       - 'smith2023fairness'
@@ -27,6 +27,8 @@ areas:
     description: 'Building systems that combine visual and textual understanding for tasks like image captioning, visual QA, and cross-modal retrieval.'
     body: |
       Language rarely arrives alone. We build models that ground words in images and in the actions of embodied agents, and we survey which architectures and training strategies make that grounding reliable.
+    figure: '/images/research-multimodal.webp'
+    caption: 'Each region of an image is grounded to the phrases that describe it.'
     publications:
       - 'chen2024multimodal'
       - 'chen2023visual'
@@ -41,6 +43,8 @@ areas:
     body: |
       We want models whose behaviour holds up outside the benchmark. That means **fairness** across languages and populations, and agents that respect constraints written in plain language.
     result: 'Natural-language safety constraints cut constraint violations during exploration by a third without slowing learning (ICML 2024).'
+    figure: '/images/research-safety.webp'
+    caption: 'A verified boundary around the states an agent can reach, with one guarded transition.'
     publications:
       - 'garcia2024safe'
       - 'smith2023fairness'

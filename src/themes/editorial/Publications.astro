@@ -1,6 +1,5 @@
 ---
 import Layout from './Layout.astro';
-import Eyebrow from './Eyebrow.astro';
 import PaperRow from './PaperRow.astro';
 import { bareArxiv, bareDoi, jsonLd } from '../../lib/editorial';
 import type { PublicationsData } from './data';
@@ -42,7 +41,6 @@ const ld = {
   <div class="ed-wrap ed-main">
     <div class="ed-pubs-head">
       <div class="ed-stack">
-        <Eyebrow>Publications</Eyebrow>
         <h1 class="ed-h1">Papers</h1>
         {
           (personal || scholar) && (
@@ -155,4 +153,18 @@ const ld = {
   }
 
   document.addEventListener('astro:page-load', initPublicationFilters);
+
+  // BibTeX copy: one delegated listener for every expander.
+  document.addEventListener('click', async (event) => {
+    const button = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-bib-copy]');
+    const text = button?.previousElementSibling?.textContent;
+    if (!button || !text) return;
+    try {
+      await navigator.clipboard.writeText(text.trim());
+      button.textContent = 'Copied';
+    } catch {
+      button.textContent = 'Select and copy';
+    }
+    setTimeout(() => (button.textContent = 'Copy'), 1600);
+  });
 </script>

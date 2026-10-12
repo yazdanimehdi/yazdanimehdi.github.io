@@ -117,7 +117,7 @@ if (!STRUCTURAL) {
     assert.match(html, /data-filter="other"/, 'editorial /publications: Other filter');
     assert.match(
       html,
-      /<details class="ed-bib">\s*<summary class="ul">Cite<\/summary>\s*<pre>@inproceedings\{smith2024adaptive,/,
+      /<details class="ed-bib">\s*<summary class="ul">Cite<\/summary>\s*<div class="ed-bib-body">\s*<pre>@inproceedings\{smith2024adaptive,/,
       'editorial /publications: BibTeX expander',
     );
     assert.match(html, /@article\{smith2023fairness,/, 'editorial /publications: bibtex field used as-is');

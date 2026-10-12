@@ -15,4 +15,14 @@ test('editorialAccentCss: accent plus darkened hover from colors.light.primary',
   assert.match(css, /html:root\[data-theme='editorial'\] \{/);
   assert.match(css, /--ed-accent: #2c5282;/);
   assert.match(css, /--ed-accent-hover: color-mix\(in oklch, #2c5282, black 25%\);/);
+  assert.match(css, /--ed-accent-border: color-mix\(in oklch, #2c5282, white 75%\);/);
+  assert.match(css, /--ed-selection: color-mix\(in oklch, #2c5282, white 84%\);/);
+});
+
+test('editorialAccentCss: dark accent plus lightened hover from colors.dark.primary, only in dark mode', () => {
+  const css = editorialAccentCss({ colors: { dark: { primary: '#22d3ee' } } } as unknown as SiteConfig);
+  assert.match(css, /html\.dark:root:root\[data-theme='editorial'\] \{/);
+  assert.match(css, /--ed-accent: #22d3ee;/);
+  assert.match(css, /--ed-accent-hover: color-mix\(in oklch, #22d3ee, white 35%\);/);
+  assert.doesNotMatch(css, /^html:root/m);
 });

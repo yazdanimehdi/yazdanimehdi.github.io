@@ -9,6 +9,7 @@ excerpt: 'The lab has received a $1.2M NSF grant to study safety and alignment i
 people:
   - 'jane-smith'
 datePrecision: 'year'
+image: '../../assets/images/news/nsf-grant-awarded.webp'
 ---
 
 We are excited to announce that our lab has been awarded a $1.2M grant from the National Science Foundation (NSF) to support our research on safety and alignment in artificial intelligence systems.

@@ -1,0 +1,156 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import Layout from './Layout.astro';
+import PeoplePortrait from './PeoplePortrait.astro';
+import SEO from '../../components/astro/SEO.astro';
+import EntryBody from '../../components/astro/EntryBody.astro';
+import ObfuscatedEmail from '../../components/astro/ObfuscatedEmail.astro';
+import { isOwner, paperLink, socialLinks } from '../../lib/editorial';
+import { getRoleName } from '../../lib/utils';
+import './people.css';
+
+interface Props {
+  person: CollectionEntry<'people'>;
+  publications: CollectionEntry<'publications'>[];
+  projects: CollectionEntry<'projects'>[];
+  cvInfo: { pdfPath: string } | null;
+  ogImage?: string;
+}
+
+const { person, publications, projects, cvInfo, ogImage } = Astro.props;
+const d = person.data;
+const roleName = getRoleName(d.role);
+const meta = [...new Set([d.title, roleName].filter(Boolean))].join(' · ');
+const links = socialLinks(d.socials);
+const interests = d.researchInterests ?? [];
+const hasBio = person.body?.trim() !== '';
+---
+
+<Layout title={d.name} description={`${d.name} - ${roleName}`} ogImage={ogImage}>
+  <SEO type="profile" title={d.name} />
+  <div class="ed-wrap ed-main">
+    <a href="/people" class="ed-back">← All people</a>
+    <div class="ed-ppl-detail">
+      <PeoplePortrait {person} width={520} alt={d.name} eager />
+
+      <div class="ed-ppl-main">
+        <header class="ed-stack">
+          <h1 class="ed-h1">{d.name}</h1>
+          <p class="ed-ppl-meta">{meta}</p>
+        </header>
+
+        {
+          (d.email || links.length > 0 || cvInfo) && (
+            <ul class="ed-ppl-links" aria-label="Contact and profiles">
+              {d.email && (
+                <li>
+                  <ObfuscatedEmail email={d.email} class="ul" />
+                </li>
+              )}
+              {links.map((l) => (
+                <li>
+                  <a href={l.href} class="ul" rel="noopener">
+                    {l.label}
+                  </a>
+                </li>
+              ))}
+              {cvInfo && (
+                <li>
+                  <a href={cvInfo.pdfPath} download={`${person.id}-cv.pdf`} class="ul">
+                    Download CV
+                  </a>
+                </li>
+              )}
+            </ul>
+          )
+        }
+
+        {
+          interests.length > 0 && (
+            <p class="ed-ppl-interests">
+              <span class="ed-label">Research interests</span>
+              <span>{interests.join(' · ')}</span>
+            </p>
+          )
+        }
+
+        {
+          hasBio && (
+            <div class="ed-prose ed-ppl-bio">
+              <EntryBody entry={person} />
+            </div>
+          )
+        }
+
+        {
+          publications.length > 0 && (
+            <section class="ed-ppl-section" aria-labelledby="ppl-pubs">
+              <h2 class="ed-ppl-head" id="ppl-pubs">
+                <span>Selected Publications</span>
+                <span class="num">{publications.length}</span>
+              </h2>
+              <ul class="ed-ppl-rows">
+                {publications.map((pub) => {
+                  const p = pub.data;
+                  const link = paperLink(p);
+                  return (
+                    <li class="row ed-paper ed-paper--list">
+                      <div class="ed-paper-body">
+                        {link ? (
+                          <a href={link} class="ed-paper-title">
+                            {p.title}
+                          </a>
+                        ) : (
+                          <span class="ed-paper-title">{p.title}</span>
+                        )}
+                        <span class="ed-authors">
+                          {p.authors.map((a, i) => (
+                            <>
+                              {i > 0 && ', '}
+                              {isOwner(a, d.name) ? <strong>{a}</strong> : a}
+                            </>
+                          ))}
+                        </span>
+                        <div class="ed-paper-meta">
+                          <span class="ed-venue">
+                            {p.venue.includes(String(p.year)) ? p.venue : `${p.venue}, ${p.year}`}
+                          </span>
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </section>
+          )
+        }
+
+        {
+          projects.length > 0 && (
+            <section class="ed-ppl-section" aria-labelledby="ppl-projects">
+              <h2 class="ed-ppl-head" id="ppl-projects">
+                <span>Projects</span>
+                <span class="num">{projects.length}</span>
+              </h2>
+              <ul class="ed-posts">
+                {projects.map((p) => (
+                  <li>
+                    <a href={`/projects/${p.id}`} class="row ed-post-link">
+                      <span>
+                        <span class="ed-post-title">{p.data.title}</span>
+                        {p.data.excerpt && <span class="ed-post-meta">{p.data.excerpt}</span>}
+                      </span>
+                      <span class="arr" aria-hidden="true">
+                        →
+                      </span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )
+        }
+      </div>
+    </div>
+  </div>
+</Layout>

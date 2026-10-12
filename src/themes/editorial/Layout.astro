@@ -2,6 +2,7 @@
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getSiteConfig, getSiteName } from '../../lib/config';
 import { socialLinks } from '../../lib/editorial';
+import ModeToggle from './ModeToggle.astro';
 import './editorial.css';
 
 interface Props {
@@ -40,8 +41,14 @@ const isActive = (href: string) => (href === '/' ? path === '/' : path === href 
           ))
         }
       </div>
+      <ModeToggle />
     </nav>
   </header>
+
+  <script is:inline>
+    // Phones scroll the nav row sideways: keep the current page's link in view.
+    document.querySelector('.ed-navlinks [aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+  </script>
 
   <main id="main-content" class="ed-grow">
     <slot />

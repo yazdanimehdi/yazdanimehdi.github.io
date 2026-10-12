@@ -1,6 +1,7 @@
 ---
-import PageLayout from '../../../layouts/PageLayout.astro';
-import PostCard from '../../../components/astro/PostCard.astro';
+import ClassicBlogTag from '../../../themes/classic/BlogTag.astro';
+import EditorialBlogTag from '../../../themes/editorial/BlogTag.astro';
+import { getTheme } from '../../../lib/config';
 import { getEntries, staticProps } from '../../../lib/content';
 import { slugify } from '../../../lib/utils';
 
@@ -24,32 +25,4 @@ if (!props) return new Response(null, { status: 404 });
 const { tag, posts } = props;
 ---
 
-<PageLayout title={`Posts tagged "${tag}"`} description={`Blog posts tagged with "${tag}".`}>
-  <h1 class="mb-2 font-serif text-2xl font-normal text-surface-900 sm:text-3xl dark:text-dm-heading">
-    #{tag.toLowerCase().replace(/\s+/g, '-')}
-  </h1>
-  <p class="mb-2 text-sm text-surface-500 dark:text-dm-muted">
-    {posts.length} post{posts.length !== 1 ? 's' : ''} tagged with "{tag}".
-  </p>
-  <a
-    href="/blog"
-    class="mb-6 inline-flex items-center gap-1 text-sm text-primary-600 hover:underline dark:text-accent-400"
-  >
-    &larr; Back to all posts
-  </a>
-
-  <div class="divide-y divide-surface-100 dark:divide-dm-border">
-    {
-      posts.map((post) => (
-        <PostCard
-          id={post.id}
-          title={post.data.title}
-          date={post.data.date}
-          excerpt={post.data.excerpt}
-          tags={post.data.tags}
-          author={post.data.author}
-        />
-      ))
-    }
-  </div>
-</PageLayout>
+{getTheme() === 'editorial' ? <EditorialBlogTag {tag} {posts} /> : <ClassicBlogTag {tag} {posts} />}

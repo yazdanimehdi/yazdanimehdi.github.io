@@ -15,3 +15,7 @@ docs/superpowers/
 
 # RenderCV import fixture, kept byte-for-byte
 tests/fixtures/
+
+# Impeccable design tooling state and raster provenance sidecars (generated)
+.impeccable/
+*.webp.json

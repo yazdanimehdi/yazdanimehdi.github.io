@@ -7,6 +7,7 @@ tags:
   - 'Lab News'
   - 'Introduction'
 draft: false
+coverImage: '../../assets/images/posts/welcome-to-our-lab.webp'
 ---
 
 Welcome to the Smith Research Lab blog! We're excited to launch this platform to share updates about our research, thoughts on the field, and resources for the community.

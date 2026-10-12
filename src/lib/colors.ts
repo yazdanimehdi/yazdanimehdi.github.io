@@ -149,11 +149,20 @@ export function generateColorOverrides(config: SiteConfig): string {
 }
 
 /**
- * Editorial accent from colors.light.primary. When unset, editorial.css supplies #1F3C88 / #142A63.
- * `html:root[…]` outranks the `:root[…]` defaults in editorial.css regardless of stylesheet order.
+ * Journal (editorial) accent from colors.light.primary, and the dark-mode accent from colors.dark.primary.
+ * When unset, editorial.css supplies #1F3C88 / #142A63 and #22D3EE / #67E8F9.
+ * `html:root[…]` outranks the `:root[…]` defaults in editorial.css, and the doubled `:root` outranks its
+ * `html.dark:root[…]` block, regardless of stylesheet order.
  */
 export function editorialAccentCss(config: SiteConfig): string {
-  const accent = config.colors?.light?.primary?.trim();
-  if (!accent) return '';
-  return `\nhtml:root[data-theme='editorial'] {\n  --ed-accent: ${accent};\n  --ed-accent-hover: color-mix(in oklch, ${accent}, black 25%);\n}`;
+  const light = config.colors?.light?.primary?.trim();
+  const dark = config.colors?.dark?.primary?.trim();
+  let css = '';
+  if (light) {
+    css += `\nhtml:root[data-theme='editorial'] {\n  --ed-accent: ${light};\n  --ed-accent-hover: color-mix(in oklch, ${light}, black 25%);\n  --ed-accent-border: color-mix(in oklch, ${light}, white 75%);\n  --ed-selection: color-mix(in oklch, ${light}, white 84%);\n}`;
+  }
+  if (dark) {
+    css += `\nhtml.dark:root:root[data-theme='editorial'] {\n  --ed-accent: ${dark};\n  --ed-accent-hover: color-mix(in oklch, ${dark}, white 35%);\n}`;
+  }
+  return css;
 }

@@ -8,6 +8,7 @@ featured: false
 excerpt: 'Maria Garcia received the Best Demo Award at NAACL 2024 for her interactive robot learning system.'
 people:
   - 'maria-garcia'
+image: '../../assets/images/news/best-demo-award.webp'
 ---
 
 Congratulations to Maria Garcia for receiving the **Best Demo Award** at NAACL 2024 for her interactive demonstration of a natural language-guided robot learning system!
