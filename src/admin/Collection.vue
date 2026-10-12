@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- front matter is user data */
 import { computed, onMounted, ref } from 'vue';
 import AdminShell from './AdminShell.vue';
+import AiAssist from './AiAssist.vue';
 import DocBanners from './DocBanners.vue';
 import FormFields from './FormFields.vue';
 import MarkdownEditor from './MarkdownEditor.vue';
@@ -175,6 +176,13 @@ async function remove() {
             <span id="adm-body-label">Body</span>
             <MarkdownEditor v-model="doc.current.body" compact :preview="doc.readonly" />
           </div>
+          <AiAssist
+            v-if="name === 'announcements' && !doc.readonly"
+            collection="announcements"
+            :doc="doc.current"
+            image-key="image"
+            @body="doc.current.body = $event"
+          />
         </fieldset>
         <div class="adm-actions">
           <button type="button" class="adm-btn adm-btn-primary" :disabled="doc.saving || doc.readonly" @click="save">

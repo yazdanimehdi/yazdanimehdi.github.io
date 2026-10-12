@@ -1,4 +1,5 @@
 ---
+import Ai from '../Ai.vue';
 import Collection from '../Collection.vue';
 import Cv from '../Cv.vue';
 import Dashboard from '../Dashboard.vue';
@@ -21,7 +22,19 @@ export const prerender = false;
 
 const { adminPath, siteName } = adminSettings();
 const [screen = '', arg = ''] = (Astro.params.path ?? '').split('/');
-const SCREENS = new Set(['', 'login', 'media', 'posts', 'publications', 'content', 'cv', 'pages', 'settings', 'users']);
+const SCREENS = new Set([
+  '',
+  'login',
+  'media',
+  'posts',
+  'publications',
+  'content',
+  'cv',
+  'pages',
+  'settings',
+  'users',
+  'ai',
+]);
 const CONTENT = ['announcements', 'people', 'projects', 'talks', 'positions'];
 if (!SCREENS.has(screen)) return new Response('Not found', { status: 404 });
 if (screen === 'content' && !CONTENT.includes(arg)) return new Response('Not found', { status: 404 });
@@ -88,6 +101,7 @@ if (screen === 'login' && error === 'denied') Astro.response.status = 403;
     {screen === 'media' && <Media client:only="vue" ctx={ctx} />}
     {screen === 'pages' && <Pages client:only="vue" ctx={ctx} />}
     {screen === 'settings' && <Settings client:only="vue" ctx={ctx} />}
+    {screen === 'ai' && <Ai client:only="vue" ctx={ctx} />}
     {screen === 'users' && <Users client:only="vue" ctx={ctx} />}
     {screen === 'cv' && <Cv client:only="vue" ctx={ctx} />}
     {screen === '' && <Dashboard client:only="vue" ctx={ctx} />}

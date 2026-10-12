@@ -2,6 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- front matter is user data */
 import { computed, nextTick, onMounted, ref } from 'vue';
 import AdminShell from './AdminShell.vue';
+import AiAssist from './AiAssist.vue';
 import DocBanners from './DocBanners.vue';
 import FormFields from './FormFields.vue';
 import MarkdownEditor from './MarkdownEditor.vue';
@@ -25,6 +26,7 @@ const SIDEBAR: FieldDef[] = [
   { key: 'tags', label: 'Tags', type: 'list' },
   { key: 'relatedPublication', label: 'Related publication', type: 'select', optionsFrom: 'publications' },
   { key: 'excerpt', label: 'Summary', type: 'textarea', hint: 'Shown in post lists and link previews.' },
+  { key: 'coverImage', label: 'Cover image', type: 'image', folder: 'content' },
   { key: 'featured', label: 'Show on home page', type: 'checkbox' },
   {
     key: 'medium.url',
@@ -197,6 +199,13 @@ function setSubtitle(e: Event) {
           />
           <pre v-if="doc.readonly" class="adm-card adm-pre">{{ doc.current.body }}</pre>
           <MarkdownEditor v-else v-model="doc.current.body" :preview="preview" />
+          <AiAssist
+            v-if="!doc.readonly"
+            collection="posts"
+            :doc="doc.current"
+            image-key="coverImage"
+            @body="doc.current.body = $event"
+          />
         </div>
         <aside class="adm-form" aria-label="Post settings">
           <label class="adm-field">

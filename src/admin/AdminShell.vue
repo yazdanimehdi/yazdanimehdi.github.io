@@ -26,6 +26,7 @@ const CONTENT = [
 const BOTTOM = computed(() => [
   ['pages', 'Pages'],
   ['media', 'Media'],
+  ['ai', 'AI'],
   ...(props.ctx.mode === 'postgres' ? [['users', 'Users'] as const] : []),
   ['settings', 'Settings'],
 ]);
