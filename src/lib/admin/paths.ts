@@ -10,7 +10,7 @@ export const COLLECTIONS = [
   'positions',
 ] as const;
 export type CollectionName = (typeof COLLECTIONS)[number];
-export const CONFIG_FILES = ['site', 'research', 'feeds', 'cv', 'cv-upload'] as const;
+export const CONFIG_FILES = ['site', 'research', 'feeds', 'cv', 'cv-upload', 'ai', 'scholar'] as const;
 export type ConfigFile = (typeof CONFIG_FILES)[number];
 export const FEEDS_JSON = 'src/data/feeds.json';
 /** Last daily-jobs results (Postgres mode): admin-only, never rendered. */

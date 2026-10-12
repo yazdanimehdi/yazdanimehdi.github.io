@@ -265,10 +265,34 @@ export const feedsConfigSchema = z
 
 export const cvUploadSchema = z.object({ enabled: z.boolean(), content: z.string() }).passthrough();
 
+/** config/ai.yml: provider choices only (keys never live here). Server code fills anything missing with defaults. */
+export const aiConfigSchema = z
+  .object({
+    text: z.object({ provider: z.string().optional(), model: z.string().optional() }).passthrough().optional(),
+    image: z.object({ provider: z.string().optional(), model: z.string().optional() }).passthrough().optional(),
+    papers: z
+      .object({ autoPost: z.boolean().optional(), maxPostsPerRun: z.number().int().min(0).optional() })
+      .passthrough()
+      .optional(),
+  })
+  .passthrough();
+
+/** config/scholar.yml, shared with scripts/sync-scholar.py. */
+export const scholarConfigSchema = z
+  .object({
+    authors: z
+      .array(z.object({ name: z.string().optional(), scholar_id: z.string().optional() }).passthrough())
+      .nullable()
+      .optional(),
+  })
+  .passthrough();
+
 export const configSchemas = {
   site: siteSchema,
   research: researchSchema,
   feeds: feedsConfigSchema,
   cv: cvSchema,
   'cv-upload': cvUploadSchema,
+  ai: aiConfigSchema,
+  scholar: scholarConfigSchema,
 };

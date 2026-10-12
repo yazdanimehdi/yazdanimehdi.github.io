@@ -39,6 +39,8 @@ test('assertAllowed accepts exactly the admin-writable paths', () => {
   const ok = [
     'config/site.yml',
     'config/cv-upload.yml',
+    'config/scholar.yml',
+    'config/ai.yml',
     'src/content/posts/hello.md',
     'src/content/announcements/grant-2025.md',
     'src/data/feeds.json',
@@ -48,7 +50,6 @@ test('assertAllowed accepts exactly the admin-writable paths', () => {
   ];
   for (const p of ok) assert.doesNotThrow(() => assertAllowed(p), p);
   const bad = [
-    'config/scholar.yml',
     'config/cms.yml',
     'src/content/posts/hello.mdx',
     'src/content/secret/x.md',
