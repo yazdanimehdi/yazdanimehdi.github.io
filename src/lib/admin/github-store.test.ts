@@ -242,7 +242,13 @@ test('capabilities reports a missing branch separately from an unreadable repo',
 test('tree: blobs of the branch by path; null when the branch is missing', async () => {
   const { fetchFn } = fakeGitHub({
     'GET /git/trees/main?recursive=1': () => ({
-      json: { truncated: false, tree: [{ path: 'a.md', type: 'blob', sha: 's1' }, { path: 'src', type: 'tree', sha: 't' }] },
+      json: {
+        truncated: false,
+        tree: [
+          { path: 'a.md', type: 'blob', sha: 's1' },
+          { path: 'src', type: 'tree', sha: 't' },
+        ],
+      },
     }),
   });
   assert.deepEqual(await new GitHubStore(cfg, author, fetchFn).tree(), new Map([['a.md', 's1']]));
