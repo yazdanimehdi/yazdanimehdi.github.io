@@ -616,6 +616,33 @@ Tick **Also publish to Medium** before publishing a post.
 A post is sent once; afterwards the editor shows **Already on Medium**. When your Medium feed later brings the same
 story in, the Writing page shows only the site's copy.
 
+### AI assist
+
+The admin can draft and rewrite post and news bodies, generate cover images, and turn new Google Scholar papers into
+draft posts, using your own provider keys.
+
+- **Keys.** Open **AI** in the admin. In Postgres mode, paste a key and **Save**: it is stored encrypted in the
+  database (with a key derived from `SESSION_SECRET`; changing that secret means entering the keys again). In git
+  mode, set them as environment variables in Vercel; the AI screen shows which are set. An environment variable is
+  the fallback in both modes. Keys: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `HIGGSFIELD_API_KEY` +
+  `HIGGSFIELD_API_SECRET`, `SERPAPI_KEY`.
+- **Models.** Writing uses Anthropic, OpenAI or Google; images use OpenAI, Google or Higgsfield. Pick them on the AI
+  screen (saved to `config/ai.yml`); an empty model uses the current default (`claude-sonnet-5-5`, `gpt-6-astra`,
+  `gemini-3.8-flash`; `gpt-image-2.5-flare`, `gemini-3.1-flash-image`, `higgsfield-ai/soul/standard`).
+- **What is sent.** **Write** and **Rewrite** send the title, subtitle, your instruction and the body to the writing
+  provider. **Generate image** sends the title and summary to the image provider. Paper posts send the paper's
+  title, authors, venue, year, link and abstract. Results land in the editor as unsaved changes (with **Undo**);
+  nothing is published until you save.
+- **Paper drafts.** Add the Scholar author id (the `user=` value of the profile URL) on the AI screen. Postgres mode
+  checks daily; **Check now** works in both modes. New papers become publications and, unless turned off, **draft**
+  posts with a cover image, linked to the publication. The first check only records the papers already on the
+  profile (no posts), so turning this on doesn't write a post for every old paper. Each check writes at most
+  **Posts per run** posts (default three); the rest wait for the next one. A publication you delete is not imported
+  again.
+- **Cost.** Each paper post is one writing call and one image call on your provider accounts. Scholar is read
+  through [SerpApi](https://serpapi.com/google-scholar-author-api): one search per author per check plus one per
+  paper post. The free tier (about 250 searches a month) covers one author daily plus a few new papers.
+
 ### CV PDF in Postgres mode
 
 The CV PDF is rendered on Vercel whenever you publish the CV or a publication (and with **Generate PDF**), stored in
