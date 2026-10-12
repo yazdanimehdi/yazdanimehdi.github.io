@@ -11,6 +11,7 @@ import {
   publish,
   sessionStatus,
   startRun,
+  startOver,
   startSession,
   type CommandResult,
   type EditorContext,
@@ -41,7 +42,8 @@ class LocalSandbox implements SandboxHandle {
   policies: NetworkPolicy[] = [];
   extended = 0;
   /** npm, `astro dev` and its wait loop: nothing to install or serve here. */
-  stubs = new Set<string>([SCRIPTS.install, SCRIPTS.dev, SCRIPTS.waitDev]);
+  static stubbed = new Set<string>([SCRIPTS.install, SCRIPTS.dev, SCRIPTS.waitDev]);
+  stubs = LocalSandbox.stubbed;
 
   constructor(
     readonly root: string,
@@ -106,29 +108,42 @@ class LocalSandbox implements SandboxHandle {
     this.status = 'stopped';
   }
 
+  async delete() {
+    this.status = 'deleted';
+    fs.rmSync(this.root, { recursive: true, force: true });
+  }
+
   called(script: string) {
     return this.calls.filter((c) => c.script === script);
   }
 }
 
 class FakeApi implements SandboxApi {
-  sandbox: LocalSandbox | null = null;
+  /** Every sandbox created, the current one last. */
+  all: LocalSandbox[] = [];
   createdWith: NetworkPolicy[] = [];
 
   constructor(private make: () => LocalSandbox) {}
 
-  async get() {
+  get sandbox() {
+    const last = this.all.at(-1);
+    return last && last.status !== 'deleted' ? last : null;
+  }
+
+  async get(_name: string, opts: { resume?: boolean } = {}) {
+    if (this.sandbox && opts.resume) this.sandbox.status = 'running';
     return this.sandbox;
   }
 
-  async getOrCreate(_name: string, opts: { networkPolicy: NetworkPolicy }) {
-    if (this.sandbox) {
-      this.sandbox.status = 'running';
-      return { sandbox: this.sandbox, created: false };
-    }
+  async create(_name: string, opts: { networkPolicy: NetworkPolicy }) {
+    assert.equal(this.sandbox, null, 'one sandbox per site');
     this.createdWith.push(opts.networkPolicy);
-    this.sandbox = this.make();
-    return { sandbox: this.sandbox, created: true };
+    this.all.push(this.make());
+    return this.all.at(-1)!;
+  }
+
+  calls() {
+    return this.all.flatMap((s) => s.calls);
   }
 }
 
@@ -454,7 +469,10 @@ test('a file changed on GitHub since the session started is a 409, and nothing m
   code.fail = new ConflictError('src/components/Header.astro');
   await assert.rejects(publish(c, 'msg'), (e: HttpError) => {
     assert.equal(e.status, 409);
-    assert.match(e.message, /site changed since this session started \(src\/components\/Header\.astro\): discard/);
+    assert.match(
+      e.message,
+      /site changed since this session started \(src\/components\/Header\.astro\): use Start over/,
+    );
     return true;
   });
   assert.equal(ready(await sessionStatus(c)).files.length, 1);
@@ -509,25 +527,100 @@ test('Postgres mode: code is committed to GitHub first, then documents to the da
   );
 });
 
-test('discard drops every change and updates the checkout to the live branch', async () => {
+test('discard drops every change and goes back to the base, without touching the network', async () => {
   const c = context();
   await startSession(c);
   await finishedRun(c, 'something');
   write(site(), { 'src/components/Header.astro': 'header v2\n', 'src/components/Extra.astro': 'x\n' });
-  write(work, { 'src/pages/index.astro': 'index v2 (pushed meanwhile)\n' });
-  git(work, 'commit', '-q', '-am', 'upstream');
-  git(work, 'push', '-q', 'origin', 'main');
-  const sb = api.sandbox!;
-  const policies = sb.policies.length;
+  fs.rmSync(site('public/remove-me.txt'));
+  const base = state().baseSha;
+  const policies = api.sandbox!.policies.length;
 
   const s = ready(await discardChanges(c));
   assert.deepEqual(s.files, []);
   assert.equal(s.run, undefined);
+  assert.equal(fs.readFileSync(site('src/components/Header.astro'), 'utf8'), 'header v1\n');
+  assert.ok(fs.existsSync(site('public/remove-me.txt')) && !fs.existsSync(site('src/components/Extra.astro')));
+  assert.equal(state().baseSha, base);
+  assert.equal(api.sandbox!.policies.length, policies, 'the network policy is untouched');
+});
+
+test('start over deletes the sandbox and clones the live branch into a new one', async () => {
+  const c = context();
+  await startSession(c);
+  write(site(), { 'src/components/Header.astro': 'header v2\n' });
+  write(work, { 'src/pages/index.astro': 'index v2 (pushed meanwhile)\n' });
+  git(work, 'commit', '-q', '-am', 'upstream');
+  git(work, 'push', '-q', 'origin', 'main');
+  const first = api.sandbox!;
+
+  const s = ready(await startOver(c));
+  assert.equal(first.status, 'deleted');
+  assert.equal(api.all.length, 2);
+  assert.deepEqual(s.files, [], 'unpublished changes are gone');
   assert.equal(fs.readFileSync(site('src/pages/index.astro'), 'utf8'), 'index v2 (pushed meanwhile)\n');
   assert.equal(state().baseSha, git(work, 'rev-parse', 'HEAD').trim());
-  const [open, closed] = sb.policies.slice(policies);
-  assert.ok(open.allow['github.com'] && !closed.allow['github.com'], 'GitHub is reachable only for the fetch');
-  assert.ok(!JSON.stringify(sb.called(SCRIPTS.sync)[0].args).includes('ghp_SECRET'));
+});
+
+test('the GitHub token enters a sandbox only for its first clone, and GitHub closes before any agent runs', async () => {
+  const c = context();
+  await startSession(c);
+  await finishedRun(c, 'first');
+  await sessionStatus(c);
+  write(site(), { 'src/components/Header.astro': 'header v2\n' });
+  const result = await publish(c);
+  await finishedRun(c, 'second');
+  write(site(), { 'src/components/Header.astro': 'header v3\n' });
+  await discardChanges(c);
+  await endSession(c);
+  await startSession(c);
+
+  const calls = api.calls();
+  const clones = calls.filter((x) => x.script === SCRIPTS.clone);
+  assert.equal(clones.length, 1);
+  const afterClone = calls.slice(calls.indexOf(clones[0]) + 1);
+  for (const call of afterClone) {
+    assert.ok(!JSON.stringify(call).includes('ghp_SECRET'), `no token in ${call.script.slice(0, 40)}`);
+    assert.equal(call.env.GIT_TOKEN, undefined);
+    assert.doesNotMatch(call.script, /\bfetch\b|\bpull\b|\bpush\b|\bclone\b/, 'nothing reaches GitHub');
+  }
+  for (const call of calls.filter((x) => !x.detached && !LocalSandbox.stubbed.has(x.script))) {
+    assert.equal(call.env.GIT_CONFIG_GLOBAL, '/dev/null', 'no user git config');
+    assert.equal(call.env.GIT_CONFIG_NOSYSTEM, '1', 'no system git config');
+  }
+  assert.equal(api.createdWith.length, 1);
+  assert.ok(api.createdWith[0].allow['github.com'], 'only the new sandbox’s policy opens GitHub');
+  for (const policy of api.all.flatMap((sb) => sb.policies)) assert.equal(policy.allow['github.com'], undefined);
+  assert.deepEqual(state().published?.id, result.commit?.id, 'the published commit is recorded');
+  assert.equal(ready(await sessionStatus(c)).published?.url, 'https://github.com/jane/site/commit/c1');
+});
+
+test('git config the agent planted does not run inside the editor’s own git commands', async () => {
+  const c = context();
+  await startSession(c);
+  const marks = path.join(root, 'marks');
+  const hooks = path.join(root, 'evil-hooks');
+  fs.mkdirSync(marks);
+  fs.mkdirSync(hooks);
+  const evil = (name: string, file = path.join(root, `evil-${name}`)) => {
+    fs.writeFileSync(file, `#!/bin/sh\ntouch "${marks}/${name}"\n`, { mode: 0o755 });
+    return file;
+  };
+  for (const hook of ['reference-transaction', 'post-checkout', 'pre-commit', 'post-commit', 'post-index-change']) {
+    evil(`hook-${hook}`, path.join(hooks, hook));
+  }
+  git(site(), 'config', 'core.hooksPath', hooks);
+  git(site(), 'config', 'core.fsmonitor', evil('fsmonitor'));
+  git(site(), 'config', 'diff.external', evil('external'));
+  git(site(), 'config', 'diff.evil.textconv', evil('textconv'));
+  fs.writeFileSync(site('.git/info/attributes'), '* diff=evil\n');
+  write(site(), { 'src/components/Header.astro': 'header v2\n' });
+
+  assert.match(ready(await sessionStatus(c)).diff, /\+header v2/);
+  await publish(c, 'msg');
+  write(site(), { 'src/components/Header.astro': 'header v3\n' });
+  await discardChanges(c);
+  assert.deepEqual(fs.readdirSync(marks), []);
 });
 
 test('end stops the sandbox and keeps it for the next start', async () => {

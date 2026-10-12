@@ -6,6 +6,7 @@ import { MemoryStore } from './memory-store';
 import { DELETE as discard } from '../../admin/routes/api/editor/changes';
 import { POST as publishRoute } from '../../admin/routes/api/editor/publish';
 import { POST as run } from '../../admin/routes/api/editor/runs';
+import { POST as startOverRoute } from '../../admin/routes/api/editor/start-over';
 import { DELETE as end, GET as status, POST as start } from '../../admin/routes/api/editor/session';
 
 const ENV = ['VERCEL', 'DATABASE_URL', 'GITHUB_TOKEN', 'GITHUB_REPO', 'ANTHROPIC_API_KEY'] as const;
@@ -20,7 +21,7 @@ beforeEach(() => {
   created = [];
   setSandboxForTests({
     get: async () => null,
-    getOrCreate: async (name) => {
+    create: async (name) => {
       created.push(name);
       throw new Error('not in this test');
     },
@@ -49,6 +50,7 @@ test('every editor route needs a session', async () => {
     [run, 'POST'],
     [discard, 'DELETE'],
     [publishRoute, 'POST'],
+    [startOverRoute, 'POST'],
   ] as const) {
     assert.equal((await call(handler, method, false)).status, 401, `${method} ${handler.name}`);
   }
@@ -78,7 +80,7 @@ test('no key for the configured provider: status names it, Start and Run are 400
   const s = await call(status, 'GET');
   assert.equal(s.body.state, 'none');
   assert.match(s.body.blocked, /ANTHROPIC_API_KEY is not set: add it on the AI screen/);
-  for (const handler of [start, run]) {
+  for (const handler of [start, run, startOverRoute]) {
     const res = await call(handler, 'POST');
     assert.equal(res.status, 400);
     assert.match(res.body.error, /ANTHROPIC_API_KEY/);

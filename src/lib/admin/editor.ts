@@ -27,13 +27,15 @@ const PLACEHOLDER = 'brokered-by-the-sandbox-firewall';
 
 /** The session's only store: a file in the sandbox, so it works in git and Postgres mode alike. */
 export interface EditorSession {
-  /** Commit the working tree is compared with: the clone, then each publish or document export on top. */
+  /** Local commit the working tree is compared with: the clone, then each publish or document export on top. */
   baseSha: string;
   /** Postgres mode: document path → version exported into the sandbox. */
   docVersions: Record<string, string>;
   provider: TextProviderId;
   model: string;
   runs: EditorRun[];
+  /** The last GitHub commit this session published, for the screen. */
+  published?: { id: string; url?: string; at: string };
 }
 
 export interface EditorRun {
@@ -64,6 +66,7 @@ export type EditorStatus =
       provider: TextProviderId;
       model: string;
       run?: EditorRun & { running: boolean };
+      published?: EditorSession['published'];
       log: string;
       files: ChangedFile[];
       diff: string;
@@ -98,16 +101,18 @@ export interface SandboxHandle {
   setNetworkPolicy(policy: NetworkPolicy): Promise<void>;
   extendTimeout(ms: number): Promise<void>;
   stop(): Promise<void>;
+  /** Stops it and deletes it with its files and snapshots. */
+  delete(): Promise<void>;
 }
 
 export interface SandboxApi {
-  /** null when it was never created. A stopped sandbox stays stopped. */
-  get(name: string): Promise<SandboxHandle | null>;
-  /** Resumes it, or creates it (persistent, port 4321 exposed). */
-  getOrCreate(
+  /** null when it was never created. A stopped sandbox stays stopped unless `resume`. */
+  get(name: string, opts?: { resume?: boolean }): Promise<SandboxHandle | null>;
+  /** A new persistent sandbox with `ports` exposed. */
+  create(
     name: string,
     opts: { networkPolicy: NetworkPolicy; timeoutMs: number; ports: number[] },
-  ): Promise<{ sandbox: SandboxHandle; created: boolean }>;
+  ): Promise<SandboxHandle>;
 }
 
 interface Agent {
@@ -187,9 +192,18 @@ Rules:
 The request:
 `;
 
+/**
+ * Every git call after the clone: the agent has had write access to .git, so config it may have planted (hooks,
+ * fsmonitor, external diff, textconv) must not run inside our own commands. Clean and smudge filters still could;
+ * that is the agent running code in its own VM, which never holds a secret after the clone.
+ */
+const GIT = 'git() { command git -c core.hooksPath=/dev/null -c core.fsmonitor=false -c diff.external= "$@"; }';
+const DIFF = 'diff --no-ext-diff --no-textconv --cached --no-renames';
+
 // Shell scripts are constants; everything variable arrives as an argument or an environment variable.
 // Exported for tests, which run them with a local bash and stub the ones that need npm or a dev server.
 export const SCRIPTS = {
+  /** The only script that ever sees GITHUB_TOKEN, in a sandbox just created, before any agent has run in it. */
   clone: `set -e
 rm -rf "$SITE"; mkdir -p "$EDITOR/runs"
 git clone -q --depth 1 --branch "$2" "$1" "$SITE"
@@ -202,18 +216,6 @@ cd "$SITE"
 v=$(node -p "(require('./package.json').packageManager || '').match(/^pnpm@([0-9][^+]*)/)?.[1] || '10'")
 npm i -g "pnpm@$v" >/dev/null 2>&1
 pnpm install --frozen-lockfile > "$EDITOR/install.log" 2>&1 || { tail -20 "$EDITOR/install.log" >&2; exit 1; }`,
-  /** Fetches the branch head and resets to it, reinstalling when the dependencies changed. */
-  sync: `set -e
-cd "$SITE"
-old=$(git rev-parse HEAD)
-git fetch -q --depth 1 origin "$1"
-git reset -q --hard FETCH_HEAD
-git clean -qfd
-rm -f "$EDITOR/status.index"
-if ! git diff --quiet "$old" HEAD -- package.json pnpm-lock.yaml; then
-  pnpm install --frozen-lockfile > "$EDITOR/install.log" 2>&1 || { tail -20 "$EDITOR/install.log" >&2; exit 1; }
-fi
-git rev-parse HEAD`,
   /** Restarts `astro dev` on PORT; the old server must free the port first or Vite moves to the next one. */
   dev: `pid=$(cat "$EDITOR/dev.pid" 2>/dev/null)
 grep -qs astro "/proc/$pid/cmdline" && kill "$pid"
@@ -238,16 +240,18 @@ if [ -f "$d/$1.exit" ]; then cat "$d/$1.exit"; elif kill -0 "$(cat "$d/$1.pid" 2
    * $1 base, $2 section separator, $3 latest run id. A private index keeps the agent's own index untouched; it is
    * seeded from the base because `add -A` never adds a tracked file that .gitignore matches.
    */
-  status: `cd "$SITE"
+  status: `${GIT}
+cd "$SITE"
 export GIT_INDEX_FILE="$EDITOR/status.index"
 [ -f "$GIT_INDEX_FILE" ] || git read-tree "$1"
 git add -A
-git diff --cached --no-renames --name-status -z "$1"; printf '%s' "$2"
-git diff --cached --no-renames --numstat -z "$1"; printf '%s' "$2"
-git diff --cached --no-renames "$1" | head -c ${MAX_DIFF + 1}; printf '%s' "$2"
+git ${DIFF} --name-status -z "$1"; printf '%s' "$2"
+git ${DIFF} --numstat -z "$1"; printf '%s' "$2"
+git ${DIFF} "$1" | head -c ${MAX_DIFF + 1}; printf '%s' "$2"
 if [ -n "$3" ]; then tail -n 200 "$EDITOR/runs/$3.log" 2>/dev/null | tail -c ${MAX_LOG}; fi`,
-  /** $1 base, $2 message, then paths: a commit of base plus the working tree's state of those paths. */
+  /** $1 base, $2 message, then paths: a local commit of base plus the working tree's state of those paths. */
   advance: `set -e
+${GIT}
 cd "$SITE"
 export GIT_INDEX_FILE="$EDITOR/advance.index"
 base=$1; msg=$2; shift 2
@@ -257,15 +261,24 @@ sha=$(git commit-tree "$(git write-tree)" -p "$base" -m "$msg")
 git update-ref refs/editor/base "$sha"
 echo "$sha"`,
   /** $1 base, then paths: each one's blob sha at base, or an empty line when it didn't exist. */
-  blobs: `cd "$SITE"; base=$1; shift
+  blobs: `${GIT}
+cd "$SITE"; base=$1; shift
 for p in "$@"; do git rev-parse -q --verify "$base:$p" || echo; done`,
   /** $1 base, then folders: tracked files under them. */
-  tracked: `cd "$SITE"; base=$1; shift
+  tracked: `${GIT}
+cd "$SITE"; base=$1; shift
 git ls-tree -r -z --name-only "$base" -- "$@"`,
   remove: `cd "$SITE"; rm -f -- "$@"`,
-} as const;
+  /** $1 base: the working tree back to it; ignored files (node_modules, .astro) stay. */
+  discard: `set -e
+${GIT}
+cd "$SITE"
+git reset -q --hard "$1"
+git clean -qfd`,
+};
 
-const SCRIPT_ENV = { SITE: SITE_DIR, EDITOR: EDITOR_DIR };
+// No system or user git config either: only the repository's, under the overrides in GIT.
+const SCRIPT_ENV = { SITE: SITE_DIR, EDITOR: EDITOR_DIR, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' };
 
 async function sh(
   sb: SandboxHandle,
@@ -345,7 +358,10 @@ export async function editorContext(store: ContentStore, user: SessionUser): Pro
   };
 }
 
-/** The real key lives only here, in the firewall's header transform; the VM sees PLACEHOLDER. */
+/**
+ * The real key lives only here, in the firewall's header transform; the VM sees PLACEHOLDER. GitHub is reachable
+ * only while a new sandbox clones, before any agent has run in it.
+ */
 export function networkPolicy(agent: EditorContext['agent'], withGitHub = false): NetworkPolicy {
   const a = AGENTS[agent.provider];
   return {
@@ -420,17 +436,23 @@ async function exportDocuments(
   };
 }
 
-/** Start: resumes the site's sandbox, or creates it (clone, install, export) on first use; restarts the preview. */
+/**
+ * Start: resumes the site's sandbox, or creates it on first use (clone, install, export); restarts the preview. The
+ * GitHub token enters a VM only here, for the clone of a sandbox created moments ago.
+ */
 export async function startSession(ctx: EditorContext): Promise<EditorStatus> {
-  const { sandbox: sb, created } = await ctx.api.getOrCreate(ctx.name, {
-    networkPolicy: networkPolicy(ctx.agent, true),
-    timeoutMs: SESSION_TIMEOUT,
-    ports: [PORT],
-  });
-  let state = created ? null : await readState(sb);
-  if (!state) {
-    // A new sandbox, or one whose first start failed half-way: set it up from scratch.
-    if (!created) await sb.setNetworkPolicy(networkPolicy(ctx.agent, true));
+  let sb = await ctx.api.get(ctx.name, { resume: true });
+  if (sb && !(await readState(sb))) {
+    // Its first start failed half-way: start clean rather than clone into a VM that may have run anything since.
+    await sb.delete();
+    sb = null;
+  }
+  if (!sb) {
+    sb = await ctx.api.create(ctx.name, {
+      networkPolicy: networkPolicy(ctx.agent, true),
+      timeoutMs: SESSION_TIMEOUT,
+      ports: [PORT],
+    });
     const url = `https://github.com/${ctx.github.owner}/${ctx.github.repo}.git`;
     let baseSha = (
       await sh(sb, SCRIPTS.clone, [url, ctx.github.branch], { env: gitAuth(ctx.github.token), timeoutMs: 120_000 })
@@ -438,15 +460,20 @@ export async function startSession(ctx: EditorContext): Promise<EditorStatus> {
     await sh(sb, SCRIPTS.install, [], { timeoutMs: 300_000 });
     let docVersions: Record<string, string> = {};
     if (ctx.docs) ({ baseSha, docVersions } = await exportDocuments(sb, ctx.docs, baseSha));
-    state = { baseSha, docVersions, provider: ctx.agent.provider, model: ctx.agent.model, runs: [] };
-    await writeState(sb, state);
+    await writeState(sb, { baseSha, docVersions, provider: ctx.agent.provider, model: ctx.agent.model, runs: [] });
   }
-  // Also how a key changed on the AI screen reaches a running session.
+  // Closes GitHub after a clone; also how a key changed on the AI screen reaches a running session.
   await sb.setNetworkPolicy(networkPolicy(ctx.agent));
   const install = AGENTS[ctx.agent.provider].install;
   if (install) await sh(sb, install, [], { timeoutMs: 120_000 });
   await restartDevServer(sb);
   return sessionStatus(ctx);
+}
+
+/** Start over: deletes the sandbox, unpublished changes included, and starts a fresh clone of the live branch. */
+export async function startOver(ctx: EditorContext): Promise<EditorStatus> {
+  await (await ctx.api.get(ctx.name))?.delete();
+  return startSession(ctx);
 }
 
 async function runState(sb: SandboxHandle, id: string): Promise<'running' | 'lost' | number> {
@@ -570,6 +597,7 @@ export async function sessionStatus(target: EditorTarget, blocked?: string): Pro
     provider: state.provider,
     model: state.model,
     run: last && { ...last, running: !last.finishedAt },
+    published: state.published,
     log: renderLog(state.provider, log),
     files,
     diff: diff.slice(0, MAX_DIFF),
@@ -594,19 +622,15 @@ export async function editorStatus(store: ContentStore, user: SessionUser): Prom
   return sessionStatus(target, blocked);
 }
 
-/** Discard: drops every change and updates the checkout to the live branch (and, in Postgres mode, live content). */
+/**
+ * Discard: back to the session's base (and, in Postgres mode, the database's current content). Local only: bringing
+ * the code up to date with GitHub is Start over, so no token ever enters a VM an agent has run in.
+ */
 export async function discardChanges(ctx: EditorContext): Promise<EditorStatus> {
   const { sb, state } = await openSession(ctx);
   await settleRun(sb, state);
   if (isRunning(state)) throw new HttpError(409, 'A change is running: wait for it to finish');
-  await sb.setNetworkPolicy(networkPolicy(ctx.agent, true));
-  try {
-    state.baseSha = (
-      await sh(sb, SCRIPTS.sync, [ctx.github.branch], { env: gitAuth(ctx.github.token), timeoutMs: 300_000 })
-    ).trim();
-  } finally {
-    await sb.setNetworkPolicy(networkPolicy(ctx.agent));
-  }
+  await sh(sb, SCRIPTS.discard, [state.baseSha]);
   if (ctx.docs) Object.assign(state, await exportDocuments(sb, ctx.docs, state.baseSha));
   state.runs = [];
   await writeState(sb, state);
@@ -627,7 +651,11 @@ function toChange(path: string, bytes: Buffer | null): Change {
 }
 
 const drift = (path: string) =>
-  new HttpError(409, `The site changed since this session started (${path}): discard and start again`, { path });
+  new HttpError(
+    409,
+    `The site changed since this session started (${path}): use Start over for a fresh copy (it drops this session's unpublished changes)`,
+    { path },
+  );
 
 export interface PublishResult {
   /** The GitHub commit, when there was code (or, in git mode, anything) to commit. */
@@ -679,6 +707,8 @@ export async function publish(ctx: EditorContext, message?: unknown): Promise<Pu
       throw e instanceof ConflictError ? drift(e.path) : e;
     }
     result.commit = { id: commit.id, url: commit.url };
+    state.published = { ...result.commit, at: new Date().toISOString() };
+    // The tree already holds what was published: a local commit is the next base, with no fetch and no token.
     state.baseSha = await advance(sb, state.baseSha, text, paths);
     await writeState(sb, state);
   }

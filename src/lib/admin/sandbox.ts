@@ -45,41 +45,45 @@ function handle(s: Sandbox): SandboxHandle {
       sdk('updating the network policy', (signal) => s.update({ networkPolicy }, { signal })),
     extendTimeout: (ms) => sdk('extending the session', (signal) => s.extendTimeout(ms, { signal })),
     stop: () => sdk('stopping the session', async (signal) => void (await s.stop({ signal }))),
+    delete: () =>
+      sdk('deleting the session', async (signal) => {
+        if (s.status === 'running') await s.stop({ signal });
+        await s.delete({ signal });
+      }),
   };
 }
 
 /** The Vercel Sandbox SDK behind the editor's SandboxApi; credentials come from VERCEL_OIDC_TOKEN (automatic on Vercel). */
 export const vercelSandbox: SandboxApi = {
-  get: (name) =>
-    sdk('looking up the session', async (signal) => {
-      try {
-        return handle(await Sandbox.get({ name, signal }));
-      } catch (e) {
-        if (e instanceof APIError && e.response.status === 404) return null;
-        throw e;
-      }
-    }),
-  getOrCreate: (name, opts) =>
+  get: (name, opts = {}) =>
     sdk(
-      'starting the session',
+      'looking up the session',
       async (signal) => {
-        let created = false;
-        const s = await Sandbox.getOrCreate({
-          name,
-          ports: opts.ports,
-          timeout: opts.timeoutMs,
-          networkPolicy: opts.networkPolicy,
-          resources: { vcpus: 2 },
-          persistent: true,
-          keepLastSnapshots: { count: 1 },
-          resume: true,
-          signal,
-          onCreate: async () => {
-            created = true;
-          },
-        });
-        return { sandbox: handle(s), created };
+        try {
+          return handle(await Sandbox.get({ name, resume: opts.resume, signal }));
+        } catch (e) {
+          if (e instanceof APIError && e.response.status === 404) return null;
+          throw e;
+        }
       },
+      opts.resume ? 180_000 : CALL_TIMEOUT,
+    ),
+  create: (name, opts) =>
+    sdk(
+      'creating the session',
+      async (signal) =>
+        handle(
+          await Sandbox.create({
+            name,
+            ports: opts.ports,
+            timeout: opts.timeoutMs,
+            networkPolicy: opts.networkPolicy,
+            resources: { vcpus: 2 },
+            persistent: true,
+            keepLastSnapshots: { count: 1 },
+            signal,
+          }),
+        ),
       180_000,
     ),
 };
