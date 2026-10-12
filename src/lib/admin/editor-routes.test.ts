@@ -1,6 +1,7 @@
 import test, { afterEach, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { setSandboxForTests, type SandboxApi } from './editor';
+import { UpstreamError } from './store';
 import { setStoreForTests } from './get-store';
 import { MemoryStore } from './memory-store';
 import { DELETE as discard } from '../../admin/routes/api/editor/changes';
@@ -93,4 +94,23 @@ test('with everything set, Start reaches the sandbox for this repository', async
   assert.equal(res.status, 500, 'the stub refuses');
   assert.deepEqual(created, ['site-editor-jane-site']);
   assert.deepEqual((await call(status, 'GET')).body, { state: 'none' });
+});
+
+test('when the sandbox service can’t be reached, status says why instead of failing', async () => {
+  setSandboxForTests({
+    get: async () => {
+      throw new UpstreamError(
+        'Vercel Sandbox: looking up the session failed: Could not get credentials from OIDC context',
+      );
+    },
+    create: async () => {
+      throw new Error('unused');
+    },
+  });
+  const s = await call(status, 'GET');
+  assert.equal(s.status, 200);
+  assert.deepEqual(s.body, {
+    state: 'unavailable',
+    reason: 'Vercel Sandbox: looking up the session failed: Could not get credentials from OIDC context',
+  });
 });

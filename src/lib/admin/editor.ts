@@ -583,7 +583,14 @@ async function changes(sb: SandboxHandle, base: string, runId = '') {
 
 /** Status: the session, the latest run and its log, the preview URL, and every changed file with the diff. */
 export async function sessionStatus(target: EditorTarget, blocked?: string): Promise<EditorStatus> {
-  const sb = await target.api.get(target.name);
+  let sb: SandboxHandle | null;
+  try {
+    sb = await target.api.get(target.name);
+  } catch (e) {
+    // No Vercel credentials (local dev without `vercel env pull`) or the service is down: say so on the screen.
+    if (e instanceof UpstreamError) return { state: 'unavailable', reason: e.message };
+    throw e;
+  }
   if (!sb) return { state: 'none', blocked };
   const state = sb.status === 'running' ? await readState(sb) : null;
   if (!state) return { state: 'stopped', blocked };
