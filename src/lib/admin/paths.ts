@@ -15,6 +15,8 @@ export type ConfigFile = (typeof CONFIG_FILES)[number];
 export const FEEDS_JSON = 'src/data/feeds.json';
 /** Last daily-jobs results (Postgres mode): admin-only, never rendered. */
 export const JOBS_JSON = 'src/data/jobs.json';
+/** Google Scholar citation ids already handled by the papers sync, and its last run: admin-only, never rendered. */
+export const SCHOLAR_JSON = 'src/data/scholar.json';
 /** Images referenced by plain URLs (config files, Markdown bodies): served from public/. */
 export const SITE_MEDIA = { dir: 'public/images', url: '/images' };
 
@@ -74,6 +76,7 @@ export function assertAllowed(path: string): void {
     CONFIG_FILES.some((file) => path === configPath(file)) ||
     path === FEEDS_JSON ||
     path === JOBS_JSON ||
+    path === SCHOLAR_JSON ||
     isMediaPath(path)
   )
     return;

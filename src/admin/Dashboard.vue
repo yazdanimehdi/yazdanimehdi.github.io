@@ -22,6 +22,7 @@ interface DashboardData {
 const JOB_LABELS: [JobName, string][] = [
   ['scheduled', 'Scheduled posts'],
   ['feeds', 'Feeds'],
+  ['papers', 'Papers from Scholar'],
   ['backup', 'Backup to git'],
 ];
 const running = ref(false);

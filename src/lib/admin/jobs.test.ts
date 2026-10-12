@@ -8,7 +8,7 @@ import { setStoreForTests } from './get-store';
 import { MemoryStore } from './memory-store';
 import { PostgresStore } from './postgres-store';
 import { JOBS_JSON } from './paths';
-import { parseJobs, releaseScheduled, releaseSince, runJobs, type Steps } from './jobs';
+import { dailySteps, parseJobs, releaseScheduled, releaseSince, runJobs, type Steps } from './jobs';
 import { GET as cron } from '../../admin/routes/api/cron/daily';
 import { POST as runNow } from '../../admin/routes/api/jobs/run';
 
@@ -63,6 +63,10 @@ test('runJobs: a failing step is recorded and the others still run; jobs.json ho
       ran.push('scheduled');
       return { detail: 'nothing due' };
     },
+    papers: async () => {
+      ran.push('papers');
+      return { detail: 'skipped: no SERPAPI_KEY' };
+    },
     backup: async () => {
       ran.push('backup');
       return { detail: '2 file(s) changed', url: 'https://github.com/o/r/commit/c' };
@@ -75,11 +79,12 @@ test('runJobs: a failing step is recorded and the others still run; jobs.json ho
   } finally {
     console.error = original;
   }
-  assert.deepEqual(ran, ['scheduled', 'feeds', 'backup']);
+  assert.deepEqual(ran, ['scheduled', 'feeds', 'papers', 'backup']);
   const at = '2026-10-07T03:00:00.000Z';
   assert.deepEqual(await jobs(), {
     feeds: { ok: false, at, detail: 'feed down' },
     scheduled: { ok: true, at, detail: 'nothing due' },
+    papers: { ok: true, at, detail: 'skipped: no SERPAPI_KEY' },
     backup: { ok: true, at, detail: '2 file(s) changed', url: 'https://github.com/o/r/commit/c' },
   });
 });
@@ -133,7 +138,13 @@ test('cron: 401 without or with a wrong secret; outside Postgres mode it skips',
 });
 
 test('cron in Postgres mode: runs every step, releases due posts, records jobs.json', async () => {
-  const restore = env({ CRON_SECRET: 's3cret', VERCEL: '1', DATABASE_URL: 'postgres://test', GITHUB_TOKEN: undefined });
+  const restore = env({
+    CRON_SECRET: 's3cret',
+    VERCEL: '1',
+    DATABASE_URL: 'postgres://test',
+    GITHUB_TOKEN: undefined,
+    SERPAPI_KEY: undefined,
+  });
   const yesterday = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
   await sql`insert into documents (path, content) values
     ('config/feeds.yml', ${"mediumUrl: ''\nfeeds: []\n"}),
@@ -151,6 +162,7 @@ test('cron in Postgres mode: runs every step, releases due posts, records jobs.j
       {
         feeds: [true, 'no feeds configured'],
         scheduled: [true, 'released now'],
+        papers: [true, 'skipped: no SERPAPI_KEY'],
         backup: [true, 'skipped: no GITHUB_TOKEN'],
       },
     );
@@ -162,7 +174,7 @@ test('cron in Postgres mode: runs every step, releases due posts, records jobs.j
 });
 
 test('Run now: Postgres only; runs the same jobs as the signed-in user', async () => {
-  const restore = env({ GITHUB_TOKEN: undefined });
+  const restore = env({ GITHUB_TOKEN: undefined, SERPAPI_KEY: undefined });
   const call = () =>
     runNow({
       request: new Request('https://site.test/api/admin/jobs/run', { method: 'POST' }),
@@ -174,7 +186,7 @@ test('Run now: Postgres only; runs the same jobs as the signed-in user', async (
     await sql`insert into documents (path, content) values ('config/feeds.yml', ${'feeds: []\n'})`;
     const res = await call();
     assert.equal(res.status, 200);
-    assert.deepEqual(Object.keys(await res.json()), ['scheduled', 'feeds', 'backup']);
+    assert.deepEqual(Object.keys(await res.json()), ['scheduled', 'feeds', 'papers', 'backup']);
     setStoreForTests(() => new MemoryStore());
     assert.equal((await call()).status, 404);
   } finally {
@@ -187,7 +199,13 @@ const ago = (hours: number) => new Date(Date.now() - hours * HOUR).toISOString()
 // The jobs.json commit purges its own tag; only the post purges matter here.
 const postPurges = () => purged.filter((tags) => tags.includes('col:posts'));
 async function cronWith(record: object, posts: Record<string, string>) {
-  const restore = env({ CRON_SECRET: 's3cret', VERCEL: '1', DATABASE_URL: 'postgres://test', GITHUB_TOKEN: undefined });
+  const restore = env({
+    CRON_SECRET: 's3cret',
+    VERCEL: '1',
+    DATABASE_URL: 'postgres://test',
+    GITHUB_TOKEN: undefined,
+    SERPAPI_KEY: undefined,
+  });
   try {
     await sql`insert into documents (path, content) values
       ('config/feeds.yml', ${'feeds: []\n'}), ('src/data/jobs.json', ${JSON.stringify(record)})`;
@@ -238,7 +256,13 @@ test('releaseScheduled: a post dated exactly `since` is not released; one dated 
 });
 
 test('cron answers 502 when a step fails; Run now writes jobs.json', async () => {
-  const restore = env({ CRON_SECRET: 's3cret', VERCEL: '1', DATABASE_URL: 'postgres://test', GITHUB_TOKEN: undefined });
+  const restore = env({
+    CRON_SECRET: 's3cret',
+    VERCEL: '1',
+    DATABASE_URL: 'postgres://test',
+    GITHUB_TOKEN: undefined,
+    SERPAPI_KEY: undefined,
+  });
   const realFetch = globalThis.fetch;
   globalThis.fetch = (async () => {
     throw new Error('offline');
@@ -264,6 +288,24 @@ test('cron answers 502 when a step fails; Run now writes jobs.json', async () =>
   } finally {
     console.error = original;
     globalThis.fetch = realFetch;
+    restore();
+  }
+});
+
+test('papers step: skips cleanly without SERPAPI_KEY, and with a key but no Scholar id', async () => {
+  const now = new Date('2026-10-12T03:00:00Z');
+  let restore = env({ SERPAPI_KEY: undefined });
+  try {
+    assert.deepEqual(await dailySteps(store()).papers({}, now), { detail: 'skipped: no SERPAPI_KEY' });
+  } finally {
+    restore();
+  }
+  restore = env({ SERPAPI_KEY: 'k' });
+  try {
+    assert.deepEqual(await dailySteps(store()).papers({}, now), {
+      detail: 'skipped: no Scholar author id in config/scholar.yml',
+    });
+  } finally {
     restore();
   }
 });

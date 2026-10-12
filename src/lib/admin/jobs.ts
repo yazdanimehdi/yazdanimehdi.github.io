@@ -6,12 +6,14 @@ import { BACKUP_BRANCH, backupToGit } from './backup';
 import { listEntries, readConfig } from './content';
 import { GitHubStore, githubConfig } from './github-store';
 import { HttpError, commitChanges } from './http';
+import { papersDeps, papersSummary, syncPapers } from './papers';
 import { FEEDS_JSON, JOBS_JSON } from './paths';
 import type { PostgresStore } from './postgres-store';
 import type { CommitResult, ContentStore } from './store';
 
-// Scheduled first: it is cheap and time-sensitive, while feeds can take 15 s per source.
-export const JOBS = ['scheduled', 'feeds', 'backup'] as const;
+// Scheduled first: it is cheap and time-sensitive, while feeds can take 15 s per source. Papers before the backup, so
+// it includes the new drafts.
+export const JOBS = ['scheduled', 'feeds', 'papers', 'backup'] as const;
 export type JobName = (typeof JOBS)[number];
 export interface StepResult {
   ok: boolean;
@@ -135,6 +137,11 @@ export function dailySteps(store: PostgresStore): Steps {
     scheduled: async (previous, now) => {
       const due = await releaseScheduled(store, releaseSince(previous.scheduled, now), now);
       return { detail: due.length ? `released ${due.join(', ')}` : 'nothing due' };
+    },
+    papers: async (_previous, now) => {
+      const deps = await papersDeps(store);
+      if (!deps) return { detail: 'skipped: no SERPAPI_KEY' };
+      return { detail: papersSummary(await syncPapers(store, deps, now)) };
     },
     backup: async (_previous, now) => {
       if (!process.env.GITHUB_TOKEN) return { detail: 'skipped: no GITHUB_TOKEN' };

@@ -17,7 +17,7 @@ function authorized(header: string | null, secret: string | undefined): boolean 
   return got.length === want.length && timingSafeEqual(got, want);
 }
 
-/** Vercel Cron (vercel.json), daily at 03:00 UTC: sync feeds, release scheduled posts, back up to git. */
+/** Vercel Cron (vercel.json), daily at 03:00 UTC: release scheduled posts, sync feeds, import Scholar papers, back up to git. */
 export const GET: APIRoute = async ({ request }) => {
   if (!authorized(request.headers.get('authorization'), process.env.CRON_SECRET)) {
     return json({ error: 'Unauthorized' }, 401);

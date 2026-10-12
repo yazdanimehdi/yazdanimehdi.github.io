@@ -6,7 +6,9 @@ import { setSqlForTests, type Sql } from '../db';
 import { setStoreForTests } from './get-store';
 import { MemoryStore } from './memory-store';
 import { PostgresStore } from './postgres-store';
+import { backupToGit } from './backup';
 import { getSecret, listSecrets, openSecret, sealSecret, setSecret } from './secrets';
+import type { Change } from './store';
 import { GET as listKeys, PUT as putKey } from '../../admin/routes/api/ai/keys';
 
 const A = 'a'.repeat(32);
@@ -109,4 +111,25 @@ test('keys API: needs a session; PUT is refused outside Postgres mode', async ()
   const res = await call(putKey, { name: 'OPENAI_API_KEY', value: KEY });
   assert.equal(res.status, 404);
   assert.equal((await call(listKeys)).status, 200);
+});
+
+test('the git backup never sees stored keys, sealed or not', async () => {
+  await sql`insert into documents (path, content) values ('config/site.yml', 'title: A')`;
+  await setSecret(sql, 'OPENAI_API_KEY', KEY, 'jane');
+  const [{ value: sealed }] = await sql<{ value: string }>`select value from secrets`;
+  const written: Change[] = [];
+  await backupToGit(sql, {
+    tree: async () => new Map(),
+    createBranch: async () => {},
+    commit: async (changes: Change[]) => {
+      written.push(...changes);
+      return { id: 'c', url: 'https://github.com/o/r/commit/c', versions: {} };
+    },
+  });
+  assert.deepEqual(
+    written.map((c) => c.path),
+    ['config/site.yml'],
+  );
+  const text = JSON.stringify(written);
+  assert.ok(!text.includes(KEY) && !text.includes(sealed));
 });

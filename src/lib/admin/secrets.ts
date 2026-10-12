@@ -78,10 +78,13 @@ export async function getSecret(sql: Sql | null, name: SecretName): Promise<stri
   return (sealed && (await openSecret(sealed))) || process.env[name] || undefined;
 }
 
+export const missingKey = (name: SecretName) =>
+  new HttpError(400, `${name} is not set: add it on the AI screen or as an environment variable`);
+
 /** Like getSecret, but a missing key is a 400 that says where to set it. */
 export async function requireSecret(sql: Sql | null, name: SecretName): Promise<string> {
   const value = await getSecret(sql, name);
-  if (!value) throw new HttpError(400, `${name} is not set: add it on the AI screen or as an environment variable`);
+  if (!value) throw missingKey(name);
   return value;
 }
 
