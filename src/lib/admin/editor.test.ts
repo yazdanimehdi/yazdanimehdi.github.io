@@ -177,8 +177,11 @@ beforeEach(() => {
     'src/content/posts/hello.md': 'hello from git\n',
     'src/content/posts/gone.md': 'deleted in the database\n',
     'src/admin/x.ts': 'admin\n',
+    '.gitignore': 'tracked-but-ignored.txt\n',
+    'tracked-but-ignored.txt': 'committed before it was ignored\n',
   });
   git(work, 'add', '-A');
+  git(work, 'add', '-f', 'tracked-but-ignored.txt');
   git(work, 'commit', '-q', '-m', 'init');
   git(root, 'clone', '-q', '--bare', work, 'remote.git');
   git(work, 'remote', 'add', 'origin', path.join(root, 'remote.git'));
@@ -243,11 +246,10 @@ test('start clones the deployed branch with the token only in git’s environmen
 
   const [clone] = sb.called(SCRIPTS.clone);
   assert.deepEqual(clone.args, ['https://github.com/jane/site.git', 'main']);
-  assert.equal(
-    clone.env.GIT_CONFIG_VALUE_0,
-    `Authorization: Basic ${Buffer.from('x-access-token:ghp_SECRET').toString('base64')}`,
-  );
+  assert.equal(clone.env.GIT_TOKEN, 'ghp_SECRET');
+  assert.equal(clone.env.GIT_CONFIG_KEY_0, 'credential.helper');
   const others = sb.calls.filter((c) => c !== clone);
+  assert.ok(!JSON.stringify(clone.env.GIT_CONFIG_VALUE_0).includes('ghp_SECRET'), 'the helper reads it from the env');
   assert.ok(!JSON.stringify(others).includes('ghp_SECRET'), 'no other command sees the token');
   assert.ok(!JSON.stringify(clone.args).includes('ghp_SECRET'), 'nor the clone’s argv');
   assert.ok(!fs.readFileSync(site('.git/config'), 'utf8').includes('ghp_SECRET'), 'nor .git/config');
@@ -362,6 +364,16 @@ second line; touch pwned3`;
   await startRun(c, 'next');
   const [, second] = sb.calls.filter((x) => x.script === SCRIPTS.run);
   assert.ok(second.args.includes('--continue'), 'later runs continue the conversation');
+});
+
+test('a run still starts when the plan won’t extend the session any further', async () => {
+  const c = context();
+  await startSession(c);
+  api.sandbox!.extendTimeout = async () => {
+    throw new UpstreamError('Vercel Sandbox: extending the session failed: would exceed maximum execution timeout');
+  };
+  fakeClaude(false);
+  assert.ok((await startRun(c, 'x')).id);
 });
 
 test('run, publish and discard need a running session', async () => {

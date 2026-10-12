@@ -209,6 +209,7 @@ old=$(git rev-parse HEAD)
 git fetch -q --depth 1 origin "$1"
 git reset -q --hard FETCH_HEAD
 git clean -qfd
+rm -f "$EDITOR/status.index"
 if ! git diff --quiet "$old" HEAD -- package.json pnpm-lock.yaml; then
   pnpm install --frozen-lockfile > "$EDITOR/install.log" 2>&1 || { tail -20 "$EDITOR/install.log" >&2; exit 1; }
 fi
@@ -233,9 +234,13 @@ cd "$SITE"
 echo $? > "$d/$id.exit"`,
   runState: `d="$EDITOR/runs"
 if [ -f "$d/$1.exit" ]; then cat "$d/$1.exit"; elif kill -0 "$(cat "$d/$1.pid" 2>/dev/null)" 2>/dev/null; then echo running; else echo lost; fi`,
-  /** $1 base, $2 section separator, $3 latest run id. A private index keeps the agent's own index untouched. */
+  /**
+   * $1 base, $2 section separator, $3 latest run id. A private index keeps the agent's own index untouched; it is
+   * seeded from the base because `add -A` never adds a tracked file that .gitignore matches.
+   */
   status: `cd "$SITE"
 export GIT_INDEX_FILE="$EDITOR/status.index"
+[ -f "$GIT_INDEX_FILE" ] || git read-tree "$1"
 git add -A
 git diff --cached --no-renames --name-status -z "$1"; printf '%s' "$2"
 git diff --cached --no-renames --numstat -z "$1"; printf '%s' "$2"
@@ -353,11 +358,15 @@ export function networkPolicy(agent: EditorContext['agent'], withGitHub = false)
   };
 }
 
-/** The token reaches git through its environment only: never a URL, argv or .git/config. */
+/**
+ * The token reaches git through its environment only (never a URL, argv or .git/config), and through a credential
+ * helper, so git hands it to GitHub only when GitHub asks for it.
+ */
 const gitAuth = (token: string) => ({
+  GIT_TOKEN: token,
   GIT_CONFIG_COUNT: '1',
-  GIT_CONFIG_KEY_0: 'http.extraHeader',
-  GIT_CONFIG_VALUE_0: `Authorization: Basic ${Buffer.from(`x-access-token:${token}`).toString('base64')}`,
+  GIT_CONFIG_KEY_0: 'credential.helper',
+  GIT_CONFIG_VALUE_0: '!f() { echo username=x-access-token; echo "password=$GIT_TOKEN"; }; f',
 });
 
 async function readState(sb: SandboxHandle): Promise<EditorSession | null> {
@@ -470,7 +479,8 @@ export async function startRun(ctx: EditorContext, prompt: unknown): Promise<Edi
   if (await settleRun(sb, state)) await restartDevServer(sb);
   if (isRunning(state)) throw new HttpError(409, 'A change is already running: wait for it to finish');
   await sb.setNetworkPolicy(networkPolicy(ctx.agent));
-  await sb.extendTimeout(SESSION_TIMEOUT);
+  // ponytail: past the plan's maximum (Hobby: 45 min) the session ends there; the files persist and Start resumes it.
+  await sb.extendTimeout(SESSION_TIMEOUT).catch(() => undefined);
   const agent = AGENTS[ctx.agent.provider];
   if (agent.install) await sh(sb, agent.install, [], { timeoutMs: 120_000 });
   const resume = state.runs.length > 0 && state.provider === ctx.agent.provider;
