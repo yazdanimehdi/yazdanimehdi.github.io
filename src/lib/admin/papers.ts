@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- SerpApi responses are parsed defensively from unknown JSON */
 import type { ImageOutput, TextInput } from '../ai/providers';
 import { resolveAiConfig } from '../ai/providers';
-import { imagePrompt, paperPostPrompt, parsePaperPost } from '../ai/prompts';
+import { imagePrompt, paperPostPrompt, parsePaperPost, type PaperPost } from '../ai/prompts';
 import { slugify } from '../utils';
 import { generateImage, generateText, readAiConfig, saveImage } from './ai';
 import { entryChange, listEntries, readConfig } from './content';
@@ -43,6 +43,9 @@ interface Article {
   venue: string;
   year: number;
 }
+
+/** A paper's network work for its post: the abstract, then the post or why it failed, then the cover or why it failed. */
+type Draft = { abstract?: string } & ({ error: string } | { post: PaperPost; image: ImageOutput | { error: string } });
 
 const STOP_WORDS = new Set(['a', 'an', 'the', 'of', 'in', 'on', 'for', 'and', 'to', 'with', 'is', 'are']);
 
@@ -151,6 +154,7 @@ export async function syncPapers(store: ContentStore, deps: PapersDeps, now = ne
   const today = now.toISOString().slice(0, 10);
   let drafted = 0;
 
+  const planned: { a: Article; pubSlug: string; writePost: boolean }[] = [];
   for (const a of articles) {
     // Manual entries win; also the same paper listed under two configured authors.
     if (titles.has(normalizeTitle(a.title))) {
@@ -162,12 +166,28 @@ export async function syncPapers(store: ContentStore, deps: PapersDeps, now = ne
       result.deferred.push(a.citationId);
       continue;
     }
+    if (writePost) drafted++;
     titles.add(normalizeTitle(a.title));
     newlySeen.push(a.citationId);
-    const pubSlug = unique(generateId(a.authors, a.year, a.title), pubSlugs);
-    let abstract: string | undefined;
-    if (writePost) {
-      drafted++;
+    planned.push({ a, pubSlug: unique(generateId(a.authors, a.year, a.title), pubSlugs), writePost });
+  }
+
+  const pubOf = (a: Article, abstract?: string) => ({
+    title: a.title,
+    authors: a.authors,
+    venue: a.venue || 'Unknown venue',
+    year: a.year,
+    url: a.link,
+    type: inferType(a.venue),
+    featured: false,
+    abstract,
+  });
+
+  // Concurrent so a run of several slow model calls stays inside the function time limit.
+  const drafts = await Promise.all(
+    planned.map(async ({ a, writePost }): Promise<Draft | undefined> => {
+      if (!writePost) return undefined;
+      let abstract: string | undefined;
       try {
         const cited = await deps.serpapi({
           engine: 'google_scholar_author',
@@ -179,35 +199,36 @@ export async function syncPapers(store: ContentStore, deps: PapersDeps, now = ne
       } catch {
         // the post is still written, from the title alone
       }
-    }
-    const pub = {
-      title: a.title,
-      authors: a.authors,
-      venue: a.venue || 'Unknown venue',
-      year: a.year,
-      url: a.link,
-      type: inferType(a.venue),
-      featured: false,
-      abstract,
-    };
-    changes.push(entryChange('publications', pubSlug, pub, ''));
-    result.imported.push(pubSlug);
-    if (!writePost) continue;
+      let post: PaperPost;
+      try {
+        post = parsePaperPost(await deps.text(paperPostPrompt(pubOf(a, abstract))));
+      } catch (e) {
+        return { abstract, error: message(e) };
+      }
+      try {
+        return { abstract, post, image: await deps.image(imagePrompt(post)) };
+      } catch (e) {
+        return { abstract, post, image: { error: message(e) } };
+      }
+    }),
+  );
 
-    let post;
-    try {
-      post = parsePaperPost(await deps.text(paperPostPrompt({ ...pub, abstract })));
-    } catch (e) {
-      result.failed.push({ item: `post for ${pubSlug}`, error: message(e) });
+  // Sequential: in git mode each saveImage is its own commit, and concurrent commits on one branch conflict.
+  for (const [i, { a, pubSlug }] of planned.entries()) {
+    const draft = drafts[i];
+    changes.push(entryChange('publications', pubSlug, pubOf(a, draft?.abstract), ''));
+    result.imported.push(pubSlug);
+    if (!draft) continue;
+
+    if ('error' in draft) {
+      result.failed.push({ item: `post for ${pubSlug}`, error: draft.error });
       continue;
     }
+    const { post, image } = draft;
     const postSlug = unique(slugify(post.title).slice(0, 80).replace(/-+$/, '') || `${pubSlug}-post`, postSlugs);
-    let coverImage: string | undefined;
-    try {
-      coverImage = (await saveImage(store, postSlug, await deps.image(imagePrompt(post)))).url;
-    } catch (e) {
-      result.failed.push({ item: `cover image for ${postSlug}`, error: message(e) });
-    }
+    const cover =
+      'error' in image ? image : await saveImage(store, postSlug, image).catch((e: unknown) => ({ error: message(e) }));
+    if ('error' in cover) result.failed.push({ item: `cover image for ${postSlug}`, error: cover.error });
     const data = {
       title: post.title,
       subtitle: post.subtitle,
@@ -216,7 +237,7 @@ export async function syncPapers(store: ContentStore, deps: PapersDeps, now = ne
       date: today,
       draft: true,
       relatedPublication: pubSlug,
-      coverImage,
+      coverImage: 'error' in cover ? undefined : cover.url,
     };
     try {
       changes.push(entryChange('posts', postSlug, data, post.body));

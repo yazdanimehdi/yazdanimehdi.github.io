@@ -176,6 +176,69 @@ test('the cap defers extra papers without importing them or marking them seen; t
   assert.deepEqual(next, { imported: ['smith2025older'], posts: ['older-paper'], deferred: [], failed: [] });
 });
 
+test('posts are generated concurrently, covers are stored one at a time, in newest-first order', async () => {
+  await baseline();
+  articles = [
+    article('p', 'Paper One', '2026'),
+    article('q', 'Paper Two', '2025'),
+    article('r', 'Paper Three', '2024'),
+    ...articles,
+  ];
+  // Resolves for everyone only once all three papers have called: a sequential run never gets past the first.
+  const barrier = () => {
+    let arrived = 0;
+    let open!: () => void;
+    const opened = new Promise<void>((resolve) => (open = resolve));
+    return () => {
+      if (++arrived === 3) open();
+      return opened;
+    };
+  };
+  const textBarrier = barrier();
+  const imageBarrier = barrier();
+  const base = deps();
+  let storing = false;
+  const stored: string[] = [];
+  const putMedia = store.putMedia.bind(store);
+  store.putMedia = async (folder, filename, base64, contentType) => {
+    if (storing) throw new Error('a second putMedia started before the first resolved');
+    storing = true;
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      stored.push(filename);
+      return await putMedia(folder, filename, base64, contentType);
+    } finally {
+      storing = false;
+    }
+  };
+  let timer: NodeJS.Timeout | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error('posts were generated one after another')), 1000);
+  });
+  const run = syncPapers(
+    store,
+    deps({
+      text: async (input) => (await textBarrier(), base.text(input)),
+      image: async (prompt) => (await imageBarrier(), base.image(prompt)),
+    }),
+    NOW,
+  );
+  const r = await Promise.race([run, timeout]).finally(() => clearTimeout(timer));
+  assert.deepEqual(r, {
+    imported: ['smith2026paper', 'smith2025paper', 'smith2024paper'],
+    posts: ['paper-one', 'paper-two', 'paper-three'],
+    deferred: [],
+    failed: [],
+  });
+  assert.deepEqual(
+    stored.map((f) => f.replace(/-[0-9a-f]{6}\.jpg$/, '')),
+    ['paper-one', 'paper-two', 'paper-three'],
+  );
+  for (const slug of r.posts)
+    assert.ok((await readEntry(store, 'posts', slug))!.data.coverImage, `${slug} has a cover`);
+  assert.equal((await readEntry(store, 'publications', 'smith2025paper'))!.data.abstract, 'Abstract of AUTH:q');
+});
+
 test('with autoPost off, new papers are imported without posts', async () => {
   await baseline();
   write('config/ai.yml', 'papers:\n  autoPost: false\n');
