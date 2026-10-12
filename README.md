@@ -643,6 +643,39 @@ draft posts, using your own provider keys.
   through [SerpApi](https://serpapi.com/google-scholar-author-api): one search per author per check plus one per
   paper post. The free tier (about 250 searches a month) covers one author daily plus a few new papers.
 
+### Site editor
+
+**Site editor** in the admin changes the site's code from a plain-language request ("make the header serif and move
+the news section above publications"). A coding agent edits a private copy of the site in a
+[Vercel Sandbox](https://vercel.com/docs/vercel-sandbox), you check the result in a live preview, and **Publish**
+commits it so the site redeploys.
+
+- **Requirements.** The admin on Vercel (git or Postgres mode), `GITHUB_TOKEN` with Contents: read and write (the
+  token git mode and the backup already use), and a key for the writing provider chosen on the AI screen. The agent
+  is that provider's own coding tool: Claude Code for Anthropic, Codex for OpenAI, Gemini CLI for Google, with the
+  writing model from the AI screen. On Vercel the sandbox signs in automatically (OIDC). For local development, run
+  `vercel link` and `vercel env pull` to get `VERCEL_OIDC_TOKEN`.
+- **How it works.** **Start session** creates one sandbox for the site (about a minute the first time: clone and
+  install), then resumes it with its changes. Describe a change and **Run**; the agent's log shows while it works,
+  and the preview reloads when it is done. Ask for more, **Discard changes** to go back, or **Publish**: one commit
+  on the deployed branch with your message (git history is the undo). In Postgres mode, code is committed to GitHub
+  and content edits (posts, `config/*.yml`) are saved to the database. **End session** stops the sandbox and keeps its
+  files. **Start over** deletes it and starts from a fresh copy of the live site, which is also the way out when the
+  site changed on GitHub since the session started (Publish then refuses with a 409).
+- **Scope.** The editor publishes only site code and content: components, layouts, pages (`.astro`, `.md`, `.mdx`;
+  never endpoints or anything named `api`), styles, themes, assets, content files, `src/data/*.json`, `public/` and
+  `config/*.yml`. The admin, sign-in, `src/lib`, middleware, integrations, `config/ai.yml`, dependencies, build and
+  deploy config, dot-files and secrets are refused: the screen shows refused files in red and Publish stays
+  disabled until you discard them. `.astro` files can still run server code, so read the diff before publishing.
+- **Keys stay out of the sandbox.** The provider key never enters the sandbox: the agent sees a placeholder and the
+  sandbox firewall adds the real key to requests to the provider's API only. The GitHub token enters a sandbox once,
+  for the first clone, before any agent has run in it, and GitHub is closed to the sandbox from then on; publishing
+  happens from the admin, not from the sandbox.
+- **Cost.** Sandbox time is billed to your Vercel account; a session times out after 30 minutes without a run (each
+  run extends it) and Hobby sessions end at 45 minutes (the files persist; **Start session** resumes). Each run is
+  billed by your provider like any use of its coding tool. One session per site: two admins share it, and a second
+  **Run** while one is active is refused.
+
 ### CV PDF in Postgres mode
 
 The CV PDF is rendered on Vercel whenever you publish the CV or a publication (and with **Generate PDF**), stored in
