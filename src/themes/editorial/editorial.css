@@ -8,7 +8,7 @@
   --ed-ink: #15192b;
   --ed-body-2: #3d4357;
   --ed-muted: #4a5068;
-  --ed-caption: #6a7085;
+  --ed-caption: #656b80;
   --ed-rule: #e4e7ee;
   --ed-rule-soft: #eef0f4;
   --ed-tint: #f3f5fa;
@@ -31,10 +31,10 @@
   /* Classic Tailwind tokens → editorial palette, so undesigned pages match without redesigns. */
   --color-primary-50: var(--ed-hover);
   --color-primary-100: var(--ed-selection);
-  --color-primary-200: color-mix(in oklch, var(--ed-accent), white 75%);
-  --color-primary-300: color-mix(in oklch, var(--ed-accent), white 55%);
-  --color-primary-400: color-mix(in oklch, var(--ed-accent), white 35%);
-  --color-primary-500: color-mix(in oklch, var(--ed-accent), white 15%);
+  --color-primary-200: color-mix(in oklab, var(--ed-accent), white 75%);
+  --color-primary-300: color-mix(in oklab, var(--ed-accent), white 55%);
+  --color-primary-400: color-mix(in oklab, var(--ed-accent), white 35%);
+  --color-primary-500: color-mix(in oklab, var(--ed-accent), white 15%);
   --color-primary-600: var(--ed-accent);
   --color-primary-700: var(--ed-accent-hover);
   --color-primary-800: var(--ed-accent-hover);
@@ -1159,6 +1159,7 @@
   }
   & .ed-tab {
     min-height: 44px;
+    min-width: 24px;
     margin-bottom: -1px;
     padding: 10px 0;
     border: 0;
@@ -1653,8 +1654,8 @@ html.dark:root[data-theme='editorial'] {
   --ed-hover: #1c2128;
   --ed-accent: #22d3ee;
   --ed-accent-hover: #67e8f9;
-  --ed-accent-border: color-mix(in oklch, var(--ed-accent), #0d1117 60%);
-  --ed-selection: color-mix(in oklch, var(--ed-accent), #0d1117 72%);
+  --ed-accent-border: color-mix(in oklab, var(--ed-accent), #0d1117 60%);
+  --ed-selection: color-mix(in oklab, var(--ed-accent), #0d1117 72%);
   --ed-footer: #161b22;
   --ed-footer-text: #c9d1d9;
   --ed-footer-muted: #8b949e;
@@ -1692,5 +1693,16 @@ html.dark:root[data-theme='editorial'] {
   & .ed-ink {
     filter: invert(1) hue-rotate(180deg);
     opacity: 0.88;
+  }
+  /* Shiki writes the light theme inline; its dual-theme vars carry the dark one. */
+  & pre.astro-code {
+    background-color: var(--ed-tint) !important;
+    color: var(--shiki-dark) !important;
+  }
+  & pre.astro-code span {
+    color: var(--shiki-dark) !important;
+    font-style: var(--shiki-dark-font-style) !important;
+    font-weight: var(--shiki-dark-font-weight) !important;
+    text-decoration: var(--shiki-dark-text-decoration) !important;
   }
 }

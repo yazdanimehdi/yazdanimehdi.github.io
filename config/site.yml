@@ -102,7 +102,7 @@ about:
   enabled: true
   title: 'About Our Lab'
   text: 'We are a multidisciplinary research group dedicated to advancing the frontiers of computer science and artificial intelligence. Our work spans natural language processing, computer vision, and human–computer interaction, with a focus on building systems that are robust, interpretable, and socially responsible.'
-  image: '/images/about.jpg'
+  image: '' # optional photo shown beside the text, e.g. '/images/about.jpg' (put the file in public/images/)
 
 # Homepage section order and visibility
 # Drag to reorder in the CMS; set enabled: false to hide a section

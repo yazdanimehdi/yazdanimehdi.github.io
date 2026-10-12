@@ -6,7 +6,7 @@
 }
 .adm {
   --adm-ink: var(--ed-ink, #15192b);
-  --adm-muted: var(--ed-caption, #6a7085);
+  --adm-muted: var(--ed-caption, #656b80);
   --adm-rule: var(--ed-rule, #e4e7ee);
   --adm-tint: var(--ed-tint, #f3f5fa);
   --adm-hover: var(--ed-hover, #f6f8fc);

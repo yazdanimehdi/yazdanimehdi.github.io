@@ -114,7 +114,10 @@ const journal = getTheme() === 'editorial';
             ) : (
               <p class="text-sm text-surface-500 dark:text-dm-muted">
                 To apply for this position, please email{' '}
-                <a href={`mailto:${contactEmail}`} class="text-primary-600 hover:underline dark:text-accent-400">
+                <a
+                  href={`mailto:${contactEmail}`}
+                  class="text-primary-600 underline underline-offset-2 dark:text-accent-400"
+                >
                   {contactEmail}
                 </a>{' '}
                 with your CV and research interests.
@@ -128,7 +131,10 @@ const journal = getTheme() === 'editorial';
           <section class="border-t border-surface-200 pt-6 dark:border-dm-border">
             <p class="text-sm text-surface-500 dark:text-dm-muted">
               This position is currently closed. For general inquiries, please contact{' '}
-              <a href={`mailto:${contactEmail}`} class="text-primary-600 hover:underline dark:text-accent-400">
+              <a
+                href={`mailto:${contactEmail}`}
+                class="text-primary-600 underline underline-offset-2 dark:text-accent-400"
+              >
                 {contactEmail}
               </a>
               .

@@ -37,7 +37,7 @@ const { config, siteName, personal, web3formsKey } = Astro.props;
             Get in touch via email:{' '}
             <ObfuscatedEmail
               email={config.socials.email!}
-              class="text-primary-600 hover:underline dark:text-accent-400"
+              class="text-primary-600 underline underline-offset-2 dark:text-accent-400"
             />
           </p>
         )
@@ -60,7 +60,7 @@ const { config, siteName, personal, web3formsKey } = Astro.props;
             <span class="text-surface-700 dark:text-dm-text">Email:</span><br />
             <ObfuscatedEmail
               email={config.socials.email!}
-              class="text-primary-600 hover:underline dark:text-accent-400"
+              class="text-primary-600 underline underline-offset-2 dark:text-accent-400"
             />
           </div>
           <div>

@@ -34,7 +34,7 @@
   --color-surface-100: #f3f4f6;
   --color-surface-200: #e5e7eb;
   --color-surface-300: #d1d5db;
-  --color-surface-400: #9ca3af;
+  --color-surface-400: #687080; /* used as meta text: keep >= 4.5:1 on white and surface-100 */
   --color-surface-500: #6b7280;
   --color-surface-600: #4b5563;
   --color-surface-700: #374151;
@@ -49,7 +49,7 @@
   --color-dm-heading: #e6edf3;
   --color-dm-text: #c9d1d9;
   --color-dm-muted: #8b949e;
-  --color-dm-faint: #484f58;
+  --color-dm-faint: #7d8590; /* used as meta text: keep >= 4.5:1 on dm and dm-alt */
   --color-dm-border: #21262d;
   --color-dm-border-alt: #30363d;
 
@@ -600,6 +600,7 @@
 
   html.dark .pub-badge {
     background-color: var(--color-accent-700);
+    color: var(--color-dm);
   }
 
   /* ===== Dark mode hero with cosmic bg ===== */

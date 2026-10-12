@@ -24,7 +24,13 @@ const colorCSS = generateColorOverrides(config) + (theme === 'editorial' ? edito
 ---
 
 <!doctype html>
-<html lang={lang} dir={dir} class="scroll-smooth" data-default-theme={defaultTheme} data-theme={theme}>
+<html
+  lang={lang}
+  dir={dir}
+  class="scroll-smooth motion-reduce:scroll-auto"
+  data-default-theme={defaultTheme}
+  data-theme={theme}
+>
   <head>
     <BaseHead title={title} description={description} ogImage={ogImage} keywords={keywords} />
     {colorCSS && <style set:html={colorCSS} />}

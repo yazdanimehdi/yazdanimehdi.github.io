@@ -49,6 +49,7 @@ const { personal, posts, feeds, timeline } = Astro.props;
     })()
   }
 
+  <h2 class="sr-only">Posts</h2>
   <div class="divide-y divide-surface-100 dark:divide-dm-border">
     {
       timeline.map((item) => {

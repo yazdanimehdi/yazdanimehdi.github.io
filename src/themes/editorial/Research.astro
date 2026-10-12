@@ -58,9 +58,9 @@ const figures = await Promise.all(areas.map((a) => imageFacts(a.figure)));
             <h2 id={`${a.id}-title`}>{a.title}</h2>
             <div class="ed-md" set:html={a.bodyHtml} />
             {a.result && (
-              <aside class="ed-result">
+              <p class="ed-result">
                 <b>Result.</b> {a.result}
-              </aside>
+              </p>
             )}
             {a.papers.length > 0 && (
               <div class="ed-related">

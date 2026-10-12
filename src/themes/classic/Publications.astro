@@ -38,5 +38,6 @@ const { config, personal, pubData } = Astro.props;
     }
   </p>
 
+  <h2 class="sr-only">Publication list</h2>
   <PublicationFilter publications={pubData} highlightAuthors={[config.author]} client:load />
 </PageLayout>

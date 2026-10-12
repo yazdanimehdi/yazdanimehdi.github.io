@@ -54,11 +54,11 @@ const coverSize = cover && typeof cover !== 'string' ? { width: cover.width, hei
 
     {
       related && (
-        <aside class="ed-aside" aria-label="Related paper">
+        <div class="ed-aside">
           <span class="ed-aside-label">Related paper</span>
           <a href={paperLink(related.data) ?? `/publications#${related.id}`}>{related.data.title}</a>
           <span class="ed-aside-venue">{related.data.venue}</span>
-        </aside>
+        </div>
       )
     }
 

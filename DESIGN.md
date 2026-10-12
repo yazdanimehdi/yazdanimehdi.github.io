@@ -9,7 +9,7 @@ colors:
   ink: '#15192b'
   body: '#3d4357'
   muted: '#4a5068'
-  caption: '#6a7085'
+  caption: '#656b80'
   code: '#2a2f45'
   rule: '#e4e7ee'
   rule-soft: '#eef0f4'
@@ -50,6 +50,16 @@ typography:
     fontSize: 'clamp(28px, 5vw, 36px)'
     fontWeight: 500
     lineHeight: 1.2
+  cv-title:
+    fontFamily: 'Source Serif 4, Georgia, serif'
+    fontSize: 'clamp(34px, 6vw, 48px)'
+    fontWeight: 500
+    lineHeight: 1.1
+  article-title:
+    fontFamily: 'Source Serif 4, Georgia, serif'
+    fontSize: 'clamp(30px, 6vw, 40px)'
+    fontWeight: 500
+    lineHeight: 1.2
   stat:
     fontFamily: 'Source Serif 4, Georgia, serif'
     fontSize: '36px'
@@ -73,6 +83,21 @@ typography:
     fontSize: 'clamp(20px, 3.5vw, 24px)'
     fontWeight: 400
     lineHeight: 1.45
+  title-md:
+    fontFamily: 'Source Serif 4, Georgia, serif'
+    fontSize: '21px'
+    fontWeight: 500
+    lineHeight: 1.35
+  lede:
+    fontFamily: 'Source Serif 4, Georgia, serif'
+    fontSize: 'clamp(18px, 3vw, 21px)'
+    fontWeight: 400
+    lineHeight: 1.6
+  subtitle:
+    fontFamily: 'IBM Plex Sans, system-ui, sans-serif'
+    fontSize: '18px'
+    fontWeight: 400
+    lineHeight: 1.55
   title-sm:
     fontFamily: 'Source Serif 4, Georgia, serif'
     fontSize: '19px'
@@ -253,7 +278,7 @@ The palette is near-monochrome: cool blue-black ink on white, a ladder of four t
 ### Primary
 
 - **Journal Navy** (accent, a deep slightly-violet navy): links, primary buttons, the active nav underline, the rotated-square brand mark, venue short-names, research and year numerals, BibTeX toggles, note outlines' text, and the 2px focus ring. **Owner-selectable** through `colors.light.primary` (and `colors.dark.primary` for dark) in `config/site.yml`; the override is emitted per mode at build time.
-- **Navy Pressed** (accent-hover): hover on primary buttons. With a custom accent it is derived as `color-mix(in oklch, accent, black 25%)` in light mode and `color-mix(in oklch, accent, white 35%)` in dark mode.
+- **Navy Pressed** (accent-hover): hover on primary buttons. With a custom accent it is derived as `color-mix(in oklab, accent, black 25%)` in light mode and `color-mix(in oklab, accent, white 35%)` in dark mode.
 - **Navy Wash** (accent-border) and **Selection Wash** (selection): the outline of notes ("Oral", "Spotlight", "Best paper"), the BibTeX copy button's hover border, `::selection`, and the light button's hover on the contact band. Both follow an owner-chosen accent: in light mode `color-mix` with white at 75% and 84%, in dark mode with Dark Paper at 60% and 72%.
 
 ### Neutral

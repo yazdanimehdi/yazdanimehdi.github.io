@@ -84,13 +84,13 @@ const journal = getTheme() === 'editorial';
         </h2>
         <p class="mb-3 text-sm text-surface-600 dark:text-dm-muted">
           {personal ? 'To apply, please visit the' : 'To apply for a position in our lab, please visit the'}{' '}
-          <a href="/positions" class="text-primary-600 hover:underline dark:text-accent-400">
+          <a href="/positions" class="text-primary-600 underline underline-offset-2 dark:text-accent-400">
             positions page
           </a>{' '}
           and use the application form on the relevant position, or send the following materials to{' '}
           <ObfuscatedEmail
             email={config.socials.email!}
-            class="text-primary-600 hover:underline dark:text-accent-400"
+            class="text-primary-600 underline underline-offset-2 dark:text-accent-400"
           />
           :
         </p>

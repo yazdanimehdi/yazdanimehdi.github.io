@@ -7,7 +7,7 @@ import { rehypeMathJaxPassthrough } from './rehype-mathjax-passthrough';
 export const markdownOptions = {
   remarkPlugins: [remarkMath],
   rehypePlugins: [rehypeExternalLinks, rehypeMathJaxPassthrough],
-  shikiConfig: { themes: { light: 'github-light', dark: 'github-dark' } as const },
+  shikiConfig: { themes: { light: 'github-light-high-contrast', dark: 'github-dark' } as const },
 };
 
 let configProcessor: Promise<MarkdownProcessor> | undefined;

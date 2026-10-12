@@ -34,11 +34,11 @@ function palette(hex: string, prefix: string): Record<string, string> {
       if (s === 600) {
         result[`--color-${prefix}-${shade}`] = hex;
       } else {
-        result[`--color-${prefix}-${shade}`] = `color-mix(in oklch, ${hex}, white ${whitePct}%)`;
+        result[`--color-${prefix}-${shade}`] = `color-mix(in oklab, ${hex}, white ${whitePct}%)`;
       }
     } else {
       const blackPct = darkShades[s] ?? 0;
-      result[`--color-${prefix}-${shade}`] = `color-mix(in oklch, ${hex}, black ${blackPct}%)`;
+      result[`--color-${prefix}-${shade}`] = `color-mix(in oklab, ${hex}, black ${blackPct}%)`;
     }
   }
   return result;
@@ -116,14 +116,14 @@ export function generateColorOverrides(config: SiteConfig): string {
   // Derive dm-* tokens from dark background color
   if (darkBgColor) {
     darkVars.push(`  --color-dm: ${darkBgColor};`);
-    darkVars.push(`  --color-dm-alt: color-mix(in oklch, ${darkBgColor}, white 5%);`);
-    darkVars.push(`  --color-dm-hover: color-mix(in oklch, ${darkBgColor}, white 8%);`);
-    darkVars.push(`  --color-dm-heading: color-mix(in oklch, ${darkBgColor}, white 92%);`);
-    darkVars.push(`  --color-dm-text: color-mix(in oklch, ${darkBgColor}, white 78%);`);
-    darkVars.push(`  --color-dm-muted: color-mix(in oklch, ${darkBgColor}, white 52%);`);
-    darkVars.push(`  --color-dm-faint: color-mix(in oklch, ${darkBgColor}, white 28%);`);
-    darkVars.push(`  --color-dm-border: color-mix(in oklch, ${darkBgColor}, white 12%);`);
-    darkVars.push(`  --color-dm-border-alt: color-mix(in oklch, ${darkBgColor}, white 18%);`);
+    darkVars.push(`  --color-dm-alt: color-mix(in oklab, ${darkBgColor}, white 5%);`);
+    darkVars.push(`  --color-dm-hover: color-mix(in oklab, ${darkBgColor}, white 8%);`);
+    darkVars.push(`  --color-dm-heading: color-mix(in oklab, ${darkBgColor}, white 92%);`);
+    darkVars.push(`  --color-dm-text: color-mix(in oklab, ${darkBgColor}, white 78%);`);
+    darkVars.push(`  --color-dm-muted: color-mix(in oklab, ${darkBgColor}, white 62%);`);
+    darkVars.push(`  --color-dm-faint: color-mix(in oklab, ${darkBgColor}, white 54%);`);
+    darkVars.push(`  --color-dm-border: color-mix(in oklab, ${darkBgColor}, white 12%);`);
+    darkVars.push(`  --color-dm-border-alt: color-mix(in oklab, ${darkBgColor}, white 18%);`);
   }
 
   if (darkVars.length > 0) {
@@ -159,10 +159,10 @@ export function editorialAccentCss(config: SiteConfig): string {
   const dark = config.colors?.dark?.primary?.trim();
   let css = '';
   if (light) {
-    css += `\nhtml:root[data-theme='editorial'] {\n  --ed-accent: ${light};\n  --ed-accent-hover: color-mix(in oklch, ${light}, black 25%);\n  --ed-accent-border: color-mix(in oklch, ${light}, white 75%);\n  --ed-selection: color-mix(in oklch, ${light}, white 84%);\n}`;
+    css += `\nhtml:root[data-theme='editorial'] {\n  --ed-accent: ${light};\n  --ed-accent-hover: color-mix(in oklab, ${light}, black 25%);\n  --ed-accent-border: color-mix(in oklab, ${light}, white 75%);\n  --ed-selection: color-mix(in oklab, ${light}, white 84%);\n}`;
   }
   if (dark) {
-    css += `\nhtml.dark:root:root[data-theme='editorial'] {\n  --ed-accent: ${dark};\n  --ed-accent-hover: color-mix(in oklch, ${dark}, white 35%);\n}`;
+    css += `\nhtml.dark:root:root[data-theme='editorial'] {\n  --ed-accent: ${dark};\n  --ed-accent-hover: color-mix(in oklab, ${dark}, white 35%);\n}`;
   }
   return css;
 }

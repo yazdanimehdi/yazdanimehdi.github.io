@@ -27,7 +27,7 @@ const { id, title, type, status, excerpt, tags, url, repoUrl } = Astro.props;
       <span
         class:list={[
           'text-xs capitalize',
-          status === 'active' ? 'text-green-600 dark:text-green-400' : 'text-surface-400 dark:text-dm-faint',
+          status === 'active' ? 'text-green-700 dark:text-green-400' : 'text-surface-400 dark:text-dm-faint',
         ]}
       >
         {status}

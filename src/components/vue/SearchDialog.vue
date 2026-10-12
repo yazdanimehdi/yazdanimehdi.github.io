@@ -2,7 +2,7 @@
   <div>
     <!-- Trigger button -->
     <button
-      class="hidden items-center gap-2 rounded-lg border border-surface-200 bg-surface-100 px-3 py-1.5 text-sm text-surface-700 transition-colors hover:border-surface-300 sm:inline-flex dark:border-surface-700 dark:bg-surface-800 dark:text-surface-400 dark:hover:border-surface-600"
+      class="hidden items-center gap-2 rounded-lg border border-surface-200 bg-surface-100 px-3 py-1.5 text-sm text-surface-700 transition-colors hover:border-surface-300 sm:inline-flex dark:border-surface-700 dark:bg-surface-800 dark:text-dm-muted dark:hover:border-surface-600"
       aria-label="Search"
       @click="openDialog"
     >
@@ -32,7 +32,7 @@
             <!-- Search input -->
             <div class="flex items-center gap-3 border-b border-surface-200 px-4 dark:border-surface-700">
               <svg
-                class="h-5 w-5 shrink-0 text-surface-400"
+                class="h-5 w-5 shrink-0 text-surface-400 dark:text-dm-muted"
                 fill="none"
                 viewBox="0 0 24 24"
                 stroke="currentColor"
@@ -47,19 +47,20 @@
                 placeholder="Search pages, people, publications..."
                 class="flex-1 bg-transparent py-3 text-sm text-surface-900 placeholder-surface-400 outline-none dark:text-surface-100"
               />
-              <kbd class="rounded bg-surface-100 px-1.5 py-0.5 font-mono text-xs text-surface-400 dark:bg-surface-800"
+              <kbd
+                class="rounded bg-surface-100 px-1.5 py-0.5 font-mono text-xs text-surface-400 dark:bg-surface-800 dark:text-dm-muted"
                 >Esc</kbd
               >
             </div>
 
             <!-- Results -->
             <div class="max-h-80 overflow-y-auto p-2">
-              <div v-if="!query" class="py-8 text-center text-sm text-surface-400 dark:text-surface-500">
+              <div v-if="!query" class="py-8 text-center text-sm text-surface-400 dark:text-dm-muted">
                 Start typing to search...
               </div>
               <div
                 v-else-if="results.length === 0"
-                class="py-8 text-center text-sm text-surface-400 dark:text-surface-500"
+                class="py-8 text-center text-sm text-surface-400 dark:text-dm-muted"
               >
                 No results found for "{{ query }}"
               </div>
@@ -78,7 +79,7 @@
                   </span>
                   <div class="min-w-0 flex-1">
                     <div class="truncate font-medium text-surface-900 dark:text-surface-100">{{ result.title }}</div>
-                    <div class="text-xs text-surface-500 capitalize dark:text-surface-400">{{ result.type }}</div>
+                    <div class="text-xs text-surface-500 capitalize dark:text-dm-muted">{{ result.type }}</div>
                   </div>
                 </a>
               </template>

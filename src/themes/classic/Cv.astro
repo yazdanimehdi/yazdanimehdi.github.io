@@ -235,7 +235,7 @@ const { config, cv, cvMeta, hasPdf, pdfHref, allSections, hasYamlPublications, p
                           <span> · </span>
                           <a
                             href={`https://doi.org/${pub.doi}`}
-                            class="text-primary-600 hover:underline dark:text-accent-400"
+                            class="text-primary-600 underline underline-offset-2 dark:text-accent-400"
                           >
                             DOI
                           </a>
@@ -244,7 +244,7 @@ const { config, cv, cvMeta, hasPdf, pdfHref, allSections, hasYamlPublications, p
                       {pub.url && (
                         <>
                           <span> · </span>
-                          <a href={pub.url} class="text-primary-600 hover:underline dark:text-accent-400">
+                          <a href={pub.url} class="text-primary-600 underline underline-offset-2 dark:text-accent-400">
                             Link
                           </a>
                         </>

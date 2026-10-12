@@ -9,11 +9,11 @@ const { video } = Astro.props;
 ---
 
 <video
-  autoplay
+  data-hero-video
   muted
   loop
   playsinline
-  preload="auto"
+  preload="none"
   width="1920"
   height="600"
   class="absolute inset-0 h-full w-full object-cover"
@@ -24,3 +24,10 @@ const { video } = Astro.props;
 
 {/* Overlay for text readability */}
 <div class="absolute inset-0 bg-white/60 dark:bg-dm/70"></div>
+
+<script>
+  // Autoplay only when motion is welcome; otherwise the poster stays.
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    for (const v of document.querySelectorAll<HTMLVideoElement>('[data-hero-video]')) v.play().catch(() => {});
+  }
+</script>

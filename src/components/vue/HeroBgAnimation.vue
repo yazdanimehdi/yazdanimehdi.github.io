@@ -262,7 +262,8 @@ async function initCustom(container: HTMLElement, scriptPath: string) {
 
 onMounted(async () => {
   const container = containerRef.value;
-  if (!container) return;
+  // Looping background motion stays off for visitors who ask for reduced motion (WCAG 2.2.2).
+  if (!container || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
 
   if (props.preset === 'custom' && props.customScript) {
     const result = await initCustom(container, props.customScript);

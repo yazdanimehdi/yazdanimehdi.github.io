@@ -88,7 +88,7 @@ const circular = isCircularShape();
 
       {
         person.data.socials && (
-          <div class="mb-4 flex items-center gap-2 text-sm">
+          <div class="mb-4 flex flex-wrap items-center gap-2 text-sm">
             {Object.entries(person.data.socials)
               .filter(([_, v]) => v)
               .map(([key, value]) => (
@@ -102,7 +102,12 @@ const circular = isCircularShape();
                 </a>
               ))
               .reduce((acc: any[], link: any, i: number) => {
-                if (i > 0) acc.push(<span class="text-surface-300 dark:text-dm-border-alt">|</span>);
+                if (i > 0)
+                  acc.push(
+                    <span class="text-surface-300 dark:text-dm-border-alt" aria-hidden="true">
+                      |
+                    </span>,
+                  );
                 acc.push(link);
                 return acc;
               }, [])}
@@ -113,7 +118,7 @@ const circular = isCircularShape();
       {
         person.data.researchInterests && person.data.researchInterests.length > 0 && (
           <div>
-            <h3 class="mb-1 text-sm font-medium text-surface-700 dark:text-dm-text">Research Interests</h3>
+            <h2 class="mb-1 text-sm font-medium text-surface-700 dark:text-dm-text">Research Interests</h2>
             <ul class="list-inside list-disc space-y-0.5 text-sm text-surface-600 dark:text-dm-muted">
               {person.data.researchInterests.map((interest) => (
                 <li>{interest}</li>
@@ -184,7 +189,7 @@ const circular = isCircularShape();
         <ul class="space-y-1">
           {projects.map((p) => (
             <li class="text-sm">
-              <a href={`/projects/${p.id}`} class="text-primary-600 hover:underline dark:text-accent-400">
+              <a href={`/projects/${p.id}`} class="text-primary-600 underline underline-offset-2 dark:text-accent-400">
                 {p.data.title}
               </a>
               {p.data.excerpt && <span class="text-surface-500 dark:text-dm-muted"> — {p.data.excerpt}</span>}

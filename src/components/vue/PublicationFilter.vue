@@ -58,7 +58,8 @@
           </button>
           <select
             v-model="selectedYear"
-            class="ms-2 cursor-pointer border-b-2 border-transparent bg-transparent px-2 py-0.5 text-sm text-[var(--color-surface-500)] outline-none dark:text-dm-muted"
+            aria-label="Filter by year"
+            class="ms-2 cursor-pointer border-b-2 border-transparent bg-transparent px-2 py-0.5 text-sm text-[var(--color-surface-500)] dark:text-dm-muted"
           >
             <option value="">Year</option>
             <option v-for="year in years" :key="year" :value="year">

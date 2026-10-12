@@ -46,7 +46,7 @@ function getPageNumbers(): (number | '...')[] {
   {
     getPageNumbers().map((page) =>
       page === '...' ? (
-        <span class="px-2 py-1.5 text-surface-400">...</span>
+        <span class="px-2 py-1.5 text-surface-400 dark:text-dm-faint">...</span>
       ) : page === currentPage ? (
         <span
           class="border-b-2 border-primary-600 px-3 py-1.5 font-medium text-primary-600 dark:border-accent-400 dark:text-accent-400"

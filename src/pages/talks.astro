@@ -48,7 +48,7 @@ const journal = getTheme() === 'editorial';
                     {talk.data.type}
                   </span>
                 </div>
-                <h3 class="mb-0.5 text-base font-medium text-surface-900 dark:text-dm-heading">{talk.data.title}</h3>
+                <h2 class="mb-0.5 text-base font-medium text-surface-900 dark:text-dm-heading">{talk.data.title}</h2>
                 <p class="text-sm text-surface-500 dark:text-dm-muted">
                   {talk.data.event}
                   {talk.data.location && <> &middot; {talk.data.location}</>}
@@ -63,7 +63,9 @@ const journal = getTheme() === 'editorial';
                   </a>
                 )}
                 {talk.data.slidesUrl && talk.data.videoUrl && (
-                  <span class="text-surface-300 dark:text-dm-border-alt">|</span>
+                  <span class="text-surface-300 dark:text-dm-border-alt" aria-hidden="true">
+                    |
+                  </span>
                 )}
                 {talk.data.videoUrl && (
                   <a href={talk.data.videoUrl} class="text-primary-600 hover:underline dark:text-accent-400">
