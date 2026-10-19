@@ -32,6 +32,10 @@ export default defineConfig({
       : mode === 'postgres'
         ? vercel({ imageService: true, includeFiles: cvPdfFonts, maxDuration: 60 })
         : vercel(),
+  // Astro ignores Host / X-Forwarded-* unless they match allowedDomains, and then Astro.url is http://localhost: every
+  // admin write fails the same-origin check. Vercel sets these headers at its edge and routes only the project's own
+  // domains, so any https host is trusted there, whichever domain the site is served from.
+  ...(mode === 'static' ? {} : { security: { allowedDomains: [{ protocol: 'https' }] } }),
   ...(mode === 'postgres'
     ? { image: { remotePatterns: [{ protocol: 'https', hostname: '*.public.blob.vercel-storage.com' }] } }
     : {}),
