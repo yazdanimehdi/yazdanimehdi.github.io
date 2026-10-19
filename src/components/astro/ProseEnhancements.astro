@@ -9,8 +9,11 @@
 <script>
   /* ── Helpers ───────────────────────────────────────────────── */
 
-  /** Idempotent script loader — resolves when the script is ready. */
-  function loadScript(src: string, id: string): Promise<void> {
+  /**
+   * Idempotent script loader — resolves when the script is ready. CDN URLs name exact versions so a new release can't
+   * change what runs on this origin; `integrity` pins the bytes too where the entry is a single file.
+   */
+  function loadScript(src: string, id: string, integrity?: string): Promise<void> {
     return new Promise((resolve, reject) => {
       if (document.getElementById(id)) {
         resolve();
@@ -19,6 +22,10 @@
       const s = document.createElement('script');
       s.id = id;
       s.src = src;
+      if (integrity) {
+        s.integrity = integrity;
+        s.crossOrigin = 'anonymous';
+      }
       s.async = true;
       s.onload = () => resolve();
       s.onerror = () => reject(new Error(`Failed to load ${src}`));
@@ -48,7 +55,11 @@
       startup: { typeset: true },
     };
 
-    await loadScript('https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js', 'mathjax-cdn');
+    await loadScript(
+      'https://cdn.jsdelivr.net/npm/mathjax@3.2.2/es5/tex-chtml.js',
+      'mathjax-cdn',
+      'sha384-AHAnt9ZhGeHIrydA1Kp1L7FN+2UosbF7RQg6C+9Is/a7kDpQ1684C2iH2VWil6r4',
+    );
   }
 
   /* ── Chart.js ──────────────────────────────────────────────── */
@@ -61,7 +72,7 @@
 
     const { Chart, registerables } = (await import(
       // @ts-expect-error -- remote ESM module, no type declarations
-      /* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.js/+esm'
+      /* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.js/+esm'
     )) as any;
     Chart.register(...registerables);
 
@@ -113,7 +124,7 @@
 
     const { default: mermaid } = (await import(
       // @ts-expect-error -- remote ESM module, no type declarations
-      /* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs'
+      /* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.esm.min.mjs'
     )) as any;
 
     mermaid.initialize({
@@ -144,7 +155,7 @@
 
     const { default: mermaid } = (await import(
       // @ts-expect-error -- remote ESM module, no type declarations
-      /* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs'
+      /* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.esm.min.mjs'
     )) as any;
 
     mermaid.initialize({
@@ -168,14 +179,15 @@
     const blocks = document.querySelectorAll<HTMLPreElement>('pre[data-language="tikz"]');
     if (blocks.length === 0) return;
 
-    await loadScript('https://cdn.jsdelivr.net/npm/tikzjax@1/dist/tikzjax.js', 'tikzjax-cdn');
+    // TikZJax's own host: the npm name `tikzjax` has no published versions, so anyone could claim it.
+    await loadScript('https://tikzjax.com/v1/tikzjax.js', 'tikzjax-cdn');
 
     // Ensure tikzjax CSS is loaded
     if (!document.getElementById('tikzjax-css')) {
       const link = document.createElement('link');
       link.id = 'tikzjax-css';
       link.rel = 'stylesheet';
-      link.href = 'https://cdn.jsdelivr.net/npm/tikzjax@1/dist/fonts.css';
+      link.href = 'https://tikzjax.com/v1/fonts.css';
       document.head.appendChild(link);
     }
 

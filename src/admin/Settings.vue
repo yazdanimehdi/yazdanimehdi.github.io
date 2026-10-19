@@ -33,7 +33,30 @@ const GROUPS: { label: string; fields: FieldDef[] }[] = [
       select('theme', 'Theme', ['classic', 'editorial']),
       select('defaultTheme', 'Light or dark by default (classic)', ['light', 'dark', 'system']),
       { key: 'colors.light.primary', label: 'Accent color', type: 'color' },
-      { key: 'colors.dark.primary', label: 'Accent color in dark mode (classic)', type: 'color' },
+      { key: 'colors.dark.primary', label: 'Accent color in dark mode', type: 'color' },
+      {
+        key: 'editorial.night',
+        label: 'Night palette (journal, dark mode)',
+        type: 'select',
+        options: [
+          { value: 'lamplight', label: 'Lamplight: warm charcoal, ivory ink, night blue (default)' },
+          { value: 'inkwell', label: 'Ink Well: deep blue-black paper, cool ink, periwinkle' },
+          { value: 'galley', label: 'Galley Proof: neutral graphite, grey ink, slate-teal' },
+        ],
+        hint: 'A dark-mode accent color above is lifted until it reads at 4.5:1 on the chosen palette.',
+      },
+      {
+        key: 'newsArt',
+        label: 'News art style',
+        type: 'select',
+        options: [
+          { value: 'ink', label: 'Ink line plate' },
+          { value: 'engraving', label: 'Engraving' },
+          { value: 'watercolor', label: 'Soft watercolor' },
+          { value: 'geometric', label: 'Flat geometric' },
+        ],
+        hint: 'The picture a news item shows when it has no image of its own, one per category. Empty follows the theme: journal uses ink plates, classic flat geometric.',
+      },
     ],
   },
   {
@@ -88,6 +111,12 @@ const GROUPS: { label: string; fields: FieldDef[] }[] = [
 ];
 
 const FEEDS: FieldDef[] = [
+  {
+    key: 'mediumUrl',
+    label: 'Medium feed URL',
+    type: 'text',
+    hint: 'Your Medium RSS feed, e.g. https://medium.com/feed/@username. Its posts appear on the Blog posts screen under Imported from feeds.',
+  },
   {
     key: 'feeds',
     label: 'Feed sources',
@@ -149,7 +178,7 @@ onMounted(() => {
       </fieldset>
     </template>
 
-    <fieldset class="adm-group">
+    <fieldset id="feeds" class="adm-group">
       <legend>Feeds</legend>
       <DocBanners
         :draft="!!feeds.draft"
@@ -161,7 +190,9 @@ onMounted(() => {
         @discard="feeds.discard()"
         @reload="feeds.reload()"
       />
-      <p class="adm-muted">Saved to config/feeds.yml. The Medium feed is set on the Dashboard.</p>
+      <p class="adm-muted">
+        Saved to config/feeds.yml. Sync them from Site status on the <a :href="`/${ctx.adminPath}`">Dashboard</a>.
+      </p>
       <FormFields v-if="feeds.current" :fields="FEEDS" :model="feeds.current" :errors="feeds.errors" />
       <div class="adm-actions">
         <button

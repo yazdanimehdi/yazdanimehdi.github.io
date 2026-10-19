@@ -509,7 +509,7 @@ Built-in content management system at `/admin`:
 
 ### Deploy on Vercel (custom admin)
 
-On Vercel, ScholarOS replaces Sveltia with its own admin at `/<adminPath>` (default `/admin`). It has a dashboard, a post editor with math, a three-column CV editor with RenderCV import, and forms for every other kind of content. Every publish is one commit to your repository; Vercel redeploys and the change is live in about a minute. Public pages stay static, and GitHub Pages and Netlify keep using Sveltia.
+On Vercel, ScholarOS replaces Sveltia with its own admin at `/<adminPath>` (default `/admin`). It has a dashboard, a post editor with math, a three-column CV editor with RenderCV import, and forms for every other kind of content. The dashboard opens with one line saying how the site is doing: the first problem by name ("Scholar sync failed and 2 more need attention"), "Nothing broken · 1 suggestion", or "Everything is up to date". Then comes **Site status**: one row each for publications, the CV PDF, feeds, scheduled posts, news, people and, in Postgres mode, the backup, with the fix on the row itself (**Retry**, **Sync all feeds**, **Regenerate PDF**, **Check now**). A failure says what went wrong in plain words and offers the action that fits: a link to the settings for a missing or refused key, nothing for a rate limit (the next daily run tries again), and **Retry** for a network error. In Postgres mode, **Run daily jobs** is the one control that runs the jobs: it releases due posts, syncs feeds, checks Google Scholar and backs up to GitHub, which they also do on their own once a day. News with no new item in 183 days is a suggestion, not a problem, and People says how many profiles weren't edited in over a year. **Next up** lists scheduled posts, soonest first, then drafts. Every publish is one commit to your repository; Vercel redeploys and the change is live in about a minute. Public pages stay static, and GitHub Pages and Netlify keep using Sveltia.
 
 If your site already runs on Vercel, set the environment variables below before its next redeploy: from then on the custom admin replaces Sveltia at `/<adminPath>`, and without them nobody can sign in.
 
@@ -547,14 +547,14 @@ content to the `content-backup` branch.
 
 1. In the Vercel project: **Storage → Marketplace → Neon** (sets `DATABASE_URL`) and **Storage → Blob**
    (sets `BLOB_READ_WRITE_TOKEN`). Add `CRON_SECRET` (`openssl rand -base64 48`). Vercel Cron calls
-   `/api/admin/cron/daily` at 03:00 UTC: it syncs feeds, releases scheduled posts and backs up to git; the dashboard
-   shows each result and has **Run now**. Keep `GITHUB_TOKEN` for the backup.
+   `/api/admin/cron/daily` at 03:00 UTC: it syncs feeds, releases scheduled posts and backs up to git; the dashboard's
+   Site status shows each result and has **Run daily jobs**. Keep `GITHUB_TOKEN` for the backup.
 2. Locally: `vercel env pull .env.local --environment=production`, then `pnpm db:setup`. It creates the tables, copies `config/`,
    `src/content/` and `src/data/` into the database, uploads `src/assets/images` and `public/images` to Blob, and
    rewrites image references to Blob URLs. It lists any file it could not copy. On a database that already has
    content it stops; `pnpm db:setup --force` overwrites the documents that exist in the repo and leaves documents
    that exist only in the database.
-3. Redeploy. The admin dashboard now shows **Postgres**.
+3. Redeploy. The dashboard's Site status now has a **Backup copy** row and **Run daily jobs**.
 
 Notes: MDX posts are shown with a notice (MDX needs a build). The CV PDF is rendered on Vercel (see _CV PDF in Postgres mode_).
 Editing `adminUsers` takes effect after a redeploy. The feeds, Google Scholar and SEO workflows
@@ -621,22 +621,22 @@ story in, the Writing page shows only the site's copy.
 The admin can draft and rewrite post and news bodies, generate cover images, and turn new Google Scholar papers into
 draft posts, using your own provider keys.
 
-- **Keys.** Open **AI** in the admin. In Postgres mode, paste a key and **Save**: it is stored encrypted in the
-  database (with a key derived from `SESSION_SECRET`; changing that secret means entering the keys again). In git
-  mode, set them as environment variables in Vercel; the AI screen shows which are set. An environment variable is
-  the fallback in both modes. Keys: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `HIGGSFIELD_API_KEY` +
-  `HIGGSFIELD_API_SECRET`, `SERPAPI_KEY`.
-- **Models.** Writing uses Anthropic, OpenAI or Google; images use OpenAI, Google or Higgsfield. Pick them on the AI
-  screen (saved to `config/ai.yml`); an empty model uses the current default (`claude-sonnet-5-5`, `gpt-6-astra`,
-  `gemini-3.8-flash`; `gpt-image-2.5-flare`, `gemini-3.1-flash-image`, `higgsfield-ai/soul/standard`).
+- **Keys.** Open **Scholar & AI** in the admin. In Postgres mode, paste a key and **Save**: it is stored encrypted in
+  the database (with a key derived from `SESSION_SECRET`; changing that secret means entering the keys again). In git
+  mode, set them as environment variables in Vercel; the Scholar & AI screen shows which are set. An environment
+  variable is the fallback in both modes. Keys: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`,
+  `HIGGSFIELD_API_KEY` + `HIGGSFIELD_API_SECRET`, `SERPAPI_KEY`.
+- **Models.** Writing uses Anthropic, OpenAI or Google; images use OpenAI, Google or Higgsfield. Pick them on the
+  Scholar & AI screen (saved to `config/ai.yml`); an empty model uses the current default (`claude-sonnet-5-5`,
+  `gpt-6-astra`, `gemini-3.8-flash`; `gpt-image-2.5-flare`, `gemini-3.1-flash-image`, `higgsfield-ai/soul/standard`).
 - **What is sent.** **Write** and **Rewrite** send the title, subtitle, your instruction and the body to the writing
   provider. **Generate image** sends the title and summary to the image provider. Paper posts send the paper's
   title, authors, venue, year, link and abstract. Results land in the editor as unsaved changes (with **Undo**);
   nothing is published until you save.
-- **Paper drafts.** Add the Scholar author id (the `user=` value of the profile URL) on the AI screen. Postgres mode
-  checks daily; **Check now** works in both modes. New papers become publications and, unless turned off, **draft**
-  posts with a cover image, linked to the publication. The first check only records the papers already on the
-  profile (no posts), so turning this on doesn't write a post for every old paper. Each check writes at most
+- **Paper drafts.** Add the Scholar author id (the `user=` value of the profile URL) on the Scholar & AI screen.
+  Postgres mode checks daily; **Check now** works in both modes. New papers become publications and, unless turned
+  off, **draft** posts with a cover image, linked to the publication. The first check only records the papers already
+  on the profile (no posts), so turning this on doesn't write a post for every old paper. Each check writes at most
   **Posts per run** posts (default three); the rest wait for the next one. A publication you delete is not imported
   again.
 - **Cost.** Each paper post is one writing call and one image call on your provider accounts. Scholar is read
@@ -651,30 +651,45 @@ the news section above publications"). A coding agent edits a private copy of th
 commits it so the site redeploys.
 
 - **Requirements.** The admin on Vercel (git or Postgres mode), `GITHUB_TOKEN` with Contents: read and write (the
-  token git mode and the backup already use), and a key for the writing provider chosen on the AI screen. The agent
-  is that provider's own coding tool: Claude Code for Anthropic, Codex for OpenAI, Gemini CLI for Google, with the
-  writing model from the AI screen. On Vercel the sandbox signs in automatically (OIDC). For local development, run
-  `vercel link` and `vercel env pull` to get `VERCEL_OIDC_TOKEN`.
-- **How it works.** **Start session** creates one sandbox for the site (about a minute the first time: clone and
-  install), then resumes it with its changes. Describe a change and **Run**; the agent's log shows while it works,
-  and the preview reloads when it is done. Ask for more, **Discard changes** to go back, or **Publish**: one commit
-  on the deployed branch with your message (git history is the undo). In Postgres mode, code is committed to GitHub
-  and content edits (posts, `config/*.yml`) are saved to the database. **End session** stops the sandbox and keeps its
-  files. **Start over** deletes it and starts from a fresh copy of the live site, which is also the way out when the
-  site changed on GitHub since the session started (Publish then refuses with a 409).
+  token git mode and the backup already use), and a key for the writing provider chosen on the Scholar & AI screen.
+  The agent is that provider's own coding tool: Claude Code for Anthropic, Codex for OpenAI, Gemini CLI for Google,
+  with the writing model from the Scholar & AI screen. On Vercel the sandbox signs in automatically (OIDC). For local
+  development, run `vercel link` and `vercel env pull` to get `VERCEL_OIDC_TOKEN`.
+- **How it works.** **Start** creates one sandbox for the site (about a minute the first time: clone and install).
+  Describe a change and **Run**; the agent's log shows while it works, and the preview reloads when it is done.
+  **Stop** ends the agent and everything it started; what it changed so far stays. Ask for more, **Discard** to go
+  back, or **Publish**: one commit on the deployed branch with your message. In Postgres mode, code is committed to
+  GitHub and content edits (posts, `config/*.yml`) are saved to the database. **Pause** stops the sandbox and keeps
+  its files; **Resume** picks up where you left off, unpublished changes included. **Start over** deletes it and
+  starts from a fresh copy of the live site, which is also the way out when the site changed on GitHub since the
+  session started (Publish then refuses with a 409).
+- **After Publish.** The screen polls `GET /api/admin/editor/deployment`, which returns the deployment's
+  `VERCEL_GIT_COMMIT_SHA`, and says the live site is updated once that matches the published commit. Off Vercel, on
+  a preview URL or behind Skew Protection the commit never changes, so the screen keeps "about a minute".
+  **Undo this publish** reverts the last publish from this screen with a new commit on GitHub. It is refused when a
+  later commit touched the same files, and it isn't offered for a Postgres-mode publish that saved content to the
+  database; in those cases, ask for the change back and publish again.
 - **Scope.** The editor publishes only site code and content: components, layouts, pages (`.astro`, `.md`, `.mdx`;
   never endpoints or anything named `api`), styles, themes, assets, content files, `src/data/*.json`, `public/` and
   `config/*.yml`. The admin, sign-in, `src/lib`, middleware, integrations, `config/ai.yml`, dependencies, build and
   deploy config, dot-files and secrets are refused: the screen shows refused files in red and Publish stays
-  disabled until you discard them. `.astro` files can still run server code, so read the diff before publishing.
+  disabled until you undo them (**Undo this file** reverts one file and keeps the rest) or discard. The review lists
+  each request with the agent's plain-language **What changed** summary, above the diff. `.astro` files can still
+  run server code when they load; if you're unsure, share the preview link with someone technical before publishing.
 - **Keys stay out of the sandbox.** The provider key never enters the sandbox: the agent sees a placeholder and the
   sandbox firewall adds the real key to requests to the provider's API only. The GitHub token enters a sandbox once,
   for the first clone, before any agent has run in it, and GitHub is closed to the sandbox from then on; publishing
   happens from the admin, not from the sandbox.
 - **Cost.** Sandbox time is billed to your Vercel account; a session times out after 30 minutes without a run (each
-  run extends it) and Hobby sessions end at 45 minutes (the files persist; **Start session** resumes). Each run is
-  billed by your provider like any use of its coding tool. One session per site: two admins share it, and a second
+  run extends it) and Hobby sessions end at 45 minutes (the files persist; **Resume** picks up). Each run is
+  billed by your provider like any use of its coding tool. One session per site: every admin shares it, and a second
   **Run** while one is active is refused.
+- **Publishers.** `publishers` in `config/site.yml` lists who may **Publish** and **Undo this publish**: GitHub
+  usernames as in `adminUsers`, or `password:<username>` for a password account (Postgres mode), so a password account
+  never passes for the GitHub user of the same name. Empty or unset, every admin publishes. Other admins can Start,
+  Run, Stop, Discard and ask for more; their changes wait in the shared session, the review says who asked for each,
+  and the publish routes answer 403. Publishers see "Site changes waiting for review" on the Dashboard's Next up,
+  read from a tag on the sandbox (one lookup that never wakes it), so it shows while the session is paused too.
 
 ### CV PDF in Postgres mode
 

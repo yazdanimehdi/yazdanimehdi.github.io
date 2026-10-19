@@ -1,20 +1,19 @@
 ---
 import Layout from './Layout.astro';
 import { formatNewsDate } from '../../lib/utils';
+import { uiStrings } from '../../lib/ui-strings';
 import type { BlogData } from './data';
 
 type Props = BlogData;
 
 const { config, items, elsewhere } = Astro.props;
-const label = config.nav.find((n) => n.href === '/blog')?.label ?? 'Writing';
-const personal = config.siteMode === 'personal';
-const description = personal
-  ? 'Posts, articles, and technical writing.'
-  : 'Lab blog posts and external articles from our team.';
+const t = uiStrings(config);
+const label = config.nav.find((n) => n.href === '/blog')?.label ?? t('home.writing');
+const description = t(config.siteMode === 'personal' ? 'blog.descriptionPersonal' : 'blog.descriptionLab');
 const hasBoth = items.some((i) => i.kind === 'site') && items.some((i) => i.kind === 'external');
 const tabs = [
-  { id: 'all', label: 'All' },
-  { id: 'site', label: 'On this site' },
+  { id: 'all', label: t('filter.all') },
+  { id: 'site', label: t('blog.onSite') },
   { id: 'external', label: elsewhere },
 ];
 ---
@@ -22,17 +21,22 @@ const tabs = [
 <Layout title={label} description={description}>
   <div class="ed-wrap ed-main ed-main--narrow">
     <div class="ed-stack">
-      <h1 class="ed-h1">Essays &amp; notes</h1>
+      <h1 class="ed-h1">{t('blog.heading')}</h1>
       <p class="ed-intro">{description}</p>
     </div>
 
     <div class="ed-filterbar" data-blog-filters>
       {
         hasBoth ? (
-          <div class="ed-tabs" role="group" aria-label="Filter by source">
-            {tabs.map((t) => (
-              <button type="button" class="ed-tab" data-filter={t.id} aria-pressed={t.id === 'all' ? 'true' : 'false'}>
-                {t.label}
+          <div class="ed-tabs" role="group" aria-label={t('blog.filterLabel')}>
+            {tabs.map((tab) => (
+              <button
+                type="button"
+                class="ed-tab"
+                data-filter={tab.id}
+                aria-pressed={tab.id === 'all' ? 'true' : 'false'}
+              >
+                {tab.label}
               </button>
             ))}
           </div>
@@ -40,31 +44,35 @@ const tabs = [
           <span />
         )
       }
-      <a href="/feed.xml" class="ul ed-feedlink">RSS</a>
+      <a href="/feed.xml" class="ul ed-feedlink">{t('blog.rss')}</a>
     </div>
 
-    {items.length === 0 && <p class="ed-intro">No posts yet.</p>}
+    {items.length === 0 && <p class="ed-intro">{t('blog.empty')}</p>}
 
     <ol class="ed-entries">
       {
         items.map((item) => {
           const external = item.kind === 'external';
-          const date = formatNewsDate(item.date, 'month');
+          const date = formatNewsDate(item.date, 'month', config.lang);
           return (
             <li class="ed-entry" data-kind={item.kind}>
               <div class="ed-entry-tile" aria-hidden="true">
-                <span class="ed-entry-tag">{external ? item.source : (item.tag ?? 'Post')}</span>
+                <span class="ed-entry-tag">{external ? item.source : (item.tag ?? t('blog.post'))}</span>
                 <span class="ed-entry-date num">{date}</span>
               </div>
               <div class="ed-entry-body">
-                <a href={item.href} class="ed-entry-title" rel={external ? 'noopener' : undefined}>
+                <a href={item.href} class="ed-entry-title" rel={external ? 'noopener' : undefined} dir="auto">
                   {item.title}
                 </a>
-                {item.excerpt && <p class="ed-entry-excerpt">{item.excerpt}</p>}
+                {item.excerpt && (
+                  <p class="ed-entry-excerpt" dir="auto">
+                    {item.excerpt}
+                  </p>
+                )}
                 <span class="ed-entry-meta">
                   {external
-                    ? `${date} · Published on ${item.source} ↗`
-                    : [date, `${item.minutes} min read`, item.tag].filter(Boolean).join(' · ')}
+                    ? `${date} · ${t('blog.publishedOn', { source: item.source ?? '' })}`
+                    : [date, t('post.minutes', { n: item.minutes ?? 0 }), item.tag].filter(Boolean).join(' · ')}
                 </span>
               </div>
             </li>

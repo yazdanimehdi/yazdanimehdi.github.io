@@ -1,23 +1,17 @@
 <script is:inline>
-  // Apply theme from localStorage or configured default
+  // Stored choice ('light' | 'dark' | 'system'), else the configured default; 'system' follows the OS.
   function applyTheme() {
-    const saved = localStorage.getItem('theme');
-    if (saved === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else if (saved === 'light') {
-      document.documentElement.classList.remove('dark');
-    } else {
-      // No saved preference — use configured default
-      const d = document.documentElement.getAttribute('data-default-theme') || 'system';
-      if (d === 'dark' || (d === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-        document.documentElement.classList.add('dark');
-      } else {
-        document.documentElement.classList.remove('dark');
-      }
+    const root = document.documentElement;
+    let saved = null;
+    try {
+      saved = localStorage.getItem('theme');
+    } catch {
+      /* storage blocked: use the site default */
     }
+    const mode = ['light', 'dark', 'system'].includes(saved) ? saved : root.getAttribute('data-default-theme');
+    const dark = mode === 'dark' || (mode !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    root.classList.toggle('dark', dark);
   }
-  // Apply on initial load
   applyTheme();
-  // Re-apply after ViewTransitions page swap
   document.addEventListener('astro:after-swap', applyTheme);
 </script>

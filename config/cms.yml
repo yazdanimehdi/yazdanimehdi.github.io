@@ -510,6 +510,16 @@ collections:
             options:
               - { label: 'Journal', value: 'journal' }
               - { label: 'Classic (legacy)', value: 'classic' }
+          - label: 'News Art Style'
+            name: 'newsArt'
+            widget: 'select'
+            required: false
+            hint: 'Built-in picture for news items without an image of their own. Empty follows the theme: Journal uses ink plates, Classic flat geometric.'
+            options:
+              - { label: 'Ink line plate', value: 'ink' }
+              - { label: 'Engraving', value: 'engraving' }
+              - { label: 'Soft watercolor', value: 'watercolor' }
+              - { label: 'Flat geometric', value: 'geometric' }
           - label: 'Editorial Theme Content'
             name: 'editorial'
             widget: 'object'
@@ -517,12 +527,29 @@ collections:
             collapsed: true
             hint: 'Used only by the journal theme. Name, email and links come from Author and Socials.'
             fields:
+              - label: 'Night Palette'
+                name: 'night'
+                widget: 'select'
+                required: false
+                default: 'lamplight'
+                hint: 'Dark-mode colors. A dark-mode accent color is lifted until it reads at 4.5:1 on the chosen palette.'
+                options:
+                  - { label: 'Lamplight: warm charcoal, ivory ink, night blue (default)', value: 'lamplight' }
+                  - { label: 'Ink Well: deep blue-black paper, cool ink, periwinkle', value: 'inkwell' }
+                  - { label: 'Galley Proof: neutral graphite, grey ink, slate-teal', value: 'galley' }
               - {
                   label: 'Eyebrow',
                   name: 'eyebrow',
                   widget: 'string',
                   required: false,
                   hint: 'Small label above your name, e.g. "Associate Professor · Computer Science"',
+                }
+              - {
+                  label: 'Lab role line (lab sites)',
+                  name: 'labRole',
+                  widget: 'string',
+                  required: false,
+                  hint: 'Shown under the lab name. Leave empty to use department · university.',
                 }
               - { label: 'Tagline', name: 'tagline', widget: 'string', required: false }
               - { label: 'Bio', name: 'bio', widget: 'markdown', required: false }

@@ -1,7 +1,27 @@
 import { configChange, readConfig } from '../../../../lib/admin/content';
 import { HttpError, commitChanges, json, readBody, route } from '../../../../lib/admin/http';
+import { FEEDS_JSON } from '../../../../lib/admin/paths';
 
 export const prerender = false;
+
+/** The Posts screen's "Imported" list: every feed item and which ones are hidden. */
+export const GET = route(async (_ctx, store) => {
+  const [config, file] = await Promise.all([readConfig(store, 'feeds'), store.read(FEEDS_JSON)]);
+  let items: unknown;
+  try {
+    items = file ? JSON.parse(file.content) : [];
+  } catch {
+    return json({
+      items: [],
+      hidden: [],
+      error: `${FEEDS_JSON} is not valid JSON. "Sync all feeds" on the Dashboard rewrites it.`,
+    });
+  }
+  return json({
+    items: Array.isArray(items) ? items : [],
+    hidden: Array.isArray(config.data.hidden) ? config.data.hidden : [],
+  });
+});
 
 /** Hide or unhide one feed item on the public site (`hidden:` in config/feeds.yml). */
 export const PUT = route(async (ctx, store) => {

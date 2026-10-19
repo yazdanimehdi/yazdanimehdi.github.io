@@ -1,21 +1,24 @@
 ---
 import Layout from './Layout.astro';
+import { getSiteConfig } from '../../lib/config';
+import { uiStrings } from '../../lib/ui-strings';
 import './projects.css';
 
+const t = uiStrings(getSiteConfig());
 const links = [
-  { label: 'Home', href: '/' },
-  { label: 'Publications', href: '/publications' },
-  { label: 'Blog', href: '/blog' },
+  { label: t('notFound.home'), href: '/' },
+  { label: t('pubs.title'), href: '/publications' },
+  { label: t('notFound.blog'), href: '/blog' },
 ];
 ---
 
-<Layout title="Page Not Found">
+<Layout title={t('notFound.title')}>
   <div class="ed-wrap ed-main ed-main--narrow">
     <div class="ed-stack">
-      <h1 class="ed-h1">Page not found</h1>
-      <p class="ed-intro">The page you're looking for doesn't exist or has been moved.</p>
+      <h1 class="ed-h1">{t('notFound.heading')}</h1>
+      <p class="ed-intro">{t('notFound.intro')}</p>
     </div>
-    <nav class="ed-pj-links ed-pj-links--lg" aria-label="Where to next">
+    <nav class="ed-pj-links ed-pj-links--lg" aria-label={t('notFound.nav')}>
       {
         links.map((l) => (
           <a href={l.href} class="ul">

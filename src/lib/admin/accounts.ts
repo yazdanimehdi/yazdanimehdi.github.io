@@ -17,14 +17,19 @@ export class MigrationMissingError extends Error {
 
 const USERNAME = /^[a-z0-9._-]{1,40}$/;
 const WINDOW_MS = 15 * 60 * 1000;
+/** Per (username, address): one address can't lock the owner out from everywhere else. */
 const MAX_FAILURES = 10;
+/** Per username across all addresses: caps distributed guessing. */
+const MAX_FAILURES_ANY_ADDRESS = 100;
 
 /** Postgres "undefined_table": migration 002 hasn't run on this database. */
 async function tables<T>(run: () => Promise<T>): Promise<T> {
   try {
     return await run();
   } catch (e) {
-    if ((e as { code?: unknown }).code === '42P01') throw new MigrationMissingError();
+    // 42P01: a table is missing; 42703: a column (a later migration not applied yet).
+    const code = (e as { code?: unknown }).code;
+    if (code === '42P01' || code === '42703') throw new MigrationMissingError();
     throw e;
   }
 }
@@ -104,6 +109,7 @@ export async function signIn(
   username: unknown,
   password: unknown,
   now = new Date(),
+  ip = '',
 ): Promise<
   | { ok: true; account: { username: string; name: string; version: number } }
   | { ok: false; reason: 'wrong' | 'throttled' }
@@ -113,11 +119,12 @@ export async function signIn(
   return tables(async () => {
     await sql`delete from login_attempts where at < ${new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString()}::timestamptz`;
     // Record this attempt first, then count: parallel requests can't all slip under the limit.
-    await sql`insert into login_attempts (username, at) values (${typed}, ${now.toISOString()}::timestamptz)`;
-    const [{ n }] = await sql<{ n: number }>`
-      select count(*)::int as n from login_attempts where username = ${typed} and at > ${since}::timestamptz`;
-    if (n > MAX_FAILURES) {
-      await sql`delete from login_attempts where ctid in (select ctid from login_attempts where username = ${typed} and at = ${now.toISOString()}::timestamptz limit 1)`;
+    await sql`insert into login_attempts (username, ip, at) values (${typed}, ${ip}, ${now.toISOString()}::timestamptz)`;
+    const [{ mine, all }] = await sql<{ mine: number; all: number }>`
+      select count(*) filter (where ip = ${ip})::int as mine, count(*)::int as all
+      from login_attempts where username = ${typed} and at > ${since}::timestamptz`;
+    if (mine > MAX_FAILURES || all > MAX_FAILURES_ANY_ADDRESS) {
+      await sql`delete from login_attempts where ctid in (select ctid from login_attempts where username = ${typed} and ip = ${ip} and at = ${now.toISOString()}::timestamptz limit 1)`;
       return { ok: false, reason: 'throttled' } as const;
     }
     const [row] = USERNAME.test(typed)

@@ -1,4 +1,7 @@
 ---
+import { getSiteConfig } from '../../lib/config';
+import { uiStrings } from '../../lib/ui-strings';
+
 /* Drawn arrow for standalone arrow columns, in ModeToggle's 1.5px stroke. `.arr` nudges it and mirrors it in RTL. */
 interface Props {
   /** ↗ for links that leave the site, → otherwise. */
@@ -31,3 +34,4 @@ const { external = false } = Astro.props;
     )
   }
 </svg>
+{external && <span class="ed-sr-only">{uiStrings(getSiteConfig())('link.external')}</span>}

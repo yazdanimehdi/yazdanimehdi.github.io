@@ -114,7 +114,7 @@
 
     <!-- List view -->
     <div v-if="viewMode === 'list'" class="divide-y divide-[var(--color-surface-100)] dark:divide-dm-border">
-      <div v-for="pub in filteredPublications" :key="pub.id" class="flex gap-3 py-3">
+      <div v-for="pub in filteredPublications" :id="pub.id" :key="pub.id" class="flex scroll-mt-28 gap-3 py-3">
         <!-- Thumbnail (if image exists) -->
         <div v-if="pub.image" class="shrink-0 pt-0.5">
           <img
@@ -180,6 +180,7 @@
     <div v-if="viewMode === 'grid'" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       <div
         v-for="pub in filteredPublications"
+        :id="pub.id"
         :key="pub.id"
         class="overflow-hidden rounded-lg border border-[var(--color-surface-200)] bg-white transition-colors hover:border-[var(--color-primary-400)] dark:border-dm-border-alt dark:bg-dm-alt dark:hover:border-[var(--color-accent-500)]"
       >

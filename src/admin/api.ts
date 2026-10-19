@@ -12,19 +12,36 @@ export class ApiError extends Error {
 }
 
 type ToastAction = { label: string; run: () => void };
-export const toasts = reactive<{ id: number; text: string; href?: string; action?: ToastAction }[]>([]);
+export interface Toast {
+  id: number;
+  text: string;
+  href?: string;
+  action?: ToastAction;
+  /** Errors render in the assertive live region and stay until dismissed. */
+  error?: boolean;
+}
+export const toasts = reactive<Toast[]>([]);
 let lastToast = 0;
+const INFO_MS = 8000;
 
+export function dismissToast(id: number): void {
+  const i = toasts.findIndex((t) => t.id === id);
+  if (i >= 0) toasts.splice(i, 1);
+}
+
+/**
+ * A notice in the corner. Plain notices leave after 8 s; a notice with a link (View commit) or an action (Undo, Retry)
+ * stays until dismissed, so nobody has to beat a timer to use it (WCAG 2.2.1).
+ */
 export function toast(text: string, href?: string, action?: ToastAction): void {
   const id = ++lastToast;
   toasts.push({ id, text, href, action });
-  setTimeout(
-    () => {
-      const i = toasts.findIndex((t) => t.id === id);
-      if (i >= 0) toasts.splice(i, 1);
-    },
-    action ? 20000 : 8000,
-  );
+  if (!action && !href) setTimeout(() => dismissToast(id), INFO_MS);
+}
+
+/** A failure: announced assertively, kept until dismissed. `action` offers the recovery, e.g. Retry. */
+export function toastError(text: string, action?: ToastAction): void {
+  toasts.push({ id: ++lastToast, text, action, error: true });
 }
 
 /** Set by AdminShell from the page context; `outage` is the persistent "database unreachable" banner. */
@@ -33,25 +50,25 @@ export const session = reactive({ mode: 'git' as AdminCtx['mode'], outage: '' })
 export function committed(result: Pick<CommitResult, 'url' | 'warning' | 'tags' | 'detail'>): void {
   if (result.warning === 'cache-purge-failed') {
     const tags = result.tags ?? [];
-    return toast('Published, but the page cache could not be refreshed: visitors may see the old version.', undefined, {
+    return toastError('Published, but the page cache could not be refreshed: visitors may see the old version.', {
       label: 'Retry refresh',
       run: () => void api('cache/purge', { body: { tags } }).then(() => toast('Cache refreshed'), report),
     });
   }
   if (result.warning === 'pdf-failed')
-    return toast(`Saved; PDF generation failed: ${result.detail ?? 'unknown error'}`);
+    return toastError(`Saved; PDF generation failed: ${result.detail ?? 'unknown error'}`);
   if (session.mode === 'postgres') return toast('Published');
   toast('Committed · live in about a minute', result.url);
 }
 
 /** A toast for any failure, listing field errors or import problems when the API sent them. */
 export function report(e: unknown): void {
-  if (e instanceof ApiError && Array.isArray(e.details)) return toast(`${e.message}: ${e.details.join('; ')}`);
+  if (e instanceof ApiError && Array.isArray(e.details)) return toastError(`${e.message}: ${e.details.join('; ')}`);
   if (e instanceof ApiError && e.status === 400 && e.details && typeof e.details === 'object') {
     const fields = Object.entries(e.details as Record<string, string>).map(([k, v]) => `${k}: ${v}`);
-    return toast(`${e.message} (${fields.join('; ')})`);
+    return toastError(`${e.message} (${fields.join('; ')})`);
   }
-  toast(e instanceof Error ? e.message : String(e));
+  toastError(e instanceof Error ? e.message : String(e));
 }
 
 export async function api<T = unknown>(

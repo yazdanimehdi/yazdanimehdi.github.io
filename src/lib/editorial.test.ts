@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  boldedAuthors,
   elsewhereLabel,
   homeBlocks,
   isOwner,
@@ -11,6 +12,7 @@ import {
   paperLink,
   shortTitle,
   socialLinks,
+  splitNav,
   toRoman,
   topicFilters,
   topicOf,
@@ -34,6 +36,33 @@ test('isOwner: ignores a leading Prof./Dr. and surrounding spaces', () => {
   assert.ok(isOwner('Jane Smith', 'Prof. Jane Smith'));
   assert.ok(isOwner(' Dr Jane Smith ', 'Jane Smith'));
   assert.ok(!isOwner('Jane Smithson', 'Prof. Jane Smith'));
+});
+
+test('boldedAuthors: the author alone on a personal site; current lab members too on a lab site', () => {
+  const people = [
+    { name: 'Dr. Alex Chen', role: 'postdoc' },
+    { name: 'Maria Garcia', role: 'phd' },
+    { name: 'Sam Old', role: 'alumni' },
+  ];
+  assert.deepEqual(boldedAuthors('Prof. Jane Smith', 'personal', people), ['Prof. Jane Smith']);
+  const lab = boldedAuthors('Prof. Jane Smith', 'lab', people);
+  assert.ok(isOwner('Jane Smith', lab));
+  assert.ok(isOwner('Alex Chen', lab), 'honorifics ignored for members too');
+  assert.ok(isOwner('Maria Garcia', lab));
+  assert.ok(!isOwner('Sam Old', lab), 'alumni are not bolded');
+  assert.ok(!isOwner('Maria Garcian', lab));
+});
+
+test('boldedAuthors: lab members marked inactive or past their end date are not bolded', () => {
+  const now = new Date('2026-10-18');
+  const people = [
+    { name: 'Left Early', role: 'phd', active: false },
+    { name: 'Gone Postdoc', role: 'postdoc', endDate: new Date('2025-06-30') },
+    { name: 'Leaving Soon', role: 'postdoc', endDate: new Date('2027-06-30') },
+    { name: 'Still Here', role: 'phd', active: true },
+  ];
+  const lab = boldedAuthors('Prof. Jane Smith', 'lab', people, now);
+  assert.deepEqual(lab, ['Prof. Jane Smith', 'Leaving Soon', 'Still Here']);
 });
 
 test('shortTitle: text before the first colon, else the whole title', () => {
@@ -153,17 +182,30 @@ test('socialLinks: known profiles in a fixed order, blanks and email skipped', (
   assert.deepEqual(socialLinks(undefined), []);
 });
 
-test('homeBlocks: hero, affiliations, research, then papers/updates in configured order', () => {
-  assert.deepEqual(
-    homeBlocks(['hero', 'about', 'news', 'publications', 'blog'], { affiliations: true, research: true }),
-    ['hero', 'affiliations', 'research', 'updates', 'publications'],
-  );
-  assert.deepEqual(homeBlocks(['publications', 'blog'], { affiliations: false, research: true }), [
+test('homeBlocks: hero, then papers/updates by homepageSections; research follows papers (personal) or leads (lab)', () => {
+  const sections = ['hero', 'about', 'news', 'publications', 'blog'] as const;
+  assert.deepEqual(homeBlocks([...sections], { research: true }, 'personal'), [
+    'hero',
+    'publications',
+    'research',
+    'updates',
+  ]);
+  assert.deepEqual(homeBlocks([...sections], { research: true }, 'lab'), [
+    'hero',
     'research',
     'publications',
     'updates',
   ]);
-  assert.deepEqual(homeBlocks(['about'], { affiliations: false, research: false }), ['hero']);
+  assert.deepEqual(homeBlocks(['news', 'blog', 'publications'], { research: false }), ['updates', 'publications']);
+  assert.deepEqual(homeBlocks(['news'], { research: false }), ['updates']);
+  assert.deepEqual(homeBlocks(['news', 'blog'], { research: true }, 'personal'), ['research', 'updates']);
+  assert.deepEqual(homeBlocks(['hero', 'blog'], { research: true }, 'personal'), ['hero', 'research', 'updates']);
+  assert.deepEqual(homeBlocks(['publications', 'blog'], { research: true }, 'lab'), [
+    'research',
+    'publications',
+    'updates',
+  ]);
+  assert.deepEqual(homeBlocks(['about'], { research: false }), ['hero']);
 });
 
 test('jsonLd: escapes "<" so content cannot close the script tag', () => {
@@ -183,4 +225,58 @@ test('featuredFirst: featured site posts lead, each group keeps its order', () =
     out.map((i) => i.href),
     ['/b', '/d', '/a', '/c'],
   );
+});
+
+test('splitNav: six header links by mode priority in nav order, Contact pinned, the rest to the footer', () => {
+  const nav = [
+    '/research',
+    '/people',
+    '/publications',
+    '/projects',
+    '/news',
+    '/blog',
+    '/positions',
+    '/repositories',
+    '/contact',
+  ].map((href) => ({ href }));
+  const hrefs = (items: { href: string }[]) => items.map((n) => n.href);
+  const personal = splitNav(nav, 'personal');
+  assert.deepEqual(hrefs(personal.primary), ['/research', '/publications', '/projects', '/news', '/blog']);
+  assert.equal(personal.contact?.href, '/contact');
+  assert.deepEqual(hrefs(personal.more), ['/people', '/positions', '/repositories']);
+  const lab = splitNav(nav, 'lab');
+  assert.deepEqual(hrefs(lab.primary), ['/research', '/people', '/publications', '/news', '/positions']);
+  assert.deepEqual(hrefs(lab.more), ['/projects', '/blog', '/repositories']);
+  const onPeople = splitNav(nav, 'personal', '/people/jane-doe');
+  assert.deepEqual(hrefs(onPeople.primary), ['/research', '/people', '/publications', '/news', '/blog']);
+  assert.equal(onPeople.contact?.href, '/contact');
+  assert.deepEqual(hrefs(onPeople.more), ['/projects', '/positions', '/repositories']);
+  assert.deepEqual(splitNav(nav, 'personal', '/blog'), personal);
+  // The sample nav in config/site.yml: CV makes the personal header, lab keeps its header and indexes CV.
+  const sample = [
+    '/research',
+    '/people',
+    '/publications',
+    '/cv',
+    '/projects',
+    '/news',
+    '/blog',
+    '/positions',
+    '/repositories',
+    '/contact',
+  ].map((href) => ({ href }));
+  assert.deepEqual(hrefs(splitNav(sample, 'personal').primary), [
+    '/research',
+    '/publications',
+    '/cv',
+    '/news',
+    '/blog',
+  ]);
+  assert.deepEqual(hrefs(splitNav(sample, 'lab').primary), hrefs(lab.primary));
+  assert.deepEqual(hrefs(splitNav(sample, 'lab').more), ['/cv', '/projects', '/blog', '/repositories']);
+  assert.deepEqual(splitNav(nav, 'personal', '/contact'), personal);
+  const short = splitNav([{ href: '/x' }, { href: '/research' }], 'lab');
+  assert.deepEqual(hrefs(short.primary), ['/x', '/research']);
+  assert.equal(short.contact, undefined);
+  assert.deepEqual(short.more, []);
 });

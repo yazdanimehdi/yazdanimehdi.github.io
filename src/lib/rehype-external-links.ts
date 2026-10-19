@@ -20,7 +20,7 @@ function walkNodes(nodes: RootContent[]) {
       if (typeof href === 'string' && (href.startsWith('http://') || href.startsWith('https://'))) {
         el.properties = el.properties || {};
         el.properties.target = '_blank';
-        el.properties.rel = 'nofollow noopener noreferrer';
+        el.properties.rel = ['nofollow', 'noopener', 'noreferrer'];
       }
     }
 

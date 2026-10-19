@@ -11,19 +11,20 @@ import {
 } from '../../lib/cv';
 import { getHomepageSections, getSiteConfig, getSiteName, loadYamlConfig } from '../../lib/config';
 import {
+  boldedAuthors,
   elsewhereLabel,
   featuredFirst,
   homeBlocks,
   isOwner,
   mergeWriting,
   normalizeAreas,
-  shortTitle,
   topicFilters,
   topicOf,
   type ResearchConfig,
   type WritingItem,
 } from '../../lib/editorial';
 import { renderMarkdown } from '../../lib/markdown';
+import { uiStrings } from '../../lib/ui-strings';
 import { byId as idOrder, readingTime } from '../../lib/utils';
 
 export function loadResearchConfig(): ResearchConfig {
@@ -70,35 +71,50 @@ export async function writingItems(): Promise<WritingItem[]> {
   ]);
 }
 
+/** A CV page has something to show: structured sections or a rendered PDF. */
+function hasCv(): boolean {
+  try {
+    return cvSections(loadCv().cv).length > 0 || !!loadCvMeta()?.pdfPath;
+  } catch {
+    return false;
+  }
+}
+
 export async function loadHome() {
   const config = getSiteConfig();
+  const lab = config.siteMode === 'lab';
   const ed = config.editorial ?? {};
   const research = loadResearchConfig();
   const areas = normalizeAreas(research.areas);
   const pubs = await getEntries('publications');
-  const byId = new Map(pubs.map((p) => [p.id, p]));
   const sections = getHomepageSections();
   const affiliations = (ed.affiliations ?? []).filter((a) => a?.trim());
+  const people = await getEntries('people');
 
   return {
     config,
     name: getSiteName(),
-    blocks: homeBlocks(sections, { affiliations: affiliations.length > 0, research: areas.length > 0 }),
+    blocks: homeBlocks(sections, { research: areas.length > 0 }, config.siteMode),
     showBio: sections.includes('about'),
     showNews: sections.includes('news'),
     showWriting: sections.includes('blog'),
     bioHtml: await renderMarkdown(ed.bio),
     affiliations,
     researchHeadline: research.headline,
-    areas: areas.map((a) => ({
-      ...a,
-      papers: pick(a.publications, byId, `research.yml area "${a.id}"`).map((p) => shortTitle(p.data.title)),
-    })),
+    areas,
     selected: [...pubs]
       .sort(idOrder)
       .sort((a, b) => Number(b.data.featured) - Number(a.data.featured) || b.data.year - a.data.year)
       .slice(0, 4),
     pubCount: pubs.length,
+    hasCv: !lab && hasCv(),
+    owners: boldedAuthors(
+      config.author,
+      config.siteMode,
+      people.map((p) => p.data),
+    ),
+    hasPeople: lab && people.length > 0,
+    hasOpenPositions: (await getEntries('positions')).some((p) => p.data.status === 'open'),
     news: (await getEntries('announcements'))
       .sort(idOrder)
       .sort((a, b) => Number(b.data.pinned) - Number(a.data.pinned) || b.data.date.getTime() - a.data.date.getTime())
@@ -138,6 +154,7 @@ export async function loadPublications() {
   const config = getSiteConfig();
   const areas = normalizeAreas(loadResearchConfig().areas);
   const areaIds = new Set(areas.map((a) => a.id));
+  const people = await getEntries('people');
   const items = (await getEntries('publications'))
     .sort(idOrder)
     .sort((a, b) => b.data.year - a.data.year || a.data.title.localeCompare(b.data.title))
@@ -149,6 +166,11 @@ export async function loadPublications() {
   const years = [...new Set(items.map((i) => i.pub.data.year))];
   return {
     config,
+    owners: boldedAuthors(
+      config.author,
+      config.siteMode,
+      people.map((p) => p.data),
+    ),
     groups: years.map((year) => ({ year, items: items.filter((i) => i.pub.data.year === year) })),
     filters: topicFilters(
       items.map((i) => i.topic),
@@ -181,7 +203,7 @@ export async function loadCvPage() {
     if (pubs.length > 0) {
       shown.push({
         key: 'selectedPublications',
-        title: 'Selected Publications',
+        title: uiStrings(config)('cv.selectedPublications'),
         entries: pubs.map((p) => ({ title: p.data.title, org: `${p.data.venue} · ${p.data.year}`, points: [] })),
       });
     }

@@ -34,6 +34,14 @@ test('public pages pass through untouched', async () => {
   assert.equal(res.headers.get('cache-control'), null);
 });
 
+test('a forged x-astro-path (only the unused edge middleware sets it) is refused before routing', async () => {
+  const ctx = context('/');
+  ctx.request.headers.set('x-astro-path', '/blog/other');
+  const res = await run(ctx);
+  assert.equal(res.status, 400);
+  assert.equal(res.headers.get('cache-control'), 'no-store');
+});
+
 test('without a session: API → 401, pages → login; the login page and auth routes stay open', async () => {
   assert.equal((await run(context('/api/admin/me'))).status, 401);
   const page = await run(context(`${admin}/cv`));

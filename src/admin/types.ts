@@ -5,6 +5,8 @@ export interface AdminCtx {
   siteName: string;
   user: { login: string; name: string; avatar: string; provider?: 'github' | 'password' } | null;
   mode: 'static' | 'git' | 'postgres';
+  /** May publish from the Site editor (site.yml `publishers`; every admin when that is empty). */
+  canPublish: boolean;
   /** MEDIUM_TOKEN is set: "Also publish to Medium" posts through the API. */
   mediumToken?: boolean;
   /** siteUrl from config/site.yml (post editor only): the public post URL handed to Medium's import tool. */

@@ -7,11 +7,12 @@ import DocBanners from './DocBanners.vue';
 import FormFields from './FormFields.vue';
 import MarkdownEditor from './MarkdownEditor.vue';
 import { api, committed, report, toast } from './api';
+import { formatDate } from './dates';
 import { COLLECTIONS, resolveOptions, type Option } from './fields';
 import { useDocument } from './useDocument';
 import type { AdminCtx, CommitResult, Entry } from './types';
 import { normalizeAreas, type ResearchAreaInput } from '../lib/editorial';
-import { slugify } from '../lib/utils';
+import { suggestSlug } from '../lib/utils';
 
 type Doc = { data: Record<string, any>; body: string };
 
@@ -28,6 +29,9 @@ const doc = useDocument<Doc>();
 
 const path = (slug: string) => `src/content/${props.name}/${slug}.md`;
 const fields = computed(() => resolveOptions(cfg.fields, { topics: topics.value }));
+/** A new entry's form: the title, then the slug derived from it, then everything else. */
+const titleFields = computed(() => fields.value.filter((f) => f.key === cfg.titleKey));
+const otherFields = computed(() => fields.value.filter((f) => f.key !== cfg.titleKey));
 const title = (e: Entry) => String(e.data[cfg.titleKey] || e.slug);
 const when = (e: Entry) => (cfg.dateKey ? String(e.data[cfg.dateKey] ?? '').slice(0, 10) : '');
 const filterOptions = (key: string) =>
@@ -37,7 +41,10 @@ const visible = computed(() =>
     .filter((e) => Object.entries(filters.value).every(([k, v]) => !v || String(e.data[k] ?? '') === v))
     .sort((a, b) => when(b).localeCompare(when(a)) || title(a).localeCompare(title(b))),
 );
-const suggested = computed(() => slugify(String(doc.current?.data[cfg.titleKey] ?? '')));
+const typedTitle = computed(() => String(doc.current?.data[cfg.titleKey] ?? '').trim());
+const suggested = computed(() => suggestSlug(typedTitle.value));
+/** A title with no ASCII letters or digits (e.g. Persian) gives no slug, so the field asks for one. */
+const slugNeeded = computed(() => !newSlug.value && !suggested.value && !!typedTitle.value);
 
 onMounted(async () => {
   try {
@@ -53,8 +60,10 @@ onMounted(async () => {
       ];
     }, report);
   }
-  const wanted = new URLSearchParams(location.search).get('slug');
+  const query = new URLSearchParams(location.search);
+  const wanted = query.get('slug');
   if (wanted) await select(wanted);
+  else if (query.has('new')) startNew();
 });
 
 async function select(slug: string) {
@@ -148,7 +157,7 @@ async function remove() {
           <li v-for="e in visible" :key="e.slug">
             <button type="button" :aria-current="selected === e.slug" @click="select(e.slug)">
               <span>{{ title(e) }}</span
-              ><span class="adm-muted">{{ when(e) }}</span>
+              ><time v-if="when(e)" class="adm-muted" :datetime="when(e)">{{ formatDate(when(e)) }}</time>
             </button>
           </li>
         </ul>
@@ -166,12 +175,25 @@ async function remove() {
           @reload="doc.reload()"
         />
         <p v-if="doc.readonly" class="adm-banner">This entry is MDX: read-only here, edit it in the repository.</p>
-        <label v-if="creating" class="adm-field">
-          <span>Slug (file name)</span>
-          <input v-model="newSlug" type="text" :placeholder="suggested" />
-        </label>
         <fieldset class="adm-plain-fieldset adm-form" :disabled="doc.readonly">
-          <FormFields :fields="fields" :model="doc.current.data" :errors="doc.errors" :owner="ctx.siteName" />
+          <template v-if="creating">
+            <FormFields :fields="titleFields" :model="doc.current.data" :errors="doc.errors" :owner="ctx.siteName" />
+            <label class="adm-field">
+              <span>Slug (file name)</span>
+              <!-- Follows the title until edited by hand; clearing it follows the title again. -->
+              <input
+                type="text"
+                :value="newSlug || suggested"
+                :aria-describedby="slugNeeded ? 'adm-slug-hint' : undefined"
+                @input="newSlug = ($event.target as HTMLInputElement).value"
+              />
+              <small v-if="slugNeeded" id="adm-slug-hint"
+                >Type a slug: lowercase letters, digits or dashes. The title has none to suggest one from.</small
+              >
+            </label>
+            <FormFields :fields="otherFields" :model="doc.current.data" :errors="doc.errors" :owner="ctx.siteName" />
+          </template>
+          <FormFields v-else :fields="fields" :model="doc.current.data" :errors="doc.errors" :owner="ctx.siteName" />
           <div class="adm-field" role="group" aria-labelledby="adm-body-label">
             <span id="adm-body-label">Body</span>
             <MarkdownEditor v-model="doc.current.body" compact :preview="doc.readonly" />

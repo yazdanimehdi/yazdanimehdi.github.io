@@ -11,6 +11,7 @@
   --ed-caption: #656b80;
   --ed-rule: #e4e7ee;
   --ed-rule-soft: #eef0f4;
+  --ed-rule-strong: #c3c8d4;
   --ed-tint: #f3f5fa;
   --ed-hover: #f6f8fc;
   --ed-accent: #1f3c88;
@@ -94,6 +95,10 @@
   & .ul:focus-visible {
     background-size: 100% 1px;
   }
+  /* The underline draws from the inline start. */
+  &[dir='rtl'] .ul {
+    background-position: 100% 100%;
+  }
   & .row {
     transition: background-color 0.2s ease;
   }
@@ -146,14 +151,37 @@
     line-height: 1.6;
     letter-spacing: 1.6px;
     text-transform: uppercase;
-    color: var(--ed-accent);
+    /* Ink, not Accent: a heading set beside an Accent "All news →" link must not read as a second link. */
+    color: var(--ed-ink);
   }
   /* Meta lines carry what a kicker would: role, tags, owner. They sit under the heading, never above it. */
   & .ed-role {
     margin: -10px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
     font-size: 17px;
     font-weight: 500;
     color: var(--ed-body-2);
+  }
+  & .ed-role p {
+    margin: 0;
+  }
+  /* Affiliations ride the role line: one quiet meta line, not a band. */
+  & .ed-affil {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ed-muted);
+  }
+  /* The dot rides the end of the item before it, so a wrapped line never starts with a lone separator. */
+  & .ed-affil li:not(:last-child)::after {
+    content: '·' / '';
+    margin-inline: 8px;
   }
   & .ed-meta {
     margin: 0;
@@ -195,6 +223,7 @@
   & .ed-brand {
     display: flex;
     align-items: center;
+    min-height: 44px;
     gap: 10px;
     color: var(--ed-ink);
   }
@@ -217,19 +246,30 @@
     gap: 4px 28px;
     font-size: 15px;
   }
-  & .ed-navlinks a {
-    padding: 8px 0;
+  /* 44px targets; the current page's 2px underline sits on the target's bottom edge. */
+  & .ed-navlinks a,
+  & .ed-nav-contact a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    border-block: 2px solid transparent;
     color: var(--ed-body-2);
+    font-size: 15px;
     transition: color 0.15s ease;
   }
-  & .ed-navlinks a:hover {
+  & .ed-navlinks a:hover,
+  & .ed-nav-contact a:hover {
     color: var(--ed-ink);
   }
-  & .ed-navlinks a[aria-current='page'] {
-    padding-bottom: 6px;
-    border-bottom: 2px solid var(--ed-accent);
+  & .ed-navlinks a[aria-current='page'],
+  & .ed-nav-contact a[aria-current='page'] {
+    border-bottom-color: var(--ed-accent);
     color: var(--ed-ink);
     font-weight: 500;
+  }
+  /* Contact sits outside the link row so phones never scroll it away; on desktop it reads as the row's last link. */
+  & .ed-nav-contact {
+    margin-inline-start: 4px;
   }
   & .ed-page {
     padding-block: 64px 80px;
@@ -253,10 +293,41 @@
     display: flex;
     flex-wrap: wrap;
     justify-content: space-between;
-    gap: 12px;
+    gap: 12px 24px;
     padding-block: 24px;
     font-size: 14px;
     color: var(--ed-caption);
+  }
+  /* Footer index: the nav pages the header leaves out. */
+  & .ed-footer-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+  }
+  & .ed-footer-nav a {
+    color: var(--ed-body-2);
+  }
+  /* 44px tap targets for small inline links: the padding grows the target, the equal negative margin keeps the line. */
+  & .ed-more,
+  & .ed-email,
+  & .ed-paper-meta a,
+  & .ed-bib summary,
+  & .ed-footer-nav a,
+  & .ed-footer-inner > a,
+  & .ed-pager a,
+  & .ed-contact-links a,
+  & .ed-contact-onward a,
+  & .ed-profiles a {
+    display: inline-block;
+    padding-block: 11px;
+    margin-block: -11px;
+    line-height: 22px;
+    background-origin: content-box;
+    background-clip: content-box;
+  }
+  & .ed-footer-nav a:hover,
+  & .ed-footer-nav a[aria-current='page'] {
+    color: var(--ed-ink);
   }
 
   /* ── Type and buttons ── */
@@ -418,6 +489,19 @@
   & .ed-mode[data-mode='system'] .ed-mode-half {
     transform: rotate(90deg);
   }
+  & .ed-mode-word {
+    display: none;
+    font-size: 13px;
+  }
+  & .ed-mode[data-mode='system'] {
+    grid-auto-flow: column;
+    gap: 6px;
+    width: auto;
+    padding-inline: 8px 13px;
+  }
+  & .ed-mode[data-mode='system'] .ed-mode-word {
+    display: block;
+  }
 
   /* ── Home ── */
   & .ed-hero {
@@ -475,17 +559,40 @@
     gap: 12px 26px;
     padding-top: 6px;
   }
-  & .ed-links {
+  /* One quiet row of scholarly IDs (Scholar, ORCID, GitHub); other profiles live in the contact band. */
+  & .ed-profiles {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px 22px;
+    gap: 22px 20px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
     font-size: 14px;
   }
-  & .ed-links a {
+  & .ed-profiles a {
     color: var(--ed-body-2);
   }
-  & .ed-links a:hover {
+  & .ed-profiles a:hover,
+  & .ed-profiles a:focus-visible {
     color: var(--ed-ink);
+  }
+  & .ed-profiles .arr {
+    margin-inline-start: 4px;
+    color: var(--ed-caption);
+  }
+  /* Underlined at rest, so on touch screens it reads as a link; the line darkens to Ink on hover. */
+  & .ed-email {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    color: var(--ed-ink);
+    font-weight: 500;
+    text-decoration: underline 1px var(--ed-rule-strong);
+    text-underline-offset: 4px;
+    transition: text-decoration-color 0.15s ease;
+  }
+  & .ed-email:hover,
+  & .ed-email:focus-visible {
+    text-decoration-color: currentColor;
   }
   & .ed-figure {
     flex: 1 1 420px;
@@ -515,35 +622,15 @@
     color: var(--ed-body-2);
     font-weight: 600;
   }
-  & .ed-band {
-    background: var(--ed-tint);
-    border-block: 1px solid var(--ed-rule);
-  }
-  & .ed-band-inner {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 14px 40px;
-    padding-block: 24px;
-  }
-  & .ed-band-label {
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 1.6px;
-    text-transform: uppercase;
-    color: var(--ed-caption);
-  }
-  & .ed-band-item {
-    font-size: 17px;
-    font-weight: 600;
-    color: var(--ed-muted);
-  }
   & .ed-home-section {
     display: flex;
     flex-direction: column;
     gap: 40px;
     padding-block: 96px 48px;
+  }
+  & .ed-home-lede {
+    max-width: 680px;
+    margin-top: -24px;
   }
   & .ed-home-section--papers {
     gap: 28px;
@@ -563,15 +650,6 @@
     border-radius: 0 0 6px 6px;
     color: var(--ed-ink);
   }
-  & .ed-card:hover {
-    color: var(--ed-ink);
-  }
-  & .ed-card-num {
-    font-family: var(--font-serif);
-    font-size: 26px;
-    font-weight: 500;
-    color: var(--ed-accent);
-  }
   & .ed-card h3 {
     margin: 0;
     font-family: var(--font-sans);
@@ -586,15 +664,69 @@
     line-height: 1.65;
     color: var(--ed-muted);
   }
-  & .ed-card-papers {
-    font-family: var(--font-serif);
-    font-size: 14px;
-    font-style: italic;
-    color: var(--ed-caption);
+  /* Home research: a numbered ruled list in the paper rows' language, one 2px Ink rule over the first row. */
+  & .ed-topics {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 2px solid var(--ed-ink);
   }
-  & .ed-card-papers .arr {
-    font-style: normal;
+  & .ed-topic {
+    position: relative;
+    display: flex;
+    align-items: baseline;
+    gap: 24px;
+    margin: 0 -16px;
+    padding: 22px 16px;
+    border-radius: 6px;
+    background: linear-gradient(var(--ed-rule), var(--ed-rule)) center bottom / calc(100% - 32px) 1px no-repeat;
+  }
+  & .ed-topic-num {
+    flex: 0 0 40px;
+    font-family: var(--font-serif);
+    font-size: 20px;
+    font-weight: 500;
     color: var(--ed-accent);
+  }
+  & .ed-topic-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  & .ed-topic-title {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+  & .ed-topic-title a {
+    color: var(--ed-ink);
+    text-decoration: underline 1px transparent;
+    text-underline-offset: 4px;
+    transition:
+      color 0.15s ease,
+      text-decoration-color 0.15s ease;
+  }
+  /* The title's link covers the row, so the whole row is the target while its name stays just the title. */
+  & .ed-topic-title a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+  & .ed-topic:hover .ed-topic-title a,
+  & .ed-topic-title a:focus-visible {
+    color: var(--ed-accent);
+    text-decoration-color: currentColor;
+  }
+  & .ed-topic p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--ed-muted);
   }
   & .ed-split {
     display: flex;
@@ -613,6 +745,15 @@
     display: flex;
     justify-content: space-between;
     align-items: baseline;
+  }
+  /* News and Blog share one row, so their heads sit a step under the full-width section heads. */
+  & .ed-split-title {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: clamp(22px, 4vw, 26px);
+    line-height: 1.25;
+    font-weight: 500;
+    color: var(--ed-ink);
   }
 
   /* ── Paper rows ── */
@@ -634,6 +775,11 @@
     background: linear-gradient(var(--ed-row-rule), var(--ed-row-rule)) center bottom / calc(100% - 32px) 1px no-repeat;
     border-radius: 6px;
     scroll-margin-top: 24px;
+  }
+  /* The row a "Cite" link landed on (data-cited covers client-side navigations, which never set :target). */
+  & .ed-paper:target,
+  & .ed-paper[data-cited] {
+    background-color: var(--ed-tint);
   }
   & .ed-paper--list {
     flex-direction: column;
@@ -678,7 +824,7 @@
     color: var(--ed-caption);
   }
   & .ed-paper-body {
-    flex: 1 1 520px;
+    flex: 1 1 320px;
     min-width: 0;
     display: flex;
     flex-direction: column;
@@ -695,8 +841,30 @@
     line-height: 1.4;
     color: var(--ed-ink);
   }
-  & a.ed-paper-title:hover {
+  /* The title is the paper's link: ↗ marks it at rest, an underline draws on hover and focus. */
+  & a.ed-paper-title {
+    padding-block: 9px;
+    margin-block: -9px;
+    text-decoration: underline 1px transparent;
+    text-underline-offset: 4px;
+    transition:
+      color 0.15s ease,
+      text-decoration-color 0.15s ease;
+  }
+  & a.ed-paper-title:hover,
+  & a.ed-paper-title:focus-visible {
     color: var(--ed-accent);
+    text-decoration-color: currentColor;
+  }
+  & .ed-paper-title .arr {
+    margin-inline-start: 6px;
+    font-family: var(--font-sans);
+    font-size: 0.8em;
+    color: var(--ed-caption);
+  }
+  & a.ed-paper-title:hover .arr,
+  & a.ed-paper-title:focus-visible .arr {
+    color: currentColor;
   }
   & .ed-paper--list .ed-paper-title {
     font-size: 19px;
@@ -753,7 +921,6 @@
     flex-basis: 100%;
   }
   & .ed-bib summary {
-    display: inline;
     list-style: none;
     cursor: pointer;
     color: var(--ed-accent);
@@ -828,17 +995,86 @@
     padding-block: 14px;
     border-top: 1px solid var(--ed-rule);
   }
+  /* Start-aligned, so a year-only date ("2024") lines up with "Sep 2024" instead of reading as a missing month. */
   & .ed-news-date {
     flex: 0 0 76px;
+    text-align: start;
     padding-top: 1px;
     font-size: 14px;
     color: var(--ed-caption);
   }
   & .ed-news-text {
     flex: 1 1 auto;
+    padding-block: 11px;
+    margin-block: -11px;
     min-width: 0;
     font-size: 15px;
     line-height: 1.55;
+    color: var(--ed-ink);
+  }
+  & a.ed-news-text:hover {
+    color: var(--ed-accent);
+  }
+  /* The lead item: its plate in a Tint frame beside the date, title and excerpt. */
+  & .ed-news-lead {
+    display: grid;
+    grid-template-columns: 152px minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+    padding-block: 16px 2px;
+    border-top: 1px solid var(--ed-rule);
+    color: var(--ed-ink);
+  }
+  & .ed-news-plate {
+    display: block;
+    aspect-ratio: 4 / 3;
+    padding: 10px;
+    background: var(--ed-tint);
+    border: 1px solid var(--ed-rule);
+    border-radius: 6px;
+  }
+  /* A row's plate: a small thumbnail to the left of the date, centered on the one-line row. */
+  & .ed-news-plate--row {
+    flex: 0 0 56px;
+    align-self: center;
+    margin-block: -6px;
+    padding: 4px;
+    border-radius: 4px;
+  }
+  & .ed-news-plate img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  & .ed-news-lead-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  & .ed-news-lead-date {
+    font-size: 13px;
+    color: var(--ed-caption);
+  }
+  & .ed-news-lead-title {
+    font-family: var(--font-serif);
+    font-size: 19px;
+    font-weight: 500;
+    line-height: 1.35;
+    transition: color 0.15s ease;
+  }
+  & .ed-news-lead:hover .ed-news-lead-title {
+    color: var(--ed-accent);
+  }
+  & .ed-news-lead-excerpt {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--ed-muted);
   }
   & .ed-posts li {
     border-top: 1px solid var(--ed-rule);
@@ -941,10 +1177,21 @@
     flex-wrap: wrap;
     gap: 20px;
   }
-  & .ed-contact-links a {
+  & .ed-contact-links a,
+  & .ed-contact .ed-footer-nav a {
     color: var(--ed-footer-text);
   }
-  & .ed-contact-links a:hover {
+  & .ed-contact-links a:hover,
+  & .ed-contact .ed-footer-nav a:hover {
+    color: var(--ed-band-strong);
+  }
+  & .ed-contact p.ed-contact-onward {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 24px;
+    font-weight: 500;
+  }
+  & .ed-contact-onward a {
     color: var(--ed-band-strong);
   }
   & .ed-contact :focus-visible {
@@ -1292,7 +1539,10 @@
   }
   & .ed-back {
     align-self: flex-start;
-    padding-block: 6px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    min-height: 44px;
     font-size: 15px;
   }
   & .ed-article-head {
@@ -1559,6 +1809,18 @@
     height: auto;
   }
 
+  /* On wider screens the home row's venue tile carries the venue, so its meta line keeps it only for screen readers. */
+  @media (min-width: 641px) {
+    & .ed-venue--tiled {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+
   /* ── Phones ── */
   @media (max-width: 640px) {
     --ed-pad: 16px;
@@ -1569,9 +1831,13 @@
       row-gap: 2px;
       padding-block: 10px 0;
     }
-    & .ed-mode {
+    & .ed-mode,
+    & .ed-nav-contact {
       order: 1;
       margin-inline-start: auto;
+    }
+    & .ed-nav-contact + .ed-mode {
+      margin-inline-start: 0;
     }
     & .ed-navlinks {
       order: 2;
@@ -1583,9 +1849,12 @@
       overflow-x: auto;
       overscroll-behavior-inline: contain;
       scrollbar-width: none;
+    }
+    /* data-more (set by Layout's script) means links remain past the trailing edge. */
+    & .ed-navlinks[data-more] {
       mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
     }
-    &[dir='rtl'] .ed-navlinks {
+    &[dir='rtl'] .ed-navlinks[data-more] {
       mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent);
     }
     & .ed-navlinks::-webkit-scrollbar {
@@ -1593,19 +1862,40 @@
     }
     & .ed-navlinks a {
       flex: none;
-      padding-block: 12px;
     }
-    & .ed-navlinks a[aria-current='page'] {
-      padding-bottom: 10px;
+    & .ed-tabs {
+      column-gap: 22px;
     }
 
     & .ed-hero {
       gap: 40px;
       padding-block: 56px 48px;
     }
-    /* Label on its own line; otherwise space-between strands the first affiliation at the right edge. */
-    & .ed-band-label {
-      flex-basis: 100%;
+    /* The tile would add a 92px block per paper; the meta line already names the venue and year. */
+    & .ed-venue-tile {
+      display: none;
+    }
+    /* A compact plate after the actions, short enough that the first paper stays within a short scroll. */
+    & .ed-hero .ed-figure {
+      gap: 8px;
+    }
+    & .ed-hero .ed-figure-box {
+      padding: 12px;
+    }
+    & .ed-hero .ed-figure-box img {
+      max-height: 116px;
+      object-fit: contain;
+    }
+    & .ed-topic {
+      gap: 12px;
+    }
+    & .ed-topic-num {
+      flex-basis: 28px;
+    }
+    /* Rows sit 44px apart so the enlarged link targets never overlap. */
+    & .ed-footer-nav,
+    & .ed-contact-links {
+      row-gap: 22px;
     }
     & .ed-home-section {
       padding-block: 56px 32px;
@@ -1618,6 +1908,10 @@
     }
     & .ed-split {
       padding-block: 24px 64px;
+    }
+    & .ed-news-lead {
+      grid-template-columns: 112px minmax(0, 1fr);
+      gap: 16px;
     }
     & .ed-contact-inner {
       padding-block: 56px 28px;
@@ -1639,31 +1933,52 @@
 }
 
 /*
- * Dark mode: neutral charcoal (classic's palette) under the journal's language. `.dark` comes from
- * DarkModeScript; the accent follows colors.dark.primary (lib/colors.ts → editorialAccentCss).
- * The classic dm-* tokens stay live, so undesigned pages using Tailwind `dark:` variants match.
+ * Owner text in another script keeps its own bidi order but lines up with the page's column edge
+ * (`text-align: match-parent` would say this, but Chromium lacks it). Zero specificity, so any
+ * component's own alignment wins. Long-form prose keeps its own: a whole article reads as one block.
+ */
+:where(:root[data-theme='editorial']:not([dir='rtl']) [dir='auto']:not(.ed-prose)) {
+  text-align: left;
+}
+:where(:root[data-theme='editorial'][dir='rtl'] [dir='auto']:not(.ed-prose)) {
+  text-align: right;
+}
+
+/*
+ * Dark mode, "the journal at night", in three owner-selectable palettes (editorial.night → `data-night`
+ * on <html>): Lamplight (default, also used when the attribute is missing), Ink Well and Galley Proof.
+ * Each palette sets only the primitives below and the ink-plate filter; every other night token derives
+ * from them. `.dark` comes from DarkModeScript; the accent follows colors.dark.primary (lib/colors.ts →
+ * editorialAccentCss, which lifts it to 4.5:1 on the palette's Hover; NIGHT_HOVER mirrors --ed-hover).
+ * The classic dm-* tokens map onto the palette, so undesigned pages match.
  */
 html.dark:root[data-theme='editorial'] {
-  --ed-ink: #e6edf3;
-  --ed-body-2: #c9d1d9;
-  --ed-muted: #a5aeb8;
-  --ed-caption: #8b949e;
-  --ed-rule: #21262d;
-  --ed-rule-soft: #1c2128;
-  --ed-tint: #161b22;
-  --ed-hover: #1c2128;
-  --ed-accent: #22d3ee;
-  --ed-accent-hover: #67e8f9;
-  --ed-accent-border: color-mix(in oklab, var(--ed-accent), #0d1117 60%);
-  --ed-selection: color-mix(in oklab, var(--ed-accent), #0d1117 72%);
-  --ed-footer: #161b22;
-  --ed-footer-text: #c9d1d9;
-  --ed-footer-muted: #8b949e;
-  --ed-footer-rule: #30363d;
-  --ed-paper: #0d1117;
-  --ed-on-accent: #0d1117;
-  --ed-code: #c9d1d9;
-  --ed-band-strong: #e6edf3;
+  /* Lamplight: warm charcoal paper, ivory ink, the light theme's navy lifted to a night blue (hue 265). */
+  --ed-paper: #1a1713;
+  --ed-tint: #211d19;
+  --ed-hover: #27231e;
+  --ed-rule: #312d28;
+  --ed-footer-rule: #403b35;
+  --ed-ink: #ede7dc;
+  --ed-body-2: #d3cdc2;
+  --ed-muted: #bbb5ac;
+  --ed-caption: #a39d96;
+  --ed-accent: #9cb1dd;
+  --ed-accent-hover: #c3d1ef;
+  /* Plain inversion turns blue-black ink into warm ivory, the colour of the night text. */
+  --ed-ink-filter: invert(1);
+
+  --ed-rule-soft: var(--ed-hover);
+  --ed-accent-border: color-mix(in oklab, var(--ed-accent), var(--ed-paper) 60%);
+  --ed-selection: color-mix(in oklab, var(--ed-accent), var(--ed-paper) 72%);
+  --ed-rule-strong: var(--ed-footer-rule);
+  /* Two steps off the page (Hover is too close to Paper at night), so the band lands as the page's ending. */
+  --ed-footer: var(--ed-rule);
+  --ed-footer-text: var(--ed-body-2);
+  --ed-footer-muted: var(--ed-caption);
+  --ed-on-accent: var(--ed-paper);
+  --ed-code: var(--ed-body-2);
+  --ed-band-strong: var(--ed-ink);
   color-scheme: dark;
 
   /* Classic Tailwind tokens → dark journal palette on undesigned pages. */
@@ -1680,9 +1995,22 @@ html.dark:root[data-theme='editorial'] {
   /* Bare links and classic accent utilities use the accent ramp in dark mode. */
   --color-accent-300: var(--ed-accent-hover);
   --color-accent-400: var(--ed-accent);
+  --color-dm: var(--ed-paper);
+  --color-dm-alt: var(--ed-tint);
+  --color-dm-hover: var(--ed-hover);
+  --color-dm-heading: var(--ed-ink);
+  --color-dm-text: var(--ed-body-2);
+  --color-dm-muted: var(--ed-caption);
+  --color-dm-faint: var(--ed-caption);
+  --color-dm-border: var(--ed-rule);
+  --color-dm-border-alt: var(--ed-footer-rule);
 
   & .ed-contact {
-    border-top: 1px solid var(--ed-rule);
+    border-top: 1px solid var(--ed-footer-rule);
+  }
+  /* Selection Wash is dark at night: under the band's dark label it fell to 1.4:1. */
+  & .ed-btn-light:hover {
+    background: var(--ed-accent-hover);
   }
   & .ed-backdrop--image {
     background-image: var(--ed-hero-img-dark);
@@ -1691,7 +2019,7 @@ html.dark:root[data-theme='editorial'] {
     opacity: 0.1;
   }
   & .ed-ink {
-    filter: invert(1) hue-rotate(180deg);
+    filter: var(--ed-ink-filter);
     opacity: 0.88;
   }
   /* Shiki writes the light theme inline; its dual-theme vars carry the dark one. */
@@ -1705,4 +2033,39 @@ html.dark:root[data-theme='editorial'] {
     font-weight: var(--shiki-dark-font-weight) !important;
     text-decoration: var(--shiki-dark-text-decoration) !important;
   }
+}
+
+/* `:where` keeps these at the base block's specificity, so the owner accent in editorialAccentCss still wins. */
+/* Ink Well: the journal's Ink as night paper, cool blue-grey ink, a periwinkle accent. */
+html.dark:root[data-theme='editorial']:where([data-night='inkwell']) {
+  --ed-paper: #121521;
+  --ed-tint: #191d2a;
+  --ed-hover: #1e2230;
+  --ed-rule: #292d3b;
+  --ed-footer-rule: #383d4b;
+  --ed-ink: #e6eaf0;
+  --ed-body-2: #cbcfda;
+  --ed-muted: #b2b7c5;
+  --ed-caption: #9ba1b0;
+  --ed-accent: #a0b6ef;
+  --ed-accent-hover: #c5d4fa;
+  /* The hue turn keeps inverted ink blue, matching the cool text. */
+  --ed-ink-filter: invert(1) hue-rotate(180deg);
+}
+
+/* Galley Proof: near-neutral warm graphite, grey ink, a muted slate-teal accent. */
+html.dark:root[data-theme='editorial']:where([data-night='galley']) {
+  --ed-paper: #1b1917;
+  --ed-tint: #22201e;
+  --ed-hover: #272623;
+  --ed-rule: #32302e;
+  --ed-footer-rule: #403e3b;
+  --ed-ink: #eae7e2;
+  --ed-body-2: #d0cdc8;
+  --ed-muted: #b8b5b0;
+  --ed-caption: #a39f9a;
+  --ed-accent: #86c0c6;
+  --ed-accent-hover: #b7dce1;
+  /* Greyscale drops the tint inversion leaves, so plates read as proof-sheet graphite. */
+  --ed-ink-filter: invert(1) grayscale(1);
 }

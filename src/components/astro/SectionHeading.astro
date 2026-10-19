@@ -1,24 +1,32 @@
 ---
+import { getSiteConfig } from '../../lib/config';
+import { uiStrings } from '../../lib/ui-strings';
+
 interface Props {
   title: string;
   viewAllHref?: string;
   viewAllText?: string;
 }
 
-const { title, viewAllHref, viewAllText = 'View all →' } = Astro.props;
+const { title, viewAllHref, viewAllText = uiStrings(getSiteConfig())('section.viewAll') } = Astro.props;
 ---
 
-<div class="flex items-baseline justify-between border-b border-surface-200 pb-2 dark:border-dm-border">
-  <h2 class="font-serif text-xl font-normal text-surface-900 dark:text-dm-heading">
+<div class="flex items-center gap-4 border-b border-surface-200 dark:border-dm-border">
+  <h2 dir="auto" class="me-auto py-2 font-serif text-xl font-normal text-surface-900 dark:text-dm-heading">
     {title}
   </h2>
+  <slot />
   {
     viewAllHref && (
       <a
         href={viewAllHref}
-        class="text-sm text-primary-600 transition-colors hover:text-primary-700 dark:text-accent-400 dark:hover:text-accent-300"
+        class="inline-flex min-h-11 shrink-0 items-center gap-1 text-sm text-primary-600 transition-colors hover:text-primary-700 dark:text-accent-400 dark:hover:text-accent-300"
       >
         {viewAllText}
+        <span class="sr-only">{` ${title}`}</span>
+        <span aria-hidden="true" class="inline-block rtl:-scale-x-100">
+          →
+        </span>
       </a>
     )
   }

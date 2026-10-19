@@ -4,7 +4,7 @@ import { getSql } from '../db';
 import { renderMarkdownDocument } from '../markdown';
 import { getMode } from '../mode';
 import { hiddenFeedIds } from '../config';
-import { isPublished, withoutCrossPosted, withoutHidden } from '../utils';
+import { isPublished, safeHref, withoutCrossPosted, withoutHidden } from '../utils';
 import { memo, readSiteFile, requestContext } from './context';
 import { parseDocuments, type DocumentCollection, type DocumentEntry } from './documents';
 
@@ -43,14 +43,21 @@ function onlyPublished<T>(name: string, entries: T[]): T[] {
     : entries;
 }
 
+/** What pages see: published entries; news entries without an image get their category's built-in art. */
+async function forPages<T>(name: string, entries: T[]): Promise<T[]> {
+  const out = onlyPublished(name, entries);
+  if (name !== 'announcements') return out;
+  // Loaded only here: it globs the art through Vite, which plain Node (the unit tests) doesn't have.
+  const { withNewsArt } = await import('./news-art');
+  return withNewsArt(out as never) as T[];
+}
+
 /** Every entry of a collection, shaped like getCollection's. Postgres mode: from the database, tagged col:<name>. */
 export async function getEntries<C extends CollectionKey>(name: C): Promise<CollectionEntry<C>[]> {
-  if (getMode() !== 'postgres') return onlyPublished(name, await (await import('astro:content')).getCollection(name));
+  if (getMode() !== 'postgres') return forPages(name, await (await import('astro:content')).getCollection(name));
   requestContext().tags.add(`col:${name}`);
   // A copy: callers sort in place, and the memo is shared by the whole request.
-  return onlyPublished(name, [
-    ...asEntries<C>(await memo(`col:${name}`, () => loadCollection(name as DocumentCollection))),
-  ]);
+  return forPages(name, [...asEntries<C>(await memo(`col:${name}`, () => loadCollection(name as DocumentCollection)))]);
 }
 
 /** One entry, or undefined. Postgres mode: tagged doc:<name>/<id>, so edits to other entries don't purge it. */
@@ -58,7 +65,7 @@ export async function getEntry<C extends CollectionKey>(name: C, id: string): Pr
   if (getMode() !== 'postgres') {
     const { getEntry: astroGetEntry } = await import('astro:content');
     const entry = await (astroGetEntry as (c: string, i: string) => Promise<CollectionEntry<C> | undefined>)(name, id);
-    return entry && onlyPublished(name, [entry])[0];
+    return entry && (await forPages(name, [entry]))[0];
   }
   requestContext().tags.add(`doc:${name}/${id}`);
   if (name === 'feeds') return (await getEntries(name)).find((e) => e.id === id);
@@ -69,7 +76,7 @@ export async function getEntry<C extends CollectionKey>(name: C, id: string): Pr
         select path, content from documents where path = any(${[`${base}.md`, `${base}.mdx`]}::text[])
         order by path`,
   );
-  return onlyPublished(name, asEntries<C>(parseDocuments(name as DocumentCollection, rows)))[0];
+  return (await forPages(name, asEntries<C>(parseDocuments(name as DocumentCollection, rows))))[0];
 }
 
 type Paths<P> = { params: Record<string, string | number | undefined>; props: P }[];
@@ -110,7 +117,11 @@ export async function entryHeadings(entry: CollectionEntry<CollectionKey>): Prom
   return (await renderEntryHtml(entry)).headings;
 }
 
-/** Feed items the public site lists: without `hidden` ids and without copies of site posts (cross-posted to Medium). */
+/**
+ * Feed items the public site lists: without `hidden` ids, without copies of site posts (cross-posted to Medium),
+ * and without non-http(s) links, which a feeds.json synced before the sync filtered them could still hold.
+ */
 export async function getPublicFeeds(): Promise<CollectionEntry<'feeds'>[]> {
-  return withoutCrossPosted(withoutHidden(await getEntries('feeds'), hiddenFeedIds()), await getEntries('posts'));
+  const feeds = (await getEntries('feeds')).filter((f) => safeHref(f.data.link));
+  return withoutCrossPosted(withoutHidden(feeds, hiddenFeedIds()), await getEntries('posts'));
 }

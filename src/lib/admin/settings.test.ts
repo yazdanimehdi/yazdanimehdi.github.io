@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { isAdminUser, loadAdminSettings } from './settings';
+import { canPublish, isAdminUser, loadAdminSettings } from './settings';
 
 function fixture(site: string, cms: string): string {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'admin-settings-'));
@@ -15,12 +15,13 @@ function fixture(site: string, cms: string): string {
 
 test('loadAdminSettings reads site.yml and cms.yml', () => {
   const root = fixture(
-    "siteMode: personal\nauthor: 'Dr. A'\nlabName: Lab\nadminPath: '/manage/'\nadminUsers: [alice]\n",
+    "siteMode: personal\nauthor: 'Dr. A'\nlabName: Lab\nadminPath: '/manage/'\nadminUsers: [alice]\npublishers: ['@bob']\n",
     "media_folder: 'src/assets/images'\npublic_folder: '/src/assets/images'\n",
   );
   assert.deepEqual(loadAdminSettings(root), {
     adminPath: 'manage',
     adminUsers: ['alice'],
+    publishers: ['@bob'],
     mediaFolder: 'src/assets/images',
     publicFolder: '/src/assets/images',
     siteName: 'Dr. A',
@@ -33,6 +34,7 @@ test('loadAdminSettings defaults: admin path, empty users, lab name in lab mode'
   );
   assert.equal(s.adminPath, 'admin');
   assert.deepEqual(s.adminUsers, []);
+  assert.deepEqual(s.publishers, []);
   assert.equal(s.siteName, 'The Lab');
   assert.equal(s.publicFolder, '/public/uploads');
 });
@@ -55,4 +57,19 @@ test('isAdminUser: usernames or profile URLs, case-insensitive', () => {
   assert.ok(!isAdminUser('jane', users));
   assert.ok(!isAdminUser('', users));
   assert.ok(!isAdminUser('github', ['https://github.com/org/repo']));
+});
+
+test('canPublish: unset means every admin; GitHub logins and password: accounts never stand in for each other', () => {
+  const github = (login: string) => ({ login, provider: 'github' as const });
+  const password = (login: string) => ({ login, provider: 'password' as const });
+  assert.ok(canPublish(github('anyone'), { publishers: [] }));
+  assert.ok(canPublish(password('anyone'), { publishers: [] }));
+
+  const publishers = ['https://github.com/JaneSmith', 'password:Priya'];
+  assert.ok(canPublish(github('janesmith'), { publishers }));
+  assert.ok(canPublish(password('priya'), { publishers }));
+  assert.ok(!canPublish(github('alex'), { publishers }));
+  assert.ok(!canPublish(password('janesmith'), { publishers }), 'a password account named like a GitHub publisher');
+  assert.ok(!canPublish(github('priya'), { publishers }), 'a GitHub login named like a password publisher');
+  assert.ok(!canPublish(github('password:priya'), { publishers }));
 });

@@ -63,25 +63,55 @@ if (!STRUCTURAL) {
   }
 
   {
+    const html = read('classic', 'index.html');
+    const h2s = [...html.matchAll(/<h2[^>]*>\s*([^<]+?)\s*<\/h2>/g)].map((m) => m[1]);
+    assert.deepEqual(
+      h2s.slice(0, 5),
+      ['Publications', 'Research', 'About', 'News', 'Blog'],
+      'classic /: journal block order (personal: papers, research, then updates), About after the proof',
+    );
+    assert.match(html, /href="\/research#nlp"/, 'classic /: research rows link to their area');
+    assert.match(read('classic', 'research/index.html'), /<div id="nlp"/, 'classic /research: area anchors');
+    assert.match(html, /<bdi>Prof\. Jane Smith<\/bdi>/, 'classic footer: site name isolated for RTL');
+  }
+
+  {
     const html = ed('index.html');
-    assert.match(html, /<h1 class="ed-hero-name">Prof\. Jane Smith<\/h1>/, 'editorial /: hero name');
+    assert.match(html, /<h1 class="ed-hero-name"[^>]*>\s*Prof\. Jane Smith\s*<\/h1>/, 'editorial /: hero name');
     assert.match(
       html,
-      /<div class="ed-bio"><p>I lead the Smith Research Lab at the <strong>/,
+      /<div class="ed-bio"[^>]*><p>I lead the Smith Research Lab at the <strong>/,
       'editorial /: bio rendered from Markdown',
     );
     assert.match(html, /"@type":"Person"/, 'editorial /: Person JSON-LD');
-    assert.match(html, /class="ed-band-item">University of Technology</, 'editorial /: affiliations band');
-    assert.match(html, /href="\/research#nlp"/, 'editorial /: research card links to its area');
     assert.match(
       html,
-      /Adaptive Fine-Tuning Strategies for Large Language Models in Low-Resource Domains · Fairness-Aware/,
-      'editorial /: card lists related papers by short title',
+      /class="ed-affil"[^>]*>[\s\S]*?University of Technology</,
+      'editorial /: affiliations in the hero',
+    );
+    assert.match(
+      html,
+      /<ol class="ed-topics">[\s\S]*?<h3 class="ed-topic-title"[^>]*>\s*<a href="\/research#nlp">/,
+      'editorial /: research row title links to its area',
+    );
+    assert.doesNotMatch(html, /class="ed-links"/, 'editorial /: profile links only in the contact band, not the hero');
+    assert.ok(
+      html.indexOf('id="home-papers"') < html.indexOf('class="ed-news"'),
+      'editorial /: selected papers come before news',
     );
     assert.match(html, /All 5 publications/, 'editorial /: publication count');
-    assert.match(html, /href="\/publications#smith2024adaptive"/, 'editorial /: Cite link');
+    assert.match(
+      html,
+      /<details class="ed-bib">\s*<summary class="ul">Cite<\/summary>[\s\S]*?data-bib-copy/,
+      'editorial /: Cite opens BibTeX in place',
+    );
+    assert.doesNotMatch(html, /href="\/publications#/, 'editorial /: Cite no longer links away');
     assert.match(html, /<strong>Jane Smith<\/strong>/, 'editorial /: owner bold in author lists');
-    assert.match(html, /class="ed-news-date num">2024</, 'editorial /: year-precision news date');
+    assert.match(
+      html,
+      /class="ed-news-date num">\s*<span aria-hidden="true">2024<\/span>\s*<span class="ed-sr-only">\s*In 2024\s*</,
+      'editorial /: year-precision news date',
+    );
     assert.match(html, /<footer class="ed-contact">/, 'editorial /: contact footer');
     assert.doesNotMatch(html, /astro-island/, 'editorial /: no framework islands');
   }
@@ -152,12 +182,12 @@ if (!STRUCTURAL) {
     const post = ed('blog/research-update-summer-2024/index.html');
     assert.match(
       post,
-      /<p class="ed-subtitle">Three papers, a toolkit release and two new lab members\.<\/p>/,
+      /<p class="ed-subtitle"[^>]*>\s*Three papers, a toolkit release and two new lab members\.\s*<\/p>/,
       'editorial post: subtitle',
     );
     assert.match(post, /<span class="ed-aside-label">Related paper<\/span>/, 'editorial post: related paper');
     assert.match(post, /\d+ min read/, 'editorial post: reading time');
-    assert.match(post, /<div class="ed-prose">/, 'editorial post: prose wrapper');
+    assert.match(post, /<div class="ed-prose"[^>]*>/, 'editorial post: prose wrapper');
     assert.match(post, /href="\/blog\/welcome-to-our-lab"/, 'editorial post: previous post link');
   }
 }

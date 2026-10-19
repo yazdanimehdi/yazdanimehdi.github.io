@@ -3,7 +3,9 @@ import type { CollectionEntry } from 'astro:content';
 import Layout from './Layout.astro';
 import { resolveImage } from '../../lib/content/image';
 import { imageFacts } from '../../lib/inkArt';
+import { getSiteConfig } from '../../lib/config';
 import { formatNewsDate } from '../../lib/utils';
+import { uiStrings } from '../../lib/ui-strings';
 import './timeline.css';
 
 interface Props {
@@ -18,6 +20,7 @@ interface Props {
 }
 
 const { title, description, heading, intro, items, categories, current } = Astro.props;
+const t = uiStrings(getSiteConfig());
 
 const rows = await Promise.all(
   items.map(async (entry) => {
@@ -39,7 +42,7 @@ for (const row of rows.filter((r) => !r.entry.data.pinned)) {
   years.set(year, [...(years.get(year) ?? []), row]);
 }
 const groups = [
-  ...(pinned.length ? [{ key: 'pinned', heading: 'Pinned', rows: pinned }] : []),
+  ...(pinned.length ? [{ key: 'pinned', heading: t('news.pinned'), rows: pinned }] : []),
   ...[...years].map(([year, rows]) => ({ key: String(year), heading: String(year), rows })),
 ];
 ---
@@ -53,10 +56,10 @@ const groups = [
 
     {
       categories.length > 0 && (
-        <nav class="ed-filterbar" aria-label="Filter news by category">
+        <nav class="ed-filterbar" aria-label={t('news.filterLabel')}>
           <div class="ed-tabs ed-tl-tabs">
             <a href="/news" class="ed-tab" aria-current={current ? undefined : 'page'}>
-              All
+              {t('filter.all')}
             </a>
             {categories.map((cat) => (
               <a href={`/news/category/${cat}`} class="ed-tab" aria-current={cat === current ? 'page' : undefined}>
@@ -68,7 +71,7 @@ const groups = [
       )
     }
 
-    {items.length === 0 && <p class="ed-tl-empty">No news yet.</p>}
+    {items.length === 0 && <p class="ed-tl-empty">{t('news.empty')}</p>}
 
     {
       groups.map((g) => (
@@ -80,13 +83,17 @@ const groups = [
             {g.rows.map(({ entry, thumb }) => (
               <li class="row ed-tl-row">
                 <time class="ed-tl-date num" datetime={entry.data.date.toISOString()}>
-                  {formatNewsDate(entry.data.date, entry.data.datePrecision)}
+                  {formatNewsDate(entry.data.date, entry.data.datePrecision, getSiteConfig().lang)}
                 </time>
                 <div class="ed-tl-body">
-                  <a href={`/news/${entry.id}`} class="ed-tl-title">
+                  <a href={`/news/${entry.id}`} class="ed-tl-title" dir="auto">
                     {entry.data.title}
                   </a>
-                  {entry.data.excerpt && <p class="ed-tl-excerpt">{entry.data.excerpt}</p>}
+                  {entry.data.excerpt && (
+                    <p class="ed-tl-excerpt" dir="auto">
+                      {entry.data.excerpt}
+                    </p>
+                  )}
                   <div class="ed-tl-meta">
                     <span class="ed-note">{entry.data.category}</span>
                   </div>

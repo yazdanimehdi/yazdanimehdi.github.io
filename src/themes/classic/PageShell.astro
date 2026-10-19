@@ -16,7 +16,8 @@ const { title, description, ogImage, keywords, fullWidth = false } = Astro.props
 ---
 
 <BaseLayout title={title} description={description} ogImage={ogImage} keywords={keywords}>
-  <div class="sticky top-0 z-40">
+  {/* Top bar and header stick together from md; on phones the wrapper dissolves and only the header sticks. */}
+  <div class="max-md:contents md:sticky md:top-0 md:z-40">
     <TopBar />
     <Header />
   </div>

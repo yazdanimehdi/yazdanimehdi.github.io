@@ -18,6 +18,9 @@ function handle(s: Sandbox): SandboxHandle {
     get status() {
       return s.status;
     },
+    get tags() {
+      return s.tags;
+    },
     run: (script, args = [], opts = {}) =>
       sdk(
         'a command',
@@ -41,6 +44,7 @@ function handle(s: Sandbox): SandboxHandle {
     readFile: (path) => sdk(`reading ${path}`, (signal) => s.readFileToBuffer({ path }, { signal })),
     writeFiles: (files) => sdk('writing files', (signal) => s.writeFiles(files, { signal })),
     domain: (port) => s.domain(port),
+    setTags: (tags) => sdk('tagging the session', (signal) => s.update({ tags }, { signal })),
     setNetworkPolicy: (networkPolicy) =>
       sdk('updating the network policy', (signal) => s.update({ networkPolicy }, { signal })),
     extendTimeout: (ms) => sdk('extending the session', (signal) => s.extendTimeout(ms, { signal })),

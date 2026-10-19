@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { TEXT_PROVIDERS, type TextProviderId } from '../ai/providers';
 import { getMode } from '../mode';
 import { readAiConfig } from './ai';
+import { defaultCommitMessage } from './editor-message';
 import { inEditorScope } from './editor-scope';
 import { GitHubStore, githubConfig, type GitHubConfig } from './github-store';
 import { HttpError, authorOf, commitChanges } from './http';
@@ -10,16 +11,25 @@ import { PostgresStore } from './postgres-store';
 import { vercelSandbox } from './sandbox';
 import { getSecret, missingKey, secretsDb } from './secrets';
 import type { SessionUser } from './session';
+import { adminSettings, canPublish } from './settings';
 import { ConflictError, UpstreamError, type Change, type CommitResult, type ContentStore } from './store';
 
 const SITE_DIR = '/vercel/site';
 const EDITOR_DIR = '/vercel/editor';
 const STATE_PATH = `${EDITOR_DIR}/state.json`;
+/** Where the agent writes its plain-language summary: outside the checkout, so it can never be published. */
+const SUMMARY_PATH = `${EDITOR_DIR}/summary.md`;
+const MAX_SUMMARY = 1500;
+/** Ends every publish commit's message: how Undo this publish tells an editor publish from any other commit. */
+export const EDITOR_TRAILER = 'Site-editor: publish';
 const PORT = 4321;
 const SESSION_TIMEOUT = 30 * 60_000;
 const MAX_PROMPT = 20_000;
 const MAX_DIFF = 200_000;
 const MAX_LOG = 100_000;
+/** The agent can write anything into these files, so they are read capped. */
+const MAX_STATE = 1_000_000;
+const MAX_SUMMARY_FILE = 8192;
 /** Postgres mode keeps every document (isDocumentPath) under these folders. */
 const DOC_DIRS = ['config', 'src/content', 'src/data'];
 /** The CLI must see a key to start; the sandbox firewall replaces the header carrying it with the real one. */
@@ -34,8 +44,11 @@ export interface EditorSession {
   provider: TextProviderId;
   model: string;
   runs: EditorRun[];
-  /** The last GitHub commit this session published, for the screen. */
-  published?: { id: string; url?: string; at: string };
+  /**
+   * The last GitHub commit this session published, for the screen. `undoable`: a publish of code alone, which Undo
+   * this publish covers; false for an undo itself and for a publish that also saved documents. Older sessions lack it.
+   */
+  published?: { id: string; url?: string; at: string; undoable?: boolean };
 }
 
 export interface EditorRun {
@@ -45,7 +58,11 @@ export interface EditorRun {
   finishedAt?: string;
   /** Missing on a finished run: it ended without one (the session stopped under it). */
   exitCode?: number;
+  /** Who asked: the session's login, and its display name (runs from before it was recorded have none). */
   by: string;
+  byName?: string;
+  /** The agent's own plain-language account of what it changed, when it gave one. */
+  summary?: string;
 }
 
 export interface ChangedFile {
@@ -54,6 +71,8 @@ export interface ChangedFile {
   binary: boolean;
   /** Inside the editor's scope (editor-scope.ts); one refused file blocks Publish. */
   allowed: boolean;
+  /** Postgres mode: Publish saves it to the database, so Undo this publish won't cover that publish. */
+  document?: boolean;
 }
 
 export type EditorStatus =
@@ -66,6 +85,8 @@ export type EditorStatus =
       provider: TextProviderId;
       model: string;
       run?: EditorRun & { running: boolean };
+      /** Every request since the last publish or discard, oldest first: what Publish would ship. */
+      requests: { prompt: string; summary?: string; by: string; byName?: string }[];
       published?: EditorSession['published'];
       log: string;
       files: ChangedFile[];
@@ -103,6 +124,9 @@ export interface SandboxHandle {
   stop(): Promise<void>;
   /** Stops it and deletes it with its files and snapshots. */
   delete(): Promise<void>;
+  /** Platform metadata, readable without waking a stopped sandbox; the agent inside can't change it. */
+  readonly tags?: Record<string, string>;
+  setTags(tags: Record<string, string>): Promise<void>;
 }
 
 export interface SandboxApi {
@@ -187,7 +211,7 @@ Rules:
 - Never touch the admin (src/admin), src/lib, integrations, config/ai.yml, package.json, the lockfile, build or deploy config, dot-files or secrets. Do not install dependencies. Do not commit.
 - Keep both the light and the dark theme working and text contrast at WCAG AA.
 - Run \`pnpm astro check\` before you finish and fix what it reports.
-- End with a short summary of what you changed.
+- When you finish, write two or three plain sentences for the site's owner, who is not a developer, saying what you changed and where it shows on the site. No headings, no code, file names only when they help. Save them to ${SUMMARY_PATH} (outside the site folder) and end your reply with the same sentences.
 
 The request:
 `;
@@ -228,12 +252,27 @@ exec ./node_modules/.bin/astro dev --host 0.0.0.0 --port "$1" --allowed-hosts > 
   sleep 1
 done
 tail -20 "$EDITOR/dev.log" >&2; exit 1`,
-  /** $1 run id, then the CLI's argv. The pid and exit files tell a running run from a finished or lost one. */
+  /**
+   * $1 run id, then the CLI's argv. The pid and exit files tell a running run from a finished or lost one. Job
+   * control puts the CLI in its own process group (.pgid), so Stop reaches whatever it started too.
+   */
   run: `d="$EDITOR/runs"; id=$1; shift
 echo $$ > "$d/$id.pid"
+rm -f "$EDITOR/summary.md"
 cd "$SITE"
-"$@" > "$d/$id.log" 2>&1 < /dev/null
-echo $? > "$d/$id.exit"`,
+set -m
+"$@" > "$d/$id.log" 2>&1 < /dev/null &
+echo $! > "$d/$id.pgid"
+wait $!
+s=$?
+mv -f "$EDITOR/summary.md" "$d/$id.summary" 2>/dev/null
+echo $s > "$d/$id.exit"`,
+  /** $1 run id: the wrapper first, so it never records an exit code, then the CLI's whole process group. */
+  stop: `d="$EDITOR/runs"
+kill -TERM "$(cat "$d/$1.pid" 2>/dev/null)" 2>/dev/null
+g=$(cat "$d/$1.pgid" 2>/dev/null)
+if [ -n "$g" ]; then kill -TERM -- "-$g" 2>/dev/null; sleep 1; kill -KILL -- "-$g" 2>/dev/null; fi
+exit 0`,
   runState: `d="$EDITOR/runs"
 if [ -f "$d/$1.exit" ]; then cat "$d/$1.exit"; elif kill -0 "$(cat "$d/$1.pid" 2>/dev/null)" 2>/dev/null; then echo running; else echo lost; fi`,
   /**
@@ -269,12 +308,25 @@ for p in "$@"; do git rev-parse -q --verify "$base:$p" || echo; done`,
 cd "$SITE"; base=$1; shift
 git ls-tree -r -z --name-only "$base" -- "$@"`,
   remove: `cd "$SITE"; rm -f -- "$@"`,
+  /** $1 base, then paths: each back to its state at base, or removed when base didn't have it. */
+  revert: `set -e
+${GIT}
+cd "$SITE"; base=$1; shift
+for p in "$@"; do
+  if git cat-file -e "$base:$p" 2>/dev/null; then git --literal-pathspecs checkout -q "$base" -- "$p"; else rm -f -- "$p"; fi
+done`,
   /** $1 base: the working tree back to it; ignored files (node_modules, .astro) stay. */
   discard: `set -e
 ${GIT}
 cd "$SITE"
 git reset -q --hard "$1"
 git clean -qfd`,
+  /** Empty when it doesn't exist; an oversize one arrives cut off, so it fails to parse like any corrupt one. */
+  state: `head -c ${MAX_STATE} "$EDITOR/state.json" 2>/dev/null; exit 0`,
+  /** $1 run id. */
+  summary: `head -c ${MAX_SUMMARY_FILE} "$EDITOR/runs/$1.summary" 2>/dev/null; exit 0`,
+  /** $1 run id. */
+  logTail: `tail -c ${MAX_LOG} "$EDITOR/runs/$1.log" 2>/dev/null; exit 0`,
 };
 
 // No system or user git config either: only the repository's, under the overrides in GIT.
@@ -339,6 +391,7 @@ export interface EditorContext extends EditorTarget {
   /** Postgres mode: the database documents are exported from and published to. */
   docs: ContentStore | null;
   by: string;
+  byName: string;
 }
 
 /** Everything Start and Run need; a missing provider key is a 400 naming it. */
@@ -355,7 +408,15 @@ export async function editorContext(store: ContentStore, user: SessionUser): Pro
     code: postgres ? new GitHubStore(target.github, authorOf(user)) : store,
     docs: postgres ? store : null,
     by: user.login,
+    byName: user.name || user.login,
   };
+}
+
+/** Publish and Undo this publish; every other editor action is shared by all admins, who share one session. */
+export function assertPublisher(user: SessionUser): void {
+  if (!canPublish(user, adminSettings())) {
+    throw new HttpError(403, 'Only the site’s publishers can publish. Your changes are saved for them to review.');
+  }
 }
 
 /**
@@ -386,12 +447,38 @@ const gitAuth = (token: string) => ({
 });
 
 async function readState(sb: SandboxHandle): Promise<EditorSession | null> {
-  const raw = await sb.readFile(STATE_PATH);
-  return raw ? (JSON.parse(raw.toString('utf8')) as EditorSession) : null;
+  const raw = await sh(sb, SCRIPTS.state);
+  return raw ? (JSON.parse(raw) as EditorSession) : null;
 }
 
 const writeState = (sb: SandboxHandle, state: EditorSession) =>
   sb.writeFiles([{ path: STATE_PATH, content: Buffer.from(JSON.stringify(state, null, 2)) }]);
+
+/** The sandbox tag naming who asked for the unpublished requests: the Dashboard's "waiting for review". */
+const REVIEW_TAG = 'review';
+
+/** Sets REVIEW_TAG from the session's requests; a failure only leaves the Dashboard behind, so it never fails a run. */
+async function tagReview(sb: SandboxHandle, state: EditorSession): Promise<void> {
+  // ponytail: tag value limits aren't documented; the first five names, URI-encoded, stay short and plain.
+  const names = [...new Set(state.runs.map((r) => r.byName || r.by))].slice(0, 5);
+  await sb
+    .setTags(names.length ? { [REVIEW_TAG]: names.map(encodeURIComponent).join(',') } : {})
+    .catch(() => undefined);
+}
+
+/**
+ * The Dashboard's Next up: who asked for changes not yet published, from the sandbox's tag, so one lookup that never
+ * wakes the sandbox. Empty when the editor can't run here or the lookup fails.
+ */
+export async function waitingForReview(): Promise<string[]> {
+  try {
+    const target = editorTarget();
+    const raw = (await target.api.get(target.name))?.tags?.[REVIEW_TAG];
+    return raw ? raw.split(',').map(decodeURIComponent) : [];
+  } catch {
+    return [];
+  }
+}
 
 /** A running sandbox with its state, or a 409 telling the admin to start one. */
 async function openSession(target: EditorTarget): Promise<{ sb: SandboxHandle; state: EditorSession }> {
@@ -462,7 +549,7 @@ export async function startSession(ctx: EditorContext): Promise<EditorStatus> {
     if (ctx.docs) ({ baseSha, docVersions } = await exportDocuments(sb, ctx.docs, baseSha));
     await writeState(sb, { baseSha, docVersions, provider: ctx.agent.provider, model: ctx.agent.model, runs: [] });
   }
-  // Closes GitHub after a clone; also how a key changed on the AI screen reaches a running session.
+  // Closes GitHub after a clone; also how a key changed on the Scholar & AI screen reaches a running session.
   await sb.setNetworkPolicy(networkPolicy(ctx.agent));
   const install = AGENTS[ctx.agent.provider].install;
   if (install) await sh(sb, install, [], { timeoutMs: 120_000 });
@@ -489,8 +576,42 @@ async function settleRun(sb: SandboxHandle, state: EditorSession): Promise<boole
   if (now === 'running') return false;
   last.finishedAt = new Date().toISOString();
   if (typeof now === 'number') last.exitCode = now;
+  if (now === 0) last.summary = await readSummary(sb, state.provider, last.id);
   await writeState(sb, state);
   return true;
+}
+
+/** The summary file the run left, else (Claude) its final message, which the preamble asks to be the same text. */
+async function readSummary(sb: SandboxHandle, provider: TextProviderId, id: string): Promise<string | undefined> {
+  const file = await sh(sb, SCRIPTS.summary, [id]);
+  if (file) return cleanSummary(file);
+  if (provider !== 'anthropic') return undefined;
+  const log = await sh(sb, SCRIPTS.logTail, [id]);
+  return log ? cleanSummary(finalMessage(log)) : undefined;
+}
+
+/** Trimmed, at most two newlines in a row, capped; undefined when nothing is left. */
+export function cleanSummary(text: string | undefined): string | undefined {
+  const clean = (text ?? '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  if (!clean) return undefined;
+  return clean.length > MAX_SUMMARY ? `${clean.slice(0, MAX_SUMMARY - 1).trimEnd()}…` : clean;
+}
+
+/** Claude's stream-json: the text of the last successful result event. */
+export function finalMessage(raw: string): string | undefined {
+  for (const line of raw.split('\n').reverse()) {
+    if (!line.startsWith('{')) continue;
+    try {
+      const event = JSON.parse(line);
+      if (event?.type === 'result') return event.is_error ? undefined : String(event.result ?? '');
+    } catch {
+      // the tail can start mid-event
+    }
+  }
+  return undefined;
 }
 
 const isRunning = (state: EditorSession) => {
@@ -516,11 +637,13 @@ export async function startRun(ctx: EditorContext, prompt: unknown): Promise<Edi
     prompt: prompt.trim(),
     startedAt: new Date().toISOString(),
     by: ctx.by,
+    byName: ctx.byName,
   };
   state.runs.push(run);
   state.provider = ctx.agent.provider;
   state.model = ctx.agent.model;
   await writeState(sb, state);
+  await tagReview(sb, state);
   await sb.spawn(SCRIPTS.run, [run.id, ...agent.cli(ctx.agent.model, PREAMBLE + run.prompt, resume)], {
     ...SCRIPT_ENV,
     ...agent.env,
@@ -604,9 +727,10 @@ export async function sessionStatus(target: EditorTarget, blocked?: string): Pro
     provider: state.provider,
     model: state.model,
     run: last && { ...last, running: !last.finishedAt },
+    requests: state.runs.map((r) => ({ prompt: r.prompt, summary: r.summary, by: r.by, byName: r.byName })),
     published: state.published,
     log: renderLog(state.provider, log),
-    files,
+    files: getMode() === 'postgres' ? files.map((f) => ({ ...f, document: isDocumentPath(f.path) })) : files,
     diff: diff.slice(0, MAX_DIFF),
     diffTruncated: diff.length > MAX_DIFF,
   };
@@ -641,8 +765,40 @@ export async function discardChanges(ctx: EditorContext): Promise<EditorStatus> 
   if (ctx.docs) Object.assign(state, await exportDocuments(sb, ctx.docs, state.baseSha));
   state.runs = [];
   await writeState(sb, state);
+  await tagReview(sb, state);
   await restartDevServer(sb);
   return sessionStatus(ctx);
+}
+
+/**
+ * Stop: ends the running agent and whatever it started; what it changed so far stays, like any finished run. Needs
+ * no provider key, so a run can be stopped after its key was removed.
+ */
+export async function stopRun(target: EditorTarget): Promise<EditorStatus> {
+  const { sb, state } = await openSession(target);
+  const last = state.runs.at(-1);
+  if (last && !last.finishedAt && (await runState(sb, last.id)) === 'running') {
+    await sh(sb, SCRIPTS.stop, [last.id]);
+    last.finishedAt = new Date().toISOString();
+    await writeState(sb, state);
+    await restartDevServer(sb);
+  }
+  return sessionStatus(target);
+}
+
+/** Revert one changed file to the session's base, so one refused file doesn't cost the rest of the changes. */
+export async function revertFile(target: EditorTarget, path: unknown): Promise<EditorStatus> {
+  const { sb, state } = await openSession(target);
+  await settleRun(sb, state);
+  if (isRunning(state)) throw new HttpError(409, 'A change is running: wait for it to finish');
+  const { files } = await changes(sb, state.baseSha);
+  // Only a path git itself listed: anything else could name a file outside the checkout.
+  if (typeof path !== 'string' || !files.some((f) => f.path === path)) {
+    throw new HttpError(400, 'That file has no change to undo');
+  }
+  await sh(sb, SCRIPTS.revert, [state.baseSha, path]);
+  await restartDevServer(sb);
+  return sessionStatus(target);
 }
 
 /** Text when the bytes are UTF-8 without NULs, base64 otherwise. */
@@ -697,10 +853,7 @@ export async function publish(ctx: EditorContext, message?: unknown): Promise<Pu
   const code = all.filter((c) => !docs.includes(c));
   // commitChanges checks these again, but by then the code commit would already be live.
   for (const c of docs) assertAllowed(c.path);
-  const first = state.runs[0]?.prompt.replace(/\s+/g, ' ') ?? 'changes';
-  const text =
-    (typeof message === 'string' && message.trim()) ||
-    `Site editor: ${first.length > 72 ? `${first.slice(0, 71)}…` : first}`;
+  const text = (typeof message === 'string' && message.trim()) || defaultCommitMessage(state.runs.map((r) => r.prompt));
 
   const result: PublishResult = {};
   if (code.length) {
@@ -709,12 +862,12 @@ export async function publish(ctx: EditorContext, message?: unknown): Promise<Pu
     const base = Object.fromEntries(paths.map((p, i) => [p, shas[i]?.trim() || null]));
     let commit: CommitResult;
     try {
-      commit = await ctx.code.commit(code, text, base);
+      commit = await ctx.code.commit(code, `${text}\n\n${EDITOR_TRAILER}`, base);
     } catch (e) {
       throw e instanceof ConflictError ? drift(e.path) : e;
     }
     result.commit = { id: commit.id, url: commit.url };
-    state.published = { ...result.commit, at: new Date().toISOString() };
+    state.published = { ...result.commit, at: new Date().toISOString(), undoable: docs.length === 0 };
     // The tree already holds what was published: a local commit is the next base, with no fetch and no token.
     state.baseSha = await advance(sb, state.baseSha, text, paths);
     await writeState(sb, state);
@@ -749,7 +902,84 @@ export async function publish(ctx: EditorContext, message?: unknown): Promise<Pu
   }
   state.runs = [];
   await writeState(sb, state);
+  await tagReview(sb, state);
   return result;
+}
+
+/** GitHub's side of Undo this publish (GitHubStore); the editor's code store in both modes. */
+interface Reverter {
+  revertChanges(sha: string): Promise<{ message: string; changes: Change[]; base: Record<string, string | null> }>;
+  latestCommitWith(trailer: string): Promise<string | null>;
+}
+
+/**
+ * Undo this publish: commits the files of publish commit `sha` back to their state before it, through the same
+ * commit path and base check as Publish. `sha` comes from the admin's browser (Publish returned it), and the file
+ * list and old contents from GitHub. The sandbox's state.json, which the agent can write, is only a first filter:
+ * GitHub must also name `sha` as the branch's newest editor publish, so a forged older publish id is refused.
+ * Also refused unless the commit touches only files the editor may publish, and no later commit touched them.
+ */
+export async function undoPublish(ctx: EditorContext, sha: unknown): Promise<EditorStatus> {
+  if (typeof sha !== 'string' || !/^[0-9a-f]{1,64}$/.test(sha)) throw new HttpError(400, 'Say which publish to undo');
+  const { sb, state } = await openSession(ctx);
+  await settleRun(sb, state);
+  if (isRunning(state)) throw new HttpError(409, 'A change is running: wait for it to finish');
+  if (state.published?.id !== sha) {
+    throw new HttpError(
+      409,
+      'Only the last publish from this screen can be undone: ask for the change back and publish again',
+    );
+  }
+  if ((await changes(sb, state.baseSha)).files.length) {
+    throw new HttpError(409, 'Publish or discard the current changes first, then undo the last publish');
+  }
+  if (!('revertChanges' in ctx.code)) throw new HttpError(400, 'Undo needs the site’s GitHub repository');
+  const github = ctx.code as ContentStore & Reverter;
+  if ((await github.latestCommitWith(EDITOR_TRAILER)) !== sha) {
+    throw new HttpError(
+      409,
+      'Only the last publish from the Site editor can be undone: ask for the change back and publish again',
+    );
+  }
+  const target = await github.revertChanges(sha);
+  const outside = target.changes.map((c) => c.path).filter((p) => !inEditorScope(p) || (ctx.docs && isDocumentPath(p)));
+  if (outside.length) {
+    throw new HttpError(
+      409,
+      `That publish changed files the Site editor may not change (${outside.join(', ')}), so it can’t be undone here`,
+      outside,
+    );
+  }
+  const message = `Undo: ${target.message.split('\n')[0]}`;
+  let commit: CommitResult;
+  try {
+    commit = await ctx.code.commit(target.changes, message, target.base);
+  } catch (e) {
+    if (!(e instanceof ConflictError)) throw e;
+    throw new HttpError(
+      409,
+      `This publish can’t be undone here: ${e.path} changed on GitHub after it. Ask for the change back and publish again`,
+      { path: e.path },
+    );
+  }
+  // The sandbox follows with GitHub's contents, so the next publish starts from what is live.
+  const paths = target.changes.map((c) => c.path);
+  const kept = target.changes.filter((c) => c.content !== null);
+  if (kept.length) {
+    await sb.writeFiles(
+      kept.map((c) => ({
+        path: `${SITE_DIR}/${c.path}`,
+        content: Buffer.from(c.content!, c.encoding === 'base64' ? 'base64' : 'utf8'),
+      })),
+    );
+  }
+  const gone = target.changes.filter((c) => c.content === null).map((c) => c.path);
+  if (gone.length) await sh(sb, SCRIPTS.remove, gone);
+  state.published = { id: commit.id, url: commit.url, at: new Date().toISOString(), undoable: false };
+  state.baseSha = await advance(sb, state.baseSha, message, paths);
+  await writeState(sb, state);
+  await restartDevServer(sb);
+  return sessionStatus(ctx);
 }
 
 /** End: stops the sandbox; its filesystem is kept and the next Start resumes it. */

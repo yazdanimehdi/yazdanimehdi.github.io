@@ -122,8 +122,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <AdminShell :ctx="ctx" active="ai" title="AI">
-    <section class="adm-form" aria-labelledby="adm-keys">
+  <AdminShell :ctx="ctx" active="ai" title="Scholar & AI">
+    <section id="keys" class="adm-form" aria-labelledby="adm-keys">
       <h2 id="adm-keys" class="adm-h2">API keys</h2>
       <p class="adm-muted">
         <template v-if="editable">
@@ -210,7 +210,7 @@ onMounted(() => {
       </div>
     </fieldset>
 
-    <fieldset class="adm-group">
+    <fieldset id="scholar" class="adm-group">
       <legend>Papers from Google Scholar</legend>
       <DocBanners
         :draft="!!scholar.draft"

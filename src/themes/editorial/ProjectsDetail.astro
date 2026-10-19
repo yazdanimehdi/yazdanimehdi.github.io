@@ -4,9 +4,10 @@ import EntryBody from '../../components/astro/EntryBody.astro';
 import ProseEnhancements from '../../components/astro/ProseEnhancements.astro';
 import Layout from './Layout.astro';
 import { getSiteConfig } from '../../lib/config';
-import { resolveImage } from '../../lib/content/image';
+import { COVER_SIZES, resolveCover } from '../../lib/content/image';
 import { isInkArt } from '../../lib/inkArt';
 import { formatNewsDate, getRoleName } from '../../lib/utils';
+import { uiStrings } from '../../lib/ui-strings';
 import './projects.css';
 
 interface Props {
@@ -17,52 +18,76 @@ interface Props {
 
 const { project, team, ogImage } = Astro.props;
 const { data } = project;
-const label = getSiteConfig().nav.find((n) => n.href === '/projects')?.label ?? 'Projects';
+const config = getSiteConfig();
+const t = uiStrings(config);
+const label = config.nav.find((n) => n.href === '/projects')?.label ?? t('projects.title');
 const cover = data.image;
-const coverSrc = cover ? (await resolveImage(cover, 1360)).src : undefined;
+const coverImg = cover ? await resolveCover(cover) : undefined;
 const coverInk = await isInkArt(cover);
-const coverSize = cover && typeof cover !== 'string' ? { width: cover.width, height: cover.height } : {};
 
-const start = data.startDate && formatNewsDate(data.startDate, 'year');
-const end = data.endDate && formatNewsDate(data.endDate, 'year');
-const years = start && end ? (start === end ? start : `${start}–${end}`) : start ? `Since ${start}` : end;
+const start = data.startDate && formatNewsDate(data.startDate, 'year', config.lang);
+const end = data.endDate && formatNewsDate(data.endDate, 'year', config.lang);
+const years =
+  start && end ? (start === end ? start : `${start}–${end}`) : start ? t('projects.since', { year: start }) : end;
 const links = [
-  { label: 'Website', href: data.url },
-  { label: 'Code', href: data.repoUrl },
-  { label: 'Paper', href: data.paperUrl },
+  { label: t('projects.website'), href: data.url },
+  { label: t('paper.code'), href: data.repoUrl },
+  { label: t('paper.paper'), href: data.paperUrl },
 ].filter((l) => l.href);
 ---
 
 <Layout title={data.title} description={data.excerpt} ogImage={ogImage}>
   <article class="ed-article">
-    <a href="/projects" class="ed-back">← {label}</a>
+    <a href="/projects" class="ed-back"><span class="arr" aria-hidden="true">←</span> {label}</a>
     <header class="ed-article-head">
-      <h1 class="ed-article-title">{data.title}</h1>
-      {data.excerpt && <p class="ed-subtitle">{data.excerpt}</p>}
-      {data.tags && data.tags.length > 0 && <p class="ed-meta">{data.tags.join(' · ')}</p>}
+      <h1 class="ed-article-title" dir="auto">{data.title}</h1>
+      {
+        data.excerpt && (
+          <p class="ed-subtitle" dir="auto">
+            {data.excerpt}
+          </p>
+        )
+      }
+      {
+        data.tags && data.tags.length > 0 && (
+          <p class="ed-meta" dir="auto">
+            {data.tags.join(' · ')}
+          </p>
+        )
+      }
     </header>
 
     {
-      coverSrc && (
+      coverImg && (
         <figure class="ed-cover ed-figure-box">
-          <img src={coverSrc} alt="" {...coverSize} class:list={[coverInk && 'ed-ink']} decoding="async" />
+          <img
+            src={coverImg.src}
+            srcset={coverImg.srcset}
+            sizes={COVER_SIZES}
+            alt=""
+            width={coverImg.width}
+            height={coverImg.height}
+            class:list={[coverInk && 'ed-ink']}
+            fetchpriority="high"
+            decoding="async"
+          />
         </figure>
       )
     }
 
     <dl class="ed-pj-facts">
       <div>
-        <dt>Status</dt>
+        <dt>{t('projects.status')}</dt>
         <dd class="ed-pj-cap">{data.status}</dd>
       </div>
       <div>
-        <dt>Type</dt>
+        <dt>{t('projects.type')}</dt>
         <dd class="ed-pj-cap">{data.type}</dd>
       </div>
       {
         years && (
           <div>
-            <dt>Years</dt>
+            <dt>{t('projects.years')}</dt>
             <dd class="num">{years}</dd>
           </div>
         )
@@ -70,15 +95,17 @@ const links = [
       {
         team.length > 0 && (
           <div>
-            <dt>Team</dt>
+            <dt>{t('projects.team')}</dt>
             <dd>
               <ul class="ed-pj-team">
                 {team.map((m) => (
                   <li>
-                    <a href={`/people/${m.id}`} class="ul">
+                    <a href={`/people/${m.id}`} class="ul" dir="auto">
                       {m.data.name}
                     </a>{' '}
-                    <span class="ed-pj-role">{m.data.title || getRoleName(m.data.role)}</span>
+                    <span class="ed-pj-role" dir="auto">
+                      {m.data.title || getRoleName(m.data.role)}
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -89,7 +116,7 @@ const links = [
       {
         links.length > 0 && (
           <div>
-            <dt>Links</dt>
+            <dt>{t('projects.links')}</dt>
             <dd class="ed-pj-links">
               {links.map((l) => (
                 <a href={l.href} class="ul" rel="noopener noreferrer">
@@ -97,6 +124,7 @@ const links = [
                   <span class="arr" aria-hidden="true">
                     ↗
                   </span>
+                  <span class="ed-sr-only">{t('link.external')}</span>
                 </a>
               ))}
             </dd>
@@ -105,7 +133,7 @@ const links = [
       }
     </dl>
 
-    <div class="ed-prose"><EntryBody entry={project} /></div>
+    <div class="ed-prose" dir="auto"><EntryBody entry={project} /></div>
     <ProseEnhancements />
   </article>
 </Layout>

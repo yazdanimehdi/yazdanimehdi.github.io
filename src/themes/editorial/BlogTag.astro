@@ -3,6 +3,7 @@ import type { CollectionEntry } from 'astro:content';
 import Layout from './Layout.astro';
 import { getSiteConfig } from '../../lib/config';
 import { formatNewsDate, readingTime } from '../../lib/utils';
+import { uiStrings } from '../../lib/ui-strings';
 
 interface Props {
   tag: string;
@@ -11,23 +12,26 @@ interface Props {
 }
 
 const { tag, posts } = Astro.props;
-const label = getSiteConfig().nav.find((n) => n.href === '/blog')?.label ?? 'Writing';
-const count = `${posts.length} post${posts.length !== 1 ? 's' : ''}`;
+const config = getSiteConfig();
+const t = uiStrings(config);
+const label = config.nav.find((n) => n.href === '/blog')?.label ?? t('home.writing');
+const count = t(posts.length === 1 ? 'tag.countOne' : 'tag.count', { n: posts.length });
+const intro = t('tag.intro', { tag }).split(/(\{count\})/);
 ---
 
-<Layout title={`Posts tagged "${tag}"`} description={`Blog posts tagged with "${tag}".`}>
+<Layout title={t('tag.title', { tag })} description={t('tag.description', { tag })}>
   <div class="ed-wrap ed-main ed-main--narrow">
-    <a href="/blog" class="ed-back">← {label}</a>
+    <a href="/blog" class="ed-back"><span class="arr" aria-hidden="true">←</span> {label}</a>
     <div class="ed-stack">
-      <h1 class="ed-h1">Posts tagged “{tag}”</h1>
-      <p class="ed-intro"><span class="num">{count}</span> tagged with “{tag}”.</p>
+      <h1 class="ed-h1">{t('tag.heading', { tag })}</h1>
+      <p class="ed-intro">{intro.map((part) => (part === '{count}' ? <span class="num">{count}</span> : part))}</p>
     </div>
 
     <ol class="ed-entries">
       {
         posts.map((post) => {
-          const date = formatNewsDate(post.data.date, 'month');
-          const meta = `${date} · ${readingTime(post.body ?? '')} min read`;
+          const date = formatNewsDate(post.data.date, 'month', config.lang);
+          const meta = `${date} · ${t('post.minutes', { n: readingTime(post.body ?? '') })}`;
           return (
             <li class="ed-entry">
               <div class="ed-entry-tile" aria-hidden="true">
@@ -35,10 +39,14 @@ const count = `${posts.length} post${posts.length !== 1 ? 's' : ''}`;
                 <span class="ed-entry-date num">{date}</span>
               </div>
               <div class="ed-entry-body">
-                <a href={`/blog/${post.id}`} class="ed-entry-title">
+                <a href={`/blog/${post.id}`} class="ed-entry-title" dir="auto">
                   {post.data.title}
                 </a>
-                {post.data.excerpt && <p class="ed-entry-excerpt">{post.data.excerpt}</p>}
+                {post.data.excerpt && (
+                  <p class="ed-entry-excerpt" dir="auto">
+                    {post.data.excerpt}
+                  </p>
+                )}
                 <span class="ed-entry-meta num">{meta}</span>
               </div>
             </li>

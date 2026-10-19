@@ -2,6 +2,8 @@
 import PageLayout from '../../layouts/PageLayout.astro';
 import ProjectCard from '../../components/astro/ProjectCard.astro';
 import PublicationEntry from '../../components/astro/PublicationEntry.astro';
+import SectionHeading from '../../components/astro/SectionHeading.astro';
+import { normalizeAreas } from '../../lib/editorial';
 import type { CollectionEntry } from 'astro:content';
 
 interface Props {
@@ -31,15 +33,11 @@ const { personal, projects, publications, researchAreas, researchDescription } =
 
   <!-- Research Areas -->
   <section class="mb-10">
-    <h2
-      class="mb-4 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading"
-    >
-      Research Areas
-    </h2>
-    <div class="space-y-6">
+    <SectionHeading title="Research Areas" />
+    <div class="mt-4 space-y-6">
       {
-        researchAreas.map((area) => (
-          <div class="border-b border-surface-100 pb-5 last:border-0 dark:border-dm-border">
+        normalizeAreas(researchAreas).map((area) => (
+          <div id={area.id} class="scroll-mt-20 border-b border-surface-100 pb-5 last:border-0 dark:border-dm-border">
             <h3 class="mb-1 text-base font-medium text-surface-900 dark:text-dm-heading">{area.title}</h3>
             <p class="mb-2 text-sm text-surface-600 dark:text-dm-muted">{area.description}</p>
             {area.tags && area.tags.length > 0 && (
@@ -59,15 +57,8 @@ const { personal, projects, publications, researchAreas, researchDescription } =
 
   <!-- Current Projects -->
   <section class="mb-10">
-    <h2
-      class="mb-4 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading"
-    >
-      Current Projects
-      <a href="/projects" class="float-right font-sans text-xs text-primary-600 hover:underline dark:text-accent-400"
-        >View all &rarr;</a
-      >
-    </h2>
-    <div class="space-y-3">
+    <SectionHeading title="Current Projects" viewAllHref="/projects" />
+    <div class="mt-4 space-y-3">
       {
         projects.map((p) => (
           <ProjectCard
@@ -87,16 +78,8 @@ const { personal, projects, publications, researchAreas, researchDescription } =
 
   <!-- Key Publications -->
   <section>
-    <h2
-      class="mb-4 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading"
-    >
-      Key Publications
-      <a
-        href="/publications"
-        class="float-right font-sans text-xs text-primary-600 hover:underline dark:text-accent-400">View all &rarr;</a
-      >
-    </h2>
-    <div class="space-y-3">
+    <SectionHeading title="Key Publications" viewAllHref="/publications" />
+    <div class="mt-4 space-y-3">
       {
         publications.map((pub) => (
           <PublicationEntry

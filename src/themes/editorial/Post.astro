@@ -5,19 +5,20 @@ import SEO from '../../components/astro/SEO.astro';
 import ProseEnhancements from '../../components/astro/ProseEnhancements.astro';
 import { paperLink } from '../../lib/editorial';
 import { formatNewsDate } from '../../lib/utils';
-import { resolveImage } from '../../lib/content/image';
+import { uiStrings } from '../../lib/ui-strings';
+import { COVER_SIZES, resolveCover } from '../../lib/content/image';
 import { isInkArt } from '../../lib/inkArt';
 import type { PostData } from './data';
 
 type Props = PostData & { ogImage?: string };
 
 const { config, post, author, minutes, related, newer, older, ogImage } = Astro.props;
-const label = config.nav.find((n) => n.href === '/blog')?.label ?? 'Writing';
+const t = uiStrings(config);
+const label = config.nav.find((n) => n.href === '/blog')?.label ?? t('home.writing');
 const tags = post.data.tags ?? [];
 const cover = post.data.coverImage;
-const coverSrc = cover ? (await resolveImage(cover, 1360)).src : undefined;
+const coverImg = cover ? await resolveCover(cover) : undefined;
 const coverInk = await isInkArt(cover);
-const coverSize = cover && typeof cover !== 'string' ? { width: cover.width, height: cover.height } : {};
 ---
 
 <Layout title={post.data.title} description={post.data.excerpt} ogImage={ogImage} keywords={post.data.keywords}>
@@ -30,43 +31,86 @@ const coverSize = cover && typeof cover !== 'string' ? { width: cover.width, hei
     keywords={post.data.keywords}
   />
   <article class="ed-article">
-    <a href="/blog" class="ed-back">← {label}</a>
+    <a href="/blog" class="ed-back"><span class="arr" aria-hidden="true">←</span> {label}</a>
     <header class="ed-article-head">
-      <h1 class="ed-article-title">{post.data.title}</h1>
-      {post.data.subtitle && <p class="ed-subtitle">{post.data.subtitle}</p>}
+      <h1 class="ed-article-title" dir="auto">{post.data.title}</h1>
+      {
+        post.data.subtitle && (
+          <p class="ed-subtitle" dir="auto">
+            {post.data.subtitle}
+          </p>
+        )
+      }
       <span class="ed-byline">
-        {author} · <time datetime={post.data.date.toISOString()}>{formatNewsDate(post.data.date, 'day')}</time> · {
-          minutes
-        } min read{tags.length > 0 && ` · ${tags.join(', ')}`}
+        <span dir="auto">{author}</span> · <time datetime={post.data.date.toISOString()}
+          >{formatNewsDate(post.data.date, 'day', config.lang)}</time
+        > · {t('post.minutes', { n: minutes })}{
+          tags.length > 0 && (
+            <>
+              {' · '}
+              <span dir="auto">{tags.join(', ')}</span>
+            </>
+          )
+        }
       </span>
     </header>
 
     {
-      coverSrc && (
+      coverImg && (
         <figure class="ed-cover ed-figure-box">
-          <img src={coverSrc} alt="" {...coverSize} class:list={[coverInk && 'ed-ink']} decoding="async" />
+          <img
+            src={coverImg.src}
+            srcset={coverImg.srcset}
+            sizes={COVER_SIZES}
+            alt=""
+            width={coverImg.width}
+            height={coverImg.height}
+            class:list={[coverInk && 'ed-ink']}
+            fetchpriority="high"
+            decoding="async"
+          />
         </figure>
       )
     }
 
-    <div class="ed-prose"><EntryBody entry={post} /></div>
+    <div class="ed-prose" dir="auto"><EntryBody entry={post} /></div>
     <ProseEnhancements />
 
     {
       related && (
         <div class="ed-aside">
-          <span class="ed-aside-label">Related paper</span>
-          <a href={paperLink(related.data) ?? `/publications#${related.id}`}>{related.data.title}</a>
-          <span class="ed-aside-venue">{related.data.venue}</span>
+          <span class="ed-aside-label">{t('post.relatedPaper')}</span>
+          <a href={paperLink(related.data) ?? `/publications#${related.id}`} dir="auto">
+            {related.data.title}
+          </a>
+          <span class="ed-aside-venue" dir="auto">
+            {related.data.venue}
+          </span>
         </div>
       )
     }
 
     {
       (older || newer) && (
-        <nav class="ed-pager" aria-label="More posts">
-          {older ? <a href={`/blog/${older.id}`}>← {older.data.title}</a> : <span />}
-          {newer && <a href={`/blog/${newer.id}`}>{newer.data.title} →</a>}
+        <nav class="ed-pager" aria-label={t('post.morePosts')}>
+          {older ? (
+            <a href={`/blog/${older.id}`}>
+              <span class="arr" aria-hidden="true">
+                ←
+              </span>{' '}
+              <span dir="auto">{older.data.title}</span>
+            </a>
+          ) : (
+            <span />
+          )}
+          {newer && (
+            <a href={`/blog/${newer.id}`}>
+              <span dir="auto">{newer.data.title}</span>{' '}
+              <span class="arr" aria-hidden="true">
+                →
+              </span>
+            </a>
+          )}
         </nav>
       )
     }

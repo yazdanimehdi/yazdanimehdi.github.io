@@ -6,7 +6,12 @@ import { pgliteSql } from './pglite-sql';
 
 test('migrate creates the tables once; a second run applies nothing', async () => {
   const sql = pgliteSql();
-  assert.deepEqual(await migrate(sql), ['001_init.sql', '002_admin_users.sql', '003_secrets.sql']);
+  assert.deepEqual(await migrate(sql), [
+    '001_init.sql',
+    '002_admin_users.sql',
+    '003_secrets.sql',
+    '004_login_attempts_ip.sql',
+  ]);
   assert.deepEqual(await migrate(sql), []);
   await sql`insert into documents (path, content) values ('config/site.yml', 'title: A')`;
   const [row] = await sql<{ version: number; updated_by: string | null }>`select version, updated_by from documents`;

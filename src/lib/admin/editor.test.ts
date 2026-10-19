@@ -5,14 +5,20 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  EDITOR_TRAILER,
   SCRIPTS,
+  cleanSummary,
   discardChanges,
+  finalMessage,
   endSession,
   publish,
+  revertFile,
   sessionStatus,
   startRun,
+  stopRun,
   startOver,
   startSession,
+  undoPublish,
   type CommandResult,
   type EditorContext,
   type EditorStatus,
@@ -100,6 +106,11 @@ class LocalSandbox implements SandboxHandle {
     this.policies.push(policy);
   }
 
+  tags?: Record<string, string>;
+  async setTags(tags: Record<string, string>) {
+    this.tags = tags;
+  }
+
   async extendTimeout() {
     this.extended++;
   }
@@ -153,6 +164,19 @@ function codeStore(order: string[] = []) {
   const store = {
     commits,
     fail: null as Error | null,
+    /** GitHub's answer to revertChanges, per commit id; the message defaults to the recorded commit's. */
+    reverts: {} as Record<string, { changes: Change[]; base: Record<string, string | null>; message?: string }>,
+    async revertChanges(sha: string) {
+      const r = store.reverts[sha];
+      const c = commits[Number(sha.slice(1)) - 1];
+      if (!r || !c) throw new UpstreamError(`Commit ${sha} is not in jane/site.`, 404);
+      return { message: r.message ?? c.message, changes: r.changes, base: r.base };
+    },
+    /** GitHub's newest commit carrying `trailer`, from the commits recorded so far. */
+    async latestCommitWith(trailer: string) {
+      const i = commits.findLastIndex((c) => c.message.split('\n').includes(trailer));
+      return i === -1 ? null : `c${i + 1}`;
+    },
     async commit(changes: Change[], message: string, base: Record<string, string | null>) {
       order.push('code');
       if (store.fail) throw store.fail;
@@ -206,7 +230,8 @@ beforeEach(() => {
 
 afterEach(() => {
   process.env.PATH = savedPath;
-  fs.rmSync(root, { recursive: true, force: true });
+  // Runs a test left going may still be writing their exit file.
+  fs.rmSync(root, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
 });
 
 function context(over: Partial<EditorContext> = {}): EditorContext {
@@ -218,6 +243,7 @@ function context(over: Partial<EditorContext> = {}): EditorContext {
     code: code as unknown as ContentStore,
     docs: null,
     by: 'jane',
+    byName: 'Jane',
     ...over,
   };
 }
@@ -376,9 +402,10 @@ second line; touch pwned3`;
   await sessionStatus(c);
   assert.equal(sb.called(SCRIPTS.dev).length, devBefore + 1, 'only once');
 
-  await startRun(c, 'next');
+  const next = await startRun(c, 'next');
   const [, second] = sb.calls.filter((x) => x.script === SCRIPTS.run);
   assert.ok(second.args.includes('--continue'), 'later runs continue the conversation');
+  await until(() => fs.existsSync(path.join(root, `vm/editor/runs/${next.id}.exit`)));
 });
 
 test('a run still starts when the plan won’t extend the session any further', async () => {
@@ -430,7 +457,7 @@ test('git mode: publish is one commit of every change, based on the blobs the se
   assert.deepEqual(result.commit, { id: 'c1', url: 'https://github.com/jane/site/commit/c1' });
   assert.equal(code.commits.length, 1);
   const [{ changes, message, base }] = code.commits;
-  assert.equal(message, 'Site editor: Make the header say v2 and add a logo');
+  assert.equal(message, `Site editor: Make the header say v2 and add a logo\n\n${EDITOR_TRAILER}`);
   const byPath = Object.fromEntries(changes.map((ch) => [ch.path, ch]));
   assert.deepEqual(Object.keys(byPath).sort(), [
     'config/site.yml',
@@ -509,6 +536,7 @@ test('Postgres mode: code is committed to GitHub first, then documents to the da
   assert.equal((await docs.read('config/site.yml'))?.content, 'title: edited\n');
   assert.equal(state().docVersions['config/site.yml'], gitBlobSha('title: edited\n'));
   assert.deepEqual(ready(await sessionStatus(c)).files, []);
+  assert.equal(state().published?.undoable, false, 'undo covers code alone, so a publish with content offers none');
 
   write(site(), { 'src/components/Header.astro': 'header v3\n', 'config/site.yml': 'title: again\n' });
   docsFail = new UpstreamError('The database is unreachable. Try again in a moment.', 503);
@@ -531,6 +559,8 @@ test('discard drops every change and goes back to the base, without touching the
   const c = context();
   await startSession(c);
   await finishedRun(c, 'something');
+  await finishedRun(context({ by: 'priya', byName: 'Priya Rao, PhD' }), 'something else');
+  assert.deepEqual(api.sandbox!.tags, { review: 'Jane,Priya%20Rao%2C%20PhD' }, 'who asked, for the Dashboard');
   write(site(), { 'src/components/Header.astro': 'header v2\n', 'src/components/Extra.astro': 'x\n' });
   fs.rmSync(site('public/remove-me.txt'));
   const base = state().baseSha;
@@ -543,6 +573,74 @@ test('discard drops every change and goes back to the base, without touching the
   assert.ok(fs.existsSync(site('public/remove-me.txt')) && !fs.existsSync(site('src/components/Extra.astro')));
   assert.equal(state().baseSha, base);
   assert.equal(api.sandbox!.policies.length, policies, 'the network policy is untouched');
+  assert.deepEqual(api.sandbox!.tags, {}, 'nothing waits for review');
+});
+
+test('stop ends the agent and what it started, keeps its changes, and lets the next run start', async () => {
+  const c = context();
+  await startSession(c);
+  const sb = api.sandbox!;
+  fakeClaude();
+  const child = path.join(root, 'child-alive');
+  // The fake agent starts a grandchild that touches a file every 50 ms: it must stop too.
+  fs.writeFileSync(
+    path.join(root, 'bin', 'claude'),
+    `#!/bin/sh\necho 'header v2' > src/components/Header.astro\n(while true; do touch "${child}"; sleep 0.05; done) &\nwhile true; do sleep 0.05; done\n`,
+    { mode: 0o755 },
+  );
+  const run = await startRun(c, 'Make the header say v2');
+  await until(() => fs.existsSync(child));
+  assert.equal(ready(await sessionStatus(c)).run?.running, true);
+  const devBefore = sb.called(SCRIPTS.dev).length;
+
+  const s = ready(await stopRun(c));
+  assert.equal(s.run?.running, false);
+  assert.equal(s.run?.exitCode, undefined, 'a stopped run has no exit code');
+  assert.deepEqual(s.requests, [{ prompt: 'Make the header say v2', summary: undefined, by: 'jane', byName: 'Jane' }]);
+  assert.deepEqual(
+    s.files.map((f) => f.path),
+    ['src/components/Header.astro'],
+    'what it changed so far stays',
+  );
+  assert.equal(sb.called(SCRIPTS.dev).length, devBefore + 1, 'the preview restarts');
+  fs.rmSync(child, { force: true });
+  await new Promise((r) => setTimeout(r, 300));
+  assert.ok(!fs.existsSync(child), 'the agent’s own child process stopped');
+  assert.ok(!fs.existsSync(path.join(root, `vm/editor/runs/${run.id}.exit`)), 'no exit code is recorded');
+
+  ready(await stopRun(c));
+  assert.equal(state().runs.length, 1, 'stopping twice is harmless');
+  fakeClaude(false);
+  assert.ok((await startRun(c, 'next')).id, 'a new run can start');
+});
+
+test('revert undoes one file, added, modified or deleted, and keeps the rest; only listed paths', async () => {
+  const c = context();
+  await startSession(c);
+  write(site(), {
+    'src/components/Header.astro': 'header v2\n',
+    'src/admin/x.ts': 'hacked\n',
+    'src/pages/new.astro': 'new\n',
+  });
+  fs.rmSync(site('public/remove-me.txt'));
+  const paths = (s: EditorStatus) => ready(s).files.map((f) => f.path);
+
+  assert.deepEqual(paths(await revertFile(c, 'src/admin/x.ts')), [
+    'public/remove-me.txt',
+    'src/components/Header.astro',
+    'src/pages/new.astro',
+  ]);
+  assert.equal(fs.readFileSync(site('src/admin/x.ts'), 'utf8'), 'admin\n');
+  await revertFile(c, 'src/pages/new.astro');
+  assert.ok(!fs.existsSync(site('src/pages/new.astro')), 'an added file is removed');
+  assert.deepEqual(paths(await revertFile(c, 'public/remove-me.txt')), ['src/components/Header.astro']);
+  assert.equal(fs.readFileSync(site('public/remove-me.txt'), 'utf8'), 'bye\n', 'a deleted file is back');
+
+  fs.writeFileSync(path.join(root, 'outside.txt'), 'keep');
+  for (const bad of ['../outside.txt', 'package.json', 42]) {
+    await assert.rejects(revertFile(c, bad), (e: HttpError) => e.status === 400, String(bad));
+  }
+  assert.ok(fs.existsSync(path.join(root, 'outside.txt')));
 });
 
 test('start over deletes the sandbox and clones the live branch into a new one', async () => {
@@ -593,6 +691,7 @@ test('the GitHub token enters a sandbox only for its first clone, and GitHub clo
   for (const policy of api.all.flatMap((sb) => sb.policies)) assert.equal(policy.allow['github.com'], undefined);
   assert.deepEqual(state().published?.id, result.commit?.id, 'the published commit is recorded');
   assert.equal(ready(await sessionStatus(c)).published?.url, 'https://github.com/jane/site/commit/c1');
+  assert.equal(ready(await sessionStatus(c)).published?.undoable, true, 'a reload still offers Undo this publish');
 });
 
 test('git config the agent planted does not run inside the editor’s own git commands', async () => {
@@ -632,4 +731,224 @@ test('end stops the sandbox and keeps it for the next start', async () => {
   assert.deepEqual(await sessionStatus(c), { state: 'stopped', blocked: undefined });
   ready(await startSession(c));
   assert.equal(api.sandbox!.called(SCRIPTS.clone).length, 1);
+});
+
+/** A fake `claude` that runs `body` (sh) in the checkout and exits with `code`. */
+function fakeAgent(body: string, code = 0) {
+  fakeClaude(false);
+  fs.writeFileSync(path.join(root, 'bin', 'claude'), `#!/bin/sh\n${body}\nexit ${code}\n`, { mode: 0o755 });
+}
+
+async function runToEnd(c: EditorContext, prompt: string) {
+  const run = await startRun(c, prompt);
+  await until(() => fs.existsSync(path.join(root, `vm/editor/runs/${run.id}.exit`)));
+  return ready(await sessionStatus(c));
+}
+
+test('the agent’s summary file becomes the request’s “what changed”, and never shows up as a change', async () => {
+  const c = context();
+  await startSession(c);
+  fakeAgent(`echo 'header v2' > src/components/Header.astro
+printf '\\n  The header now says v2.\\r\\n\\n\\n\\nIt shows on every page.  \\n' > "$EDITOR/summary.md"`);
+  const s = await runToEnd(c, 'Make the header say v2');
+  assert.deepEqual(s.requests, [
+    {
+      prompt: 'Make the header say v2',
+      summary: 'The header now says v2.\n\nIt shows on every page.',
+      by: 'jane',
+      byName: 'Jane',
+    },
+  ]);
+  assert.deepEqual(
+    s.files.map((f) => f.path),
+    ['src/components/Header.astro'],
+  );
+  assert.ok(!fs.existsSync(path.join(root, 'vm/editor/summary.md')), 'moved next to its run');
+
+  fakeAgent(`echo '{"type":"result","is_error":false,"result":"Made the footer smaller."}'`);
+  const second = await runToEnd(c, 'Smaller footer');
+  assert.equal(second.requests[1].summary, 'Made the footer smaller.', 'no file: Claude’s final message');
+  assert.equal(second.requests[0].summary, 'The header now says v2.\n\nIt shows on every page.', 'kept per run');
+
+  fakeAgent(`printf 'stale' > "$EDITOR/summary.md"`, 1);
+  const failed = await runToEnd(c, 'Break something');
+  assert.equal(failed.run?.exitCode, 1);
+  assert.equal(failed.requests[2].summary, undefined, 'a failed run has no summary');
+  fakeAgent('true');
+  assert.equal((await runToEnd(c, 'Nothing')).requests[3].summary, undefined, 'and a stale file is never reused');
+});
+
+test('the agent-writable state, summary and log are read capped; an oversize state.json is corrupt', async () => {
+  const c = context();
+  await startSession(c);
+  const sb = api.sandbox!;
+  sb.readFile = async (p: string) => assert.fail(`read ${p} uncapped`);
+  fakeAgent(`head -c 20000 /dev/zero | tr '\\0' a > "$EDITOR/summary.md"`);
+  const s = await runToEnd(c, 'Long summary');
+  assert.match(s.requests[0].summary!, /^a+…$/);
+  fakeAgent(`echo '{"type":"result","is_error":false,"result":"From the log."}'`);
+  assert.equal((await runToEnd(c, 'No file')).requests[1].summary, 'From the log.');
+
+  fs.writeFileSync(path.join(root, 'vm/editor/state.json'), JSON.stringify({ ...state(), pad: 'x'.repeat(1_000_000) }));
+  await assert.rejects(sessionStatus(c), SyntaxError);
+});
+
+test('summary helpers: the last successful result, trimmed and capped', () => {
+  const log = [
+    '{"type":"assistant","message":{"content":[]}}',
+    '{"type":"result","is_error":false,"result":"first"}',
+    'not json',
+    '{"type":"result","is_error":false,"result":"  Changed the header.  "}',
+  ].join('\n');
+  assert.equal(cleanSummary(finalMessage(log)), 'Changed the header.');
+  assert.equal(finalMessage('{"type":"result","is_error":true,"result":"boom"}'), undefined);
+  assert.equal(finalMessage('{"type":"res'), undefined, 'a cut-off event is skipped');
+  assert.equal(cleanSummary('   \n '), undefined);
+  assert.equal(cleanSummary(undefined), undefined);
+  const long = cleanSummary('x'.repeat(5000))!;
+  assert.equal(long.length, 1500);
+  assert.ok(long.endsWith('…'));
+});
+
+const b64 = (text: string) => ({ content: Buffer.from(text).toString('base64'), encoding: 'base64' as const });
+
+/** Publishes header v2, a new file and a deletion as c1, and tells the fake GitHub how c1 reverts. */
+async function publishedC1(c: EditorContext) {
+  await startSession(c);
+  write(site(), { 'src/components/Header.astro': 'header v2\n', 'src/components/New.astro': 'new\n' });
+  fs.rmSync(site('public/remove-me.txt'));
+  await publish(c, 'Site editor: header v2');
+  code.reverts.c1 = {
+    changes: [
+      { path: 'src/components/Header.astro', ...b64('header v1\n') },
+      { path: 'src/components/New.astro', content: null },
+      { path: 'public/remove-me.txt', ...b64('bye\n') },
+    ],
+    base: {
+      'src/components/Header.astro': gitBlobSha('header v2\n'),
+      'src/components/New.astro': gitBlobSha('new\n'),
+      'public/remove-me.txt': null,
+    },
+  };
+}
+
+test('undo this publish commits GitHub’s own revert of the publish, and the sandbox follows', async () => {
+  const c = context();
+  await publishedC1(c);
+
+  const s = ready(await undoPublish(c, 'c1'));
+  assert.equal(code.commits.length, 2);
+  const [, { changes, message, base }] = code.commits;
+  assert.equal(message, 'Undo: Site editor: header v2');
+  assert.deepEqual(changes, code.reverts.c1.changes);
+  assert.deepEqual(base, code.reverts.c1.base);
+  assert.deepEqual(s.files, [], 'the undo is the new base');
+  assert.equal(fs.readFileSync(site('src/components/Header.astro'), 'utf8'), 'header v1\n');
+  assert.equal(fs.readFileSync(site('public/remove-me.txt'), 'utf8'), 'bye\n');
+  assert.ok(!fs.existsSync(site('src/components/New.astro')));
+  assert.equal(s.published?.id, 'c2');
+  assert.equal(s.published?.undoable, false, 'the screen offers no undo of an undo');
+
+  await assert.rejects(
+    undoPublish(c, 'c1'),
+    (e: HttpError) => e.status === 409 && /Only the last publish/.test(e.message),
+  );
+  code.reverts.c2 = { changes: [], base: {} };
+  await assert.rejects(
+    undoPublish(c, 'c2'),
+    (e: HttpError) => e.status === 409 && /Only the last publish from the Site editor/.test(e.message),
+    'an undo carries no trailer, so it can’t be undone again',
+  );
+  assert.equal(code.commits.length, 2);
+});
+
+test('undo this publish refuses a bad id, unpublished changes, and files GitHub changed since', async () => {
+  const c = context();
+  await startSession(c);
+  await assert.rejects(undoPublish(c, 'c1'), (e: HttpError) => e.status === 409);
+  await assert.rejects(undoPublish(c, 42), (e: HttpError) => e.status === 400);
+  await assert.rejects(undoPublish(c, '../x'), (e: HttpError) => e.status === 400);
+  await endSession(c);
+  await publishedC1(c);
+
+  write(site(), { 'src/pages/index.astro': 'index v2\n' });
+  await assert.rejects(
+    undoPublish(c, 'c1'),
+    (e: HttpError) => e.status === 409 && /Publish or discard/.test(e.message),
+  );
+  await discardChanges(c);
+
+  code.fail = new ConflictError('src/components/Header.astro');
+  await assert.rejects(undoPublish(c, 'c1'), (e: HttpError) => {
+    assert.equal(e.status, 409);
+    assert.match(e.message, /src\/components\/Header\.astro changed on GitHub after it/);
+    return true;
+  });
+  assert.deepEqual(ready(await sessionStatus(c)).files, [], 'the sandbox is left as published');
+  assert.equal(fs.readFileSync(site('src/components/Header.astro'), 'utf8'), 'header v2\n');
+  code.fail = null;
+  assert.equal(ready(await undoPublish(c, 'c1')).published?.id, 'c2', 'undoable once GitHub allows it');
+});
+
+test('undo this publish takes nothing from the sandbox’s state: a tampered state.json can’t widen or forge it', async () => {
+  const c = context();
+  await publishedC1(c);
+  // What a run could plant: a local commit with a hacked admin file, named as the undo's source, plus extra paths.
+  write(site(), { 'src/admin/x.ts': 'hacked\n', 'src/components/Header.astro': 'forged\n' });
+  git(site(), 'add', '-A');
+  git(site(), '-c', 'user.name=x', '-c', 'user.email=x@x', 'commit', '-q', '-m', 'forged');
+  const forged = git(site(), 'rev-parse', 'HEAD').trim();
+  git(site(), 'reset', '-q', '--hard', state().baseSha);
+  const tampered = state();
+  tampered.published.undo = { paths: ['src/admin/x.ts', 'package.json'], before: forged, message: 'x' };
+  fs.writeFileSync(path.join(root, 'vm/editor/state.json'), JSON.stringify(tampered));
+
+  await undoPublish(c, 'c1');
+  assert.deepEqual(code.commits[1].changes, code.reverts.c1.changes, 'only GitHub’s files, with GitHub’s contents');
+  assert.equal(fs.readFileSync(site('src/admin/x.ts'), 'utf8'), 'admin\n');
+  assert.equal(fs.readFileSync(site('src/components/Header.astro'), 'utf8'), 'header v1\n');
+
+  const other = state();
+  other.published.id = 'c0ffee';
+  fs.writeFileSync(path.join(root, 'vm/editor/state.json'), JSON.stringify(other));
+  await assert.rejects(undoPublish(c, 'c2'), (e: HttpError) => e.status === 409, 'a forged publish id is refused');
+  await assert.rejects(
+    undoPublish(c, 'c0ffee'),
+    (e: HttpError) => e.status === 409,
+    'and GitHub doesn’t name it as the last publish',
+  );
+  assert.equal(code.commits.length, 2);
+});
+
+test('undo this publish refuses a publish commit that touched files the editor may not change', async () => {
+  const c = context();
+  await publishedC1(c);
+  code.reverts.c1.changes.push({ path: 'src/admin/x.ts', ...b64('admin\n') }, { path: 'package.json', ...b64('{}') });
+  await assert.rejects(undoPublish(c, 'c1'), (e: HttpError) => {
+    assert.equal(e.status, 409);
+    assert.deepEqual(e.details, ['src/admin/x.ts', 'package.json']);
+    return true;
+  });
+  code.reverts.c1.changes.splice(-2);
+  code.commits[0].message = 'Site editor: header v2';
+  await assert.rejects(undoPublish(c, 'c1'), (e: HttpError) => e.status === 409, 'no trailer, no undo');
+  assert.equal(code.commits.length, 1);
+});
+
+test('undo this publish refuses an older publish that a tampered state.json names as the last one', async () => {
+  const c = context();
+  await publishedC1(c);
+  write(site(), { 'src/pages/index.astro': 'index v2\n' });
+  await publish(c, 'Site editor: index v2');
+  assert.equal(state().published.id, 'c2');
+  const forged = state();
+  forged.published.id = 'c1';
+  fs.writeFileSync(path.join(root, 'vm/editor/state.json'), JSON.stringify(forged));
+
+  await assert.rejects(
+    undoPublish(c, 'c1'),
+    (e: HttpError) => e.status === 409 && /Only the last publish from the Site editor/.test(e.message),
+    'GitHub’s newest editor publish is c2',
+  );
+  assert.equal(code.commits.length, 2, 'nothing reverted');
 });

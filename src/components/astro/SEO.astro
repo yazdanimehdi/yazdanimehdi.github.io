@@ -1,5 +1,6 @@
 ---
 import { getSiteConfig, isPersonalMode, getSiteName } from '../../lib/config';
+import { jsonLd as serializeJsonLd } from '../../lib/editorial';
 
 interface Props {
   type?: 'website' | 'article' | 'blogPost' | 'profile';
@@ -70,7 +71,7 @@ if (type === 'website') {
     Object.assign(jsonLd, {
       '@type': 'Person',
       name: config.author,
-      jobTitle: config.title,
+      jobTitle: config.editorial?.eyebrow || config.title,
       description: config.description,
       url: config.siteUrl,
       sameAs: sameAs.length > 0 ? sameAs : undefined,
@@ -131,5 +132,5 @@ if (type === 'website') {
 }
 ---
 
-<script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
-<script type="application/ld+json" set:html={JSON.stringify(breadcrumbLd)} />
+<script type="application/ld+json" set:html={serializeJsonLd(jsonLd)} />
+<script type="application/ld+json" set:html={serializeJsonLd(breadcrumbLd)} />

@@ -1,21 +1,85 @@
 ---
 import type { CollectionEntry } from 'astro:content';
+import { getSiteConfig } from '../../lib/config';
+import { resolveImage } from '../../lib/content/image';
+import { imageFacts } from '../../lib/inkArt';
 import { formatNewsDate } from '../../lib/utils';
+import { uiStrings } from '../../lib/ui-strings';
 
 interface Props {
   items: CollectionEntry<'announcements'>[];
 }
 
 const { items } = Astro.props;
+const config = getSiteConfig();
+const t = uiStrings(config);
+// The first item leads with its plate and excerpt when it has an image; the rest stay date rows.
+const first = items[0];
+const lead = first?.data.image
+  ? {
+      entry: first,
+      src: (await resolveImage(first.data.image, 480)).src,
+      ink: (await imageFacts(first.data.image)).ink,
+    }
+  : null;
+// Every row carries a small plate too: the item's own image or its category's built-in art.
+const rows = await Promise.all(
+  (lead ? items.slice(1) : items).map(async (n) => ({
+    n,
+    thumb: n.data.image
+      ? { src: (await resolveImage(n.data.image, 128)).src, ink: (await imageFacts(n.data.image)).ink }
+      : undefined,
+  })),
+);
 ---
 
-<ul class="ed-news">
-  {
-    items.map((n) => (
-      <li>
-        <span class="ed-news-date num">{formatNewsDate(n.data.date, n.data.datePrecision)}</span>
-        <span class="ed-news-text">{n.data.title}</span>
-      </li>
-    ))
-  }
-</ul>
+{
+  lead && (
+    <a href={`/news/${lead.entry.id}`} class="ed-news-lead">
+      <span class="ed-news-plate" aria-hidden="true">
+        <img src={lead.src} alt="" class:list={[lead.ink && 'ed-ink']} decoding="async" loading="lazy" />
+      </span>
+      <span class="ed-news-lead-body">
+        <span class="ed-news-lead-date num">
+          {formatNewsDate(lead.entry.data.date, lead.entry.data.datePrecision, config.lang)}
+        </span>
+        <span class="ed-news-lead-title" dir="auto">
+          {lead.entry.data.title}
+        </span>
+        {lead.entry.data.excerpt && (
+          <span class="ed-news-lead-excerpt" dir="auto">
+            {lead.entry.data.excerpt}
+          </span>
+        )}
+      </span>
+    </a>
+  )
+}
+{
+  rows.length > 0 && (
+    <ul class="ed-news">
+      {rows.map(({ n, thumb }) => (
+        <li>
+          {thumb && (
+            <span class="ed-news-plate ed-news-plate--row" aria-hidden="true">
+              <img src={thumb.src} alt="" class:list={[thumb.ink && 'ed-ink']} decoding="async" loading="lazy" />
+            </span>
+          )}
+          {n.data.datePrecision === 'year' ? (
+            <span class="ed-news-date num">
+              <span aria-hidden="true">{formatNewsDate(n.data.date, 'year', config.lang)}</span>
+              <span class="ed-sr-only">
+                {t('news.yearOnly', { year: formatNewsDate(n.data.date, 'year', config.lang) })}
+              </span>
+            </span>
+          ) : (
+            <span class="ed-news-date num">{formatNewsDate(n.data.date, n.data.datePrecision, config.lang)}</span>
+          )}
+          <a href={`/news/${n.id}`} class="ed-news-text" dir="auto">
+            {n.data.title}
+          </a>
+        </li>
+      ))}
+    </ul>
+  )
+}

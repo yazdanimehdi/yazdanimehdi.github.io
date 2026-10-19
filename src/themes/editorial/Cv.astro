@@ -1,23 +1,29 @@
 ---
 import Layout from './Layout.astro';
 import type { CvPageData } from './data';
-import { slugify } from '../../lib/utils';
+import { formatMonthYear, slugify } from '../../lib/utils';
+import { getSiteConfig } from '../../lib/config';
+import { uiStrings } from '../../lib/ui-strings';
 
 type Props = CvPageData;
 
 const { name, sections, pdfHref, updated } = Astro.props;
+const config = getSiteConfig();
+const t = uiStrings(config);
 ---
 
-<Layout title="CV" description={`Curriculum Vitae of ${name}`}>
+<Layout title={t('cv.title')} description={t('cv.description', { name })}>
   <div class="ed-wrap ed-main ed-main--narrow ed-main--flush">
     <div class="ed-cv-head">
       <div class="ed-stack">
-        <h1 class="ed-cv-title">Curriculum Vitae</h1>
-        <p class="ed-meta">{name}</p>
+        <h1 class="ed-cv-title">{t('cv.heading')}</h1>
+        <p class="ed-meta" dir="auto">{name}</p>
         {
           updated && (
             <span class="ed-cv-updated">
-              Updated {updated.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })}
+              {t('cv.updated', {
+                date: formatMonthYear(updated, config.lang),
+              })}
             </span>
           )
         }
@@ -25,7 +31,7 @@ const { name, sections, pdfHref, updated } = Astro.props;
       {
         pdfHref && (
           <a href={pdfHref} class="ed-btn-outline" download="cv.pdf">
-            Download PDF
+            {t('cv.download')}
           </a>
         )
       }
@@ -39,14 +45,20 @@ const { name, sections, pdfHref, updated } = Astro.props;
             {s.entries.map((e) => (
               <div class="ed-cv-entry">
                 <div class="ed-cv-entry-top">
-                  <span class="ed-cv-entry-title">{e.title}</span>
+                  <span class="ed-cv-entry-title" dir="auto">
+                    {e.title}
+                  </span>
                   {e.when && <span class="ed-cv-when num">{e.when}</span>}
                 </div>
-                {e.org && <span class="ed-cv-org">{e.org}</span>}
+                {e.org && (
+                  <span class="ed-cv-org" dir="auto">
+                    {e.org}
+                  </span>
+                )}
                 {e.points.length > 0 && (
                   <ul class="ed-cv-points">
                     {e.points.map((p) => (
-                      <li>{p}</li>
+                      <li dir="auto">{p}</li>
                     ))}
                   </ul>
                 )}

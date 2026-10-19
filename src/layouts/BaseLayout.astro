@@ -6,6 +6,7 @@ import DarkModeScript from '../components/astro/DarkModeScript.astro';
 import { ClientRouter } from 'astro:transitions';
 import { getSiteConfig, getTheme } from '../lib/config';
 import { editorialAccentCss, generateColorOverrides } from '../lib/colors';
+import { uiStrings } from '../lib/ui-strings';
 
 interface Props {
   title: string;
@@ -30,6 +31,7 @@ const colorCSS = generateColorOverrides(config) + (theme === 'editorial' ? edito
   class="scroll-smooth motion-reduce:scroll-auto"
   data-default-theme={defaultTheme}
   data-theme={theme}
+  data-night={theme === 'editorial' ? config.editorial?.night : undefined}
 >
   <head>
     <BaseHead title={title} description={description} ogImage={ogImage} keywords={keywords} />
@@ -38,7 +40,7 @@ const colorCSS = generateColorOverrides(config) + (theme === 'editorial' ? edito
     <DarkModeScript />
   </head>
   <body class="flex min-h-screen flex-col">
-    <a href="#main-content" class="skip-link">Skip to main content</a>
+    <a href="#main-content" class="skip-link">{uiStrings(config)('a11y.skip')}</a>
     <slot />
     <Analytics />
     {config.cookieConsent && <CookieConsent />}

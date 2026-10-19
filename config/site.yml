@@ -8,6 +8,14 @@ siteMode: 'personal'
 lang: 'en' # BCP 47 language tag (e.g. "en", "fa", "ar", "zh")
 direction: 'ltr' # "ltr" (left-to-right) or "rtl" (right-to-left)
 
+# Interface text for both themes, by string id (see src/lib/ui-strings.ts for every id and its English default).
+# Set only what you want to change, e.g. to translate a site whose `lang` has no built-in table.
+# ui:
+#   home.viewPublications: 'View publications'
+#   home.allPublications: 'All {count} publications'
+#   contact.heading: 'Get in touch'
+#   about.personal: 'Biography' # classic: the About heading on a personal site
+
 # Default theme when no user preference is saved
 defaultTheme: 'light' # "light" | "dark" | "system"
 
@@ -15,9 +23,16 @@ defaultTheme: 'light' # "light" | "dark" | "system"
 # Build-time override: SCHOLAROS_THEME=classic pnpm build
 theme: 'journal'
 
-# Journal theme content (ignored by the classic theme). Name, email and links come from
-# author/socials below. Without `figure` the home hero is a single column.
+# Built-in picture for news items that have no image of their own, one per category (paper, grant, award, talk,
+# media, general). Unset follows the theme: journal → "ink" line plates, classic → "geometric".
+# newsArt: 'ink' # "ink" | "engraving" | "watercolor" | "geometric"
+
+# Journal theme content. Name, email and links come from author/socials below. Without `figure` the
+# home hero is a single column. The classic hero also reads eyebrow (personal role) and tagline,
+# and its closing block reads contact.
 editorial:
+  # night: 'lamplight' # dark-mode palette: "lamplight" (default) | "inkwell" | "galley"
+  # labRole: 'Department of Computer Science · University of Technology' # lab mode's line under the name; default: department · university
   eyebrow: 'Associate Professor · Computer Science'
   tagline: 'Language technology that works for every language, and that people can trust.'
   bio: 'I lead the Smith Research Lab at the **University of Technology**, where we study natural language processing, multimodal learning and AI safety. Before that I was an assistant professor at **Previous University**.'
@@ -32,8 +47,12 @@ editorial:
   contact:
     heading: 'Interested in collaborating?'
     text: 'I am open to research collaborations, talks and conversations about language technology and AI safety.'
+    # links: # optional onward links in the home contact band, e.g. for prospective students
+    #   - label: 'Prospective students'
+    #     href: '/join'
 
-# Top bar (thin bar above header)
+# Top bar (thin bar above header, classic theme). `links` show on lab sites only; a personal
+# site's bar carries just `text`.
 topBar:
   enabled: true
   text: 'Department of Computer Science, University of Technology'
@@ -61,6 +80,9 @@ hero:
   animation:
     preset: 'wave-lines' # "particles" | "gradient-morph" | "geometric" | "wave-lines" | "custom"
     customScript: '' # path to JS file in /public (when preset: "custom")
+  # portrait: # optional photo beside the classic hero text
+  #   image: '/images/portrait.jpg'
+  #   alt: 'Jane Smith'
 
 # Typography
 fonts:
@@ -82,7 +104,8 @@ colors:
     primary: '#1f3c88'
     secondary: '#06b6d4'
   dark:
-    primary: '#22d3ee'
+    # primary: unset, so the journal uses its night blue and classic its cyan. A journal accent set here
+    # is lifted until it reads at 4.5:1 on the chosen night palette (editorial.night).
     secondary: '#2c5282'
 
 # Page background
@@ -100,9 +123,10 @@ imageShape: 'rectangular' # "rectangular" | "circular" | "oval"
 # About section (shown on homepage between hero and content grid)
 about:
   enabled: true
-  title: 'About Our Lab'
+  title: 'About Our Lab' # lab sites; personal sites use the `about.personal` ui string ("About")
   text: 'We are a multidisciplinary research group dedicated to advancing the frontiers of computer science and artificial intelligence. Our work spans natural language processing, computer vision, and human–computer interaction, with a focus on building systems that are robust, interpretable, and socially responsible.'
   image: '' # optional photo shown beside the text, e.g. '/images/about.jpg' (put the file in public/images/)
+  # imageAlt: 'The lab at the 2025 retreat' # describe the photo; unset means decorative
 
 # Homepage section order and visibility
 # Drag to reorder in the CMS; set enabled: false to hide a section
@@ -134,6 +158,8 @@ nav:
     href: '/people'
   - label: 'Publications'
     href: '/publications'
+  - label: 'CV'
+    href: '/cv'
   - label: 'Projects'
     href: '/projects'
   - label: 'News'
@@ -204,6 +230,10 @@ adminPath: 'admin'
 
 adminUsers:
   - 'janesmith'
+
+# Who can publish from the Site editor: GitHub usernames like adminUsers, or 'password:<username>' for a password
+# account (Postgres mode). Other admins can still ask for changes, which wait for a publisher. Empty: every admin.
+publishers: []
 
 # GDPR cookie consent banner
 cookieConsent: false

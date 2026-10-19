@@ -28,6 +28,21 @@ test('every config file in the repo passes its admin schema', () => {
   }
 });
 
+test('site: editorial.night takes the three palette ids or empty, nothing else', () => {
+  const site = (night: unknown) =>
+    configSchemas.site.safeParse({ siteMode: 'personal', title: 'T', author: 'A', editorial: { night } });
+  for (const night of ['lamplight', 'inkwell', 'galley', '', undefined]) assert.ok(site(night).success, String(night));
+  assert.equal(site('neon').success, false);
+});
+
+test('site: editorial.labRole is optional text', () => {
+  const site = (labRole: unknown) =>
+    configSchemas.site.safeParse({ siteMode: 'lab', title: 'T', author: 'A', editorial: { labRole } });
+  for (const labRole of ['Department of CS · University', '', undefined])
+    assert.ok(site(labRole).success, String(labRole));
+  assert.equal(site(42).success, false);
+});
+
 test('cv entries: RenderCV shapes and the visible flag pass, unknown shapes fail', () => {
   const ok = (entry: unknown) => cvSchema.safeParse({ cv: { name: 'N', sections: { s: [entry] } } }).success;
   assert.ok(ok({ institution: 'U', area: 'CS', visible: false }));

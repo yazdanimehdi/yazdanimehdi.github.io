@@ -14,6 +14,12 @@ defineProps<{ ctx: AdminCtx }>();
 
 const HOME: FieldDef[] = [
   text('editorial.eyebrow', 'Eyebrow'),
+  {
+    key: 'editorial.labRole',
+    label: 'Lab role line (lab sites)',
+    type: 'text',
+    hint: 'Shown under the lab name. Leave empty to use department · university.',
+  },
   { key: 'editorial.tagline', label: 'Tagline', type: 'textarea' },
   { key: 'editorial.bio', label: 'Bio', type: 'markdown' },
   { key: 'editorial.figure.image', label: 'Figure image', type: 'image', folder: 'site' },

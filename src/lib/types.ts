@@ -1,3 +1,5 @@
+import type { NightPalette } from './colors';
+
 export interface NavItem {
   label: string;
   href: string;
@@ -70,6 +72,10 @@ export type SiteDirection = 'ltr' | 'rtl';
 export type DefaultTheme = 'light' | 'dark' | 'system';
 
 export type ThemeName = 'classic' | 'editorial';
+
+/** Style of the built-in news category art (src/assets/images/news-art/<style>/<category>.webp). */
+export const NEWS_ART_STYLES = ['ink', 'engraving', 'watercolor', 'geometric'] as const;
+export type NewsArtStyle = (typeof NEWS_ART_STYLES)[number];
 
 export type ImageShape = 'rectangular' | 'circular' | 'oval';
 
@@ -173,12 +179,16 @@ export interface EditorialFigure {
 
 export interface EditorialConfig {
   eyebrow?: string;
+  /** Lab mode's role line under the hero name; unset, it reads department · university. */
+  labRole?: string;
   tagline?: string;
   /** Markdown */
   bio?: string;
   figure?: EditorialFigure;
   affiliations?: string[];
   contact?: { heading?: string; text?: string };
+  /** Dark-mode palette: 'lamplight' (default), 'inkwell' or 'galley'. */
+  night?: NightPalette;
 }
 
 export interface SiteConfig {
@@ -195,6 +205,8 @@ export interface SiteConfig {
   lang?: string;
   direction?: SiteDirection;
   defaultTheme?: DefaultTheme;
+  /** Normalized by getSiteConfig: unset follows the theme (journal → ink, classic → geometric). */
+  newsArt?: NewsArtStyle;
   nav: NavItem[];
   socials: SocialLinks;
   footer: FooterConfig;
@@ -214,6 +226,7 @@ export interface SiteConfig {
   background?: BackgroundConfig;
   adminPath?: string;
   adminUsers?: string[];
+  publishers?: string[];
 }
 
 export interface Publication {

@@ -59,3 +59,18 @@ test('syncFeeds: one failing feed is reported, all failing throws, none configur
   await assert.rejects(syncFeeds(config, [], fetcher({})), /All 2 feed\(s\) failed/);
   await assert.rejects(syncFeeds({ feeds: [] }, [], fetcher({})), /No feeds configured/);
 });
+
+test('syncFeeds: drops items whose link is not http(s), such as javascript:', async () => {
+  const feed = rss(
+    `<item><title>Evil</title><link>javascript:alert(document.cookie)</link></item>` +
+      `<item><title>Data</title><link>data:text/html,hi</link></item>` +
+      `<item><title>Upper</title><link>HTTPS://ex.com/up</link></item>` +
+      `<item><title>Fine</title><link>https://ex.com/fine</link></item>`,
+  );
+  const { items } = await syncFeeds(
+    { feeds: [{ name: 'B', url: 'https://ex.com/feed' }] },
+    [],
+    fetcher({ 'https://ex.com/feed': feed }),
+  );
+  assert.deepEqual(items.map((i) => i.title).sort(), ['Fine', 'Upper']);
+});

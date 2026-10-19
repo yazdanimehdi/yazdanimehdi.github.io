@@ -7,6 +7,8 @@ import EntryBody from '../../components/astro/EntryBody.astro';
 import ObfuscatedEmail from '../../components/astro/ObfuscatedEmail.astro';
 import { isOwner, paperLink, socialLinks } from '../../lib/editorial';
 import { getRoleName } from '../../lib/utils';
+import { getSiteConfig } from '../../lib/config';
+import { uiStrings } from '../../lib/ui-strings';
 import './people.css';
 
 interface Props {
@@ -18,6 +20,7 @@ interface Props {
 }
 
 const { person, publications, projects, cvInfo, ogImage } = Astro.props;
+const t = uiStrings(getSiteConfig());
 const d = person.data;
 const roleName = getRoleName(d.role);
 const meta = [...new Set([d.title, roleName].filter(Boolean))].join(' · ');
@@ -29,19 +32,19 @@ const hasBio = person.body?.trim() !== '';
 <Layout title={d.name} description={`${d.name} - ${roleName}`} ogImage={ogImage}>
   <SEO type="profile" title={d.name} />
   <div class="ed-wrap ed-main">
-    <a href="/people" class="ed-back">← All people</a>
+    <a href="/people" class="ed-back"><span class="arr" aria-hidden="true">←</span> {t('person.allPeople')}</a>
     <div class="ed-ppl-detail">
       <PeoplePortrait {person} width={520} alt={d.name} eager />
 
       <div class="ed-ppl-main">
         <header class="ed-stack">
-          <h1 class="ed-h1">{d.name}</h1>
-          <p class="ed-ppl-meta">{meta}</p>
+          <h1 class="ed-h1" dir="auto">{d.name}</h1>
+          <p class="ed-ppl-meta" dir="auto">{meta}</p>
         </header>
 
         {
           (d.email || links.length > 0 || cvInfo) && (
-            <ul class="ed-ppl-links" aria-label="Contact and profiles">
+            <ul class="ed-ppl-links" aria-label={t('person.links')}>
               {d.email && (
                 <li>
                   <ObfuscatedEmail email={d.email} class="ul" />
@@ -57,7 +60,7 @@ const hasBio = person.body?.trim() !== '';
               {cvInfo && (
                 <li>
                   <a href={cvInfo.pdfPath} download={`${person.id}-cv.pdf`} class="ul">
-                    Download CV
+                    {t('person.downloadCv')}
                   </a>
                 </li>
               )}
@@ -68,15 +71,15 @@ const hasBio = person.body?.trim() !== '';
         {
           interests.length > 0 && (
             <p class="ed-ppl-interests">
-              <span class="ed-label">Research interests</span>
-              <span>{interests.join(' · ')}</span>
+              <span class="ed-label">{t('person.interests')}</span>
+              <span dir="auto">{interests.join(' · ')}</span>
             </p>
           )
         }
 
         {
           hasBio && (
-            <div class="ed-prose ed-ppl-bio">
+            <div class="ed-prose ed-ppl-bio" dir="auto">
               <EntryBody entry={person} />
             </div>
           )
@@ -86,7 +89,7 @@ const hasBio = person.body?.trim() !== '';
           publications.length > 0 && (
             <section class="ed-ppl-section" aria-labelledby="ppl-pubs">
               <h2 class="ed-ppl-head" id="ppl-pubs">
-                <span>Selected Publications</span>
+                <span>{t('person.publications')}</span>
                 <span class="num">{publications.length}</span>
               </h2>
               <ul class="ed-ppl-rows">
@@ -97,13 +100,15 @@ const hasBio = person.body?.trim() !== '';
                     <li class="row ed-paper ed-paper--list">
                       <div class="ed-paper-body">
                         {link ? (
-                          <a href={link} class="ed-paper-title">
+                          <a href={link} class="ed-paper-title" dir="auto">
                             {p.title}
                           </a>
                         ) : (
-                          <span class="ed-paper-title">{p.title}</span>
+                          <span class="ed-paper-title" dir="auto">
+                            {p.title}
+                          </span>
                         )}
-                        <span class="ed-authors">
+                        <span class="ed-authors" dir="auto">
                           {p.authors.map((a, i) => (
                             <>
                               {i > 0 && ', '}
@@ -112,7 +117,7 @@ const hasBio = person.body?.trim() !== '';
                           ))}
                         </span>
                         <div class="ed-paper-meta">
-                          <span class="ed-venue">
+                          <span class="ed-venue" dir="auto">
                             {p.venue.includes(String(p.year)) ? p.venue : `${p.venue}, ${p.year}`}
                           </span>
                         </div>
@@ -129,7 +134,7 @@ const hasBio = person.body?.trim() !== '';
           projects.length > 0 && (
             <section class="ed-ppl-section" aria-labelledby="ppl-projects">
               <h2 class="ed-ppl-head" id="ppl-projects">
-                <span>Projects</span>
+                <span>{t('projects.title')}</span>
                 <span class="num">{projects.length}</span>
               </h2>
               <ul class="ed-posts">
@@ -137,8 +142,14 @@ const hasBio = person.body?.trim() !== '';
                   <li>
                     <a href={`/projects/${p.id}`} class="row ed-post-link">
                       <span>
-                        <span class="ed-post-title">{p.data.title}</span>
-                        {p.data.excerpt && <span class="ed-post-meta">{p.data.excerpt}</span>}
+                        <span class="ed-post-title" dir="auto">
+                          {p.data.title}
+                        </span>
+                        {p.data.excerpt && (
+                          <span class="ed-post-meta" dir="auto">
+                            {p.data.excerpt}
+                          </span>
+                        )}
                       </span>
                       <span class="arr" aria-hidden="true">
                         →

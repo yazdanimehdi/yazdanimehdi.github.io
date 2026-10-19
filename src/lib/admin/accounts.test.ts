@@ -56,6 +56,16 @@ test('throttle: the 11th try within 15 minutes is refused even with the right pa
   assert.equal(n, 0, 'success clears the attempts');
 });
 
+test("throttle is per address: one address's failures don't lock the owner out elsewhere; a per-name ceiling holds", async () => {
+  await createAccount(sql, 'jane', 'Jane', PW);
+  const t0 = new Date('2026-10-07T12:00:00Z');
+  for (let i = 0; i < 10; i++) await signIn(sql, 'jane', 'wrong password 1', t0, '203.0.113.9');
+  assert.deepEqual(await signIn(sql, 'jane', PW, t0, '203.0.113.9'), { ok: false, reason: 'throttled' });
+  assert.equal((await signIn(sql, 'jane', PW, t0, '198.51.100.7')).ok, true, 'the owner, elsewhere, still signs in');
+  for (let i = 0; i < 100; i++) await signIn(sql, 'jane', 'wrong password 1', t0, `192.0.2.${i}`);
+  assert.deepEqual(await signIn(sql, 'jane', PW, t0, '198.51.100.8'), { ok: false, reason: 'throttled' });
+});
+
 test('reset bumps the session version; change-own checks the current password', async () => {
   await createAccount(sql, 'jane', 'Jane', PW);
   const v = (await sessionVersion(sql, 'jane'))!;

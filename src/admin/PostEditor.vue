@@ -10,7 +10,7 @@ import { ApiError, api, report, toast } from './api';
 import { resolveOptions, setIn, type FieldDef, type Option } from './fields';
 import { useDocument } from './useDocument';
 import type { AdminCtx, CommitResult, Entry } from './types';
-import { postStatus, slugify } from '../lib/utils';
+import { postStatus, suggestSlug } from '../lib/utils';
 
 type Post = { data: Record<string, any>; body: string };
 
@@ -38,7 +38,7 @@ const SIDEBAR: FieldDef[] = [
 const sidebar = computed(() => resolveOptions(SIDEBAR, { publications: publications.value }));
 /** A future date: "Publish" schedules the post. */
 const scheduled = computed(() => postStatus({ date: doc.current?.data.date }).startsWith('Scheduled'));
-const suggested = computed(() => slugify(String(doc.current?.data.title ?? '')));
+const suggested = computed(() => suggestSlug(String(doc.current?.data.title ?? '')));
 
 const loadPost = (target: string) => async () => {
   const entry = await api<Post & { version: string; readonly: boolean }>(`collections/posts/${target}`);
@@ -211,7 +211,10 @@ function setSubtitle(e: Event) {
           <label class="adm-field">
             <span>Slug (URL)</span>
             <input v-model="slug" type="text" :readonly="!isNew" :placeholder="suggested" />
-            <small>/blog/{{ slug || suggested }}</small>
+            <small v-if="slug || suggested || !doc.current.data.title">/blog/{{ slug || suggested }}</small>
+            <small v-else
+              >Type a slug: lowercase letters, digits or dashes. The title has none to suggest one from.</small
+            >
           </label>
           <fieldset class="adm-plain-fieldset" :disabled="doc.readonly">
             <FormFields :fields="sidebar" :model="doc.current.data" :errors="doc.errors" />

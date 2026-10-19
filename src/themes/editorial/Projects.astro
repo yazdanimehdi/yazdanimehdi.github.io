@@ -4,6 +4,7 @@ import Layout from './Layout.astro';
 import { getSiteConfig } from '../../lib/config';
 import { resolveImage } from '../../lib/content/image';
 import { isInkArt } from '../../lib/inkArt';
+import { uiStrings } from '../../lib/ui-strings';
 import './projects.css';
 
 interface Props {
@@ -14,12 +15,9 @@ interface Props {
 const { projects } = Astro.props;
 const config = getSiteConfig();
 const personal = config.siteMode === 'personal';
-const description = personal
-  ? 'My research projects, tools, and datasets.'
-  : 'Our research projects, tools, and datasets.';
-const intro = personal
-  ? 'My research projects, open-source tools, and datasets.'
-  : 'Explore our research projects, open-source tools, and datasets.';
+const t = uiStrings(config);
+const description = t(personal ? 'projects.descriptionPersonal' : 'projects.descriptionLab');
+const intro = t(personal ? 'projects.introPersonal' : 'projects.introLab');
 
 const cards = await Promise.all(
   projects.map(async (p) => {
@@ -31,32 +29,32 @@ const cards = await Promise.all(
       ink: await isInkArt(image),
       size: image && typeof image !== 'string' ? { width: image.width, height: image.height } : {},
       links: [
-        { label: 'Website', href: p.data.url },
-        { label: 'Code', href: p.data.repoUrl },
-        { label: 'Paper', href: p.data.paperUrl },
+        { label: t('projects.website'), href: p.data.url },
+        { label: t('paper.code'), href: p.data.repoUrl },
+        { label: t('paper.paper'), href: p.data.paperUrl },
       ].filter((l) => l.href),
     };
   }),
 );
 
 const GROUPS = [
-  { status: 'active', title: 'Active' },
-  { status: 'upcoming', title: 'Upcoming' },
-  { status: 'completed', title: 'Completed' },
+  { status: 'active', title: t('projects.active') },
+  { status: 'upcoming', title: t('projects.upcoming') },
+  { status: 'completed', title: t('projects.completed') },
 ] as const;
 const groups = GROUPS.map((g) => ({ ...g, cards: cards.filter((c) => c.data.status === g.status) })).filter(
   (g) => g.cards.length > 0,
 );
 ---
 
-<Layout title="Projects" description={description}>
+<Layout title={t('projects.title')} description={description}>
   <div class="ed-wrap ed-main">
     <div class="ed-stack">
-      <h1 class="ed-h1">Projects</h1>
+      <h1 class="ed-h1">{t('projects.title')}</h1>
       <p class="ed-intro">{intro}</p>
     </div>
 
-    {cards.length === 0 && <p class="ed-pj-empty">No projects yet.</p>}
+    {cards.length === 0 && <p class="ed-pj-empty">{t('projects.empty')}</p>}
 
     {
       groups.map((g) => (
@@ -80,14 +78,24 @@ const groups = GROUPS.map((g) => ({ ...g, cards: cards.filter((c) => c.data.stat
                   </a>
                 )}
                 <h3 class="ed-pj-title">
-                  <a href={`/projects/${c.id}`}>{c.data.title}</a>
+                  <a href={`/projects/${c.id}`} dir="auto">
+                    {c.data.title}
+                  </a>
                 </h3>
                 <div class="ed-pj-notes">
                   <span class="ed-note">{c.data.type}</span>
                   <span class="ed-note">{c.data.status}</span>
                 </div>
-                {c.data.excerpt && <p class="ed-pj-desc">{c.data.excerpt}</p>}
-                {c.data.tags && c.data.tags.length > 0 && <p class="ed-pj-tags">{c.data.tags.join(' · ')}</p>}
+                {c.data.excerpt && (
+                  <p class="ed-pj-desc" dir="auto">
+                    {c.data.excerpt}
+                  </p>
+                )}
+                {c.data.tags && c.data.tags.length > 0 && (
+                  <p class="ed-pj-tags" dir="auto">
+                    {c.data.tags.join(' · ')}
+                  </p>
+                )}
                 {c.links.length > 0 && (
                   <div class="ed-pj-links">
                     {c.links.map((l) => (
@@ -96,6 +104,7 @@ const groups = GROUPS.map((g) => ({ ...g, cards: cards.filter((c) => c.data.stat
                         <span class="arr" aria-hidden="true">
                           ↗
                         </span>
+                        <span class="ed-sr-only">{t('link.external')}</span>
                       </a>
                     ))}
                   </div>

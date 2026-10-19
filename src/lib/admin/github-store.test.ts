@@ -269,3 +269,69 @@ test('createBranch: from the default branch head', async () => {
     body: { ref: 'refs/heads/content-backup', sha: 'head1' },
   });
 });
+
+test('revertChanges: each file the commit touched back to its parent’s content, based on the blobs it left', async () => {
+  const content = (text: string) => ({
+    json: {
+      type: 'file',
+      encoding: 'base64',
+      content: Buffer.from(text)
+        .toString('base64')
+        .replace(/(.{4})/g, '$1\n'),
+    },
+  });
+  const { fetchFn } = fakeGitHub({
+    'GET /commits/abc': () => ({
+      json: {
+        commit: { message: 'Site editor: x\n\nSite-editor: publish' },
+        parents: [{ sha: 'p1' }],
+        files: [
+          { filename: 'a.astro', status: 'modified', sha: 'a2' },
+          { filename: 'new.astro', status: 'added', sha: 'n1' },
+          { filename: 'gone.md', status: 'removed', sha: 'g1' },
+          { filename: 'to.css', status: 'renamed', sha: 't1', previous_filename: 'from.css' },
+        ],
+      },
+    }),
+    'GET /contents/a.astro?ref=p1': () => content('a v1\n'),
+    'GET /contents/gone.md?ref=p1': () => content('gone\n'),
+    'GET /contents/from.css?ref=p1': () => content('css\n'),
+    'GET /commits/merge': () => ({
+      json: { commit: { message: 'm' }, parents: [{ sha: '1' }, { sha: '2' }], files: [] },
+    }),
+  });
+  const store = new GitHubStore(cfg, author, fetchFn);
+  const r = await store.revertChanges('abc');
+  assert.equal(r.message, 'Site editor: x\n\nSite-editor: publish');
+  const text = Object.fromEntries(
+    r.changes.map((c) => [c.path, c.content === null ? null : Buffer.from(c.content, 'base64').toString()]),
+  );
+  assert.deepEqual(text, {
+    'a.astro': 'a v1\n',
+    'new.astro': null,
+    'gone.md': 'gone\n',
+    'from.css': 'css\n',
+    'to.css': null,
+  });
+  assert.ok(r.changes.every((c) => c.content === null || (c.encoding === 'base64' && !/\s/.test(c.content))));
+  assert.deepEqual(r.base, { 'a.astro': 'a2', 'new.astro': 'n1', 'gone.md': null, 'from.css': null, 'to.css': 't1' });
+  await assert.rejects(store.revertChanges('merge'), (e: UpstreamError) => e.status === 409);
+  await assert.rejects(store.revertChanges('nope'), (e: UpstreamError) => e.status === 404);
+});
+
+test('latestCommitWith: the newest of the branch’s recent commits with the trailer as a whole line', async () => {
+  const { fetchFn, calls } = fakeGitHub({
+    'GET /commits?sha=main&per_page=100': () => ({
+      json: [
+        { sha: 'undo', commit: { message: 'Undo: Site editor: x' } },
+        { sha: 'quoted', commit: { message: 'Mentions Site-editor: publish mid-line' } },
+        { sha: 'newer', commit: { message: 'Site editor: y\n\nSite-editor: publish' } },
+        { sha: 'older', commit: { message: 'Site editor: x\n\nSite-editor: publish' } },
+      ],
+    }),
+  });
+  const store = new GitHubStore(cfg, author, fetchFn);
+  assert.equal(await store.latestCommitWith('Site-editor: publish'), 'newer');
+  assert.equal(calls[0].path, '/commits?sha=main&per_page=100', 'the deployed branch');
+  assert.equal(await store.latestCommitWith('Nope: never'), null);
+});

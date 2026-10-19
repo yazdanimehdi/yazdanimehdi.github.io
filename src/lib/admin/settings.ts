@@ -2,10 +2,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 import yaml from 'js-yaml';
 import { extractGitHubUsername } from '../utils';
+import type { SessionUser } from './session';
 
 export interface AdminSettings {
   adminPath: string;
   adminUsers: string[];
+  /** Who may publish from the Site editor (site.yml `publishers`); empty means every admin. */
+  publishers: string[];
   /** Repo folder for collection images (cms.yml `media_folder`), e.g. src/assets/images */
   mediaFolder: string;
   /** Prefix written into front matter for those images (cms.yml `public_folder`), e.g. /src/assets/images */
@@ -32,6 +35,7 @@ export function loadAdminSettings(root = process.cwd()): AdminSettings {
   return {
     adminPath: trimSlashes(String(site.adminPath || 'admin')),
     adminUsers: Array.isArray(site.adminUsers) ? site.adminUsers.map(String) : [],
+    publishers: Array.isArray(site.publishers) ? site.publishers.map(String) : [],
     mediaFolder,
     publicFolder: `/${trimSlashes(String(cms.public_folder ?? mediaFolder))}`,
     siteName: String((site.siteMode === 'lab' ? site.labName : site.author) ?? ''),
@@ -52,4 +56,27 @@ export function isAdminUser(login: string, adminUsers: string[]): boolean {
   const wanted = login.trim().toLowerCase();
   if (!wanted) return false;
   return adminUsers.some((entry) => adminLogin(entry).toLowerCase() === wanted);
+}
+
+const PASSWORD = /^password:/i;
+
+/**
+ * Whether this session may publish from the Site editor. Entries name GitHub logins like `adminUsers`; a password
+ * account is written `password:<username>`, so a password account can never pass as the GitHub login of that name.
+ * No `publishers` at all: every admin publishes.
+ */
+export function canPublish(
+  user: Pick<SessionUser, 'login' | 'provider'>,
+  { publishers }: Pick<AdminSettings, 'publishers'>,
+): boolean {
+  if (!publishers.length) return true;
+  if (user.provider !== 'password')
+    return isAdminUser(
+      user.login,
+      publishers.filter((e) => !PASSWORD.test(e.trim())),
+    );
+  const wanted = user.login.trim().toLowerCase();
+  return publishers.some(
+    (e) => PASSWORD.test(e.trim()) && e.trim().slice('password:'.length).trim().toLowerCase() === wanted,
+  );
 }

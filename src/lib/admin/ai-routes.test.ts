@@ -48,7 +48,7 @@ test('text: no key is a 400 naming the key and the AI screen; nothing is sent', 
   provider({});
   const res = await call(aiText, { action: 'write', collection: 'posts', title: 'Hello' });
   assert.equal(res.status, 400);
-  assert.match((await res.json()).error, /ANTHROPIC_API_KEY is not set: add it on the AI screen/);
+  assert.match((await res.json()).error, /ANTHROPIC_API_KEY is not set: add it on the Scholar & AI screen/);
   assert.equal(sent.length, 0);
 });
 

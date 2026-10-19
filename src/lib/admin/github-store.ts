@@ -223,6 +223,65 @@ export class GitHubStore implements ContentStore {
     return { id: commit.sha, url: commit.html_url, versions: blobVersions(changes) };
   }
 
+  /**
+   * What reverting commit `sha` takes, read from GitHub alone: each file it touched back to its content in the parent
+   * (null where the commit added it), and as the base the blobs the commit left (null where it removed one), so
+   * `commit` refuses if anything touched those files since. Single-parent commits under GitHub's 300-file listing only.
+   */
+  async revertChanges(
+    sha: string,
+  ): Promise<{ message: string; changes: Change[]; base: Record<string, string | null> }> {
+    const c = await this.gh<{
+      commit: { message: string };
+      parents: { sha: string }[];
+      files?: { filename: string; status: string; sha: string; previous_filename?: string }[];
+    }>('GET', `/commits/${encodeURIComponent(sha)}`, undefined, true);
+    if (!c) throw new UpstreamError(`Commit ${sha.slice(0, 7)} is not in ${this.cfg.owner}/${this.cfg.repo}.`, 404);
+    if (c.parents.length !== 1 || !c.files || c.files.length >= 300) {
+      throw new UpstreamError(`Commit ${sha.slice(0, 7)} is too large or a merge, so it can't be undone here.`, 409);
+    }
+    const parent = c.parents[0].sha;
+    const changes: Change[] = [];
+    const base: Record<string, string | null> = {};
+    const restore = async (path: string, current: string | null) => {
+      const old = await this.gh<{ type?: string; content?: string; encoding?: string }>(
+        'GET',
+        `/contents/${encodePath(path)}${this.ref(parent)}`,
+        undefined,
+        true,
+      );
+      if (!old || Array.isArray(old) || old.type !== 'file' || old.encoding !== 'base64') {
+        throw new UpstreamError(`${path} can't be restored here (missing before the commit, or over 1 MB).`, 409);
+      }
+      changes.push({ path, content: (old.content ?? '').replace(/\s/g, ''), encoding: 'base64' });
+      base[path] = current;
+    };
+    for (const f of c.files) {
+      if (f.status === 'added') {
+        changes.push({ path: f.filename, content: null });
+        base[f.filename] = f.sha;
+      } else if (f.status === 'removed') {
+        await restore(f.filename, null);
+      } else if (f.status === 'renamed' && f.previous_filename) {
+        await restore(f.previous_filename, null);
+        changes.push({ path: f.filename, content: null });
+        base[f.filename] = f.sha;
+      } else {
+        await restore(f.filename, f.sha);
+      }
+    }
+    return { message: c.commit.message, changes, base };
+  }
+
+  /** The newest of the branch's last 100 commits whose message has `trailer` as a line; null when none does. */
+  async latestCommitWith(trailer: string): Promise<string | null> {
+    const commits = await this.gh<{ sha: string; commit: { message: string } }[]>(
+      'GET',
+      `/commits?sha=${encodeURIComponent(this.cfg.branch)}&per_page=100`,
+    );
+    return commits?.find((c) => c.commit.message.split('\n').includes(trailer))?.sha ?? null;
+  }
+
   async lastModified(path: string): Promise<string | null> {
     const commits = await this.gh<{ commit: { committer: { date: string } } }[]>(
       'GET',
@@ -246,6 +305,16 @@ export class GitHubStore implements ContentStore {
   /** Starts a workflow_dispatch run (e.g. render-cv.yml) on the configured branch. */
   async dispatchWorkflow(file: string): Promise<void> {
     await this.gh('POST', `/actions/workflows/${encodeURIComponent(file)}/dispatches`, { ref: this.cfg.branch });
+  }
+
+  /** The configured branch's head: the last publish, since every commit redeploys the site. */
+  async latestCommit(): Promise<{ at: string; url: string } | null> {
+    const commits = await this.gh<{ html_url: string; commit: { committer: { date: string } } }[]>(
+      'GET',
+      `/commits?sha=${encodeURIComponent(this.cfg.branch)}&per_page=1`,
+    );
+    const head = commits?.[0];
+    return head ? { at: head.commit.committer.date, url: head.html_url } : null;
   }
 
   async latestRun(file: string): Promise<WorkflowRun | null> {

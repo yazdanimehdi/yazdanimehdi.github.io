@@ -1,5 +1,6 @@
 ---
 import { getSiteConfig, getTheme } from '../../lib/config';
+import { cssValue } from '../../lib/utils';
 
 const config = getSiteConfig();
 const fonts = config.fonts;
@@ -36,19 +37,20 @@ const defaultSizes = {
   h3: '1.25rem',
 };
 
+// Config values end up inside a <style>.
 const families = {
-  sans: fonts?.families?.sans || themeFamilies.sans,
-  serif: fonts?.families?.serif || themeFamilies.serif,
-  mono: fonts?.families?.mono || themeFamilies.mono,
+  sans: cssValue(fonts?.families?.sans || themeFamilies.sans),
+  serif: cssValue(fonts?.families?.serif || themeFamilies.serif),
+  mono: cssValue(fonts?.families?.mono || themeFamilies.mono),
 };
 
 const sizes = {
-  base: fonts?.sizes?.base || defaultSizes.base,
-  sm: fonts?.sizes?.sm || defaultSizes.sm,
-  lg: fonts?.sizes?.lg || defaultSizes.lg,
-  h1: fonts?.sizes?.h1 || defaultSizes.h1,
-  h2: fonts?.sizes?.h2 || defaultSizes.h2,
-  h3: fonts?.sizes?.h3 || defaultSizes.h3,
+  base: cssValue(fonts?.sizes?.base || defaultSizes.base),
+  sm: cssValue(fonts?.sizes?.sm || defaultSizes.sm),
+  lg: cssValue(fonts?.sizes?.lg || defaultSizes.lg),
+  h1: cssValue(fonts?.sizes?.h1 || defaultSizes.h1),
+  h2: cssValue(fonts?.sizes?.h2 || defaultSizes.h2),
+  h3: cssValue(fonts?.sizes?.h3 || defaultSizes.h3),
 };
 
 // Build Google Fonts URL
@@ -64,14 +66,22 @@ const fontParams = uniqueFamilies
     return `family=${encoded}:wght@300;400;500;700`;
   })
   .join('&');
+// Arabic-script sites also get Vazirmatn, the first face of global.css's --font-script. It sits after the
+// Latin family in every stack, so its files load only for Arabic-script text.
+const arabicScript = ['ar', 'fa', 'ur', 'ps', 'ckb', 'sd', 'ug'].includes(
+  (config.lang ?? 'en').toLowerCase().split('-')[0],
+);
+const scriptParam = arabicScript && !uniqueFamilies.includes('Vazirmatn') ? '&family=Vazirmatn:wght@400;500;700' : '';
 // Editorial: `optional` keeps the fallback instead of swapping late, which shifted every
 // block below the hero (CLS ~0.32 in Lighthouse); cached fonts are used on later visits.
 const fontDisplay = theme === 'editorial' ? 'optional' : 'swap';
-const googleFontsUrl = `https://fonts.googleapis.com/css2?${fontParams}&display=${fontDisplay}`;
+const googleFontsUrl = `https://fonts.googleapis.com/css2?${fontParams}${scriptParam}&display=${fontDisplay}`;
 
-// Font family stacks
-const sansFallback = 'ui-sans-serif, system-ui, -apple-system, sans-serif';
-const serifFallback = 'ui-serif, Georgia, serif';
+// Font family stacks, matching global.css: Latin face, a Latin-only fallback, the Arabic-script slot, generics.
+// With font-display optional the fallback is what a cold load shows, so Latin names stay serif in the serif slot.
+const sansFallback =
+  "'Helvetica Neue', var(--font-script, ui-sans-serif), ui-sans-serif, system-ui, -apple-system, sans-serif";
+const serifFallback = 'Georgia, var(--font-script, ui-serif), ui-serif, serif';
 const monoFallback = 'ui-monospace, monospace';
 
 // Check if any value differs from defaults

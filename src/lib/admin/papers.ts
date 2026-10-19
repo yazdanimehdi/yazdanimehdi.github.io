@@ -2,7 +2,7 @@
 import type { ImageOutput, TextInput } from '../ai/providers';
 import { resolveAiConfig } from '../ai/providers';
 import { imagePrompt, paperPostPrompt, parsePaperPost, type PaperPost } from '../ai/prompts';
-import { slugify } from '../utils';
+import { suggestSlug } from '../utils';
 import { generateImage, generateText, readAiConfig, saveImage } from './ai';
 import { entryChange, listEntries, readConfig } from './content';
 import { commitChanges } from './http';
@@ -225,7 +225,7 @@ export async function syncPapers(store: ContentStore, deps: PapersDeps, now = ne
       continue;
     }
     const { post, image } = draft;
-    const postSlug = unique(slugify(post.title).slice(0, 80).replace(/-+$/, '') || `${pubSlug}-post`, postSlugs);
+    const postSlug = unique(suggestSlug(post.title) || `${pubSlug}-post`, postSlugs);
     const cover =
       'error' in image ? image : await saveImage(store, postSlug, image).catch((e: unknown) => ({ error: message(e) }));
     if ('error' in cover) result.failed.push({ item: `cover image for ${postSlug}`, error: cover.error });

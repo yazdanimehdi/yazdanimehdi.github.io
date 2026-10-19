@@ -2,10 +2,20 @@
 import SocialLinks from './SocialLinks.astro';
 import NewsletterForm from '../vue/NewsletterForm.vue';
 import { getSiteConfig, getSiteName } from '../../lib/config';
+import { splitNav } from '../../lib/editorial';
+import { uiStrings } from '../../lib/ui-strings';
 
 const config = getSiteConfig();
 const siteName = getSiteName();
+const t = uiStrings(config);
 const currentYear = new Date().getFullYear();
+// Pages that did not fit the header cap.
+const more = splitNav(config.nav, config.siteMode, Astro.url.pathname).more;
+const path = Astro.url.pathname;
+// The sentence is one translatable string; the site name and "ScholarOS" are isolated so RTL can't reorder them.
+const copyright = t('footer.copyright', { year: currentYear }).split(/(\{name\}|\{scholaros\})/);
+const linkClass =
+  'inline-flex min-h-11 items-center text-surface-600 underline-offset-4 hover:text-primary-600 hover:underline dark:text-dm-text dark:hover:text-accent-400';
 ---
 
 <footer class="mt-12 border-t border-surface-200 dark:border-dm-border">
@@ -13,9 +23,9 @@ const currentYear = new Date().getFullYear();
     {
       config.newsletter?.enabled && config.newsletter?.accessKey && (
         <div class="mb-6 border-b border-surface-200 pb-6 dark:border-dm-border">
-          <h3 class="mb-1 font-serif text-base font-normal text-surface-900 dark:text-dm-heading">
-            {config.newsletter.heading || 'Stay Updated'}
-          </h3>
+          <h2 class="mb-1 font-serif text-base font-normal text-surface-900 dark:text-dm-heading">
+            {config.newsletter.heading || t('footer.newsletter')}
+          </h2>
           {config.newsletter.text && (
             <p class="mb-3 text-sm text-surface-500 dark:text-dm-muted">{config.newsletter.text}</p>
           )}
@@ -24,18 +34,45 @@ const currentYear = new Date().getFullYear();
       )
     }
 
+    {
+      more.length > 0 && (
+        <nav class="mb-2 flex flex-wrap items-center gap-x-6 text-sm" aria-labelledby="footer-more">
+          <span id="footer-more" class="text-xs text-surface-500 dark:text-dm-muted">
+            {t('nav.more')}
+          </span>
+          {more.map((item) => (
+            <a
+              href={item.href}
+              class={linkClass}
+              aria-current={path === item.href || path.startsWith(`${item.href}/`) ? 'page' : undefined}
+            >
+              {item.label}
+            </a>
+          ))}
+        </nav>
+      )
+    }
+
     <div
-      class="flex flex-col items-center justify-between gap-3 text-sm text-surface-500 sm:flex-row dark:text-dm-muted"
+      class="flex flex-col items-start justify-between gap-3 text-sm text-surface-500 sm:flex-row sm:items-center dark:text-dm-muted"
     >
       <p>
-        &copy; {currentYear}
-        {siteName}. Powered by <a
-          href="https://github.com/yazdanimehdi/ScholarOS"
-          class="text-surface-600 underline hover:text-primary-600 dark:text-dm-text dark:hover:text-accent-400"
-          >ScholarOS</a
-        >.
+        {
+          copyright.map((part) =>
+            part === '{name}' ? (
+              <bdi>{siteName}</bdi>
+            ) : part === '{scholaros}' ? (
+              <a href="https://github.com/yazdanimehdi/ScholarOS" class:list={[linkClass, 'underline']}>
+                <bdi>ScholarOS</bdi>
+              </a>
+            ) : (
+              part
+            ),
+          )
+        }
       </p>
-      <div class="flex items-center gap-4">
+      {/* The icons sit centred in 44px targets; the negative margin lines the glyphs up with the text edges. */}
+      <div class="-mx-3.5 flex items-center gap-4">
         <SocialLinks socials={config.socials} size="sm" />
       </div>
     </div>

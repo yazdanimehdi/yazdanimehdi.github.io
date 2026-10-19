@@ -123,12 +123,30 @@ test('config: save keeps comments; stale → 409; invalid → 400; unknown file 
   assert.equal((await call(getConfig, { params: { file: 'cms' } })).status, 400);
 });
 
-test('dashboard: posts, feed items, feeds config and counts in one response', async () => {
+test('dashboard: posts and the status facts in one response', async () => {
   const d = await (await call(dashboard)).json();
   assert.ok(Array.isArray(d.posts));
-  assert.ok(Array.isArray(d.feedItems));
   assert.equal(typeof d.publications, 'number');
-  assert.ok('version' in d.feeds && 'data' in d.feeds);
+  assert.equal(typeof d.feeds.sources, 'number');
+  assert.equal(typeof d.feeds.items, 'number');
+  assert.ok('generated' in d.cv && 'configured' in d.scholar);
+  assert.deepEqual(d.runs, {}, 'no workflow runs outside GitHub');
+  assert.equal(typeof d.news.count, 'number');
+  assert.ok(d.news.count === 0 || !Number.isNaN(Date.parse(d.news.latest)), 'news.latest is the newest date');
+  assert.equal(typeof d.people.count, 'number');
+  assert.equal(d.people.edited, null, 'profile edit times only in Postgres mode');
+});
+
+test('dashboard: news.latest skips drafts and future-dated announcements', async () => {
+  const day = (offset: number) => new Date(Date.now() + offset * 86_400_000).toISOString().slice(0, 10);
+  const seed = { published: `date: ${day(-2)}`, draft: `date: ${day(-1)}\ndraft: true`, future: 'date: 2099-01-01' };
+  const changes = Object.entries(seed).map(([slug, front]) => ({
+    path: `src/content/announcements/dash-${slug}.md`,
+    content: `---\ntitle: ${slug}\n${front}\n---\n`,
+  }));
+  await store.commit(changes, 'seed', Object.fromEntries(changes.map((c) => [c.path, null])));
+  const d = await (await call(dashboard)).json();
+  assert.equal(d.news.latest, day(-2));
 });
 
 test('collections: an .mdx entry refuses PUT and DELETE and never commits', async () => {
@@ -324,8 +342,8 @@ test('a corrupt feeds.json: the dashboard still loads; a sync rewrites it', asyn
   const res = await call(dashboard);
   assert.equal(res.status, 200);
   const d = await res.json();
-  assert.deepEqual(d.feedItems, []);
-  assert.equal(d.feedsError, 'src/data/feeds.json is not valid JSON');
+  assert.equal(d.feeds.items, 0);
+  assert.equal(d.feeds.error, 'src/data/feeds.json is not valid JSON');
 
   const rss =
     '<?xml version="1.0"?><rss version="2.0"><channel><title>F</title>' +

@@ -15,7 +15,7 @@ import { getMode } from '../../lib/mode';
 import { readConfig } from '../../lib/admin/content';
 import { getStore } from '../../lib/admin/get-store';
 import { authorOf } from '../../lib/admin/http';
-import { adminSettings } from '../../lib/admin/settings';
+import { adminSettings, canPublish } from '../../lib/admin/settings';
 import '../../themes/editorial/editorial.css';
 import '../admin.css';
 
@@ -60,6 +60,7 @@ const ctx = {
   siteName,
   user: user ?? null,
   mode,
+  canPublish: !!user && canPublish(user, adminSettings()),
   mediumToken: !!process.env.MEDIUM_TOKEN,
   siteUrl,
 };

@@ -1,8 +1,11 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getSiteConfig, getSiteName } from '../../lib/config';
-import { socialLinks } from '../../lib/editorial';
+import { socialLinks, splitNav } from '../../lib/editorial';
+import { uiStrings } from '../../lib/ui-strings';
+import type { NavItem } from '../../lib/types';
 import ModeToggle from './ModeToggle.astro';
+import FooterNav from './FooterNav.astro';
 import './editorial.css';
 
 interface Props {
@@ -19,7 +22,10 @@ const config = getSiteConfig();
 const name = getSiteName();
 const email = config.socials?.email;
 const links = socialLinks(config.socials);
-const contact = config.editorial?.contact;
+// `links`: optional onward links in the home contact band (e.g. a prospective-students page).
+const contact = config.editorial?.contact as { heading?: string; text?: string; links?: NavItem[] } | undefined;
+const nav = splitNav(config.nav, config.siteMode, Astro.url.pathname);
+const t = uiStrings(config);
 const year = new Date().getFullYear();
 const path = Astro.url.pathname;
 const isActive = (href: string) => (href === '/' ? path === '/' : path === href || path.startsWith(`${href}/`));
@@ -27,27 +33,48 @@ const isActive = (href: string) => (href === '/' ? path === '/' : path === href 
 
 <BaseLayout title={title} description={description} ogImage={ogImage} keywords={keywords}>
   <header class="ed-header">
-    <nav class="ed-wrap ed-nav" aria-label="Primary">
+    <nav class="ed-wrap ed-nav" aria-label={t('nav.primary')}>
       <a href="/" class="ed-brand">
         <span class="ed-brand-mark" aria-hidden="true"></span>
-        <span class="ed-brand-name">{name}</span>
+        <span class="ed-brand-name" dir="auto">
+          {name}
+        </span>
       </a>
       <div class="ed-navlinks">
         {
-          config.nav.map((item) => (
+          nav.primary.map((item) => (
             <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
               {item.label}
             </a>
           ))
         }
       </div>
+      {
+        nav.contact && (
+          <span class="ed-nav-contact">
+            <a href={nav.contact.href} aria-current={isActive(nav.contact.href) ? 'page' : undefined}>
+              {nav.contact.label}
+            </a>
+          </span>
+        )
+      }
       <ModeToggle />
     </nav>
   </header>
 
   <script is:inline>
-    // Phones scroll the nav row sideways: keep the current page's link in view.
-    document.querySelector('.ed-navlinks [aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+    (() => {
+      // Phones scroll the nav row sideways: keep the current page's link in view, and fade the row's
+      // trailing edge only while links remain past it.
+      const row = document.querySelector('.ed-navlinks');
+      if (!row) return;
+      row.querySelector('[aria-current]')?.scrollIntoView({ block: 'nearest', inline: 'center' });
+      const fade = () =>
+        row.toggleAttribute('data-more', row.scrollWidth - row.clientWidth - Math.abs(row.scrollLeft) > 1);
+      fade();
+      row.addEventListener('scroll', fade, { passive: true });
+      new ResizeObserver(fade).observe(row);
+    })();
   </script>
 
   <main id="main-content" class="ed-grow">
@@ -60,8 +87,17 @@ const isActive = (href: string) => (href === '/' ? path === '/' : path === href 
         <div class="ed-wrap ed-contact-inner">
           <div class="ed-contact-top">
             <div class="ed-contact-copy">
-              <h2>{contact?.heading || 'Get in touch'}</h2>
-              {contact?.text && <p>{contact.text}</p>}
+              <h2 dir="auto">{contact?.heading || t('contact.heading')}</h2>
+              {contact?.text && <p dir="auto">{contact.text}</p>}
+              {contact?.links?.length ? (
+                <p class="ed-contact-onward">
+                  {contact.links.map((l) => (
+                    <a class="ul" href={l.href}>
+                      {l.label} <span class="arr">→</span>
+                    </a>
+                  ))}
+                </p>
+              ) : null}
             </div>
             {email && (
               <a class="ed-btn-light" href={`mailto:${email}`}>
@@ -71,8 +107,9 @@ const isActive = (href: string) => (href === '/' ? path === '/' : path === href 
           </div>
           <div class="ed-contact-bottom">
             <span>
-              © {year} {name}
+              © <span class="num">{year}</span> <bdi>{name}</bdi>
             </span>
+            {nav.more.length > 0 && <FooterNav items={nav.more} label={t('nav.more')} {isActive} />}
             {links.length > 0 && (
               <span class="ed-contact-links">
                 {links.map((l) => (
@@ -89,8 +126,9 @@ const isActive = (href: string) => (href === '/' ? path === '/' : path === href 
       <footer class="ed-footer">
         <div class="ed-wrap ed-footer-inner">
           <span>
-            © {year} {name}
+            © <span class="num">{year}</span> <bdi>{name}</bdi>
           </span>
+          {nav.more.length > 0 && <FooterNav items={nav.more} label={t('nav.more')} {isActive} />}
           {email && (
             <a class="ul" href={`mailto:${email}`}>
               {email}

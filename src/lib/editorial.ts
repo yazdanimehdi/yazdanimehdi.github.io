@@ -9,8 +9,25 @@ export function stripHonorific(name: string): string {
     .trim();
 }
 
-export function isOwner(author: string, siteAuthor: string): boolean {
-  return stripHonorific(author) === stripHonorific(siteAuthor);
+/** `owners`: the site author, or every name to bold (see `boldedAuthors`). */
+export function isOwner(author: string, owners: string | readonly string[]): boolean {
+  const name = stripHonorific(author);
+  return (typeof owners === 'string' ? [owners] : owners).some((o) => stripHonorific(o) === name);
+}
+
+/**
+ * Names bolded in author lists: the site author, and on a lab site every current member too. A member is past
+ * when their role is alumni, they are marked inactive, or their end date has passed.
+ */
+export function boldedAuthors(
+  siteAuthor: string,
+  siteMode: 'personal' | 'lab',
+  people: readonly { name: string; role: string; active?: boolean; endDate?: Date }[],
+  now = new Date(),
+): string[] {
+  if (siteMode === 'personal') return [siteAuthor];
+  const current = people.filter((p) => p.role !== 'alumni' && p.active !== false && !(p.endDate && p.endDate < now));
+  return [siteAuthor, ...current.map((p) => p.name)];
 }
 
 /** "https://doi.org/10.1/x" → "10.1/x". */
@@ -180,7 +197,7 @@ const SOCIAL_LABELS: [keyof SocialLinks, string][] = [
   ['github', 'GitHub'],
   ['linkedin', 'LinkedIn'],
   ['orcid', 'ORCID'],
-  ['twitter', 'X'],
+  ['twitter', 'X (Twitter)'],
   ['bluesky', 'Bluesky'],
   ['mastodon', 'Mastodon'],
   ['website', 'Website'],
@@ -194,24 +211,57 @@ export function socialLinks(socials: SocialLinks = {}): { label: string; href: s
   });
 }
 
-export type HomeBlock = 'hero' | 'affiliations' | 'research' | 'publications' | 'updates';
+// Header priority per site mode; pages not listed rank after these, in nav order.
+const NAV_PRIORITY: Record<'personal' | 'lab', string[]> = {
+  personal: ['/research', '/publications', '/cv', '/blog', '/talks', '/news', '/projects', '/people', '/positions'],
+  lab: ['/research', '/people', '/publications', '/positions', '/join', '/news', '/projects', '/blog', '/talks'],
+};
 
 /**
- * Editorial home block order from homepageSections. The hero shows when `hero` or `about` is on
- * (about = the bio inside it); affiliations and research follow it when configured; news + blog
- * share one "updates" row placed where the first of them is.
+ * Journal header: at most `max` links (Contact included), shown in nav order. Contact is returned on
+ * its own so the header can keep it in view on phones; the rest go to the footer index. When `path` is
+ * a footer page, it takes the last-ranked header slot so the header always marks where the reader is.
+ */
+export function splitNav<T extends { href: string }>(nav: T[], siteMode: 'personal' | 'lab', path = '', max = 6) {
+  const contact = nav.find((n) => n.href === '/contact');
+  const others = nav.filter((n) => n !== contact);
+  const rank = (n: T) => {
+    const i = NAV_PRIORITY[siteMode].indexOf(n.href);
+    return i === -1 ? Number.MAX_SAFE_INTEGER : i;
+  };
+  const ranked = [...others].sort((a, b) => rank(a) - rank(b));
+  const slots = max - (contact ? 1 : 0);
+  const active = ranked.findIndex((n) => n.href !== '/' && (path === n.href || path.startsWith(`${n.href}/`)));
+  if (active >= slots && slots > 0) ranked.splice(slots - 1, 0, ...ranked.splice(active, 1));
+  const shown = new Set(ranked.slice(0, slots));
+  return { primary: others.filter((n) => shown.has(n)), contact, more: others.filter((n) => !shown.has(n)) };
+}
+
+export type HomeBlock = 'hero' | 'research' | 'publications' | 'updates';
+
+/**
+ * Journal home block order from homepageSections. The hero shows when `hero` or `about` is on
+ * (about = the bio inside it); news + blog share one "updates" row placed where the last of them is,
+ * so papers listed between them come first. Research, when configured, follows the papers on a
+ * personal site (the papers are the proof a visitor came for) and leads on a lab site, where the
+ * lab's themes are what prospective students look for first.
  */
 export function homeBlocks(
   sections: HomepageSectionId[],
-  has: { affiliations: boolean; research: boolean },
+  has: { research: boolean },
+  siteMode: 'personal' | 'lab' = 'personal',
 ): HomeBlock[] {
   const blocks: HomeBlock[] = [];
   if (sections.includes('hero') || sections.includes('about')) blocks.push('hero');
-  if (has.affiliations) blocks.push('affiliations');
-  if (has.research) blocks.push('research');
-  for (const id of sections) {
+  const lastUpdate = Math.max(sections.lastIndexOf('news'), sections.lastIndexOf('blog'));
+  sections.forEach((id, i) => {
     if (id === 'publications') blocks.push('publications');
-    if ((id === 'news' || id === 'blog') && !blocks.includes('updates')) blocks.push('updates');
+    if (i === lastUpdate) blocks.push('updates');
+  });
+  if (has.research) {
+    const papers = blocks.indexOf('publications');
+    const at = siteMode === 'personal' && papers !== -1 ? papers + 1 : blocks.indexOf('hero') + 1;
+    blocks.splice(at, 0, 'research');
   }
   return blocks;
 }

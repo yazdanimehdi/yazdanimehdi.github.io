@@ -32,6 +32,23 @@ function dropDraft(key: string): void {
   }
 }
 
+/** Drafts kept in this browser whose document key starts with `prefix`, e.g. `announcements/`. */
+export function storedDrafts(prefix: string): { key: string; value: unknown }[] {
+  const found: { key: string; value: unknown }[] = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const raw = localStorage.key(i) ?? '';
+      if (!raw.startsWith(storageKey(prefix))) continue;
+      const key = raw.slice(storageKey('').length);
+      const draft = readDraft(key);
+      if (draft) found.push({ key, value: draft.value });
+    }
+  } catch {
+    // Storage blocked: no drafts to list.
+  }
+  return found;
+}
+
 function changedKeys(a: object, b: object): string[] {
   const x = a as Record<string, unknown>;
   const y = b as Record<string, unknown>;

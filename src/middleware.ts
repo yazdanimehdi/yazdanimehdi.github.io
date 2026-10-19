@@ -64,6 +64,11 @@ async function publicPage(next: () => Promise<Response>): Promise<Response> {
 
 /** Guards the admin (pages under /<adminPath>, API under /api/admin): session, same-origin writes, no caching or indexing. Postgres mode: renders public pages inside a request context and sets CDN cache headers. */
 export const onRequest: MiddlewareHandler = async (ctx, next) => {
+  // @astrojs/vercel 8 lets this header replace the request path, and only its edge middleware (off here) sets it. A
+  // client sending it could have the CDN cache one page's HTML under another URL.
+  if (ctx.request.headers.has('x-astro-path')) {
+    return new Response('Bad request', { status: 400, headers: { 'Cache-Control': 'no-store' } });
+  }
   if (ctx.isPrerendered) return next();
   const { pathname } = ctx.url;
   const { adminPath, adminUsers } = adminSettings();

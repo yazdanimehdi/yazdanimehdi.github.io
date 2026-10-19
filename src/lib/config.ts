@@ -1,7 +1,15 @@
 import yaml from 'js-yaml';
 import { memo, readSiteFile } from './content/context';
 import { getMode } from './mode';
-import type { SiteConfig, HomepageSectionId, HomepageSectionEntry, ThemeName } from './types';
+import { NIGHT_PALETTES, type NightPalette } from './colors';
+import {
+  NEWS_ART_STYLES,
+  type NewsArtStyle,
+  type SiteConfig,
+  type HomepageSectionId,
+  type HomepageSectionEntry,
+  type ThemeName,
+} from './types';
 
 let _siteConfig: SiteConfig | null = null;
 
@@ -17,6 +25,20 @@ export function normalizeTheme(value: unknown, source: string): ThemeName {
   throw new Error(`${source}: theme must be 'journal' or 'classic', got '${String(value)}'`);
 }
 
+/** '' or missing → 'lamplight', the default night palette. Any other unknown value is a config error. */
+export function normalizeNight(value: unknown, source: string): NightPalette {
+  if (value === undefined || value === null || value === '') return 'lamplight';
+  if ((NIGHT_PALETTES as readonly unknown[]).includes(value)) return value as NightPalette;
+  throw new Error(`${source}: editorial.night must be one of ${NIGHT_PALETTES.join(', ')}, got '${String(value)}'`);
+}
+
+/** '' or missing → the theme's own style (journal: ink plates, classic: flat geometric). Unknown values are a config error. */
+export function normalizeNewsArt(value: unknown, theme: ThemeName, source: string): NewsArtStyle {
+  if (value === undefined || value === null || value === '') return theme === 'editorial' ? 'ink' : 'geometric';
+  if ((NEWS_ART_STYLES as readonly unknown[]).includes(value)) return value as NewsArtStyle;
+  throw new Error(`${source}: newsArt must be one of ${NEWS_ART_STYLES.join(', ')}, got '${String(value)}'`);
+}
+
 function readConfigFile(filename: string): string {
   const raw = readSiteFile(`config/${filename}`);
   if (raw === null) throw new Error(`config/${filename} not found`);
@@ -29,6 +51,8 @@ function parseSiteConfig(): SiteConfig {
   config.theme = envTheme
     ? normalizeTheme(envTheme, 'SCHOLAROS_THEME')
     : normalizeTheme(config.theme, 'config/site.yml');
+  config.editorial = { ...config.editorial, night: normalizeNight(config.editorial?.night, 'config/site.yml') };
+  config.newsArt = normalizeNewsArt(config.newsArt, config.theme, 'config/site.yml');
   return config;
 }
 

@@ -13,11 +13,6 @@ const siteName = getSiteName();
 
 const sections = getHomepageSections();
 
-const GRID_IDS = ['publications', 'blog'] as const;
-const enabledGridSections = sections.filter((id) => (GRID_IDS as readonly string[]).includes(id));
-const firstGridId = enabledGridSections[0] ?? null;
-const bottomGridClass = enabledGridSections.length >= 2 ? 'md:grid-cols-2' : '';
-
 // Only fetch data for enabled sections
 const announcements = sections.includes('news')
   ? (await getEntries('announcements'))
@@ -79,18 +74,6 @@ const editorialHome = getTheme() === 'editorial' ? await loadHome() : null;
   editorialHome ? (
     <EditorialHome {...editorialHome} />
   ) : (
-    <ClassicHome
-      {config}
-      {personal}
-      {siteName}
-      {sections}
-      {enabledGridSections}
-      {firstGridId}
-      {bottomGridClass}
-      {announcementData}
-      {publications}
-      {posts}
-      {feeds}
-    />
+    <ClassicHome {config} {personal} {siteName} {sections} {announcementData} {publications} {posts} {feeds} />
   )
 }

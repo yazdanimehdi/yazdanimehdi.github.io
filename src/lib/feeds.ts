@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import Parser from 'rss-parser';
 import type { FeedItem } from './types';
+import { safeHref } from './utils';
 
 export interface FeedSource {
   name: string;
@@ -71,10 +72,11 @@ function truncate(str: string, maxLen = 300): string {
   return str.slice(0, maxLen).replace(/\s+\S*$/, '') + '...';
 }
 
+/** Items with a title and an http(s) link: the site renders the link as an <a href>, and a feed could send `javascript:`. */
 function toItems(source: FeedSource, items: Parser.Item[], maxItems: number): FeedItem[] {
   return items
     .slice(0, maxItems)
-    .filter((item) => item.title && item.link)
+    .filter((item) => item.title && safeHref(item.link))
     .map((item) => {
       const link = normalizeLink(item.link!);
       const result: FeedItem = {

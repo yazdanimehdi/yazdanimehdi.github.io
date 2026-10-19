@@ -2,10 +2,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   becameDue,
+  cssValue,
+  formatMonthYear,
   formatNewsDate,
+  formatShortDate,
   isPublished,
   postStatus,
+  nextColorMode,
   readingTime,
+  safeHref,
+  suggestSlug,
   withoutCrossPosted,
   withoutHidden,
 } from './utils';
@@ -15,15 +21,29 @@ process.env.TZ = 'America/Los_Angeles';
 
 test('formatNewsDate: formats at the requested precision', () => {
   const d = new Date('2025-10-03');
-  assert.equal(formatNewsDate(d, 'day'), 'Oct 3, 2025');
-  assert.equal(formatNewsDate(d, 'month'), 'Oct 2025');
-  assert.equal(formatNewsDate(d, 'year'), '2025');
-  assert.equal(formatNewsDate(d), 'Oct 2025');
+  assert.equal(formatNewsDate(d, 'day', 'en'), 'Oct 3, 2025');
+  assert.equal(formatNewsDate(d, 'month', 'en'), 'Oct 2025');
+  assert.equal(formatNewsDate(d, 'year', 'en'), '2025');
+  assert.equal(formatNewsDate(d, undefined, 'en'), 'Oct 2025');
 });
 
 test('formatNewsDate: date-only values keep their day west of UTC', () => {
-  assert.equal(formatNewsDate(new Date('2024-01-01'), 'day'), 'Jan 1, 2024');
-  assert.equal(formatNewsDate(new Date('2024-01-01'), 'year'), '2024');
+  assert.equal(formatNewsDate(new Date('2024-01-01'), 'day', 'en'), 'Jan 1, 2024');
+  assert.equal(formatNewsDate(new Date('2024-01-01'), 'year', 'en'), '2024');
+});
+
+test('formatMonthYear: a malformed locale falls back to English; date-only stays its month west of UTC', () => {
+  assert.equal(formatMonthYear(new Date('2024-01-01'), 'en_US'), 'January 2024');
+  assert.equal(formatMonthYear(new Date('2024-01-01'), 'de'), 'Januar 2024');
+});
+
+test("date formatters: follow the site's locale; unset or malformed falls back to English", () => {
+  const d = new Date('2025-10-03');
+  assert.equal(formatNewsDate(d, 'day', 'de'), '3. Okt. 2025');
+  assert.equal(formatNewsDate(d, 'day', undefined), 'Oct 3, 2025');
+  assert.equal(formatNewsDate(d, 'day', 'not a tag!'), 'Oct 3, 2025');
+  assert.equal(formatShortDate('2025-10-03T12:00:00Z', 'en'), 'Oct 3, 2025');
+  assert.equal(formatShortDate('2025-10-03T12:00:00Z', 'fr'), '3 oct. 2025');
 });
 
 test('readingTime: ceil(words / 230), at least 1 minute', () => {
@@ -112,4 +132,44 @@ test('withoutCrossPosted: http/https and www. are the same link; empty titles ne
     kept.map((i) => i.data.title),
     ['???'],
   );
+});
+
+test('cssValue: a config value cannot leave its string, declaration, rule or the <style>', () => {
+  assert.equal(cssValue('Source Serif 4'), 'Source Serif 4');
+  assert.equal(cssValue('clamp(1rem, 2vw, 1.25rem)'), 'clamp(1rem, 2vw, 1.25rem)');
+  assert.equal(cssValue('Roboto"; } </style><script>alert(1)</script>'), 'Roboto  /stylescriptalert(1)/script');
+  assert.equal(cssValue('a\\"\n{b'), 'ab');
+});
+
+test('safeHref: http(s) links only; javascript:, data: and relative links give no href', () => {
+  assert.equal(safeHref('https://ex.com/a'), 'https://ex.com/a');
+  assert.equal(safeHref('HTTP://ex.com/a'), 'HTTP://ex.com/a');
+  assert.equal(safeHref('javascript:alert(1)'), undefined);
+  assert.equal(safeHref('JavaScript:alert(1)'), undefined);
+  assert.equal(safeHref('data:text/html,<script>alert(1)</script>'), undefined);
+  assert.equal(safeHref('//ex.com/a'), undefined);
+  assert.equal(safeHref(''), undefined);
+  assert.equal(safeHref(undefined), undefined);
+});
+
+test('suggestSlug: at most 80 characters with no trailing dash; empty for a title with no ASCII letters', () => {
+  assert.equal(suggestSlug('Hello, World!'), 'hello-world');
+  const long = suggestSlug(`${'a'.repeat(79)} b ${'c'.repeat(20)}`);
+  assert.equal(long, 'a'.repeat(79), 'cut at 80, then the dash left at the cut dropped');
+  assert.ok(suggestSlug('word '.repeat(40)).length <= 80);
+  assert.match(suggestSlug('word '.repeat(40)), /^[a-z0-9-]{1,80}$/);
+  assert.equal(suggestSlug('سلام دنیا'), '');
+});
+
+test('nextColorMode: every click changes what is on screen, including the click that leaves system', () => {
+  // OS light: light → dark → system (light on screen) → dark.
+  assert.equal(nextColorMode(null, false, false), 'dark', 'nothing stored, light on screen');
+  assert.equal(nextColorMode('light', false, false), 'dark');
+  assert.equal(nextColorMode('dark', true, false), 'system');
+  assert.equal(nextColorMode('system', false, false), 'dark', 'leaving system flips, not light again');
+  // OS dark.
+  assert.equal(nextColorMode('system', true, true), 'light');
+  assert.equal(nextColorMode(null, true, true), 'light');
+  // A site default of dark on a light OS: system shows light, which flips.
+  assert.equal(nextColorMode(null, true, false), 'system');
 });

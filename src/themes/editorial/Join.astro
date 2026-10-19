@@ -2,6 +2,7 @@
 import ObfuscatedEmail from '../../components/astro/ObfuscatedEmail.astro';
 import Layout from './Layout.astro';
 import { getSiteConfig } from '../../lib/config';
+import { uiStrings } from '../../lib/ui-strings';
 import './timeline.css';
 
 interface Props {
@@ -10,43 +11,39 @@ interface Props {
 
 const { personal } = Astro.props;
 const config = getSiteConfig();
+const t = uiStrings(config);
 const email = config.socials.email;
 const culture = [
-  {
-    title: 'Rigorous Research',
-    desc: 'We pursue high-impact research with scientific rigor and intellectual honesty.',
-  },
-  {
-    title: 'Collaborative Spirit',
-    desc: 'We believe the best research comes from diverse perspectives and open collaboration.',
-  },
-  {
-    title: 'Growth & Mentorship',
-    desc: 'We invest in the development of every team member through mentorship and support.',
-  },
+  { title: t('join.rigorTitle'), desc: t('join.rigorText') },
+  { title: t('join.collabTitle'), desc: t('join.collabText') },
+  { title: t('join.growthTitle'), desc: t('join.growthText') },
 ];
+const howToApply = t(
+  email
+    ? personal
+      ? 'join.applyEmailPersonal'
+      : 'join.applyEmailLab'
+    : personal
+      ? 'join.applyPersonal'
+      : 'join.applyLab',
+).split(/(\{positions\}|\{email\})/);
+const subject = t('join.subject').split(/(\{code\})/);
 ---
 
 <Layout
-  title={personal ? 'Prospective Students' : 'Join Us'}
-  description={personal
-    ? 'Interested in working with me? See open positions and opportunities.'
-    : 'Open positions and opportunities to join our research lab.'}
+  title={t(personal ? 'join.titlePersonal' : 'join.titleLab')}
+  description={t(personal ? 'join.descriptionPersonal' : 'join.descriptionLab')}
 >
   <div class="ed-wrap ed-main ed-main--narrow">
     <div class="ed-stack">
-      <h1 class="ed-h1">{personal ? 'Prospective Students' : 'Join Our Lab'}</h1>
+      <h1 class="ed-h1">{t(personal ? 'join.headingPersonal' : 'join.headingLab')}</h1>
       <p class="ed-intro">
-        {
-          personal
-            ? "Interested in working with me? I'm always looking for talented and motivated students and collaborators."
-            : "We're always looking for talented and motivated researchers to join our team."
-        }
+        {t(personal ? 'join.introPersonal' : 'join.introLab')}
       </p>
     </div>
 
     <section class="ed-tl-section" aria-labelledby="join-culture">
-      <h2 id="join-culture" class="ed-label ed-tl-group">{personal ? 'Working With Me' : 'Our Culture'}</h2>
+      <h2 id="join-culture" class="ed-label ed-tl-group">{t(personal ? 'join.culturePersonal' : 'join.cultureLab')}</h2>
       <div class="ed-cards">
         {
           culture.map((item) => (
@@ -60,40 +57,38 @@ const culture = [
     </section>
 
     <section class="ed-tl-section" aria-labelledby="join-positions">
-      <h2 id="join-positions" class="ed-label ed-tl-group">Open Positions</h2>
+      <h2 id="join-positions" class="ed-label ed-tl-group">{t('join.openPositions')}</h2>
       <p>
-        {
-          personal
-            ? 'I have several open positions for students and researchers at various levels.'
-            : 'We have several open positions for researchers at various levels.'
-        }
+        {t(personal ? 'join.positionsPersonal' : 'join.positionsLab')}
       </p>
-      <a href="/positions" class="ul ed-more">View all positions and apply <span class="arr">→</span></a>
+      <a href="/positions" class="ul ed-more">{t('join.viewPositions')} <span class="arr">→</span></a>
     </section>
 
     <section class="ed-tl-section" aria-labelledby="join-apply">
-      <h2 id="join-apply" class="ed-label ed-tl-group">How to Apply</h2>
+      <h2 id="join-apply" class="ed-label ed-tl-group">{t('join.howToApply')}</h2>
       <p>
-        {personal ? 'To apply, please visit the' : 'To apply for a position in our lab, please visit the'}{' '}
-        <a href="/positions" class="ul">positions page</a>{' '}
-        and use the application form on the relevant position{
-          email ? (
-            <>
-              , or send the following materials to <ObfuscatedEmail email={email} class="ul" />:
-            </>
-          ) : (
-            '. Please include:'
+        {
+          howToApply.map((part) =>
+            part === '{positions}' ? (
+              <a href="/positions" class="ul">
+                {t('join.positionsPage')}
+              </a>
+            ) : part === '{email}' && email ? (
+              <ObfuscatedEmail email={email} class="ul" />
+            ) : (
+              part
+            ),
           )
         }
       </p>
       <ol class="ed-tl-steps">
-        <li>Your CV/resume</li>
-        <li>A brief statement of research interests (1-2 paragraphs)</li>
-        <li>Relevant publications or writing samples (if available)</li>
-        <li>Names and contact information for 2-3 references</li>
+        <li>{t('join.stepCv')}</li>
+        <li>{t('join.stepStatement')}</li>
+        <li>{t('join.stepPublications')}</li>
+        <li>{t('join.stepReferences')}</li>
       </ol>
       <p class="ed-tl-fine">
-        Please use the subject line: <code class="ed-tl-code">[Position Type] Application - Your Name</code>
+        {subject.map((part) => (part === '{code}' ? <code class="ed-tl-code">{t('join.subjectLine')}</code> : part))}
       </p>
     </section>
   </div>

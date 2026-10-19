@@ -3,6 +3,8 @@ import type { CollectionEntry } from 'astro:content';
 import Layout from './Layout.astro';
 import PeoplePortrait from './PeoplePortrait.astro';
 import { getRoleName } from '../../lib/utils';
+import { getSiteConfig } from '../../lib/config';
+import { uiStrings } from '../../lib/ui-strings';
 import './people.css';
 
 interface Props {
@@ -12,9 +14,8 @@ interface Props {
 }
 
 const { personal, groups } = Astro.props;
-const description = personal
-  ? 'Collaborators, students, and research group members.'
-  : 'Meet our team of researchers, students, and collaborators.';
+const t = uiStrings(getSiteConfig());
+const description = t(personal ? 'people.descriptionPersonal' : 'people.descriptionLab');
 
 /** "2019–2023", "2021", or "" from the optional start/end dates. */
 function years({ startDate, endDate }: CollectionEntry<'people'>['data']): string {
@@ -24,14 +25,14 @@ function years({ startDate, endDate }: CollectionEntry<'people'>['data']): strin
 }
 ---
 
-<Layout title="People" description={description}>
+<Layout title={t('people.title')} description={description}>
   <div class="ed-wrap ed-main">
     <div class="ed-stack">
-      <h1 class="ed-h1">{personal ? 'Collaborators & Students' : 'Our Team'}</h1>
+      <h1 class="ed-h1">{t(personal ? 'people.headingPersonal' : 'people.headingLab')}</h1>
       <p class="ed-intro">{description}</p>
     </div>
 
-    {groups.length === 0 && <p class="ed-ppl-empty">No people listed yet.</p>}
+    {groups.length === 0 && <p class="ed-ppl-empty">{t('people.empty')}</p>}
 
     {
       groups.map(({ name, people }) => (
@@ -48,10 +49,14 @@ function years({ startDate, endDate }: CollectionEntry<'people'>['data']): strin
                   <li class="row ed-ppl-alum">
                     <span class="ed-ppl-years num">{years(p.data)}</span>
                     <span class="ed-ppl-alum-text">
-                      <a href={`/people/${p.id}`} class="ed-ppl-alum-name">
+                      <a href={`/people/${p.id}`} class="ed-ppl-alum-name" dir="auto">
                         {p.data.name}
                       </a>
-                      {role && <span class="ed-ppl-role">{role}</span>}
+                      {role && (
+                        <span class="ed-ppl-role" dir="auto">
+                          {role}
+                        </span>
+                      )}
                     </span>
                   </li>
                 );
@@ -64,11 +69,17 @@ function years({ startDate, endDate }: CollectionEntry<'people'>['data']): strin
                   <PeoplePortrait person={p} width={400} />
                   <div class="ed-ppl-text">
                     <h3 class="ed-ppl-name">
-                      <a href={`/people/${p.id}`}>{p.data.name}</a>
+                      <a href={`/people/${p.id}`} dir="auto">
+                        {p.data.name}
+                      </a>
                     </h3>
-                    <span class="ed-ppl-role">{p.data.title || getRoleName(p.data.role)}</span>
+                    <span class="ed-ppl-role" dir="auto">
+                      {p.data.title || getRoleName(p.data.role)}
+                    </span>
                     {p.data.researchInterests?.length ? (
-                      <span class="ed-ppl-focus">{p.data.researchInterests.join(' · ')}</span>
+                      <span class="ed-ppl-focus" dir="auto">
+                        {p.data.researchInterests.join(' · ')}
+                      </span>
                     ) : null}
                   </div>
                 </li>

@@ -2,13 +2,17 @@
 import Layout from './Layout.astro';
 import PaperRow from './PaperRow.astro';
 import { bareArxiv, bareDoi, jsonLd } from '../../lib/editorial';
+import { uiStrings } from '../../lib/ui-strings';
 import type { PublicationsData } from './data';
 
 type Props = PublicationsData;
 
-const { config, groups, filters, total, firstCount } = Astro.props;
+const { config, owners, groups, filters, total, firstCount } = Astro.props;
 const personal = config.siteMode === 'personal';
 const scholar = config.socials?.scholar;
+const t = uiStrings(config);
+const filterLabel = (f: { id: string; label: string }) =>
+  f.id === 'all' ? t('filter.all') : f.id === 'other' ? t('filter.other') : f.label;
 
 const ld = {
   '@context': 'https://schema.org',
@@ -33,22 +37,19 @@ const ld = {
 };
 ---
 
-<Layout
-  title="Publications"
-  description={personal ? 'My published research papers and articles.' : 'Our published research papers and articles.'}
->
+<Layout title={t('pubs.title')} description={t(personal ? 'pubs.descriptionPersonal' : 'pubs.descriptionLab')}>
   <script type="application/ld+json" set:html={jsonLd(ld)} />
   <div class="ed-wrap ed-main">
     <div class="ed-pubs-head">
       <div class="ed-stack">
-        <h1 class="ed-h1">Papers</h1>
+        <h1 class="ed-h1">{t('pubs.heading')}</h1>
         {
           (personal || scholar) && (
             <p class="ed-intro">
-              {personal && 'My name is shown in bold. '}
+              {personal && `${t('pubs.ownerBold')} `}
               {scholar && (
                 <>
-                  See also{' '}
+                  {t('pubs.seeAlso')}{' '}
                   <span class="ed-link-punct">
                     <a href={scholar} class="ul">
                       Google Scholar
@@ -63,13 +64,13 @@ const ld = {
       </div>
       <div class="ed-stats">
         <div class="ed-stat">
-          <span class="ed-stat-num num">{total}</span><span class="ed-stat-label">publications</span>
+          <span class="ed-stat-num num">{total}</span><span class="ed-stat-label">{t('pubs.count')}</span>
         </div>
         {
           personal && (
             <div class="ed-stat">
               <span class="ed-stat-num num">{firstCount}</span>
-              <span class="ed-stat-label">first-author</span>
+              <span class="ed-stat-label">{t('pubs.firstAuthorCount')}</span>
             </div>
           )
         }
@@ -79,10 +80,10 @@ const ld = {
     <div class="ed-filterbar" data-pub-filters>
       {
         filters.length > 2 ? (
-          <div class="ed-tabs" role="group" aria-label="Filter by topic">
+          <div class="ed-tabs" role="group" aria-label={t('pubs.filterByTopic')}>
             {filters.map((f) => (
               <button type="button" class="ed-tab" data-filter={f.id} aria-pressed={f.id === 'all' ? 'true' : 'false'}>
-                {f.label} <span class="ed-tab-count num">{f.count}</span>
+                {filterLabel(f)} <span class="ed-tab-count num">{f.count}</span>
               </button>
             ))}
           </div>
@@ -93,13 +94,13 @@ const ld = {
       {
         personal && (
           <label class="ed-toggle">
-            <input type="checkbox" data-first-only /> First-author only
+            <input type="checkbox" data-first-only /> {t('pubs.firstAuthorOnly')}
           </label>
         )
       }
     </div>
 
-    <p class="ed-intro" data-pub-empty hidden>No papers match these filters.</p>
+    <p class="ed-intro" data-pub-empty hidden>{t('pubs.empty')}</p>
 
     {
       groups.map((g) => (
@@ -109,7 +110,7 @@ const ld = {
           </h2>
           <ol class="ed-papers">
             {g.items.map((i) => (
-              <PaperRow pub={i.pub} owner={config.author} variant="list" topic={i.topic} first={i.first} />
+              <PaperRow pub={i.pub} {owners} variant="list" topic={i.topic} first={i.first} />
             ))}
           </ol>
         </section>
@@ -154,17 +155,17 @@ const ld = {
 
   document.addEventListener('astro:page-load', initPublicationFilters);
 
-  // BibTeX copy: one delegated listener for every expander.
-  document.addEventListener('click', async (event) => {
-    const button = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-bib-copy]');
-    const text = button?.previousElementSibling?.textContent;
-    if (!button || !text) return;
-    try {
-      await navigator.clipboard.writeText(text.trim());
-      button.textContent = 'Copied';
-    } catch {
-      button.textContent = 'Select and copy';
-    }
-    setTimeout(() => (button.textContent = 'Copy'), 1600);
-  });
+  // A link to /publications#id (research pages, other sites) opens that row's BibTeX and marks the row.
+  // :target alone misses client-side navigations, which change the hash through the History API.
+  function openCited() {
+    document.querySelector('[data-cited]')?.removeAttribute('data-cited');
+    const id = location.hash.slice(1);
+    const row = id ? document.getElementById(id) : null;
+    if (!row?.matches('li.ed-paper')) return;
+    row.setAttribute('data-cited', '');
+    row.querySelector('details')?.setAttribute('open', '');
+  }
+
+  document.addEventListener('astro:page-load', openCited);
+  window.addEventListener('hashchange', openCited);
 </script>

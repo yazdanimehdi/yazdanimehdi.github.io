@@ -1,4 +1,5 @@
 import { z } from 'astro/zod';
+import { NIGHT_PALETTES } from './colors';
 
 /** Treat empty/whitespace-only strings as absent (CMS writes '' instead of omitting). */
 const emptyToUndefined = z
@@ -207,11 +208,16 @@ export const siteSchema = z
     title: z.string().min(1),
     author: z.string(),
     theme: z.enum(['journal', 'classic', 'editorial', '']).optional(),
+    editorial: z
+      .object({ night: z.enum([...NIGHT_PALETTES, '']).optional(), labRole: z.string().optional() })
+      .passthrough()
+      .optional(),
     adminPath: z
       .string()
       .regex(/^[a-z0-9-]*$/, 'Use lowercase letters, digits and dashes')
       .optional(),
     adminUsers: z.array(z.string()).optional(),
+    publishers: z.array(z.string()).optional(),
     nav: z.array(z.object({ label: z.string(), href: z.string() }).passthrough()).optional(),
     homepageSections: z
       .array(z.object({ id: z.enum(['hero', 'about', 'news', 'publications', 'blog']), enabled: z.boolean() }))

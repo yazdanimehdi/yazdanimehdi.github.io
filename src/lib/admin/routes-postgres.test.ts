@@ -137,17 +137,26 @@ test('dashboard reports the mode and the last daily jobs', async () => {
     del: async () => {},
   });
   const record = { backup: { ok: true, at: '2026-10-06T03:00:00.000Z', detail: '2 file(s) changed' } };
-  await store.commit([{ path: 'src/data/jobs.json', content: JSON.stringify(record) }], 'r', {});
+  await store.commit(
+    [
+      { path: 'src/data/jobs.json', content: JSON.stringify(record) },
+      { path: 'src/content/people/dash-person.md', content: '---\nname: P\nrole: phd\n---\n' },
+    ],
+    'r',
+    {},
+  );
   const outside = await (await call(dashboard)).json();
   assert.equal(outside.mode, 'static'); // tests run without VERCEL
-  assert.equal(outside.jobs, null, 'only Postgres mode reads the jobs record');
+  assert.deepEqual(outside.runs, {}, 'only Postgres mode reads the jobs record');
   const saved = { VERCEL: process.env.VERCEL, DATABASE_URL: process.env.DATABASE_URL };
   process.env.VERCEL = '1';
   process.env.DATABASE_URL = 'postgres://test';
   try {
     const body = await (await call(dashboard)).json();
     assert.equal(body.mode, 'postgres');
-    assert.deepEqual(body.jobs, record);
+    assert.deepEqual(body.runs, record);
+    assert.ok(body.people.count >= 1);
+    assert.equal(body.people.edited.length, body.people.count, 'Postgres knows every profile edit time');
   } finally {
     for (const [k, v] of Object.entries(saved))
       if (v === undefined) delete process.env[k];

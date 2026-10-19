@@ -8,13 +8,18 @@ export function formatDate(date: Date | string, options?: Intl.DateTimeFormatOpt
   });
 }
 
-export function formatShortDate(date: Date | string): string {
+/** `locale` is the site's BCP 47 tag (config.lang); unset or malformed falls back to 'en'. */
+function localeDate(d: Date, locale: string | undefined, options: Intl.DateTimeFormatOptions): string {
+  try {
+    return d.toLocaleDateString(locale || 'en', options);
+  } catch {
+    return d.toLocaleDateString('en', options);
+  }
+}
+
+export function formatShortDate(date: Date | string, locale: string | undefined): string {
   const d = typeof date === 'string' ? new Date(date) : date;
-  return d.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  return localeDate(d, locale, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 export function formatYear(date: Date | string): number {
@@ -28,6 +33,30 @@ export function slugify(text: string): string {
     .replace(/[^\w\s-]/g, '')
     .replace(/[\s_]+/g, '-')
     .replace(/^-+|-+$/g, '');
+}
+
+/** A file-name slug from a title, within the 80 characters the admin accepts; '' when the title has no ASCII letters or digits. */
+export function suggestSlug(title: string): string {
+  return slugify(title).slice(0, 80).replace(/-+$/, '');
+}
+
+/** The URL when it is http(s), else undefined: feed links come from third-party XML and could be `javascript:`. */
+export function safeHref(url: string | undefined): string | undefined {
+  return url && /^https?:\/\//i.test(url.trim()) ? url : undefined;
+}
+
+export type ColorMode = 'light' | 'dark' | 'system';
+
+/**
+ * The theme toggle's next mode. It starts from what is on screen, so every click flips the page: the OS
+ * preference, then its opposite, then system; leaving system goes to the opposite of what system shows.
+ */
+export function nextColorMode(stored: ColorMode | null, screenDark: boolean, osDark: boolean): ColorMode {
+  if (stored === 'system') return screenDark ? 'light' : 'dark';
+  const os: ColorMode = osDark ? 'dark' : 'light';
+  const order: ColorMode[] = [os, osDark ? 'light' : 'dark', 'system'];
+  const current = stored ?? (screenDark ? 'dark' : 'light');
+  return order[(order.indexOf(current) + 1) % order.length];
 }
 
 export function getRoleName(role: string): string {
@@ -104,15 +133,23 @@ export function readingTime(body: string): number {
 export type DatePrecision = 'day' | 'month' | 'year';
 
 /** "Oct 3, 2025" / "Oct 2025" / "2025". UTC, because date-only frontmatter parses as UTC midnight. */
-export function formatNewsDate(date: Date, precision: DatePrecision = 'month'): string {
+export function formatNewsDate(date: Date, precision: DatePrecision | undefined, locale: string | undefined): string {
   const parts: Intl.DateTimeFormatOptions =
     precision === 'year'
       ? { year: 'numeric' }
       : precision === 'day'
         ? { year: 'numeric', month: 'short', day: 'numeric' }
         : { year: 'numeric', month: 'short' };
-  return date.toLocaleDateString('en-US', { ...parts, timeZone: 'UTC' });
+  return localeDate(date, locale, { ...parts, timeZone: 'UTC' });
 }
+
+/** "October 2025", in UTC. */
+export function formatMonthYear(date: Date, locale: string | undefined): string {
+  return localeDate(date, locale, { month: 'long', year: 'numeric', timeZone: 'UTC' });
+}
+
+/** A config value made safe to inline in a <style>: drops what could end its string, declaration, rule or the element. */
+export const cssValue = (value: string) => String(value).replace(/[<>"'`;{}\\\r\n]/g, '');
 
 /** The content layer's entry order is not stable, so lists get an id tie-break before their real sort. */
 export const byId = (a: { id: string }, b: { id: string }) => a.id.localeCompare(b.id);
