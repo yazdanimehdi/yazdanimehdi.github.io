@@ -9,6 +9,7 @@
     "dev:postgres": "tsx scripts/dev-postgres.ts",
     "start": "astro dev",
     "build": "astro build",
+    "vercel-build": "tsx scripts/vercel-bootstrap.ts && astro build",
     "preview": "astro preview",
     "astro": "astro",
     "sync:feeds": "tsx scripts/sync-feeds.ts",

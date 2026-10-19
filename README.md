@@ -197,6 +197,29 @@ If your website should behave more like a research instrument than a static page
 
 ## Getting Started
 
+### One-click deploy on Vercel
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fyazdanimehdi%2FScholarOS&project-name=scholaros&repository-name=scholaros&stores=%5B%7B%22type%22%3A%22integration%22%2C%22integrationSlug%22%3A%22neon%22%2C%22productSlug%22%3A%22neon%22%2C%22protocol%22%3A%22storage%22%7D%2C%7B%22type%22%3A%22blob%22%2C%22access%22%3A%22public%22%7D%5D&env=SESSION_SECRET%2CCRON_SECRET%2CADMIN_PASSWORD&envDescription=SESSION_SECRET%20and%20CRON_SECRET%3A%20any%20random%20text%20of%2032%2B%20characters%20each%20%28they%20are%20never%20typed%20again%29.%20ADMIN_PASSWORD%3A%20the%20password%20you%20will%20sign%20in%20with%20%2812%2B%20characters%29%3B%20your%20username%20is%20your%20GitHub%20username.&envLink=https%3A%2F%2Fgithub.com%2Fyazdanimehdi%2FScholarOS%23one-click-deploy-on-vercel)
+
+The button copies ScholarOS into your GitHub account, creates a Vercel project with a Neon Postgres database and a
+public Vercel Blob store, and asks for three values:
+
+| Variable         | What to enter                                                                                    |
+| ---------------- | ------------------------------------------------------------------------------------------------ |
+| `SESSION_SECRET` | any random text of 32+ characters (`openssl rand -base64 48`, or a password manager's generator) |
+| `CRON_SECRET`    | another random text of 32+ characters                                                            |
+| `ADMIN_PASSWORD` | the password you will sign in with (12+ characters)                                              |
+
+The first build sets everything up: it creates the tables, copies the example content into the database, uploads its
+images to Blob and creates your admin account. Sign in at `https://<your-project>.vercel.app/admin/login` with your
+GitHub username (lowercase) and `ADMIN_PASSWORD`, then make the site yours from the admin. Edits go live on the next
+page load, with no rebuild ([Postgres mode](#postgres-mode-live-edits-no-rebuilds)).
+
+Afterwards: change your password under **Users** (the account is created only once, so `ADMIN_PASSWORD` is never
+used again and you can delete it), and add a `GITHUB_TOKEN` if you want the daily backup to git
+([step 3 of Deploy on Vercel](#deploy-on-vercel-custom-admin)). Set `ADMIN_USERNAME` before the first deploy to pick
+a different username.
+
 ### The quick way (no local setup needed)
 
 1. Click the **"Use this template"** button at the top of the repository
@@ -549,12 +572,15 @@ content to the `content-backup` branch.
    (sets `BLOB_READ_WRITE_TOKEN`). Add `CRON_SECRET` (`openssl rand -base64 48`). Vercel Cron calls
    `/api/admin/cron/daily` at 03:00 UTC: it syncs feeds, releases scheduled posts and backs up to git; the dashboard's
    Site status shows each result and has **Run daily jobs**. Keep `GITHUB_TOKEN` for the backup.
-2. Locally: `vercel env pull .env.local --environment=production`, then `pnpm db:setup`. It creates the tables, copies `config/`,
-   `src/content/` and `src/data/` into the database, uploads `src/assets/images` and `public/images` to Blob, and
-   rewrites image references to Blob URLs. It lists any file it could not copy. On a database that already has
-   content it stops; `pnpm db:setup --force` overwrites the documents that exist in the repo and leaves documents
-   that exist only in the database.
-3. Redeploy. The dashboard's Site status now has a **Backup copy** row and **Run daily jobs**.
+   Add `ADMIN_PASSWORD` for your first account (username: `ADMIN_USERNAME`, else the repository owner).
+2. Redeploy. Every build on Vercel runs `scripts/vercel-bootstrap.ts` first: it applies new migrations, and on an
+   empty database copies `config/`, `src/content/` and `src/data/` into it, uploads `src/assets/images` and
+   `public/images` to Blob and rewrites image references to Blob URLs. While no account exists it creates one from
+   `ADMIN_PASSWORD`. The build log lists what it did and any file it could not copy. A database that already has
+   content is never overwritten; to copy the repo's files again, run `pnpm db:setup --force` locally after
+   `vercel env pull .env.local --environment=production` (it overwrites the documents that exist in the repo and
+   leaves documents that exist only in the database).
+3. The dashboard's Site status now has a **Backup copy** row and **Run daily jobs**.
 
 Notes: MDX posts are shown with a notice (MDX needs a build). The CV PDF is rendered on Vercel (see _CV PDF in Postgres mode_).
 Editing `adminUsers` takes effect after a redeploy. The feeds, Google Scholar and SEO workflows
@@ -1074,6 +1100,9 @@ ScholarOS includes 8 GitHub Actions workflows that keep your site up to date aut
 4. Node.js version: `22`
 
 ### Vercel
+
+The [Deploy button](#one-click-deploy-on-vercel) sets up a Postgres-mode site in one step. To deploy an existing
+repository instead:
 
 1. Import your repository on [Vercel](https://vercel.com)
 2. Framework preset: **Astro**

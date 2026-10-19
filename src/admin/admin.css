@@ -510,6 +510,7 @@
 .adm input[type='date'],
 .adm input[type='number'],
 .adm input[type='search'],
+.adm input[type='password'],
 .adm select,
 .adm textarea {
   width: 100%;
