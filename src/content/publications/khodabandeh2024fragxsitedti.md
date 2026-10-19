@@ -29,7 +29,7 @@ bibtex: "@inproceedings{khodabandeh2024fragxsitedti,\n  title={FragXsiteDTI: Rev
   \ Ozlem Ozmen},\n  booktitle={International Conference on Research in Computational Molecular Biology},\n\
   \  url={https://arxiv.org/abs/2311.02326},\n  pages={68--85},\n  year={2024},\n  organization={Springer}\n\
   }"
-image: ../../assets/images/publications/fragx.gif
+image: ../../assets/images/publications/fragx.webp
 venueShort: RECOMB
 topic: dti
 note: Oral

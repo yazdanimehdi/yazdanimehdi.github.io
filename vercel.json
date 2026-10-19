@@ -1,4 +1,5 @@
 {
+  "buildCommand": "pnpm run vercel-build",
   "crons": [{ "path": "/api/admin/cron/daily", "schedule": "0 3 * * *" }],
   "git": { "deploymentEnabled": { "content-backup": false } },
   "headers": [
