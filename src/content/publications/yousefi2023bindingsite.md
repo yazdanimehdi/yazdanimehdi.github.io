@@ -35,4 +35,5 @@ bibtex: "@article{yousefi2023bindingsite,\n  title={BindingSite-AugmentedDTA: en
 image: ../../assets/images/publications/bsa.jpg
 venueShort: Brief. Bioinform.
 topic: dti
+equalContribution: 2
 ---

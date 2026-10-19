@@ -78,6 +78,14 @@ test('cvEntryView: each RenderCV entry shape', () => {
       points: [],
     },
   );
+  assert.equal(
+    cvEntryView({
+      title: 'Paper',
+      authors: ['Alex Chen\\*', '**Jane Smith**\\*'],
+      journal: 'ACL; \\* equal contribution',
+    })?.org,
+    'Alex Chen*, Jane Smith* · ACL; * equal contribution',
+  );
   assert.deepEqual(cvEntryView({ name: 'Best Paper', date: '2023', highlights: ['x', 3] }), {
     title: 'Best Paper',
     when: '2023',

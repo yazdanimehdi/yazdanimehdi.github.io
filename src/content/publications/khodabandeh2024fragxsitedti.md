@@ -35,4 +35,5 @@ topic: dti
 note: Oral
 arxiv: '2311.02326'
 code: https://github.com/yazdanimehdi/FragXsiteDTI
+equalContribution: 2
 ---

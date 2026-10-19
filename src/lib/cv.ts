@@ -90,6 +90,8 @@ export interface CvEntryView {
 }
 
 const str = (v: unknown): string => (typeof v === 'string' || typeof v === 'number' ? String(v).trim() : '');
+/** Markdown emphasis removed, an escaped `\*` (e.g. marking equal contribution) kept as `*`. */
+const plain = (v: unknown) => str(v).replace(/\\\*/g, '\0').replace(/\*+/g, '').replace(/\0/g, '*');
 const joined = (parts: unknown[], sep: string) => parts.map(str).filter(Boolean).join(sep);
 
 function view(title: string, org: string, when: string, points: string[]): CvEntryView {
@@ -109,8 +111,8 @@ export function cvEntryView(entry: unknown): CvEntryView | null {
   if (isOneLineEntry(entry)) return view(str(e.label), str(e.details), '', []);
   if (isExperienceEntry(entry)) return view(str(e.position), joined([e.company, e.location], ', '), range, points);
   if (isPublicationEntry(entry)) {
-    const authors = (Array.isArray(e.authors) ? e.authors : []).map((a) => str(a).replace(/\*+/g, ''));
-    return view(str(e.title), joined([authors.join(', '), e.journal], ' · '), str(e.date), points);
+    const authors = (Array.isArray(e.authors) ? e.authors : []).map(plain);
+    return view(str(e.title), joined([authors.join(', '), plain(e.journal)], ' · '), str(e.date), points);
   }
   if (isNormalEntry(entry)) return view(str(e.name), str(e.location), range, points);
   return null;

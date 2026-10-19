@@ -4,6 +4,7 @@ import {
   boldedAuthors,
   elsewhereLabel,
   homeBlocks,
+  isFirstAuthor,
   isOwner,
   jsonLd,
   featuredFirst,
@@ -279,4 +280,12 @@ test('splitNav: six header links by mode priority in nav order, Contact pinned, 
   assert.deepEqual(hrefs(short.primary), ['/x', '/research']);
   assert.equal(short.contact, undefined);
   assert.deepEqual(short.more, []);
+});
+
+test('isFirstAuthor: the first author, or any of the leading equal-contribution authors', () => {
+  const authors = ['Ali Yalabadi', 'Jane Smith', 'Sina Abdidizaji'];
+  assert.ok(isFirstAuthor(['Jane Smith', 'Ali Yalabadi'], 'Prof. Jane Smith'));
+  assert.ok(!isFirstAuthor(authors, 'Jane Smith'));
+  assert.ok(isFirstAuthor(authors, 'Jane Smith', 2));
+  assert.ok(!isFirstAuthor(authors, 'Sina Abdidizaji', 2));
 });
