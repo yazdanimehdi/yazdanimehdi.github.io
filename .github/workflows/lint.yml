@@ -24,6 +24,49 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Unit tests
+        run: pnpm test
+
+      - name: Static build (no adapter output; Sveltia admin present)
+        run: |
+          pnpm build
+          admin_path=$(node -e "const y=require('js-yaml');console.log(y.load(require('fs').readFileSync('config/site.yml','utf8')).adminPath||'admin')")
+          test -f "dist/$admin_path/index.html"
+          test ! -e .vercel/output
+          pnpm exec tsx --test src/lib/markdown-parity.test.ts
+
+      - name: Vercel build (admin routes are functions)
+        env:
+          VERCEL: '1'
+          SESSION_SECRET: ci-build-only-not-a-real-secret-0000
+        run: |
+          pnpm build
+          test -d .vercel/output/functions
+          if grep -rq "__SCHOLAROS_ADMIN__" .vercel/output/functions; then echo "admin settings were not baked in"; exit 1; fi
+
+      - name: Postgres-mode build (public pages are functions; the build never connects)
+        env:
+          VERCEL: '1'
+          DATABASE_URL: postgres://ci@localhost:1/ci
+          SESSION_SECRET: ci-build-only-not-a-real-secret-0000
+        run: |
+          rm -rf .vercel/output
+          pnpm build
+          test -d .vercel/output/functions
+          test -f .vercel/output/functions/_render.func/src/lib/cv-pdf/fonts/SourceSerif4-Regular.ttf
+          test ! -e .vercel/output/static/index.html
+          test ! -e .vercel/output/static/blog/index.html
+
+      # Full demo assertions only in the template repo; forks edit content, so they get the structural check.
+      # The dist-baseline comparison is a local pre-merge gate (gitignored), so CI always skips it.
+      - name: Build both themes (template, full check)
+        if: ${{ github.event.repository.is_template }}
+        run: pnpm check:themes
+
+      - name: Build both themes (fork, structural check)
+        if: ${{ !github.event.repository.is_template }}
+        run: node scripts/check-themes.mjs --structural
+
       - name: ESLint
         continue-on-error: true
         run: pnpm eslint .

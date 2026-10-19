@@ -1,0 +1,38 @@
+---
+/*
+ * hero.type in the journal's terms: a hairline pattern at a whisper, an image or video under a paper wash, or
+ * nothing. Animation presets are classic-only; the journal draws them as the configured pattern instead.
+ */
+import type { HeroConfig } from '../../lib/types';
+
+interface Props {
+  hero?: HeroConfig;
+}
+
+const { hero } = Astro.props;
+const type = hero?.type === 'animation' ? 'pattern' : (hero?.type ?? 'none');
+const pattern = hero?.pattern?.name ?? 'grid';
+const light = hero?.light?.bgImage?.trim();
+const dark = hero?.dark?.bgImage?.trim() || light;
+const video = hero?.video?.src?.trim();
+const poster = hero?.video?.poster?.trim();
+const imageStyle =
+  type === 'image' && light ? `--ed-hero-img: url('${light}'); --ed-hero-img-dark: url('${dark}');` : undefined;
+---
+
+{type === 'pattern' && <div class="ed-backdrop ed-backdrop--pattern" data-pattern={pattern} aria-hidden="true" />}
+{type === 'image' && imageStyle && <div class="ed-backdrop ed-backdrop--image" style={imageStyle} aria-hidden="true" />}
+{
+  type === 'video' && video && (
+    <div class="ed-backdrop ed-backdrop--video" aria-hidden="true">
+      <video data-hero-video muted loop playsinline preload="none" poster={poster} src={video} />
+    </div>
+  )
+}
+
+<script>
+  // Autoplay only when motion is welcome; otherwise the poster stays.
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    for (const v of document.querySelectorAll<HTMLVideoElement>('[data-hero-video]')) v.play().catch(() => {});
+  }
+</script>

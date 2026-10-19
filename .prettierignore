@@ -1,6 +1,21 @@
 dist/
+.vercel/
 node_modules/
 .astro/
 pnpm-lock.yaml
 src/data/*.json
 src/components/astro/Analytics.astro
+dist-*/
+
+# design reference and planning docs (not code)
+personal-site-handoff/
+HANDOFF.md
+docs/superpowers/
+.superpowers/
+
+# RenderCV import fixture, kept byte-for-byte
+tests/fixtures/
+
+# Impeccable design tooling state and raster provenance sidecars (generated)
+.impeccable/
+*.webp.json

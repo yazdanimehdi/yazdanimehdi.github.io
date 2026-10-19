@@ -1,0 +1,22 @@
+---
+import type { NavItem } from '../../lib/types';
+
+/** The footer index: nav pages that did not fit the journal header. */
+interface Props {
+  items: NavItem[];
+  label: string;
+  isActive: (href: string) => boolean;
+}
+
+const { items, label, isActive } = Astro.props;
+---
+
+<nav class="ed-footer-nav" aria-label={label}>
+  {
+    items.map((item) => (
+      <a class="ul" href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
+        {item.label}
+      </a>
+    ))
+  }
+</nav>

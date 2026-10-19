@@ -1,0 +1,117 @@
+---
+import Ai from '../Ai.vue';
+import Collection from '../Collection.vue';
+import Cv from '../Cv.vue';
+import Editor from '../Editor.vue';
+import Dashboard from '../Dashboard.vue';
+import Login from '../Login.vue';
+import Media from '../Media.vue';
+import Pages from '../Pages.vue';
+import PostEditor from '../PostEditor.vue';
+import Posts from '../Posts.vue';
+import Settings from '../Settings.vue';
+import Users from '../Users.vue';
+import { getMode } from '../../lib/mode';
+import { readConfig } from '../../lib/admin/content';
+import { getStore } from '../../lib/admin/get-store';
+import { authorOf } from '../../lib/admin/http';
+import { adminSettings, canPublish } from '../../lib/admin/settings';
+import '../../themes/editorial/editorial.css';
+import '../admin.css';
+
+export const prerender = false;
+
+const { adminPath, siteName } = adminSettings();
+const [screen = '', arg = ''] = (Astro.params.path ?? '').split('/');
+const SCREENS = new Set([
+  '',
+  'login',
+  'media',
+  'posts',
+  'publications',
+  'content',
+  'cv',
+  'pages',
+  'settings',
+  'users',
+  'ai',
+  'editor',
+]);
+const CONTENT = ['announcements', 'people', 'projects', 'talks', 'positions'];
+if (!SCREENS.has(screen)) return new Response('Not found', { status: 404 });
+if (screen === 'content' && !CONTENT.includes(arg)) return new Response('Not found', { status: 404 });
+if (screen === 'users' && getMode() !== 'postgres') return new Response('Not found', { status: 404 });
+
+// The post editor's "Import to Medium" needs the public site URL. Read from the store like the medium API route, so
+// it is current in both modes (git: GitHub; Postgres: the database, where site.yml lives); unreadable → the editor
+// falls back to its own origin.
+const user = Astro.locals.user;
+let siteUrl = '';
+if (screen === 'posts' && arg && user) {
+  try {
+    siteUrl = String((await readConfig(getStore(authorOf(user)), 'site')).data.siteUrl ?? '');
+  } catch {
+    // the editor still opens; its API calls report the store error
+  }
+}
+const mode = getMode();
+const ctx = {
+  adminPath,
+  siteName,
+  user: user ?? null,
+  mode,
+  canPublish: !!user && canPublish(user, adminSettings()),
+  mediumToken: !!process.env.MEDIUM_TOKEN,
+  siteUrl,
+};
+const LOGIN_ERRORS: Record<string, string> = {
+  denied: "That GitHub account isn't on this site's admin list (adminUsers in config/site.yml).",
+  expired: 'Sign-in expired or was interrupted. Please try again.',
+};
+const error = Astro.url.searchParams.get('error');
+const githubLogin = mode !== 'postgres' || !!(process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET);
+const loginError = error ? (Object.hasOwn(LOGIN_ERRORS, error) ? LOGIN_ERRORS[error] : LOGIN_ERRORS.expired) : '';
+if (screen === 'login' && error === 'denied') Astro.response.status = 403;
+---
+
+<!doctype html>
+<html lang="en" data-theme="editorial">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex" />
+    <title>Site admin · {siteName}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono&family=IBM+Plex+Sans:wght@400;500;600&family=Source+Serif+4:opsz,wght@8..60,400;8..60,600&display=swap"
+    />
+  </head>
+  <body class="adm">
+    {
+      screen === 'login' && (
+        <Login
+          client:only="vue"
+          adminPath={adminPath}
+          siteName={siteName}
+          password={mode === 'postgres'}
+          github={githubLogin}
+          error={loginError}
+        />
+      )
+    }
+    {screen === 'media' && <Media client:only="vue" ctx={ctx} />}
+    {screen === 'pages' && <Pages client:only="vue" ctx={ctx} />}
+    {screen === 'settings' && <Settings client:only="vue" ctx={ctx} />}
+    {screen === 'ai' && <Ai client:only="vue" ctx={ctx} />}
+    {screen === 'editor' && <Editor client:only="vue" ctx={ctx} />}
+    {screen === 'users' && <Users client:only="vue" ctx={ctx} />}
+    {screen === 'cv' && <Cv client:only="vue" ctx={ctx} />}
+    {screen === '' && <Dashboard client:only="vue" ctx={ctx} />}
+    {screen === 'posts' && !arg && <Posts client:only="vue" ctx={ctx} />}
+    {screen === 'posts' && arg && <PostEditor client:only="vue" ctx={ctx} slug={arg} />}
+    {screen === 'publications' && <Collection client:only="vue" ctx={ctx} name="publications" />}
+    {screen === 'content' && <Collection client:only="vue" ctx={ctx} name={arg} />}
+  </body>
+</html>

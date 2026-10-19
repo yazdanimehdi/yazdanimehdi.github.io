@@ -172,6 +172,7 @@ If your website should behave more like a research instrument than a static page
   - [SEO & Structured Data](#seo--structured-data)
   - [RSS Feed](#rss-feed)
   - [CMS Admin Panel](#cms-admin-panel)
+  - [Deploy on Vercel (custom admin)](#deploy-on-vercel-custom-admin)
   - [Cookie Consent (GDPR)](#cookie-consent-gdpr)
   - [Internationalization (i18n)](#internationalization-i18n)
   - [View Transitions](#view-transitions)
@@ -505,6 +506,204 @@ Built-in content management system at `/admin`:
 - **Collection management** -- full CRUD for all content types
 - **Media uploads** -- image and file management
 - **Access control** -- configurable admin user list
+
+### Deploy on Vercel (custom admin)
+
+On Vercel, ScholarOS replaces Sveltia with its own admin at `/<adminPath>` (default `/admin`). It has a dashboard, a post editor with math, a three-column CV editor with RenderCV import, and forms for every other kind of content. The dashboard opens with one line saying how the site is doing: the first problem by name ("Scholar sync failed and 2 more need attention"), "Nothing broken · 1 suggestion", or "Everything is up to date". Then comes **Site status**: one row each for publications, the CV PDF, feeds, scheduled posts, news, people and, in Postgres mode, the backup, with the fix on the row itself (**Retry**, **Sync all feeds**, **Regenerate PDF**, **Check now**). A failure says what went wrong in plain words and offers the action that fits: a link to the settings for a missing or refused key, nothing for a rate limit (the next daily run tries again), and **Retry** for a network error. In Postgres mode, **Run daily jobs** is the one control that runs the jobs: it releases due posts, syncs feeds, checks Google Scholar and backs up to GitHub, which they also do on their own once a day. News with no new item in 183 days is a suggestion, not a problem, and People says how many profiles weren't edited in over a year. **Next up** lists scheduled posts, soonest first, then drafts. Every publish is one commit to your repository; Vercel redeploys and the change is live in about a minute. Public pages stay static, and GitHub Pages and Netlify keep using Sveltia.
+
+If your site already runs on Vercel, set the environment variables below before its next redeploy: from then on the custom admin replaces Sveltia at `/<adminPath>`, and without them nobody can sign in.
+
+1. **Import the repository in Vercel** (New Project → your repository). No build settings are needed.
+2. **Create a GitHub OAuth App** (GitHub → Settings → Developer settings → OAuth Apps → New OAuth App).
+   - Homepage URL: `https://<your-domain>`
+   - Authorization callback URL: `https://<your-domain>/api/admin/auth/callback`
+   - Keep the client ID, and generate a client secret.
+3. **Create a fine-grained personal access token** (GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens).
+   - Repository access: only this repository.
+   - Permissions: **Contents: Read and write**, and **Actions: Read and write** (needed for "Generate PDF").
+4. **Set the environment variables** in Vercel (Project → Settings → Environment Variables):
+
+   | Variable               | Value                                                                            |
+   | ---------------------- | -------------------------------------------------------------------------------- |
+   | `GITHUB_CLIENT_ID`     | OAuth App client ID                                                              |
+   | `GITHUB_CLIENT_SECRET` | OAuth App client secret                                                          |
+   | `GITHUB_TOKEN`         | the fine-grained token                                                           |
+   | `SESSION_SECRET`       | at least 32 random characters (`openssl rand -base64 48`)                        |
+   | `GITHUB_REPO`          | optional: `owner/name` (defaults to the repository Vercel deploys)               |
+   | `GITHUB_BRANCH`        | optional: the branch to commit to (defaults to the deployed branch, then `main`) |
+
+5. **Add your GitHub username to `adminUsers`** in `config/site.yml`, commit, and let Vercel redeploy.
+
+Sign in at `https://<your-domain>/<adminPath>`. Only `adminUsers` can sign in, and the token never leaves the server. `.env.example` lists the same variables.
+
+To try the admin locally without GitHub, run `VERCEL=1 ADMIN_STORE=memory SESSION_SECRET=<32+ characters> pnpm dev` and open `http://localhost:4321/api/admin/auth/dev`. Edits stay in memory and are never written to disk.
+
+### Postgres mode (live edits, no rebuilds)
+
+With a Postgres database on Vercel, content lives in the database instead of git: a published edit shows on the
+next page load, images go to Vercel Blob, and pages are cached on Vercel's CDN and refreshed precisely when you
+publish. Git stays a safety net: every save keeps a revision (History in the admin) and a daily job commits all
+content to the `content-backup` branch.
+
+1. In the Vercel project: **Storage → Marketplace → Neon** (sets `DATABASE_URL`) and **Storage → Blob**
+   (sets `BLOB_READ_WRITE_TOKEN`). Add `CRON_SECRET` (`openssl rand -base64 48`). Vercel Cron calls
+   `/api/admin/cron/daily` at 03:00 UTC: it syncs feeds, releases scheduled posts and backs up to git; the dashboard's
+   Site status shows each result and has **Run daily jobs**. Keep `GITHUB_TOKEN` for the backup.
+2. Locally: `vercel env pull .env.local --environment=production`, then `pnpm db:setup`. It creates the tables, copies `config/`,
+   `src/content/` and `src/data/` into the database, uploads `src/assets/images` and `public/images` to Blob, and
+   rewrites image references to Blob URLs. It lists any file it could not copy. On a database that already has
+   content it stops; `pnpm db:setup --force` overwrites the documents that exist in the repo and leaves documents
+   that exist only in the database.
+3. Redeploy. The dashboard's Site status now has a **Backup copy** row and **Run daily jobs**.
+
+Notes: MDX posts are shown with a notice (MDX needs a build). The CV PDF is rendered on Vercel (see _CV PDF in Postgres mode_).
+Editing `adminUsers` takes effect after a redeploy. The feeds, Google Scholar and SEO workflows
+(`sync-feeds.yml`, `sync-scholar.yml`, `generate-seo.yml`) commit to git and have no effect on a Postgres-mode site;
+the daily job syncs feeds, and **Check now** syncs them at once.
+
+**Back to git mode:** `pnpm db:export` (writes the database's files into the repo; image references stay Blob
+URLs), commit, remove `DATABASE_URL` from the project, redeploy.
+
+### Admin accounts (Postgres mode)
+
+In Postgres mode you can sign in with a username and password instead of GitHub (GitHub sign-in keeps working when
+`GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET` are set).
+
+1. Apply the migration once: `DATABASE_URL='<production connection string>' pnpm db:migrate` (a `DATABASE_URL`
+   in the shell overrides `.env.local`, which holds the preview pull from local development below).
+2. Create the first account: `DATABASE_URL='<production connection string>' pnpm admin:create-user <username> --production`
+   (asks for a display name and a password of at least 12 characters; you confirm by typing the username again).
+3. Sign in at `https://<your-domain>/<adminPath>/login`.
+
+The **Users** screen adds accounts, resets passwords and deletes accounts; everyone can change their own password
+there. Resetting or changing a password signs that account out on its other devices. After 10 failed sign-ins for a
+username within 15 minutes, that username is refused until the window passes.
+
+### Local development against Neon
+
+1. In the Neon console, create a branch named `dev` from `main` (a copy of your live content).
+2. `vercel link`, then `vercel env pull .env.local --environment=preview`.
+3. Add `DEV_DATABASE_URL=<the dev branch's connection string>` to `.env.local`.
+4. `pnpm admin:create-user <username>` (on the dev branch), then `pnpm dev:postgres`.
+
+`pnpm dev:postgres` runs the site in Postgres mode against the dev branch only: it never uses the `DATABASE_URL`
+from `.env.local` (production). Uploads (images, the CV PDF) go to the shared Blob store; deletes are skipped
+locally so the live site's files are never removed.
+
+### Scheduled posts
+
+A post whose date is in the future is _scheduled_: the editor's button reads **Schedule**, the admin lists it as
+`Scheduled · <date>`, and the site hides it (lists, tag pages, RSS, sitemap, search; its URL is a 404) until that date.
+Precision is one day.
+
+- **Postgres mode:** the daily job (03:00 UTC) refreshes the cached pages.
+- **Git mode on Vercel:** `.github/workflows/release-scheduled.yml` runs daily at 06:00 UTC and, when a post became
+  due, calls a deploy hook. Create one (Vercel → Project → Settings → Git → Deploy Hooks) and save its URL as the
+  repository secret `VERCEL_DEPLOY_HOOK_URL`. Without it the workflow only logs a notice. GitHub sometimes skips
+  scheduled workflow runs; if a scheduled post didn't appear, run "Release scheduled posts" manually from the
+  Actions tab (`workflow_dispatch`).
+- **GitHub Pages:** `deploy.yml` checks daily at 06:00 UTC and rebuilds only when a post became due.
+
+### Cross-posting to Medium
+
+Tick **Also publish to Medium** before publishing a post.
+
+- With `MEDIUM_TOKEN` set (an existing Medium integration token; Medium no longer issues new ones), the post is
+  sent as a Medium **draft** with its canonical link pointing at your site; the Medium link is saved in the post.
+- Without a token, **Import to Medium** copies the post's URL and opens Medium's import tool, which sets the
+  canonical link itself. Paste the resulting Medium link into **Medium URL**.
+
+A post is sent once; afterwards the editor shows **Already on Medium**. When your Medium feed later brings the same
+story in, the Writing page shows only the site's copy.
+
+### AI assist
+
+The admin can draft and rewrite post and news bodies, generate cover images, and turn new Google Scholar papers into
+draft posts, using your own provider keys.
+
+- **Keys.** Open **Scholar & AI** in the admin. In Postgres mode, paste a key and **Save**: it is stored encrypted in
+  the database (with a key derived from `SESSION_SECRET`; changing that secret means entering the keys again). In git
+  mode, set them as environment variables in Vercel; the Scholar & AI screen shows which are set. An environment
+  variable is the fallback in both modes. Keys: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`,
+  `HIGGSFIELD_API_KEY` + `HIGGSFIELD_API_SECRET`, `SERPAPI_KEY`.
+- **Models.** Writing uses Anthropic, OpenAI or Google; images use OpenAI, Google or Higgsfield. Pick them on the
+  Scholar & AI screen (saved to `config/ai.yml`); an empty model uses the current default (`claude-sonnet-5-5`,
+  `gpt-6-astra`, `gemini-3.8-flash`; `gpt-image-2.5-flare`, `gemini-3.1-flash-image`, `higgsfield-ai/soul/standard`).
+- **What is sent.** **Write** and **Rewrite** send the title, subtitle, your instruction and the body to the writing
+  provider. **Generate image** sends the title and summary to the image provider. Paper posts send the paper's
+  title, authors, venue, year, link and abstract. Results land in the editor as unsaved changes (with **Undo**);
+  nothing is published until you save.
+- **Paper drafts.** Add the Scholar author id (the `user=` value of the profile URL) on the Scholar & AI screen.
+  Postgres mode checks daily; **Check now** works in both modes. New papers become publications and, unless turned
+  off, **draft** posts with a cover image, linked to the publication. The first check only records the papers already
+  on the profile (no posts), so turning this on doesn't write a post for every old paper. Each check writes at most
+  **Posts per run** posts (default three); the rest wait for the next one. A publication you delete is not imported
+  again.
+- **Cost.** Each paper post is one writing call and one image call on your provider accounts. Scholar is read
+  through [SerpApi](https://serpapi.com/google-scholar-author-api): one search per author per check plus one per
+  paper post. The free tier (about 250 searches a month) covers one author daily plus a few new papers.
+
+### Site editor
+
+**Site editor** in the admin changes the site's code from a plain-language request ("make the header serif and move
+the news section above publications"). A coding agent edits a private copy of the site in a
+[Vercel Sandbox](https://vercel.com/docs/vercel-sandbox), you check the result in a live preview, and **Publish**
+commits it so the site redeploys.
+
+- **Requirements.** The admin on Vercel (git or Postgres mode), `GITHUB_TOKEN` with Contents: read and write (the
+  token git mode and the backup already use), and a key for the writing provider chosen on the Scholar & AI screen.
+  The agent is that provider's own coding tool: Claude Code for Anthropic, Codex for OpenAI, Gemini CLI for Google,
+  with the writing model from the Scholar & AI screen. On Vercel the sandbox signs in automatically (OIDC). For local
+  development, run `vercel link` and `vercel env pull` to get `VERCEL_OIDC_TOKEN`.
+- **How it works.** **Start** creates one sandbox for the site (about a minute the first time: clone and install).
+  Describe a change and **Run**; the agent's log shows while it works, and the preview reloads when it is done.
+  **Stop** ends the agent and everything it started; what it changed so far stays. Ask for more, **Discard** to go
+  back, or **Publish**: one commit on the deployed branch with your message. In Postgres mode, code is committed to
+  GitHub and content edits (posts, `config/*.yml`) are saved to the database. **Pause** stops the sandbox and keeps
+  its files; **Resume** picks up where you left off, unpublished changes included. **Start over** deletes it and
+  starts from a fresh copy of the live site, which is also the way out when the site changed on GitHub since the
+  session started (Publish then refuses with a 409).
+- **After Publish.** The screen polls `GET /api/admin/editor/deployment`, which returns the deployment's
+  `VERCEL_GIT_COMMIT_SHA`, and says the live site is updated once that matches the published commit. Off Vercel, on
+  a preview URL or behind Skew Protection the commit never changes, so the screen keeps "about a minute".
+  **Undo this publish** reverts the last publish from this screen with a new commit on GitHub. It is refused when a
+  later commit touched the same files, and it isn't offered for a Postgres-mode publish that saved content to the
+  database; in those cases, ask for the change back and publish again.
+- **Scope.** The editor publishes only site code and content: components, layouts, pages (`.astro`, `.md`, `.mdx`;
+  never endpoints or anything named `api`), styles, themes, assets, content files, `src/data/*.json`, `public/` and
+  `config/*.yml`. The admin, sign-in, `src/lib`, middleware, integrations, `config/ai.yml`, dependencies, build and
+  deploy config, dot-files and secrets are refused: the screen shows refused files in red and Publish stays
+  disabled until you undo them (**Undo this file** reverts one file and keeps the rest) or discard. The review lists
+  each request with the agent's plain-language **What changed** summary, above the diff. `.astro` files can still
+  run server code when they load; if you're unsure, share the preview link with someone technical before publishing.
+- **Keys stay out of the sandbox.** The provider key never enters the sandbox: the agent sees a placeholder and the
+  sandbox firewall adds the real key to requests to the provider's API only. The GitHub token enters a sandbox once,
+  for the first clone, before any agent has run in it, and GitHub is closed to the sandbox from then on; publishing
+  happens from the admin, not from the sandbox.
+- **Cost.** Sandbox time is billed to your Vercel account; a session times out after 30 minutes without a run (each
+  run extends it) and Hobby sessions end at 45 minutes (the files persist; **Resume** picks up). Each run is
+  billed by your provider like any use of its coding tool. One session per site: every admin shares it, and a second
+  **Run** while one is active is refused.
+- **Publishers.** `publishers` in `config/site.yml` lists who may **Publish** and **Undo this publish**: GitHub
+  usernames as in `adminUsers`, or `password:<username>` for a password account (Postgres mode), so a password account
+  never passes for the GitHub user of the same name. Empty or unset, every admin publishes. Other admins can Start,
+  Run, Stop, Discard and ask for more; their changes wait in the shared session, the review says who asked for each,
+  and the publish routes answer 403. Publishers see "Site changes waiting for review" on the Dashboard's Next up,
+  read from a tag on the sandbox (one lookup that never wakes it), so it shows while the session is paused too.
+
+### CV PDF in Postgres mode
+
+The CV PDF is rendered on Vercel whenever you publish the CV or a publication (and with **Generate PDF**), stored in
+Vercel Blob, and linked from the CV page. It uses fixed fonts (Source Serif 4 and IBM Plex Sans) and its own layout,
+so it looks different from the RenderCV PDF that git mode builds on GitHub Actions. Paper size:
+
+```yaml
+# config/cv.yml
+pdf:
+  pageSize: A4 # or LETTER (default)
+```
+
+Per-person lab CVs (`cv/*.yml`) are rendered in git mode only.
 
 ### Cookie Consent (GDPR)
 

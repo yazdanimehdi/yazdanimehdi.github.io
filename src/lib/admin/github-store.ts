@@ -1,0 +1,357 @@
+import { deleteRepoMedia, listRepoMedia, putRepoMedia } from './git-media';
+import {
+  ConflictError,
+  UpstreamError,
+  blobVersions,
+  type Author,
+  type Change,
+  type ContentStore,
+  type MediaFolder,
+  type StoredFile,
+} from './store';
+
+export interface GitHubConfig {
+  token: string;
+  owner: string;
+  repo: string;
+  branch: string;
+}
+
+export interface WorkflowRun {
+  status: string;
+  conclusion: string | null;
+  url: string;
+  createdAt: string;
+}
+
+/** Repo from GITHUB_REPO ("owner/name") or Vercel's git metadata; branch from GITHUB_BRANCH, the deployed ref, or main. */
+export function githubConfig(env: Record<string, string | undefined>): GitHubConfig {
+  const [owner, repo] = env.GITHUB_REPO
+    ? env.GITHUB_REPO.split('/')
+    : [env.VERCEL_GIT_REPO_OWNER, env.VERCEL_GIT_REPO_SLUG];
+  if (!env.GITHUB_TOKEN) {
+    throw new UpstreamError('GITHUB_TOKEN is not set. Add a fine-grained token in the Vercel project settings.', 500);
+  }
+  if (!owner || !repo)
+    throw new UpstreamError('Set GITHUB_REPO to "owner/name" (Vercel git metadata is missing).', 500);
+  return { token: env.GITHUB_TOKEN, owner, repo, branch: env.GITHUB_BRANCH || env.VERCEL_GIT_COMMIT_REF || 'main' };
+}
+
+class GitHubError extends UpstreamError {
+  constructor(
+    message: string,
+    readonly githubStatus: number,
+  ) {
+    super(message);
+  }
+}
+
+/** The branch moved between reading the head and updating the ref. */
+class RefRace extends Error {}
+
+const encodePath = (p: string) => p.split('/').map(encodeURIComponent).join('/');
+
+export class GitHubStore implements ContentStore {
+  constructor(
+    private cfg: GitHubConfig,
+    private author?: Author,
+    private fetchFn: typeof fetch = fetch,
+  ) {}
+
+  private async gh<T>(method: string, route: string, body?: unknown, allow404 = false): Promise<T | null> {
+    const res = await this.fetchFn(`https://api.github.com/repos/${this.cfg.owner}/${this.cfg.repo}${route}`, {
+      method,
+      headers: {
+        Authorization: `Bearer ${this.cfg.token}`,
+        Accept: 'application/vnd.github+json',
+        'X-GitHub-Api-Version': '2022-11-28',
+        'User-Agent': 'ScholarOS-admin',
+        ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    if (allow404 && res.status === 404) return null;
+    if (res.status === 204) return null;
+    if (!res.ok) throw await this.error(res);
+    return (await res.json()) as T;
+  }
+
+  private async error(res: Response): Promise<GitHubError> {
+    const text = await res.text().catch(() => '');
+    let message = text;
+    try {
+      message = (JSON.parse(text) as { message?: string }).message ?? text;
+    } catch {
+      // not JSON: keep the text
+    }
+    if (res.status === 401)
+      return new GitHubError(`GitHub rejected GITHUB_TOKEN (expired or revoked): ${message}`, 401);
+    if (res.status === 403 || res.status === 404) {
+      const needed =
+        res.headers.get('x-accepted-github-permissions') || 'Contents: read and write, Actions: read and write';
+      return new GitHubError(
+        `GitHub refused the request (${res.status}: ${message}). The token needs ${needed} on ${this.cfg.owner}/${this.cfg.repo}.`,
+        res.status,
+      );
+    }
+    return new GitHubError(`GitHub error ${res.status}: ${message}`, res.status);
+  }
+
+  private ref(ref = this.cfg.branch): string {
+    return `?ref=${encodeURIComponent(ref)}`;
+  }
+
+  async read(path: string): Promise<StoredFile | null> {
+    const file = await this.gh<{ type?: string; sha: string; content?: string; encoding?: string }>(
+      'GET',
+      `/contents/${encodePath(path)}${this.ref()}`,
+      undefined,
+      true,
+    );
+    if (!file || Array.isArray(file) || file.type !== 'file') return null;
+    if (file.encoding !== 'base64')
+      throw new UpstreamError(`${path} is larger than 1 MB and can't be edited here.`, 413);
+    return { path, content: Buffer.from(file.content ?? '', 'base64').toString('utf8'), version: file.sha };
+  }
+
+  async list(dir: string): Promise<{ path: string; version: string }[]> {
+    const entries = await this.gh<{ type: string; path: string; sha: string }[]>(
+      'GET',
+      `/contents/${encodePath(dir)}${this.ref()}`,
+      undefined,
+      true,
+    );
+    if (!Array.isArray(entries)) return [];
+    const nested = await Promise.all(
+      entries.map(async (e) =>
+        e.type === 'dir' ? this.list(e.path) : e.type === 'file' ? [{ path: e.path, version: e.sha }] : [],
+      ),
+    );
+    return nested.flat();
+  }
+
+  /** Every file on the branch with its blob sha; null when the branch doesn't exist. */
+  async tree(): Promise<Map<string, string> | null> {
+    const t = await this.gh<{ truncated: boolean; tree: { path: string; type: string; sha: string }[] }>(
+      'GET',
+      `/git/trees/${encodePath(this.cfg.branch)}?recursive=1`,
+      undefined,
+      true,
+    );
+    if (!t) return null;
+    if (t.truncated) throw new UpstreamError('The repository tree is too large to compare in one request.');
+    return new Map(t.tree.filter((e) => e.type === 'blob').map((e) => [e.path, e.sha]));
+  }
+
+  /** Creates the configured branch at the head of the repository's default branch. */
+  async createBranch(): Promise<void> {
+    const repo = await this.gh<{ default_branch: string }>('GET', '');
+    const head = await this.gh<{ object: { sha: string } }>(
+      'GET',
+      `/git/ref/heads/${encodePath(repo!.default_branch)}`,
+    );
+    await this.gh('POST', '/git/refs', { ref: `refs/heads/${this.cfg.branch}`, sha: head!.object.sha });
+  }
+
+  async commit(changes: Change[], message: string, base: Record<string, string | null>) {
+    try {
+      return await this.tryCommit(changes, message, base);
+    } catch (e) {
+      if (!(e instanceof RefRace)) throw e;
+      // The branch moved: start again from the new head (versions are checked again there).
+      try {
+        return await this.tryCommit(changes, message, base);
+      } catch (again) {
+        throw again instanceof RefRace ? new ConflictError(changes[0]?.path ?? this.cfg.branch) : again;
+      }
+    }
+  }
+
+  private async tryCommit(changes: Change[], message: string, base: Record<string, string | null>) {
+    const branch = encodePath(this.cfg.branch);
+    const ref = await this.gh<{ object: { sha: string } }>('GET', `/git/ref/heads/${branch}`, undefined, true);
+    if (!ref) {
+      // A token without access to a private repo also gets 404 here: if the repo itself 404s, blame the token.
+      await this.gh('GET', '');
+      const { owner, repo } = this.cfg;
+      throw new UpstreamError(
+        `Branch "${this.cfg.branch}" was not found in ${owner}/${repo}. Set GITHUB_BRANCH to an existing branch.`,
+      );
+    }
+    const head = ref.object.sha;
+    const baseTree = (await this.gh<{ tree: { sha: string } }>('GET', `/git/commits/${head}`))!.tree.sha;
+    const current = await Promise.all(
+      changes.map((c) =>
+        this.gh<{ sha: string }>('GET', `/contents/${encodePath(c.path)}${this.ref(head)}`, undefined, true),
+      ),
+    );
+    changes.forEach((c, i) => {
+      const file = current[i];
+      const sha = file && !Array.isArray(file) ? file.sha : null;
+      if (sha !== (base[c.path] ?? null)) throw new ConflictError(c.path);
+      // Deleting a file that isn't there: GitHub would answer 422 on the tree.
+      if (c.content === null && sha === null) throw new ConflictError(c.path);
+    });
+    const tree = await Promise.all(
+      changes.map(async (c) => ({
+        path: c.path,
+        mode: '100644',
+        type: 'blob',
+        sha:
+          c.content === null
+            ? null
+            : (await this.gh<{ sha: string }>('POST', '/git/blobs', {
+                content: c.content,
+                encoding: c.encoding ?? 'utf-8',
+              }))!.sha,
+      })),
+    );
+    const newTree = (await this.gh<{ sha: string }>('POST', '/git/trees', { base_tree: baseTree, tree }))!.sha;
+    const author = this.author && { ...this.author, date: new Date().toISOString() };
+    const commit = (await this.gh<{ sha: string; html_url: string }>('POST', '/git/commits', {
+      message,
+      tree: newTree,
+      parents: [head],
+      ...(author ? { author } : {}),
+    }))!;
+    try {
+      await this.gh('PATCH', `/git/refs/heads/${branch}`, { sha: commit.sha, force: false });
+    } catch (e) {
+      if (e instanceof GitHubError && e.githubStatus === 422) throw new RefRace();
+      throw e;
+    }
+    return { id: commit.sha, url: commit.html_url, versions: blobVersions(changes) };
+  }
+
+  /**
+   * What reverting commit `sha` takes, read from GitHub alone: each file it touched back to its content in the parent
+   * (null where the commit added it), and as the base the blobs the commit left (null where it removed one), so
+   * `commit` refuses if anything touched those files since. Single-parent commits under GitHub's 300-file listing only.
+   */
+  async revertChanges(
+    sha: string,
+  ): Promise<{ message: string; changes: Change[]; base: Record<string, string | null> }> {
+    const c = await this.gh<{
+      commit: { message: string };
+      parents: { sha: string }[];
+      files?: { filename: string; status: string; sha: string; previous_filename?: string }[];
+    }>('GET', `/commits/${encodeURIComponent(sha)}`, undefined, true);
+    if (!c) throw new UpstreamError(`Commit ${sha.slice(0, 7)} is not in ${this.cfg.owner}/${this.cfg.repo}.`, 404);
+    if (c.parents.length !== 1 || !c.files || c.files.length >= 300) {
+      throw new UpstreamError(`Commit ${sha.slice(0, 7)} is too large or a merge, so it can't be undone here.`, 409);
+    }
+    const parent = c.parents[0].sha;
+    const changes: Change[] = [];
+    const base: Record<string, string | null> = {};
+    const restore = async (path: string, current: string | null) => {
+      const old = await this.gh<{ type?: string; content?: string; encoding?: string }>(
+        'GET',
+        `/contents/${encodePath(path)}${this.ref(parent)}`,
+        undefined,
+        true,
+      );
+      if (!old || Array.isArray(old) || old.type !== 'file' || old.encoding !== 'base64') {
+        throw new UpstreamError(`${path} can't be restored here (missing before the commit, or over 1 MB).`, 409);
+      }
+      changes.push({ path, content: (old.content ?? '').replace(/\s/g, ''), encoding: 'base64' });
+      base[path] = current;
+    };
+    for (const f of c.files) {
+      if (f.status === 'added') {
+        changes.push({ path: f.filename, content: null });
+        base[f.filename] = f.sha;
+      } else if (f.status === 'removed') {
+        await restore(f.filename, null);
+      } else if (f.status === 'renamed' && f.previous_filename) {
+        await restore(f.previous_filename, null);
+        changes.push({ path: f.filename, content: null });
+        base[f.filename] = f.sha;
+      } else {
+        await restore(f.filename, f.sha);
+      }
+    }
+    return { message: c.commit.message, changes, base };
+  }
+
+  /** The newest of the branch's last 100 commits whose message has `trailer` as a line; null when none does. */
+  async latestCommitWith(trailer: string): Promise<string | null> {
+    const commits = await this.gh<{ sha: string; commit: { message: string } }[]>(
+      'GET',
+      `/commits?sha=${encodeURIComponent(this.cfg.branch)}&per_page=100`,
+    );
+    return commits?.find((c) => c.commit.message.split('\n').includes(trailer))?.sha ?? null;
+  }
+
+  async lastModified(path: string): Promise<string | null> {
+    const commits = await this.gh<{ commit: { committer: { date: string } } }[]>(
+      'GET',
+      `/commits?path=${encodeURIComponent(path)}&sha=${encodeURIComponent(this.cfg.branch)}&per_page=1`,
+    );
+    return commits?.[0]?.commit.committer.date ?? null;
+  }
+
+  listMedia(folder: MediaFolder) {
+    return listRepoMedia(this, folder);
+  }
+
+  putMedia(folder: MediaFolder, filename: string, base64: string, _contentType?: string) {
+    return putRepoMedia(this, folder, filename, base64);
+  }
+
+  deleteMedia(path: string, version: string) {
+    return deleteRepoMedia(this, path, version);
+  }
+
+  /** Starts a workflow_dispatch run (e.g. render-cv.yml) on the configured branch. */
+  async dispatchWorkflow(file: string): Promise<void> {
+    await this.gh('POST', `/actions/workflows/${encodeURIComponent(file)}/dispatches`, { ref: this.cfg.branch });
+  }
+
+  /** The configured branch's head: the last publish, since every commit redeploys the site. */
+  async latestCommit(): Promise<{ at: string; url: string } | null> {
+    const commits = await this.gh<{ html_url: string; commit: { committer: { date: string } } }[]>(
+      'GET',
+      `/commits?sha=${encodeURIComponent(this.cfg.branch)}&per_page=1`,
+    );
+    const head = commits?.[0];
+    return head ? { at: head.commit.committer.date, url: head.html_url } : null;
+  }
+
+  async latestRun(file: string): Promise<WorkflowRun | null> {
+    const runs = await this.gh<{
+      workflow_runs: { status: string; conclusion: string | null; html_url: string; created_at: string }[];
+    }>(
+      'GET',
+      `/actions/workflows/${encodeURIComponent(file)}/runs?per_page=1&branch=${encodeURIComponent(this.cfg.branch)}`,
+    );
+    const run = runs?.workflow_runs[0];
+    return run
+      ? { status: run.status, conclusion: run.conclusion, url: run.html_url, createdAt: run.created_at }
+      : null;
+  }
+
+  /** Read probes for the admin's permission banner; missing write access shows up as a 502 on the first save. */
+  async capabilities(): Promise<{ contents: boolean; actions: boolean; error?: string }> {
+    const probe = (route: string) =>
+      this.gh('GET', route).then(
+        () => true,
+        () => false,
+      );
+    const [contents, actions] = await Promise.all([
+      probe(`/contents${this.ref()}`),
+      probe('/actions/workflows?per_page=1'),
+    ]);
+    const branchMissing =
+      !contents &&
+      (await probe('')) &&
+      (await this.gh('GET', `/git/ref/heads/${encodePath(this.cfg.branch)}`, undefined, true)) === null;
+    const error = branchMissing
+      ? `Branch "${this.cfg.branch}" was not found in ${this.cfg.owner}/${this.cfg.repo}. Set GITHUB_BRANCH.`
+      : !contents
+        ? `The GitHub token can't read ${this.cfg.owner}/${this.cfg.repo}. It needs Contents: read and write.`
+        : !actions
+          ? 'The GitHub token lacks Actions: read and write, so "Generate PDF" will not work.'
+          : undefined;
+    return { contents, actions, ...(error ? { error } : {}) };
+  }
+}

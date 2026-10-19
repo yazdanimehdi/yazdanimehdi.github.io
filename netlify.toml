@@ -6,6 +6,16 @@
   NODE_VERSION = "22"
 
 [[headers]]
+  # Security headers for every response (mirrors vercel.json)
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "SAMEORIGIN"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=(), payment=(), usb=(), browsing-topics=()"
+    Content-Security-Policy = "frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; upgrade-insecure-requests"
+
+[[headers]]
   # Hashed assets built by Astro/Vite — immutable forever
   for = "/_astro/*"
   [headers.values]

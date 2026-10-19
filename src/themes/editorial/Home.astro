@@ -1,0 +1,287 @@
+---
+import Layout from './Layout.astro';
+import PaperRow from './PaperRow.astro';
+import NewsList from './NewsList.astro';
+import PostRow from './PostRow.astro';
+import HeroBackdrop from './HeroBackdrop.astro';
+import { jsonLd, socialLinks } from '../../lib/editorial';
+import { imageFacts } from '../../lib/inkArt';
+import { uiStrings } from '../../lib/ui-strings';
+import type { HomeData } from './data';
+
+type Props = HomeData;
+
+const {
+  config,
+  name,
+  blocks,
+  showBio,
+  showNews,
+  showWriting,
+  bioHtml,
+  affiliations,
+  researchHeadline,
+  areas,
+  selected,
+  pubCount,
+  owners,
+  hasCv,
+  hasPeople,
+  hasOpenPositions,
+  news,
+  writing,
+} = Astro.props;
+const ed = config.editorial ?? {};
+const email = config.socials?.email;
+const links = socialLinks(config.socials);
+// The hero's one quiet profile row: scholarly IDs only. Every profile stays in the contact band.
+const profiles = socialLinks({
+  scholar: config.socials?.scholar,
+  orcid: config.socials?.orcid,
+  github: config.socials?.github,
+});
+const t = uiStrings(config);
+const navLabel = (href: string) => config.nav.find((n) => n.href === href)?.label;
+const blogLabel = navLabel('/blog') ?? t('home.writing');
+const newsLabel = navLabel('/news') ?? t('home.news');
+const lab = config.siteMode === 'lab';
+// Hero actions come from the data: only pages that have something to show. The first is the button.
+// A lab leads with what a prospective member came for: open positions, the team, then its work.
+const actions = (
+  lab
+    ? [
+        hasOpenPositions && { href: '/positions', label: t('home.positions') },
+        hasPeople && { href: '/people', label: t('home.people') },
+        areas.length > 0
+          ? { href: '/research', label: t('home.researchOverview') }
+          : pubCount > 0 && { href: '/publications', label: t('home.viewPublications') },
+      ]
+    : [
+        pubCount > 0 && { href: '/publications', label: t('home.viewPublications') },
+        hasCv && { href: '/cv', label: t('home.cv') },
+        hasOpenPositions && { href: '/positions', label: t('engage.students') },
+      ]
+).filter((a): a is { href: string; label: string } => !!a);
+// The line under the name: a lab's own role line (or department · university), a person's eyebrow.
+const role = lab
+  ? ed.labRole?.trim() || [config.department, config.university].filter((v) => v?.trim()).join(' · ')
+  : ed.eyebrow;
+// Affiliations the role line already names are not repeated under it.
+const affils = affiliations.filter((a) => !role?.includes(a));
+const hasUpdates = (showNews && news.length > 0) || (showWriting && writing.length > 0);
+const figure = ed.figure?.image ? await imageFacts(ed.figure.image) : null;
+
+const ld =
+  config.siteMode === 'personal'
+    ? {
+        '@context': 'https://schema.org',
+        '@type': 'Person',
+        name,
+        jobTitle: ed.eyebrow,
+        affiliation: affiliations.map((a) => ({ '@type': 'Organization', name: a })),
+        sameAs: links.map((l) => l.href),
+        email: email ? `mailto:${email}` : undefined,
+        url: config.siteUrl,
+      }
+    : {
+        '@context': 'https://schema.org',
+        '@type': 'ResearchOrganization',
+        name,
+        url: config.siteUrl,
+        sameAs: links.map((l) => l.href),
+      };
+---
+
+<Layout title={lab ? config.title : name} contactFooter>
+  <script type="application/ld+json" set:html={jsonLd(ld)} />
+  {!blocks.includes('hero') && <h1 class="ed-sr-only">{name}</h1>}
+  {
+    blocks.map((block) => {
+      if (block === 'hero') {
+        return (
+          <section class="ed-hero-band">
+            <HeroBackdrop hero={config.hero} />
+            <div class="ed-wrap ed-hero">
+              <div class="ed-hero-text">
+                <h1 class="ed-hero-name" dir="auto">
+                  {name}
+                </h1>
+                {(role || affils.length > 0) && (
+                  <div class="ed-role">
+                    {role && <p dir="auto">{role}</p>}
+                    {affils.length > 0 && (
+                      <ul class="ed-affil" aria-label={t('home.affiliations')}>
+                        {affils.map((a) => (
+                          <li>
+                            <span dir="auto">{a}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+                {ed.tagline && (
+                  <p class="ed-tagline" dir="auto">
+                    {ed.tagline}
+                  </p>
+                )}
+                {showBio && bioHtml && <div class="ed-bio" dir="auto" set:html={bioHtml} />}
+                {(profiles.length > 0 || email) && (
+                  <ul class="ed-profiles" aria-label={t('home.profiles')}>
+                    {email && (
+                      <li>
+                        <a href={`mailto:${email}`} class="ed-email" dir="ltr">
+                          {email}
+                        </a>
+                      </li>
+                    )}
+                    {profiles.map((l) => (
+                      <li>
+                        <a href={l.href} class="ul" rel="noopener noreferrer">
+                          <bdi>{l.label}</bdi>
+                          <span class="arr" aria-hidden="true">
+                            ↗
+                          </span>
+                          <span class="ed-sr-only">{t('link.external')}</span>
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {actions.length > 0 && (
+                  <div class="ed-actions">
+                    {actions.map((a, i) =>
+                      i === 0 ? (
+                        <a href={a.href} class="ed-btn">
+                          {a.label}
+                        </a>
+                      ) : (
+                        <a href={a.href} class="ul ed-more">
+                          {a.label} <span class="arr">→</span>
+                        </a>
+                      ),
+                    )}
+                  </div>
+                )}
+              </div>
+              {ed.figure?.image && (
+                <figure class="ed-figure">
+                  <div class="ed-figure-box">
+                    <img
+                      src={ed.figure.image}
+                      alt={ed.figure.alt ?? ''}
+                      width={figure?.width}
+                      height={figure?.height}
+                      class:list={[figure?.ink && 'ed-ink']}
+                      fetchpriority="high"
+                      decoding="async"
+                    />
+                  </div>
+                  {ed.figure.caption && (
+                    <figcaption class="ed-figcaption">
+                      <b>
+                        <bdi>{t('figure.label', { n: 1 })}</bdi>
+                      </b>{' '}
+                      <span dir="auto">{ed.figure.caption}</span>
+                    </figcaption>
+                  )}
+                </figure>
+              )}
+            </div>
+          </section>
+        );
+      }
+
+      if (block === 'research') {
+        return (
+          <section class="ed-wrap ed-home-section" aria-labelledby="home-research">
+            <div class="ed-section-head">
+              <h2 id="home-research" class="ed-h2">
+                {t('home.research')}
+              </h2>
+              <a href="/research" class="ul ed-more">
+                {t('home.researchOverview')} <span class="arr">→</span>
+              </a>
+            </div>
+            {/* The tagline already says what this person studies; the full lede stays on /research. */}
+            {researchHeadline && !ed.tagline && (
+              <p class="ed-lede ed-home-lede" dir="auto">
+                {researchHeadline}
+              </p>
+            )}
+            <ol class="ed-topics">
+              {areas.map((a) => (
+                <li class="row ed-topic">
+                  <span class="ed-topic-num" aria-hidden="true">
+                    <bdi>{a.numeral}</bdi>
+                  </span>
+                  <div class="ed-topic-body">
+                    <h3 class="ed-topic-title" dir="auto">
+                      <a href={`/research#${a.id}`}>{a.title}</a>
+                    </h3>
+                    <p dir="auto">{a.description}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
+          </section>
+        );
+      }
+
+      if (block === 'publications' && selected.length > 0) {
+        return (
+          <section class="ed-wrap ed-home-section ed-home-section--papers" aria-labelledby="home-papers">
+            <div class="ed-section-head">
+              <h2 id="home-papers" class="ed-h2">
+                {t('home.selectedPapers')}
+              </h2>
+              <a href="/publications" class="ul ed-more">
+                {t('home.allPublications', { count: pubCount })} <span class="arr">→</span>
+              </a>
+            </div>
+            <ol class="ed-papers">
+              {selected.map((pub) => (
+                <PaperRow pub={pub} {owners} />
+              ))}
+            </ol>
+          </section>
+        );
+      }
+
+      if (block === 'updates' && hasUpdates) {
+        return (
+          <section class="ed-wrap ed-split" aria-label={t('home.updates')}>
+            {showNews && news.length > 0 && (
+              <div>
+                <div class="ed-split-head">
+                  <h2 class="ed-split-title">{newsLabel}</h2>
+                  <a href="/news" class="ul ed-more">
+                    {t('home.allNews')} <span class="arr">→</span>
+                  </a>
+                </div>
+                <NewsList items={news} />
+              </div>
+            )}
+            {showWriting && writing.length > 0 && (
+              <div>
+                <div class="ed-split-head">
+                  <h2 class="ed-split-title">{blogLabel}</h2>
+                  <a href="/blog" class="ul ed-more">
+                    {t('home.allPosts')} <span class="arr">→</span>
+                  </a>
+                </div>
+                <ul class="ed-posts">
+                  {writing.map((item) => (
+                    <PostRow item={item} />
+                  ))}
+                </ul>
+              </div>
+            )}
+          </section>
+        );
+      }
+
+      return null;
+    })
+  }
+</Layout>

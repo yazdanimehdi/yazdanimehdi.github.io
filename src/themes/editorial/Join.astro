@@ -1,0 +1,95 @@
+---
+import ObfuscatedEmail from '../../components/astro/ObfuscatedEmail.astro';
+import Layout from './Layout.astro';
+import { getSiteConfig } from '../../lib/config';
+import { uiStrings } from '../../lib/ui-strings';
+import './timeline.css';
+
+interface Props {
+  personal: boolean;
+}
+
+const { personal } = Astro.props;
+const config = getSiteConfig();
+const t = uiStrings(config);
+const email = config.socials.email;
+const culture = [
+  { title: t('join.rigorTitle'), desc: t('join.rigorText') },
+  { title: t('join.collabTitle'), desc: t('join.collabText') },
+  { title: t('join.growthTitle'), desc: t('join.growthText') },
+];
+const howToApply = t(
+  email
+    ? personal
+      ? 'join.applyEmailPersonal'
+      : 'join.applyEmailLab'
+    : personal
+      ? 'join.applyPersonal'
+      : 'join.applyLab',
+).split(/(\{positions\}|\{email\})/);
+const subject = t('join.subject').split(/(\{code\})/);
+---
+
+<Layout
+  title={t(personal ? 'join.titlePersonal' : 'join.titleLab')}
+  description={t(personal ? 'join.descriptionPersonal' : 'join.descriptionLab')}
+>
+  <div class="ed-wrap ed-main ed-main--narrow">
+    <div class="ed-stack">
+      <h1 class="ed-h1">{t(personal ? 'join.headingPersonal' : 'join.headingLab')}</h1>
+      <p class="ed-intro">
+        {t(personal ? 'join.introPersonal' : 'join.introLab')}
+      </p>
+    </div>
+
+    <section class="ed-tl-section" aria-labelledby="join-culture">
+      <h2 id="join-culture" class="ed-label ed-tl-group">{t(personal ? 'join.culturePersonal' : 'join.cultureLab')}</h2>
+      <div class="ed-cards">
+        {
+          culture.map((item) => (
+            <div class="ed-card">
+              <h3>{item.title}</h3>
+              <p>{item.desc}</p>
+            </div>
+          ))
+        }
+      </div>
+    </section>
+
+    <section class="ed-tl-section" aria-labelledby="join-positions">
+      <h2 id="join-positions" class="ed-label ed-tl-group">{t('join.openPositions')}</h2>
+      <p>
+        {t(personal ? 'join.positionsPersonal' : 'join.positionsLab')}
+      </p>
+      <a href="/positions" class="ul ed-more">{t('join.viewPositions')} <span class="arr">→</span></a>
+    </section>
+
+    <section class="ed-tl-section" aria-labelledby="join-apply">
+      <h2 id="join-apply" class="ed-label ed-tl-group">{t('join.howToApply')}</h2>
+      <p>
+        {
+          howToApply.map((part) =>
+            part === '{positions}' ? (
+              <a href="/positions" class="ul">
+                {t('join.positionsPage')}
+              </a>
+            ) : part === '{email}' && email ? (
+              <ObfuscatedEmail email={email} class="ul" />
+            ) : (
+              part
+            ),
+          )
+        }
+      </p>
+      <ol class="ed-tl-steps">
+        <li>{t('join.stepCv')}</li>
+        <li>{t('join.stepStatement')}</li>
+        <li>{t('join.stepPublications')}</li>
+        <li>{t('join.stepReferences')}</li>
+      </ol>
+      <p class="ed-tl-fine">
+        {subject.map((part) => (part === '{code}' ? <code class="ed-tl-code">{t('join.subjectLine')}</code> : part))}
+      </p>
+    </section>
+  </div>
+</Layout>

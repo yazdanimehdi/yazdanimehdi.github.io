@@ -1,0 +1,76 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import Layout from './Layout.astro';
+import { getSiteConfig } from '../../lib/config';
+import { uiStrings } from '../../lib/ui-strings';
+import './timeline.css';
+
+interface Props {
+  personal: boolean;
+  /** Already in display order (newest first, undated last). */
+  talks: CollectionEntry<'talks'>[];
+}
+
+const { personal, talks } = Astro.props;
+const t = uiStrings(getSiteConfig());
+const description = t(personal ? 'talks.descriptionPersonal' : 'talks.descriptionLab');
+const intro = t(personal ? 'talks.introPersonal' : 'talks.introLab');
+
+// `date` is free text ("November 2024"); the year comes from sortDate, else the first 4-digit year in it, else '' (undated).
+const yearOf = (talk: CollectionEntry<'talks'>) =>
+  talk.data.sortDate ? String(talk.data.sortDate.getUTCFullYear()) : (talk.data.date.match(/\b\d{4}\b/)?.[0] ?? '');
+const groups = new Map<string, CollectionEntry<'talks'>[]>();
+for (const talk of talks) groups.set(yearOf(talk), [...(groups.get(yearOf(talk)) ?? []), talk]);
+---
+
+<Layout title={t('talks.title')} description={description}>
+  <div class="ed-wrap ed-main ed-main--narrow">
+    <div class="ed-stack">
+      <h1 class="ed-h1">{t('talks.title')}</h1>
+      <p class="ed-intro">{intro}</p>
+    </div>
+
+    {talks.length === 0 && <p class="ed-tl-empty">{t('talks.empty')}</p>}
+
+    {
+      [...groups].map(([year, items]) => (
+        <section class="ed-year ed-tl-year" aria-labelledby={`talks-${year || 'Undated'}`}>
+          <h2 id={`talks-${year || 'Undated'}`} class="num">
+            {year || t('talks.undated')}
+          </h2>
+          <ol class="ed-tl-list">
+            {items.map((talk) => (
+              <li class="row ed-tl-row">
+                <span class="ed-tl-date num" dir="auto">
+                  {talk.data.date}
+                </span>
+                <div class="ed-tl-body">
+                  <h3 class="ed-tl-title" dir="auto">
+                    {talk.data.title}
+                  </h3>
+                  <span class="ed-tl-venue" dir="auto">
+                    {talk.data.event}
+                    {talk.data.location && <> · {talk.data.location}</>}
+                  </span>
+                  <div class="ed-tl-meta">
+                    <span class="ed-note">{talk.data.type}</span>
+                    {talk.data.slidesUrl && (
+                      <a href={talk.data.slidesUrl} class="ul">
+                        {t('talks.slides')}
+                      </a>
+                    )}
+                    {talk.data.videoUrl && (
+                      <a href={talk.data.videoUrl} class="ul">
+                        {t('talks.video')}
+                      </a>
+                    )}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      ))
+    }
+  </div>
+</Layout>

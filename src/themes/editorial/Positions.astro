@@ -1,0 +1,103 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import Layout from './Layout.astro';
+import { getSiteConfig } from '../../lib/config';
+import { formatNewsDate } from '../../lib/utils';
+import { uiStrings } from '../../lib/ui-strings';
+import './timeline.css';
+
+interface Props {
+  personal: boolean;
+  /** Already sorted: open first, then by sortOrder. */
+  positions: CollectionEntry<'positions'>[];
+  formatType: (type: string) => string;
+}
+
+const { personal, positions, formatType } = Astro.props;
+const config = getSiteConfig();
+const t = uiStrings(config);
+const title = t(personal ? 'positions.titlePersonal' : 'positions.titleLab');
+const open = positions.filter((p) => p.data.status === 'open');
+const closed = positions.filter((p) => p.data.status !== 'open');
+---
+
+<Layout title={title} description={t(personal ? 'positions.descriptionPersonal' : 'positions.descriptionLab')}>
+  <div class="ed-wrap ed-main ed-main--narrow">
+    <div class="ed-stack">
+      <h1 class="ed-h1">{title}</h1>
+      <p class="ed-intro">
+        {t(personal ? 'positions.introPersonal' : 'positions.introLab')}
+      </p>
+    </div>
+
+    {
+      positions.length === 0 ? (
+        <p class="ed-tl-empty">{t('positions.emptyNone')}</p>
+      ) : open.length === 0 ? (
+        <p class="ed-tl-empty">{t('positions.emptyClosed')}</p>
+      ) : (
+        <ol class="ed-tl-list">
+          {open.map((p) => (
+            <li class="row ed-tl-row">
+              <div class="ed-tl-body">
+                <div class="ed-tl-titleline">
+                  <a href={`/positions/${p.id}`} class="ed-tl-title" dir="auto">
+                    {p.data.title}
+                  </a>
+                  <span class="ed-note">{formatType(p.data.type)}</span>
+                </div>
+                {p.data.excerpt && (
+                  <p class="ed-tl-excerpt" dir="auto">
+                    {p.data.excerpt}
+                  </p>
+                )}
+                <div class="ed-tl-meta">
+                  {p.data.deadline && (
+                    <span class="ed-tl-deadline">
+                      <span class="ed-label">{t('positions.deadline')}</span>
+                      <time class="num" datetime={p.data.deadline.toISOString()}>
+                        {formatNewsDate(p.data.deadline, 'day', config.lang)}
+                      </time>
+                    </span>
+                  )}
+                  {p.data.tags && p.data.tags.length > 0 && <span dir="auto">{p.data.tags.join(' · ')}</span>}
+                  <a
+                    href={`/positions/${p.id}`}
+                    class="ul ed-tl-more"
+                    aria-label={t('positions.detailsLabel', { title: p.data.title })}
+                  >
+                    {t('positions.details')} <span class="arr">→</span>
+                  </a>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ol>
+      )
+    }
+
+    {
+      closed.length > 0 && (
+        <section class="ed-tl-closed" aria-labelledby="positions-closed">
+          <h2 id="positions-closed" class="ed-label ed-tl-group">
+            {t('positions.closed')}
+          </h2>
+          <ol class="ed-tl-list">
+            {closed.map((p) => (
+              <li class="row ed-tl-row">
+                <div class="ed-tl-body">
+                  <div class="ed-tl-titleline">
+                    <a href={`/positions/${p.id}`} class="ed-tl-title" dir="auto">
+                      {p.data.title}
+                    </a>
+                    <span class="ed-tl-meta">{formatType(p.data.type)}</span>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      )
+    }
+  </div>
+</Layout>

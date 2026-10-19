@@ -1,40 +1,54 @@
 ---
 import { getSiteConfig, isPersonalMode } from '../../lib/config';
 import { getImageShapeClass } from '../../lib/imageShape';
+import { renderMarkdown } from '../../lib/markdown';
+import { uiStrings } from '../../lib/ui-strings';
+import SectionHeading from './SectionHeading.astro';
 
 const config = getSiteConfig();
-const about = config.about;
-const personal = isPersonalMode();
+const about = config.about as (typeof config.about & { imageAlt?: string }) | undefined;
+const t = uiStrings(config);
 const show = !!about?.enabled;
-const title = about?.title ?? (personal ? 'About Me' : 'About Our Lab');
+// A personal site's section is plain "About" (the `about.personal` ui string); `about.title` names a lab's.
+const title = isPersonalMode() ? t('about.personal') : (about?.title ?? t('about.lab'));
+// A personal site speaks in the owner's voice: the bio both themes share, else the about text.
+const bioHtml = isPersonalMode() ? await renderMarkdown(config.editorial?.bio) : '';
 const hasImage = !!about?.image;
 const shapeClass = getImageShapeClass();
 ---
 
 {
   show && (
-    <section class="border-b border-surface-200 bg-surface-50 dark:border-dm-border dark:bg-dm">
-      <div class="mx-auto max-w-[930px] px-4 py-10 sm:px-6 sm:py-14">
-        <h2 class="mb-6 font-serif text-2xl font-normal text-surface-900 sm:text-3xl dark:text-dm-heading">{title}</h2>
-        <div class:list={['flex flex-col gap-8', hasImage && 'md:flex-row']}>
-          <div class:list={[hasImage ? 'md:flex-1' : 'w-full']}>
-            <p class="text-base leading-relaxed text-surface-600 dark:text-dm-muted">{about!.text}</p>
-          </div>
-          {hasImage && (
-            <div class="flex-shrink-0 md:w-[280px]">
-              <img
-                src={about!.image}
-                alt={title}
-                width="280"
-                height="280"
-                class:list={['w-full object-cover', shapeClass]}
-                loading="eager"
-                fetchpriority="high"
-                decoding="async"
-              />
-            </div>
+    <section class="mx-auto max-w-[930px] px-4 py-8 sm:px-6">
+      <SectionHeading title={title} />
+      <div class:list={['mt-4 flex flex-col gap-8', hasImage && 'md:flex-row']}>
+        <div class:list={[hasImage ? 'md:flex-1' : 'w-full']}>
+          {bioHtml ? (
+            <div
+              dir="auto"
+              class="max-w-[68ch] space-y-3 text-base leading-relaxed text-surface-600 dark:text-dm-text [&_a]:text-primary-600 [&_a]:underline [&_a]:underline-offset-2 dark:[&_a]:text-accent-400"
+              set:html={bioHtml}
+            />
+          ) : (
+            <p dir="auto" class="max-w-[68ch] text-base leading-relaxed text-surface-600 dark:text-dm-text">
+              {about!.text}
+            </p>
           )}
         </div>
+        {hasImage && (
+          <div class="flex-shrink-0 md:w-[280px]">
+            <img
+              src={about!.image}
+              alt={about!.imageAlt ?? ''}
+              width="280"
+              height="280"
+              class:list={['w-full object-cover', shapeClass]}
+              loading="eager"
+              fetchpriority="high"
+              decoding="async"
+            />
+          </div>
+        )}
       </div>
     </section>
   )

@@ -1,0 +1,2071 @@
+/*
+ * Editorial theme. Every rule is scoped to html[data-theme='editorial']: route files import both
+ * themes, so Astro bundles this stylesheet into classic pages too, where it must stay inert.
+ * Component classes are unlayered (they only appear in editorial markup); nothing here targets
+ * bare elements that classic Tailwind utilities style on undesigned pages.
+ */
+:root[data-theme='editorial'] {
+  --ed-ink: #15192b;
+  --ed-body-2: #3d4357;
+  --ed-muted: #4a5068;
+  --ed-caption: #656b80;
+  --ed-rule: #e4e7ee;
+  --ed-rule-soft: #eef0f4;
+  --ed-rule-strong: #c3c8d4;
+  --ed-tint: #f3f5fa;
+  --ed-hover: #f6f8fc;
+  --ed-accent: #1f3c88;
+  --ed-accent-hover: #142a63;
+  --ed-accent-border: #c7d0e6;
+  --ed-selection: #dce3f5;
+  --ed-footer: #15192b;
+  --ed-footer-text: #c9cedc;
+  --ed-footer-muted: #9aa0b4;
+  --ed-footer-rule: #2c3248;
+  --ed-paper: #fff;
+  --ed-on-accent: #fff;
+  --ed-code: #2a2f45;
+  --ed-band-strong: #fff;
+  --ed-pad: 32px;
+  color-scheme: light;
+
+  /* Classic Tailwind tokens → editorial palette, so undesigned pages match without redesigns. */
+  --color-primary-50: var(--ed-hover);
+  --color-primary-100: var(--ed-selection);
+  --color-primary-200: color-mix(in oklab, var(--ed-accent), white 75%);
+  --color-primary-300: color-mix(in oklab, var(--ed-accent), white 55%);
+  --color-primary-400: color-mix(in oklab, var(--ed-accent), white 35%);
+  --color-primary-500: color-mix(in oklab, var(--ed-accent), white 15%);
+  --color-primary-600: var(--ed-accent);
+  --color-primary-700: var(--ed-accent-hover);
+  --color-primary-800: var(--ed-accent-hover);
+  --color-primary-900: var(--ed-ink);
+  --color-surface-50: var(--ed-hover);
+  --color-surface-100: var(--ed-tint);
+  --color-surface-200: var(--ed-rule);
+  --color-surface-300: var(--ed-caption); /* text-surface-300 is used as text: keep >= 4.5:1 */
+  --color-surface-400: var(--ed-caption);
+  --color-surface-500: var(--ed-caption);
+  --color-surface-600: var(--ed-muted);
+  --color-surface-700: var(--ed-body-2);
+  --color-surface-800: var(--ed-ink);
+  --color-surface-900: var(--ed-ink);
+
+  & body {
+    background: var(--ed-paper);
+    color: var(--ed-ink);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.6;
+  }
+  & .prose {
+    font-size: 17px;
+  }
+  & ::selection {
+    background: var(--ed-selection);
+  }
+  & [hidden] {
+    display: none !important;
+  }
+  & :focus-visible {
+    outline: 2px solid var(--ed-accent);
+    outline-offset: 2px;
+  }
+  & .ed-sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* ── Design utilities ── */
+  & .ul {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 0% 1px;
+    background-repeat: no-repeat;
+    background-position: 0 100%;
+    transition: background-size 0.25s ease;
+  }
+  & .ul:hover,
+  & .ul:focus-visible {
+    background-size: 100% 1px;
+  }
+  /* The underline draws from the inline start. */
+  &[dir='rtl'] .ul {
+    background-position: 100% 100%;
+  }
+  & .row {
+    transition: background-color 0.2s ease;
+  }
+  & .row:hover {
+    background-color: var(--ed-hover);
+  }
+  & .arr {
+    display: inline-block;
+    transition: transform 0.2s ease;
+  }
+  & .row:hover .arr,
+  & .ul:hover .arr {
+    transform: translateX(4px);
+  }
+  /* Right-to-left: arrows point the reading direction and nudge that way. */
+  /* `translate` composes before `scale`, so the nudge is not mirrored back. */
+  &[dir='rtl'] .arr {
+    scale: -1 1;
+    transition: translate 0.2s ease;
+  }
+  &[dir='rtl'] .row:hover .arr,
+  &[dir='rtl'] .ul:hover .arr {
+    transform: none;
+    translate: -4px 0;
+  }
+  & .num {
+    font-variant-numeric: tabular-nums;
+  }
+  & .ed-arrow {
+    flex: none;
+    vertical-align: -0.15em;
+  }
+  /* Headlines and bios break into balanced lines, never a one-word last line. */
+  & .ed-hero-name,
+  & .ed-h1,
+  & .ed-h2,
+  & .ed-article-title {
+    text-wrap: balance;
+  }
+  & .ed-bio p,
+  & .ed-tagline,
+  & .ed-intro {
+    text-wrap: pretty;
+  }
+  & .ed-eyebrow {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.6;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    /* Ink, not Accent: a heading set beside an Accent "All news →" link must not read as a second link. */
+    color: var(--ed-ink);
+  }
+  /* Meta lines carry what a kicker would: role, tags, owner. They sit under the heading, never above it. */
+  & .ed-role {
+    margin: -10px 0 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 17px;
+    font-weight: 500;
+    color: var(--ed-body-2);
+  }
+  & .ed-role p {
+    margin: 0;
+  }
+  /* Affiliations ride the role line: one quiet meta line, not a band. */
+  & .ed-affil {
+    display: flex;
+    flex-wrap: wrap;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 15px;
+    font-weight: 400;
+    color: var(--ed-muted);
+  }
+  /* The dot rides the end of the item before it, so a wrapped line never starts with a lone separator. */
+  & .ed-affil li:not(:last-child)::after {
+    content: '·' / '';
+    margin-inline: 8px;
+  }
+  & .ed-meta {
+    margin: 0;
+    font-size: 14px;
+    color: var(--ed-caption);
+  }
+  & .ed-meta-cap {
+    text-transform: capitalize;
+  }
+  & .ed-label {
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: var(--ed-caption);
+  }
+
+  /* ── Shell ── */
+  & .ed-wrap {
+    max-width: 1080px;
+    margin-inline: auto;
+    padding-inline: var(--ed-pad);
+  }
+  & .ed-grow {
+    flex: 1 0 auto;
+  }
+  & .ed-header {
+    border-bottom: 1px solid var(--ed-rule);
+  }
+  & .ed-nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px 24px;
+    padding-block: 18px;
+  }
+  & .ed-brand {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    gap: 10px;
+    color: var(--ed-ink);
+  }
+  & .ed-brand-mark {
+    width: 10px;
+    height: 10px;
+    background: var(--ed-accent);
+    transform: rotate(45deg);
+  }
+  & .ed-brand-name {
+    font-family: var(--font-serif);
+    font-size: 19px;
+    font-weight: 600;
+  }
+  & .ed-navlinks {
+    margin-inline-start: auto;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 28px;
+    font-size: 15px;
+  }
+  /* 44px targets; the current page's 2px underline sits on the target's bottom edge. */
+  & .ed-navlinks a,
+  & .ed-nav-contact a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    border-block: 2px solid transparent;
+    color: var(--ed-body-2);
+    font-size: 15px;
+    transition: color 0.15s ease;
+  }
+  & .ed-navlinks a:hover,
+  & .ed-nav-contact a:hover {
+    color: var(--ed-ink);
+  }
+  & .ed-navlinks a[aria-current='page'],
+  & .ed-nav-contact a[aria-current='page'] {
+    border-bottom-color: var(--ed-accent);
+    color: var(--ed-ink);
+    font-weight: 500;
+  }
+  /* Contact sits outside the link row so phones never scroll it away; on desktop it reads as the row's last link. */
+  & .ed-nav-contact {
+    margin-inline-start: 4px;
+  }
+  & .ed-page {
+    padding-block: 64px 80px;
+  }
+  & .ed-main {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    padding-block: 80px 104px;
+  }
+  & .ed-main--narrow {
+    max-width: 960px;
+  }
+  & .ed-main--flush {
+    gap: 0;
+  }
+  & .ed-footer {
+    border-top: 1px solid var(--ed-rule);
+  }
+  & .ed-footer-inner {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 12px 24px;
+    padding-block: 24px;
+    font-size: 14px;
+    color: var(--ed-caption);
+  }
+  /* Footer index: the nav pages the header leaves out. */
+  & .ed-footer-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+  }
+  & .ed-footer-nav a {
+    color: var(--ed-body-2);
+  }
+  /* 44px tap targets for small inline links: the padding grows the target, the equal negative margin keeps the line. */
+  & .ed-more,
+  & .ed-email,
+  & .ed-paper-meta a,
+  & .ed-bib summary,
+  & .ed-footer-nav a,
+  & .ed-footer-inner > a,
+  & .ed-pager a,
+  & .ed-contact-links a,
+  & .ed-contact-onward a,
+  & .ed-profiles a {
+    display: inline-block;
+    padding-block: 11px;
+    margin-block: -11px;
+    line-height: 22px;
+    background-origin: content-box;
+    background-clip: content-box;
+  }
+  & .ed-footer-nav a:hover,
+  & .ed-footer-nav a[aria-current='page'] {
+    color: var(--ed-ink);
+  }
+
+  /* ── Type and buttons ── */
+  & .ed-h1 {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: clamp(36px, 7vw, 52px);
+    line-height: 1.1;
+    font-weight: 500;
+    letter-spacing: -0.8px;
+    color: var(--ed-ink);
+  }
+  & .ed-h2 {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: clamp(28px, 5vw, 36px);
+    line-height: 1.2;
+    font-weight: 500;
+    color: var(--ed-ink);
+  }
+  & .ed-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  & .ed-section-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+  }
+  & .ed-more {
+    font-size: 15px;
+    font-weight: 500;
+  }
+  & .ed-intro {
+    margin: 0;
+    max-width: 680px;
+    font-size: 16px;
+    line-height: 1.65;
+    color: var(--ed-muted);
+  }
+  /* Flex drops the formatter's line breaks, so a link's trailing punctuation sits flush against it. */
+  & .ed-link-punct {
+    display: inline-flex;
+  }
+  & .ed-btn {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 20px;
+    border-radius: 4px;
+    background: var(--ed-accent);
+    color: var(--ed-on-accent);
+    font-size: 15px;
+    font-weight: 500;
+  }
+  & .ed-btn:hover {
+    background: var(--ed-accent-hover);
+    color: var(--ed-on-accent);
+  }
+  & .ed-btn-outline {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 16px;
+    border: 1px solid var(--ed-ink);
+    border-radius: 4px;
+    color: var(--ed-ink);
+    font-size: 15px;
+    font-weight: 500;
+  }
+  & .ed-btn-outline:hover {
+    background: var(--ed-hover);
+    color: var(--ed-ink);
+  }
+
+  /* ── Hero band and backdrop (hero.type) ── */
+  & .ed-hero-band {
+    position: relative;
+    isolation: isolate;
+    overflow: clip;
+  }
+  & .ed-backdrop {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+  }
+  /* Hairline pattern in ink, strongest behind the figure side and fading out toward the text and the fold. */
+  & .ed-backdrop--pattern {
+    background: var(--ed-ink);
+    opacity: 0.07;
+    mask-image: var(--ed-pattern), radial-gradient(ellipse 70% 90% at 82% 40%, #000 0%, transparent 72%);
+    mask-composite: intersect;
+    -webkit-mask-composite: source-in;
+  }
+  &[dir='rtl'] .ed-backdrop--pattern {
+    mask-image: var(--ed-pattern), radial-gradient(ellipse 70% 90% at 18% 40%, #000 0%, transparent 72%);
+  }
+  & .ed-backdrop--pattern[data-pattern='dots'] {
+    --ed-pattern: url('data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2722%27 height=%2722%27><circle cx=%2711%27 cy=%2711%27 r=%271.1%27/></svg>');
+  }
+  & .ed-backdrop--pattern[data-pattern='grid'] {
+    --ed-pattern: url('data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2728%27 height=%2728%27><path fill=%27none%27 stroke=%27black%27 stroke-width=%271%27 d=%27M28 .5H.5V28%27/></svg>');
+  }
+  & .ed-backdrop--pattern[data-pattern='diagonal'] {
+    --ed-pattern: url('data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2718%27 height=%2718%27><path fill=%27none%27 stroke=%27black%27 stroke-width=%271%27 d=%27M-2 20 20-2%27/></svg>');
+  }
+  & .ed-backdrop--pattern[data-pattern='waves'] {
+    --ed-pattern: url('data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2716%27><path fill=%27none%27 stroke=%27black%27 stroke-width=%271%27 d=%27M0 8c6-6 18-6 24 0s18 6 24 0%27/></svg>');
+  }
+  & .ed-backdrop--pattern[data-pattern='hexagons'] {
+    --ed-pattern: url('data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2728%27 height=%2748%27><path fill=%27none%27 stroke=%27black%27 stroke-width=%271%27 d=%27M14 0v8L0 16v16l14 8 14-8V16L14 8M14 48v-8%27/></svg>');
+  }
+  & .ed-backdrop--image {
+    background: var(--ed-hero-img) center / cover no-repeat;
+  }
+  & .ed-backdrop--image::after,
+  & .ed-backdrop--video::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: var(--ed-paper);
+    opacity: 0.86;
+  }
+  & .ed-backdrop--video video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* ── Mode toggle ── */
+  & .ed-mode {
+    display: inline-grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    margin-inline-end: -13px;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--ed-body-2);
+    cursor: pointer;
+    transition: color 0.15s ease;
+  }
+  & .ed-mode:hover {
+    color: var(--ed-ink);
+  }
+  & .ed-mode-half {
+    transform-origin: 12px 12px;
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  & .ed-mode[data-mode='dark'] .ed-mode-half {
+    transform: rotate(180deg);
+  }
+  & .ed-mode[data-mode='system'] .ed-mode-half {
+    transform: rotate(90deg);
+  }
+  & .ed-mode-word {
+    display: none;
+    font-size: 13px;
+  }
+  & .ed-mode[data-mode='system'] {
+    grid-auto-flow: column;
+    gap: 6px;
+    width: auto;
+    padding-inline: 8px 13px;
+  }
+  & .ed-mode[data-mode='system'] .ed-mode-word {
+    display: block;
+  }
+
+  /* ── Home ── */
+  & .ed-hero {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 64px;
+    padding-block: 96px 88px;
+  }
+  & .ed-hero-text {
+    flex: 1 1 520px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+  & .ed-hero-name {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: clamp(40px, 9vw, 62px);
+    line-height: 1.04;
+    font-weight: 500;
+    letter-spacing: -1.2px;
+    color: var(--ed-ink);
+  }
+  & .ed-tagline {
+    margin: 0;
+    max-width: 560px;
+    font-family: var(--font-serif);
+    font-size: clamp(20px, 3.5vw, 24px);
+    line-height: 1.45;
+    font-style: italic;
+    color: var(--ed-body-2);
+  }
+  & .ed-bio {
+    max-width: 580px;
+    font-size: 17px;
+    line-height: 1.72;
+    color: var(--ed-body-2);
+  }
+  & .ed-bio > * {
+    margin: 0 0 12px;
+  }
+  & .ed-bio > :last-child {
+    margin-bottom: 0;
+  }
+  & .ed-bio strong {
+    color: var(--ed-ink);
+    font-weight: 500;
+  }
+  & .ed-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 26px;
+    padding-top: 6px;
+  }
+  /* One quiet row of scholarly IDs (Scholar, ORCID, GitHub); other profiles live in the contact band. */
+  & .ed-profiles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 22px 20px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 14px;
+  }
+  & .ed-profiles a {
+    color: var(--ed-body-2);
+  }
+  & .ed-profiles a:hover,
+  & .ed-profiles a:focus-visible {
+    color: var(--ed-ink);
+  }
+  & .ed-profiles .arr {
+    margin-inline-start: 4px;
+    color: var(--ed-caption);
+  }
+  /* Underlined at rest, so on touch screens it reads as a link; the line darkens to Ink on hover. */
+  & .ed-email {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    color: var(--ed-ink);
+    font-weight: 500;
+    text-decoration: underline 1px var(--ed-rule-strong);
+    text-underline-offset: 4px;
+    transition: text-decoration-color 0.15s ease;
+  }
+  & .ed-email:hover,
+  & .ed-email:focus-visible {
+    text-decoration-color: currentColor;
+  }
+  & .ed-figure {
+    flex: 1 1 420px;
+    max-width: 500px;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  & .ed-figure-box {
+    padding: 24px;
+    background: var(--ed-tint);
+    border: 1px solid var(--ed-rule);
+    border-radius: 6px;
+  }
+  & .ed-figure-box img {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  & .ed-figcaption {
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--ed-caption);
+  }
+  & .ed-figcaption b {
+    color: var(--ed-body-2);
+    font-weight: 600;
+  }
+  & .ed-home-section {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+    padding-block: 96px 48px;
+  }
+  & .ed-home-lede {
+    max-width: 680px;
+    margin-top: -24px;
+  }
+  & .ed-home-section--papers {
+    gap: 28px;
+    padding-block: 56px;
+  }
+  & .ed-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(260px, 100%), 1fr));
+    gap: 24px;
+  }
+  & .ed-card {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 20px 18px 22px;
+    border-top: 2px solid var(--ed-ink);
+    border-radius: 0 0 6px 6px;
+    color: var(--ed-ink);
+  }
+  & .ed-card h3 {
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: 19px;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--ed-ink);
+  }
+  & .ed-card p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.65;
+    color: var(--ed-muted);
+  }
+  /* Home research: a numbered ruled list in the paper rows' language, one 2px Ink rule over the first row. */
+  & .ed-topics {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 2px solid var(--ed-ink);
+  }
+  & .ed-topic {
+    position: relative;
+    display: flex;
+    align-items: baseline;
+    gap: 24px;
+    margin: 0 -16px;
+    padding: 22px 16px;
+    border-radius: 6px;
+    background: linear-gradient(var(--ed-rule), var(--ed-rule)) center bottom / calc(100% - 32px) 1px no-repeat;
+  }
+  & .ed-topic-num {
+    flex: 0 0 40px;
+    font-family: var(--font-serif);
+    font-size: 20px;
+    font-weight: 500;
+    color: var(--ed-accent);
+  }
+  & .ed-topic-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  & .ed-topic-title {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 1.4;
+  }
+  & .ed-topic-title a {
+    color: var(--ed-ink);
+    text-decoration: underline 1px transparent;
+    text-underline-offset: 4px;
+    transition:
+      color 0.15s ease,
+      text-decoration-color 0.15s ease;
+  }
+  /* The title's link covers the row, so the whole row is the target while its name stays just the title. */
+  & .ed-topic-title a::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+  & .ed-topic:hover .ed-topic-title a,
+  & .ed-topic-title a:focus-visible {
+    color: var(--ed-accent);
+    text-decoration-color: currentColor;
+  }
+  & .ed-topic p {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--ed-muted);
+  }
+  & .ed-split {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 56px;
+    padding-block: 40px 104px;
+  }
+  & .ed-split > div {
+    flex: 1 1 420px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  & .ed-split-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  /* News and Blog share one row, so their heads sit a step under the full-width section heads. */
+  & .ed-split-title {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: clamp(22px, 4vw, 26px);
+    line-height: 1.25;
+    font-weight: 500;
+    color: var(--ed-ink);
+  }
+
+  /* ── Paper rows ── */
+  & .ed-papers {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--ed-rule);
+  }
+  & .ed-paper {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 16px 32px;
+    margin: 0 -16px;
+    padding: 26px 16px;
+    --ed-row-rule: var(--ed-rule);
+    /* The row's hover tint bleeds 16px past the column; its rule does not, so every rule shares the column edge. */
+    background: linear-gradient(var(--ed-row-rule), var(--ed-row-rule)) center bottom / calc(100% - 32px) 1px no-repeat;
+    border-radius: 6px;
+    scroll-margin-top: 24px;
+  }
+  /* The row a "Cite" link landed on (data-cited covers client-side navigations, which never set :target). */
+  & .ed-paper:target,
+  & .ed-paper[data-cited] {
+    background-color: var(--ed-tint);
+  }
+  & .ed-paper--list {
+    flex-direction: column;
+    align-items: stretch;
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding-block: 20px;
+    --ed-row-rule: var(--ed-rule-soft);
+  }
+  & .ed-venue-tile {
+    flex: 0 0 140px;
+    height: 92px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 12px 14px;
+    background: var(--ed-tint);
+    border: 1px solid var(--ed-rule);
+    border-radius: 4px;
+  }
+  & .ed-venue-tile-short {
+    font-family: var(--font-serif);
+    font-size: 20px;
+    font-weight: 600;
+    line-height: 1.1;
+    color: var(--ed-accent);
+  }
+  /* No venueShort: the full venue, clamped so it never leaves the tile. */
+  & .ed-venue-tile-short--long {
+    font-size: 13px;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    overflow: hidden;
+  }
+  & .ed-venue-tile-year {
+    font-size: 12px;
+    color: var(--ed-caption);
+  }
+  & .ed-paper-body {
+    flex: 1 1 320px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  /* In a column-direction list row the 520px basis would become a height. */
+  & .ed-paper--list .ed-paper-body {
+    flex: none;
+  }
+  & .ed-paper-title {
+    font-family: var(--font-serif);
+    font-size: 20px;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--ed-ink);
+  }
+  /* The title is the paper's link: ↗ marks it at rest, an underline draws on hover and focus. */
+  & a.ed-paper-title {
+    padding-block: 9px;
+    margin-block: -9px;
+    text-decoration: underline 1px transparent;
+    text-underline-offset: 4px;
+    transition:
+      color 0.15s ease,
+      text-decoration-color 0.15s ease;
+  }
+  & a.ed-paper-title:hover,
+  & a.ed-paper-title:focus-visible {
+    color: var(--ed-accent);
+    text-decoration-color: currentColor;
+  }
+  & .ed-paper-title .arr {
+    margin-inline-start: 6px;
+    font-family: var(--font-sans);
+    font-size: 0.8em;
+    color: var(--ed-caption);
+  }
+  & a.ed-paper-title:hover .arr,
+  & a.ed-paper-title:focus-visible .arr {
+    color: currentColor;
+  }
+  & .ed-paper--list .ed-paper-title {
+    font-size: 19px;
+  }
+  & .ed-authors {
+    font-size: 15px;
+    color: var(--ed-muted);
+  }
+  & .ed-paper--list .ed-authors {
+    font-size: 14.5px;
+  }
+  & .ed-authors strong {
+    font-weight: 600;
+    color: var(--ed-ink);
+  }
+  & .ed-paper-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 18px;
+    padding-top: 4px;
+    font-size: 14px;
+  }
+  /* Venues are set as the journal sets them: italic serif (Plex has no true small caps to fake). */
+  & .ed-venue {
+    font-family: var(--font-serif);
+    font-size: 15px;
+    font-style: italic;
+    color: var(--ed-ink);
+  }
+  & .ed-paper--list .ed-venue {
+    font-family: var(--font-serif);
+    font-size: 15px;
+    font-weight: 400;
+    font-style: italic;
+    font-variant: normal;
+    letter-spacing: 0;
+  }
+  & .ed-note {
+    padding: 2px 6px;
+    border: 1px solid var(--ed-accent-border);
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: var(--ed-accent);
+  }
+  & .ed-bib {
+    min-width: 0;
+    max-width: 100%;
+  }
+  & .ed-bib[open] {
+    flex-basis: 100%;
+  }
+  & .ed-bib summary {
+    list-style: none;
+    cursor: pointer;
+    color: var(--ed-accent);
+  }
+  & .ed-bib summary::-webkit-details-marker {
+    display: none;
+  }
+  & .ed-bib pre {
+    margin: 8px 0 0;
+    padding: 14px 16px;
+    overflow-x: auto;
+    background: var(--ed-hover);
+    border: 1px solid var(--ed-rule);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    line-height: 1.6;
+    color: var(--ed-code);
+    white-space: pre;
+  }
+  & .ed-bib-body {
+    position: relative;
+  }
+  & .ed-bib-body pre {
+    padding-inline-end: 84px;
+  }
+  /* Copy sits in the block's top corner, quiet until hovered. */
+  & .ed-bib-copy {
+    position: absolute;
+    top: 6px;
+    inset-inline-end: 6px;
+    min-height: 32px;
+    padding: 0 10px;
+    border: 1px solid var(--ed-rule);
+    border-radius: 4px;
+    background: var(--ed-paper);
+    color: var(--ed-body-2);
+    font: inherit;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    transition:
+      color 0.15s ease,
+      border-color 0.15s ease;
+  }
+  & .ed-bib-copy:hover {
+    border-color: var(--ed-accent-border);
+    color: var(--ed-accent);
+  }
+  & .ed-cover {
+    margin: 0;
+  }
+  /* Tall art never pushes the article below the fold. */
+  & .ed-cover img {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-height: 420px;
+    object-fit: contain;
+  }
+
+  /* ── News and writing rows ── */
+  & .ed-news,
+  & .ed-posts {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  & .ed-news li {
+    display: flex;
+    gap: 20px;
+    padding-block: 14px;
+    border-top: 1px solid var(--ed-rule);
+  }
+  /* Start-aligned, so a year-only date ("2024") lines up with "Sep 2024" instead of reading as a missing month. */
+  & .ed-news-date {
+    flex: 0 0 76px;
+    text-align: start;
+    padding-top: 1px;
+    font-size: 14px;
+    color: var(--ed-caption);
+  }
+  & .ed-news-text {
+    flex: 1 1 auto;
+    padding-block: 11px;
+    margin-block: -11px;
+    min-width: 0;
+    font-size: 15px;
+    line-height: 1.55;
+    color: var(--ed-ink);
+  }
+  & a.ed-news-text:hover {
+    color: var(--ed-accent);
+  }
+  /* The lead item: its plate in a Tint frame beside the date, title and excerpt. */
+  & .ed-news-lead {
+    display: grid;
+    grid-template-columns: 152px minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+    padding-block: 16px 2px;
+    border-top: 1px solid var(--ed-rule);
+    color: var(--ed-ink);
+  }
+  & .ed-news-plate {
+    display: block;
+    aspect-ratio: 4 / 3;
+    padding: 10px;
+    background: var(--ed-tint);
+    border: 1px solid var(--ed-rule);
+    border-radius: 6px;
+  }
+  /* A row's plate: a small thumbnail to the left of the date, centered on the one-line row. */
+  & .ed-news-plate--row {
+    flex: 0 0 56px;
+    align-self: center;
+    margin-block: -6px;
+    padding: 4px;
+    border-radius: 4px;
+  }
+  & .ed-news-plate img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  & .ed-news-lead-body {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+  }
+  & .ed-news-lead-date {
+    font-size: 13px;
+    color: var(--ed-caption);
+  }
+  & .ed-news-lead-title {
+    font-family: var(--font-serif);
+    font-size: 19px;
+    font-weight: 500;
+    line-height: 1.35;
+    transition: color 0.15s ease;
+  }
+  & .ed-news-lead:hover .ed-news-lead-title {
+    color: var(--ed-accent);
+  }
+  & .ed-news-lead-excerpt {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+    font-size: 14px;
+    line-height: 1.55;
+    color: var(--ed-muted);
+  }
+  & .ed-posts li {
+    border-top: 1px solid var(--ed-rule);
+  }
+  & .ed-post-link {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 0 -12px;
+    padding: 14px 12px;
+    border-radius: 6px;
+    color: var(--ed-ink);
+  }
+  & .ed-post-link:hover {
+    color: var(--ed-ink);
+  }
+  & .ed-post-link > span:first-child {
+    min-width: 0;
+  }
+  & .ed-post-title {
+    display: block;
+    font-family: var(--font-serif);
+    font-size: 19px;
+    font-weight: 500;
+    line-height: 1.35;
+  }
+  & .ed-post-meta {
+    display: block;
+    margin-top: 4px;
+    font-size: 13px;
+    color: var(--ed-caption);
+  }
+  & .ed-post-link .arr {
+    padding-top: 2px;
+    color: var(--ed-accent);
+  }
+
+  /* ── Dark contact footer ── */
+  & .ed-contact {
+    background: var(--ed-footer);
+    color: var(--ed-footer-text);
+  }
+  & .ed-contact-inner {
+    display: flex;
+    flex-direction: column;
+    gap: 48px;
+    padding-block: 72px 32px;
+  }
+  & .ed-contact-top {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 28px;
+  }
+  & .ed-contact-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    max-width: 600px;
+  }
+  & .ed-contact h2 {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: clamp(28px, 5vw, 36px);
+    line-height: 1.2;
+    font-weight: 500;
+    color: var(--ed-band-strong);
+  }
+  & .ed-contact p {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.6;
+  }
+  & .ed-btn-light {
+    padding: 14px 22px;
+    border-radius: 4px;
+    background: var(--ed-band-strong);
+    color: var(--ed-footer);
+    font-size: 15px;
+    font-weight: 500;
+    overflow-wrap: anywhere;
+  }
+  & .ed-btn-light:hover {
+    background: var(--ed-selection);
+    color: var(--ed-footer);
+  }
+  & .ed-contact-bottom {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 12px;
+    padding-top: 24px;
+    border-top: 1px solid var(--ed-footer-rule);
+    font-size: 14px;
+    color: var(--ed-footer-muted);
+  }
+  & .ed-contact-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 20px;
+  }
+  & .ed-contact-links a,
+  & .ed-contact .ed-footer-nav a {
+    color: var(--ed-footer-text);
+  }
+  & .ed-contact-links a:hover,
+  & .ed-contact .ed-footer-nav a:hover {
+    color: var(--ed-band-strong);
+  }
+  & .ed-contact p.ed-contact-onward {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 24px;
+    font-weight: 500;
+  }
+  & .ed-contact-onward a {
+    color: var(--ed-band-strong);
+  }
+  & .ed-contact :focus-visible {
+    outline-color: var(--ed-band-strong);
+  }
+
+  /* ── Research ── */
+  & .ed-research-intro {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    max-width: 760px;
+    padding-bottom: 40px;
+  }
+  & .ed-lede {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: clamp(18px, 3vw, 21px);
+    line-height: 1.6;
+    color: var(--ed-body-2);
+  }
+  & .ed-toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 32px;
+    padding-block: 16px;
+    border-block: 1px solid var(--ed-rule);
+    font-size: 14px;
+  }
+  & .ed-toc-label {
+    color: var(--ed-caption);
+  }
+  & .ed-area {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 40px 64px;
+    padding-block: 72px;
+    border-bottom: 1px solid var(--ed-rule);
+    scroll-margin-top: 24px;
+  }
+  & .ed-area-text {
+    flex: 1 1 460px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+  }
+  & .ed-area-num {
+    font-family: var(--font-serif);
+    font-size: 28px;
+    color: var(--ed-accent);
+  }
+  & .ed-area h2 {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: clamp(26px, 4.5vw, 32px);
+    line-height: 1.2;
+    font-weight: 500;
+    color: var(--ed-ink);
+  }
+  & .ed-md {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    font-size: 16px;
+    line-height: 1.75;
+    color: var(--ed-body-2);
+  }
+  & .ed-md > * {
+    margin: 0;
+  }
+  & .ed-md strong {
+    font-weight: 600;
+    color: var(--ed-ink);
+  }
+  /* A result is set between hairlines, like a ruled pull-quote, not boxed or side-tabbed. */
+  & .ed-result {
+    padding: 14px 0;
+    border-block: 1px solid var(--ed-rule);
+    font-size: 14px;
+    line-height: 1.6;
+    color: var(--ed-body-2);
+  }
+  & .ed-result b {
+    font-weight: 600;
+    color: var(--ed-ink);
+  }
+  & .ed-related {
+    display: flex;
+    flex-direction: column;
+    padding-top: 8px;
+  }
+  & .ed-related .ed-label {
+    padding-bottom: 6px;
+  }
+  & .ed-related a {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0 -8px;
+    padding: 10px 8px;
+    /* Shared Edge: the hover tint bleeds 8px, the rule stays on the column. */
+    background: linear-gradient(var(--ed-rule), var(--ed-rule)) center top / calc(100% - 16px) 1px no-repeat;
+    border-radius: 4px;
+    color: var(--ed-ink);
+    font-size: 15px;
+  }
+  & .ed-related-venue {
+    color: var(--ed-caption);
+  }
+  & .ed-related .arr {
+    color: var(--ed-accent);
+  }
+  & .ed-area-fig {
+    flex: 1 1 380px;
+    max-width: 460px;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  & .ed-area-fig .ed-figure-box {
+    padding: 28px 20px;
+  }
+  & .ed-software {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding-top: 72px;
+    scroll-margin-top: 24px;
+  }
+  & .ed-software-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));
+    gap: 24px;
+  }
+  & .ed-software-card {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 22px;
+    border: 1px solid var(--ed-rule);
+    border-radius: 6px;
+    color: var(--ed-ink);
+  }
+  & .ed-software-card:hover {
+    color: var(--ed-ink);
+  }
+  & .ed-software-name {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    font-family: var(--font-mono);
+    font-size: 16px;
+    font-weight: 500;
+  }
+  & .ed-software-name .arr {
+    color: var(--ed-accent);
+  }
+  & .ed-software-desc {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--ed-muted);
+  }
+  & .ed-software-tech {
+    font-size: 13px;
+    color: var(--ed-caption);
+  }
+
+  /* ── Publications ── */
+  & .ed-pubs-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 20px;
+  }
+  & .ed-pubs-head .ed-stack {
+    gap: 14px;
+    max-width: 680px;
+  }
+  & .ed-stats {
+    display: flex;
+    gap: 28px;
+  }
+  & .ed-stat {
+    display: flex;
+    flex-direction: column;
+  }
+  & .ed-stat-num {
+    font-family: var(--font-serif);
+    font-size: 36px;
+    line-height: 1.1;
+  }
+  & .ed-stat-label {
+    font-size: 13px;
+    color: var(--ed-caption);
+  }
+  & .ed-filterbar {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px 24px;
+    border-bottom: 1px solid var(--ed-rule);
+  }
+  & .ed-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 28px;
+  }
+  & .ed-tab {
+    min-height: 44px;
+    min-width: 24px;
+    margin-bottom: -1px;
+    padding: 10px 0;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    background: transparent;
+    font: inherit;
+    font-size: 15px;
+    color: var(--ed-body-2);
+    cursor: pointer;
+  }
+  & .ed-tab[aria-pressed='true'] {
+    border-bottom-color: var(--ed-ink);
+    color: var(--ed-ink);
+    font-weight: 500;
+  }
+  & .ed-tab-count {
+    font-size: 12px;
+    color: var(--ed-caption);
+  }
+  & .ed-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 44px;
+    font-size: 14px;
+    color: var(--ed-body-2);
+    cursor: pointer;
+  }
+  & .ed-toggle input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--ed-accent);
+  }
+  & .ed-year {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 40px;
+    padding-top: 8px;
+  }
+  & .ed-year h2 {
+    flex: 0 0 100px;
+    margin: 0;
+    padding-top: 20px;
+    font-family: var(--font-serif);
+    font-size: 28px;
+    font-weight: 500;
+    color: var(--ed-accent);
+  }
+  & .ed-year .ed-papers {
+    flex: 1 1 600px;
+    min-width: 0;
+    border-top: 0;
+  }
+
+  /* ── Writing list ── */
+  & .ed-entries {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  & .ed-entry {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 32px;
+    padding-block: 24px;
+    border-bottom: 1px solid var(--ed-rule-soft);
+  }
+  & .ed-entry-tile {
+    flex: 0 0 150px;
+    height: 96px;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 12px 14px;
+    background: var(--ed-tint);
+    border: 1px solid var(--ed-rule);
+    border-radius: 4px;
+  }
+  & .ed-entry-tag {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: var(--ed-accent);
+  }
+  & .ed-entry-date {
+    font-size: 13px;
+    color: var(--ed-caption);
+  }
+  & .ed-entry-body {
+    flex: 1 1 480px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  & .ed-entry-title {
+    font-family: var(--font-serif);
+    font-size: 21px;
+    font-weight: 500;
+    line-height: 1.35;
+    color: var(--ed-ink);
+  }
+  & .ed-entry-title:hover {
+    color: var(--ed-accent);
+  }
+  & .ed-entry-excerpt {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--ed-muted);
+  }
+  & .ed-entry-meta {
+    font-size: 13px;
+    color: var(--ed-caption);
+  }
+  & .ed-feedlink {
+    font-size: 14px;
+  }
+
+  /* ── Post ── */
+  & .ed-article {
+    max-width: calc(680px + 2 * var(--ed-pad));
+    margin-inline: auto;
+    padding: 64px var(--ed-pad) 80px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+  & .ed-back {
+    align-self: flex-start;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    min-height: 44px;
+    font-size: 15px;
+  }
+  & .ed-article-head {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--ed-rule);
+  }
+  & .ed-article-title {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: clamp(30px, 6vw, 40px);
+    line-height: 1.2;
+    font-weight: 500;
+    color: var(--ed-ink);
+  }
+  & .ed-subtitle {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.55;
+    color: var(--ed-muted);
+  }
+  & .ed-byline {
+    font-size: 14px;
+    color: var(--ed-caption);
+  }
+  & .ed-aside {
+    margin-top: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-top: 16px;
+    border-top: 2px solid var(--ed-ink);
+  }
+  & .ed-aside-label {
+    font-size: 13px;
+    color: var(--ed-caption);
+  }
+  & .ed-aside a {
+    font-size: 16px;
+    font-weight: 500;
+  }
+  & .ed-aside-venue {
+    font-size: 14px;
+    font-style: italic;
+    color: var(--ed-muted);
+  }
+  & .ed-pager {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    gap: 16px;
+    padding-top: 8px;
+    font-size: 15px;
+  }
+  & .ed-prose {
+    font-family: var(--font-serif);
+    font-size: 19px;
+    line-height: 1.75;
+    color: var(--ed-ink);
+    overflow-wrap: break-word;
+  }
+  & .ed-prose > * {
+    margin: 0 0 22px;
+  }
+  & .ed-prose > :last-child {
+    margin-bottom: 0;
+  }
+  & .ed-prose h2 {
+    margin-top: 34px;
+    font-family: var(--font-serif);
+    font-size: 26px;
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--ed-ink);
+  }
+  & .ed-prose h3 {
+    margin-top: 28px;
+    font-family: var(--font-serif);
+    font-size: 21px;
+    font-weight: 500;
+    line-height: 1.35;
+    color: var(--ed-ink);
+  }
+  & .ed-prose a {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+  & .ed-prose ul,
+  & .ed-prose ol {
+    padding-inline-start: 1.4em;
+  }
+  & .ed-prose ul {
+    list-style: disc;
+  }
+  & .ed-prose ol {
+    list-style: decimal;
+  }
+  & .ed-prose li + li {
+    margin-top: 6px;
+  }
+  & .ed-prose blockquote {
+    padding-inline-start: 18px;
+    border-inline-start: 1px solid var(--ed-caption);
+    font-style: italic;
+    color: var(--ed-body-2);
+  }
+  & .ed-prose code {
+    padding: 1px 5px;
+    border-radius: 3px;
+    background: var(--ed-tint);
+    font-family: var(--font-mono);
+    font-size: 0.82em;
+  }
+  & .ed-prose pre {
+    padding: 16px;
+    overflow-x: auto;
+    border: 1px solid var(--ed-rule);
+    border-radius: 4px;
+    font-size: 14px;
+    line-height: 1.6;
+  }
+  & .ed-prose pre code {
+    padding: 0;
+    background: none;
+    font-size: inherit;
+  }
+  & .ed-prose table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    border-collapse: collapse;
+    font-family: var(--font-sans);
+    font-size: 15px;
+  }
+  & .ed-prose th {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--ed-ink);
+    text-align: start;
+    font-weight: 500;
+  }
+  & .ed-prose td {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--ed-rule);
+  }
+  & .ed-prose img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 4px;
+  }
+  & .ed-prose figcaption {
+    margin-top: 10px;
+    font-family: var(--font-sans);
+    font-size: 14px;
+    color: var(--ed-caption);
+  }
+  & .ed-prose hr {
+    border: 0;
+    border-top: 1px solid var(--ed-rule);
+  }
+  & .ed-prose mjx-container[display='true'],
+  & .ed-prose .katex-display {
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  /* ── CV ── */
+  & .ed-cv-head {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: flex-end;
+    gap: 16px;
+    padding-bottom: 32px;
+  }
+  & .ed-cv-head .ed-stack {
+    gap: 6px;
+  }
+  & .ed-cv-title {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: clamp(34px, 6vw, 48px);
+    line-height: 1.1;
+    font-weight: 500;
+    color: var(--ed-ink);
+  }
+  & .ed-cv-updated {
+    font-size: 15px;
+    color: var(--ed-caption);
+  }
+  & .ed-cv-section {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 40px;
+    padding-block: 32px;
+    border-top: 1px solid var(--ed-rule);
+  }
+  & .ed-cv-section h2 {
+    flex: 0 0 180px;
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 600;
+    line-height: 1.8;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    color: var(--ed-accent);
+  }
+  & .ed-cv-entries {
+    flex: 1 1 520px;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+  }
+  & .ed-cv-entry {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  & .ed-cv-entry-top {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0 16px;
+  }
+  & .ed-cv-entry-title {
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.45;
+  }
+  & .ed-cv-when {
+    font-size: 14px;
+    color: var(--ed-caption);
+    white-space: nowrap;
+  }
+  & .ed-cv-org {
+    font-size: 15px;
+    color: var(--ed-muted);
+  }
+  & .ed-cv-points {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin: 6px 0 0;
+    padding-inline-start: 18px;
+    list-style: disc;
+  }
+  & .ed-cv-points li {
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--ed-body-2);
+  }
+
+  /* ── Ink figures ── */
+  /* Line art ships as dark ink on transparency; in dark mode it is inverted to light ink. */
+  & .ed-ink {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  /* On wider screens the home row's venue tile carries the venue, so its meta line keeps it only for screen readers. */
+  @media (min-width: 641px) {
+    & .ed-venue--tiled {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip-path: inset(50%);
+      white-space: nowrap;
+    }
+  }
+
+  /* ── Phones ── */
+  @media (max-width: 640px) {
+    --ed-pad: 16px;
+
+    /* Brand and mode toggle share the first line; the links become one row that scrolls sideways. */
+    & .ed-nav {
+      flex-wrap: wrap;
+      row-gap: 2px;
+      padding-block: 10px 0;
+    }
+    & .ed-mode,
+    & .ed-nav-contact {
+      order: 1;
+      margin-inline-start: auto;
+    }
+    & .ed-nav-contact + .ed-mode {
+      margin-inline-start: 0;
+    }
+    & .ed-navlinks {
+      order: 2;
+      flex: 1 0 100%;
+      flex-wrap: nowrap;
+      gap: 0 22px;
+      margin-inline: calc(-1 * var(--ed-pad));
+      padding-inline: var(--ed-pad);
+      overflow-x: auto;
+      overscroll-behavior-inline: contain;
+      scrollbar-width: none;
+    }
+    /* data-more (set by Layout's script) means links remain past the trailing edge. */
+    & .ed-navlinks[data-more] {
+      mask-image: linear-gradient(to right, #000 calc(100% - 28px), transparent);
+    }
+    &[dir='rtl'] .ed-navlinks[data-more] {
+      mask-image: linear-gradient(to left, #000 calc(100% - 28px), transparent);
+    }
+    & .ed-navlinks::-webkit-scrollbar {
+      display: none;
+    }
+    & .ed-navlinks a {
+      flex: none;
+    }
+    & .ed-tabs {
+      column-gap: 22px;
+    }
+
+    & .ed-hero {
+      gap: 40px;
+      padding-block: 56px 48px;
+    }
+    /* The tile would add a 92px block per paper; the meta line already names the venue and year. */
+    & .ed-venue-tile {
+      display: none;
+    }
+    /* A compact plate after the actions, short enough that the first paper stays within a short scroll. */
+    & .ed-hero .ed-figure {
+      gap: 8px;
+    }
+    & .ed-hero .ed-figure-box {
+      padding: 12px;
+    }
+    & .ed-hero .ed-figure-box img {
+      max-height: 116px;
+      object-fit: contain;
+    }
+    & .ed-topic {
+      gap: 12px;
+    }
+    & .ed-topic-num {
+      flex-basis: 28px;
+    }
+    /* Rows sit 44px apart so the enlarged link targets never overlap. */
+    & .ed-footer-nav,
+    & .ed-contact-links {
+      row-gap: 22px;
+    }
+    & .ed-home-section {
+      padding-block: 56px 32px;
+    }
+    & .ed-main {
+      padding-block: 48px 64px;
+    }
+    & .ed-area {
+      padding-block: 48px;
+    }
+    & .ed-split {
+      padding-block: 24px 64px;
+    }
+    & .ed-news-lead {
+      grid-template-columns: 112px minmax(0, 1fr);
+      gap: 16px;
+    }
+    & .ed-contact-inner {
+      padding-block: 56px 28px;
+    }
+    & .ed-article {
+      padding-block: 40px 56px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    scroll-behavior: auto;
+
+    & *,
+    & *::before,
+    & *::after {
+      transition: none !important;
+    }
+  }
+}
+
+/*
+ * Owner text in another script keeps its own bidi order but lines up with the page's column edge
+ * (`text-align: match-parent` would say this, but Chromium lacks it). Zero specificity, so any
+ * component's own alignment wins. Long-form prose keeps its own: a whole article reads as one block.
+ */
+:where(:root[data-theme='editorial']:not([dir='rtl']) [dir='auto']:not(.ed-prose)) {
+  text-align: left;
+}
+:where(:root[data-theme='editorial'][dir='rtl'] [dir='auto']:not(.ed-prose)) {
+  text-align: right;
+}
+
+/*
+ * Dark mode, "the journal at night", in three owner-selectable palettes (editorial.night → `data-night`
+ * on <html>): Lamplight (default, also used when the attribute is missing), Ink Well and Galley Proof.
+ * Each palette sets only the primitives below and the ink-plate filter; every other night token derives
+ * from them. `.dark` comes from DarkModeScript; the accent follows colors.dark.primary (lib/colors.ts →
+ * editorialAccentCss, which lifts it to 4.5:1 on the palette's Hover; NIGHT_HOVER mirrors --ed-hover).
+ * The classic dm-* tokens map onto the palette, so undesigned pages match.
+ */
+html.dark:root[data-theme='editorial'] {
+  /* Lamplight: warm charcoal paper, ivory ink, the light theme's navy lifted to a night blue (hue 265). */
+  --ed-paper: #1a1713;
+  --ed-tint: #211d19;
+  --ed-hover: #27231e;
+  --ed-rule: #312d28;
+  --ed-footer-rule: #403b35;
+  --ed-ink: #ede7dc;
+  --ed-body-2: #d3cdc2;
+  --ed-muted: #bbb5ac;
+  --ed-caption: #a39d96;
+  --ed-accent: #9cb1dd;
+  --ed-accent-hover: #c3d1ef;
+  /* Plain inversion turns blue-black ink into warm ivory, the colour of the night text. */
+  --ed-ink-filter: invert(1);
+
+  --ed-rule-soft: var(--ed-hover);
+  --ed-accent-border: color-mix(in oklab, var(--ed-accent), var(--ed-paper) 60%);
+  --ed-selection: color-mix(in oklab, var(--ed-accent), var(--ed-paper) 72%);
+  --ed-rule-strong: var(--ed-footer-rule);
+  /* Two steps off the page (Hover is too close to Paper at night), so the band lands as the page's ending. */
+  --ed-footer: var(--ed-rule);
+  --ed-footer-text: var(--ed-body-2);
+  --ed-footer-muted: var(--ed-caption);
+  --ed-on-accent: var(--ed-paper);
+  --ed-code: var(--ed-body-2);
+  --ed-band-strong: var(--ed-ink);
+  color-scheme: dark;
+
+  /* Classic Tailwind tokens → dark journal palette on undesigned pages. */
+  --color-surface-50: var(--ed-hover);
+  --color-surface-100: var(--ed-tint);
+  --color-surface-200: var(--ed-rule);
+  --color-surface-300: var(--ed-caption);
+  --color-surface-400: var(--ed-caption);
+  --color-surface-500: var(--ed-caption);
+  --color-surface-600: var(--ed-muted);
+  --color-surface-700: var(--ed-body-2);
+  --color-surface-800: var(--ed-ink);
+  --color-surface-900: var(--ed-ink);
+  /* Bare links and classic accent utilities use the accent ramp in dark mode. */
+  --color-accent-300: var(--ed-accent-hover);
+  --color-accent-400: var(--ed-accent);
+  --color-dm: var(--ed-paper);
+  --color-dm-alt: var(--ed-tint);
+  --color-dm-hover: var(--ed-hover);
+  --color-dm-heading: var(--ed-ink);
+  --color-dm-text: var(--ed-body-2);
+  --color-dm-muted: var(--ed-caption);
+  --color-dm-faint: var(--ed-caption);
+  --color-dm-border: var(--ed-rule);
+  --color-dm-border-alt: var(--ed-footer-rule);
+
+  & .ed-contact {
+    border-top: 1px solid var(--ed-footer-rule);
+  }
+  /* Selection Wash is dark at night: under the band's dark label it fell to 1.4:1. */
+  & .ed-btn-light:hover {
+    background: var(--ed-accent-hover);
+  }
+  & .ed-backdrop--image {
+    background-image: var(--ed-hero-img-dark);
+  }
+  & .ed-backdrop--pattern {
+    opacity: 0.1;
+  }
+  & .ed-ink {
+    filter: var(--ed-ink-filter);
+    opacity: 0.88;
+  }
+  /* Shiki writes the light theme inline; its dual-theme vars carry the dark one. */
+  & pre.astro-code {
+    background-color: var(--ed-tint) !important;
+    color: var(--shiki-dark) !important;
+  }
+  & pre.astro-code span {
+    color: var(--shiki-dark) !important;
+    font-style: var(--shiki-dark-font-style) !important;
+    font-weight: var(--shiki-dark-font-weight) !important;
+    text-decoration: var(--shiki-dark-text-decoration) !important;
+  }
+}
+
+/* `:where` keeps these at the base block's specificity, so the owner accent in editorialAccentCss still wins. */
+/* Ink Well: the journal's Ink as night paper, cool blue-grey ink, a periwinkle accent. */
+html.dark:root[data-theme='editorial']:where([data-night='inkwell']) {
+  --ed-paper: #121521;
+  --ed-tint: #191d2a;
+  --ed-hover: #1e2230;
+  --ed-rule: #292d3b;
+  --ed-footer-rule: #383d4b;
+  --ed-ink: #e6eaf0;
+  --ed-body-2: #cbcfda;
+  --ed-muted: #b2b7c5;
+  --ed-caption: #9ba1b0;
+  --ed-accent: #a0b6ef;
+  --ed-accent-hover: #c5d4fa;
+  /* The hue turn keeps inverted ink blue, matching the cool text. */
+  --ed-ink-filter: invert(1) hue-rotate(180deg);
+}
+
+/* Galley Proof: near-neutral warm graphite, grey ink, a muted slate-teal accent. */
+html.dark:root[data-theme='editorial']:where([data-night='galley']) {
+  --ed-paper: #1b1917;
+  --ed-tint: #22201e;
+  --ed-hover: #272623;
+  --ed-rule: #32302e;
+  --ed-footer-rule: #403e3b;
+  --ed-ink: #eae7e2;
+  --ed-body-2: #d0cdc8;
+  --ed-muted: #b8b5b0;
+  --ed-caption: #a39f9a;
+  --ed-accent: #86c0c6;
+  --ed-accent-hover: #b7dce1;
+  /* Greyscale drops the tint inversion leaves, so plates read as proof-sheet graphite. */
+  --ed-ink-filter: invert(1) grayscale(1);
+}

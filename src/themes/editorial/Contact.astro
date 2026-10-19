@@ -1,0 +1,103 @@
+---
+import Layout from './Layout.astro';
+import ContactForm from '../../components/vue/ContactForm.vue';
+import ObfuscatedEmail from '../../components/astro/ObfuscatedEmail.astro';
+import { socialLinks } from '../../lib/editorial';
+import type { SiteConfig } from '../../lib/types';
+import { uiStrings } from '../../lib/ui-strings';
+import './projects.css';
+
+interface Props {
+  config: SiteConfig;
+  siteName: string;
+  personal: boolean;
+  web3formsKey?: string;
+}
+
+const { config, siteName, personal, web3formsKey } = Astro.props;
+const t = uiStrings(config);
+const email = config.socials?.email;
+const affiliation = [config.department, config.university].filter(Boolean);
+const profiles = socialLinks(config.socials);
+const intro = config.editorial?.contact?.text || t(personal ? 'contact.introPersonal' : 'contact.introLab');
+const byEmail = t(personal ? 'contact.byEmailPersonal' : 'contact.byEmailLab').split(/(\{email\})/);
+---
+
+<Layout title={t('contact.title')} description={t(personal ? 'contact.descriptionPersonal' : 'contact.descriptionLab')}>
+  <div class="ed-wrap ed-main">
+    <div class="ed-stack">
+      <h1 class="ed-h1" dir="auto">{config.editorial?.contact?.heading || t('contact.heading')}</h1>
+      <p class="ed-intro" dir="auto">{intro}</p>
+    </div>
+
+    <div class="ed-pj-contact">
+      <section class="ed-pj-contact-main" aria-labelledby="ct-message">
+        <h2 id="ct-message" class="ed-label ed-pj-group-head">{t('contact.sendMessage')}</h2>
+        {
+          web3formsKey ? (
+            <div class="ed-pj-form">
+              <ContactForm client:visible accessKey={web3formsKey} />
+            </div>
+          ) : email ? (
+            <p class="ed-pj-text">
+              {byEmail.map((part) => (part === '{email}' ? <ObfuscatedEmail email={email} class="ul" /> : part))}
+            </p>
+          ) : (
+            <p class="ed-pj-empty">{t('contact.empty')}</p>
+          )
+        }
+      </section>
+
+      <section class="ed-pj-contact-info" aria-labelledby="ct-info">
+        <h2 id="ct-info" class="ed-label ed-pj-group-head">
+          {t(personal ? 'contact.infoPersonal' : 'contact.infoLab')}
+        </h2>
+        <dl class="ed-pj-facts ed-pj-facts--stack">
+          <div>
+            <dt>{t(personal ? 'contact.namePersonal' : 'contact.nameLab')}</dt>
+            <dd dir="auto">{siteName}</dd>
+          </div>
+          {
+            affiliation.length > 0 && (
+              <div>
+                <dt>{t('contact.affiliation')}</dt>
+                <dd dir="auto">
+                  {affiliation.map((a, i) => (
+                    <>
+                      {i > 0 && <br />}
+                      {a}
+                    </>
+                  ))}
+                </dd>
+              </div>
+            )
+          }
+          {
+            email && (
+              <div>
+                <dt>{t('contact.email')}</dt>
+                <dd>
+                  <ObfuscatedEmail email={email} class="ul" />
+                </dd>
+              </div>
+            )
+          }
+          {
+            profiles.length > 0 && (
+              <div>
+                <dt>{t('contact.elsewhere')}</dt>
+                <dd class="ed-pj-links">
+                  {profiles.map((l) => (
+                    <a href={l.href} class="ul" rel="noopener noreferrer">
+                      {l.label}
+                    </a>
+                  ))}
+                </dd>
+              </div>
+            )
+          }
+        </dl>
+      </section>
+    </div>
+  </div>
+</Layout>

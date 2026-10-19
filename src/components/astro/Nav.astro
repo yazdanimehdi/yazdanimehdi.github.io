@@ -1,166 +1,150 @@
 ---
 import { getSiteConfig } from '../../lib/config';
+import { uiStrings } from '../../lib/ui-strings';
+import type { NavItem } from '../../lib/types';
 
-const config = getSiteConfig();
-const currentPath = Astro.url.pathname;
-
-function isActive(href: string): boolean {
-  if (href === '/') return currentPath === '/';
-  return currentPath.startsWith(href);
+interface Props {
+  items: NavItem[];
+  /** Kept in view after the overflow menu. */
+  contact?: NavItem;
 }
+
+const { items, contact } = Astro.props;
+const t = uiStrings(getSiteConfig());
+const currentPath = Astro.url.pathname;
+const isActive = (href: string) =>
+  href === '/' ? currentPath === '/' : currentPath === href || currentPath.startsWith(`${href}/`);
+const linkClass = (href: string) => [
+  'inline-flex min-h-11 items-center px-2.5 text-sm whitespace-nowrap transition-colors',
+  isActive(href)
+    ? 'font-medium text-primary-600 dark:text-accent-400'
+    : 'text-surface-600 hover:text-primary-600 dark:text-dm-muted dark:hover:text-accent-400',
+];
 ---
 
-<div class="relative flex items-center gap-0.5" data-nav-overflow>
-  <nav class="flex items-center gap-0.5" data-nav-visible>
-    {
-      config.nav.map((item) => (
-        <a
-          href={item.href}
-          class:list={[
-            'px-2.5 py-1.5 text-sm whitespace-nowrap transition-colors',
-            isActive(item.href)
-              ? 'font-medium text-primary-600 dark:text-accent-400'
-              : 'text-surface-600 hover:text-primary-600 dark:text-dm-muted dark:hover:text-accent-400',
-          ]}
-          aria-current={isActive(item.href) ? 'page' : undefined}
-          data-nav-item
-        >
-          {item.label}
-        </a>
-      ))
-    }
-  </nav>
+<nav class="relative flex items-center gap-0.5" aria-label={t('nav.primary')} data-nav-overflow>
+  {
+    items.map((item) => (
+      <a
+        href={item.href}
+        class:list={linkClass(item.href)}
+        aria-current={isActive(item.href) ? 'page' : undefined}
+        data-nav-item
+      >
+        {item.label}
+      </a>
+    ))
+  }
 
-  <!-- "More" dropdown toggle -->
+  <!-- Disclosure for the links that don't fit; filled by the script below -->
   <div class="relative hidden" data-nav-more>
     <button
       type="button"
-      class="flex items-center gap-1 px-2.5 py-1.5 text-sm whitespace-nowrap text-surface-600 transition-colors hover:text-primary-600 dark:text-dm-muted dark:hover:text-accent-400"
+      class="flex min-h-11 items-center gap-1 px-2.5 text-sm whitespace-nowrap text-surface-600 transition-colors hover:text-primary-600 dark:text-dm-muted dark:hover:text-accent-400"
       data-nav-more-btn
       aria-expanded="false"
-      aria-haspopup="true"
+      aria-controls="nav-more-list"
     >
-      More
-      <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+      {t('nav.moreButton')}
+      <svg
+        class="h-3.5 w-3.5"
+        fill="none"
+        viewBox="0 0 24 24"
+        stroke="currentColor"
+        stroke-width="2"
+        aria-hidden="true"
+      >
         <path d="M19 9l-7 7-7-7"></path>
       </svg>
     </button>
-    <div
-      class="absolute end-0 top-full z-50 mt-1 hidden min-w-[160px] rounded-md border border-surface-200 bg-white py-1 shadow-lg dark:border-dm-border-alt dark:bg-dm-alt"
+    <ul
+      id="nav-more-list"
+      class="absolute end-0 top-full z-50 hidden min-w-[160px] rounded-md border border-surface-200 bg-white py-1 shadow-lg dark:border-dm-border-alt dark:bg-dm-alt"
       data-nav-more-menu
     >
-      <!-- Overflow items inserted here by JS -->
-    </div>
+    </ul>
   </div>
-</div>
+
+  {
+    contact && (
+      <a
+        href={contact.href}
+        class:list={linkClass(contact.href)}
+        aria-current={isActive(contact.href) ? 'page' : undefined}
+      >
+        {contact.label}
+      </a>
+    )
+  }
+</nav>
 
 <script>
-  function initNavOverflow() {
-    const containers = document.querySelectorAll<HTMLElement>('[data-nav-overflow]');
-    containers.forEach(setupOverflow);
-  }
-
+  // Links that don't fit the header row move, from the end, into the "More" disclosure. Overflow is read
+  // from the row's scrollWidth, so it holds in either direction (LTR or RTL).
   function setupOverflow(container: HTMLElement) {
-    // Guard against duplicate setup
     if (container.hasAttribute('data-nav-initialized')) return;
     container.setAttribute('data-nav-initialized', '');
 
-    const nav = container.querySelector<HTMLElement>('[data-nav-visible]');
-    const moreWrapper = container.querySelector<HTMLElement>('[data-nav-more]');
-    const moreBtn = container.querySelector<HTMLButtonElement>('[data-nav-more-btn]');
-    const moreMenu = container.querySelector<HTMLElement>('[data-nav-more-menu]');
-    if (!nav || !moreWrapper || !moreBtn || !moreMenu) return;
+    const row = container.closest<HTMLElement>('[data-nav-desktop]');
+    const more = container.querySelector<HTMLElement>('[data-nav-more]');
+    const button = container.querySelector<HTMLButtonElement>('[data-nav-more-btn]');
+    const menu = container.querySelector<HTMLElement>('[data-nav-more-menu]');
+    const items = Array.from(container.querySelectorAll<HTMLAnchorElement>('[data-nav-item]'));
+    if (!row || !more || !button || !menu || items.length === 0) return;
 
-    const items = Array.from(nav.querySelectorAll<HTMLAnchorElement>('[data-nav-item]'));
-    if (items.length === 0) return;
+    const setOpen = (open: boolean) => {
+      menu.classList.toggle('hidden', !open);
+      button.setAttribute('aria-expanded', String(open));
+    };
+    const overflows = () => row.scrollWidth > row.clientWidth + 1;
 
     function measure() {
-      // Reset: show all items, hide More
-      items.forEach((item) => item.classList.remove('hidden'));
-      moreWrapper.classList.add('hidden');
-      while (moreMenu.firstChild) moreMenu.removeChild(moreMenu.firstChild);
-      moreMenu.classList.add('hidden');
-      moreBtn.setAttribute('aria-expanded', 'false');
-
-      // Walk up to find the header row (flex justify-between container)
-      const headerRow = container.closest('.flex.justify-between') as HTMLElement | null;
-      if (!headerRow) return;
-
-      // Find the logo and theme toggle to calculate their widths
-      const logo = headerRow.querySelector<HTMLElement>('[data-nav-logo]');
-      const themeToggle = container.parentElement?.querySelector('.border-s') as HTMLElement | null;
-      const logoWidth = logo ? logo.getBoundingClientRect().width : 0;
-      const toggleWidth = themeToggle ? themeToggle.getBoundingClientRect().width + 8 : 40;
-      // Reserve space for the "More" button (~70px) + gaps (~24px)
-      const totalReserved = logoWidth + toggleWidth + 70 + 24;
-      const availableWidth = headerRow.clientWidth - totalReserved;
-      const navLeft = nav.getBoundingClientRect().left;
-
-      let overflowStartIndex = items.length;
-      for (let i = 0; i < items.length; i++) {
-        const rect = items[i].getBoundingClientRect();
-        if (rect.right - navLeft > availableWidth) {
-          overflowStartIndex = i;
-          break;
-        }
+      setOpen(false);
+      menu!.replaceChildren();
+      items.forEach((item) => (item.style.display = ''));
+      more!.classList.add('hidden');
+      if (!overflows()) return;
+      more!.classList.remove('hidden');
+      const moved: HTMLAnchorElement[] = [];
+      for (let i = items.length - 1; i >= 0 && overflows(); i--) {
+        items[i].style.display = 'none';
+        moved.unshift(items[i]);
       }
-
-      if (overflowStartIndex < items.length) {
-        // Hide overflow items and create dropdown links
-        for (let i = overflowStartIndex; i < items.length; i++) {
-          items[i].classList.add('hidden');
-
-          const link = document.createElement('a');
-          link.href = items[i].href;
-          link.textContent = items[i].textContent?.trim() || '';
-          if (items[i].getAttribute('aria-current') === 'page') {
-            link.className =
-              'block px-3 py-1.5 text-sm font-medium text-primary-600 dark:text-accent-400 bg-surface-50 dark:bg-dm-hover';
-            link.setAttribute('aria-current', 'page');
-          } else {
-            link.className =
-              'block px-3 py-1.5 text-sm text-surface-600 hover:text-primary-600 hover:bg-surface-50 dark:text-dm-muted dark:hover:text-accent-400 dark:hover:bg-[#1c2128] transition-colors';
-          }
-          moreMenu.appendChild(link);
-        }
-        moreWrapper.classList.remove('hidden');
+      for (const item of moved) {
+        const link = item.cloneNode(true) as HTMLAnchorElement;
+        link.style.display = '';
+        link.classList.remove('inline-flex', 'px-2.5');
+        link.classList.add('flex', 'px-3', 'hover:bg-surface-50', 'dark:hover:bg-dm-hover');
+        link.removeAttribute('data-nav-item');
+        const li = document.createElement('li');
+        li.append(link);
+        menu!.append(li);
       }
     }
 
-    // Toggle dropdown
-    moreBtn.addEventListener('click', (e) => {
-      e.stopPropagation();
-      const isOpen = moreBtn.getAttribute('aria-expanded') === 'true';
-      if (isOpen) {
-        moreMenu.classList.add('hidden');
-        moreBtn.setAttribute('aria-expanded', 'false');
-      } else {
-        moreMenu.classList.remove('hidden');
-        moreBtn.setAttribute('aria-expanded', 'true');
-      }
+    button.addEventListener('click', () => setOpen(button.getAttribute('aria-expanded') !== 'true'));
+    container.addEventListener('keydown', (e) => {
+      if (e.key !== 'Escape' || button.getAttribute('aria-expanded') !== 'true') return;
+      setOpen(false);
+      button.focus();
     });
-
-    // Close dropdown on outside click
+    container.addEventListener('focusout', (e) => {
+      if (!container.contains(e.relatedTarget as Node | null)) setOpen(false);
+    });
     document.addEventListener('click', (e) => {
-      if (!container.contains(e.target as Node)) {
-        moreMenu.classList.add('hidden');
-        moreBtn.setAttribute('aria-expanded', 'false');
-      }
+      if (!container.contains(e.target as Node)) setOpen(false);
     });
 
-    // Measure on load and resize
+    // Re-measure when the row resizes: window resize, web fonts, and the search and theme islands hydrating.
+    let frame = 0;
+    new ResizeObserver(() => {
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(measure);
+    }).observe(row);
     measure();
-    const resizeHandler = () => measure();
-    window.addEventListener('resize', resizeHandler);
   }
 
-  // Run on initial load and after Astro view transitions
-  initNavOverflow();
-  document.addEventListener('astro:after-swap', () => {
-    // Remove init guard so new DOM elements get set up
-    document.querySelectorAll('[data-nav-initialized]').forEach((el) => {
-      el.removeAttribute('data-nav-initialized');
-    });
-    initNavOverflow();
-  });
+  const init = () => document.querySelectorAll<HTMLElement>('[data-nav-overflow]').forEach(setupOverflow);
+  init();
+  document.addEventListener('astro:after-swap', init);
 </script>

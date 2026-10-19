@@ -1,0 +1,92 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import EntryBody from '../../components/astro/EntryBody.astro';
+import ProseEnhancements from '../../components/astro/ProseEnhancements.astro';
+import Layout from './Layout.astro';
+import { getSiteConfig } from '../../lib/config';
+import { getEntries } from '../../lib/content';
+import { COVER_SIZES, resolveCover } from '../../lib/content/image';
+import { imageFacts } from '../../lib/inkArt';
+import { formatNewsDate } from '../../lib/utils';
+import { uiStrings } from '../../lib/ui-strings';
+import './timeline.css';
+
+interface Props {
+  entry: CollectionEntry<'announcements'>;
+  ogImage?: string;
+}
+
+const { entry, ogImage } = Astro.props;
+const config = getSiteConfig();
+const t = uiStrings(config);
+const label = config.nav.find((n) => n.href === '/news')?.label ?? t('home.news');
+const cover = entry.data.image;
+const facts = await imageFacts(cover);
+const coverImg = cover ? await resolveCover(cover) : undefined;
+
+const ids = entry.data.people ?? [];
+const people = ids.length ? (await getEntries('people')).filter((p) => ids.includes(p.id)) : [];
+people.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
+---
+
+<Layout title={entry.data.title} description={entry.data.excerpt} ogImage={ogImage}>
+  <article class="ed-article">
+    <a href="/news" class="ed-back"><span class="arr" aria-hidden="true">←</span> {label}</a>
+    <header class="ed-article-head">
+      <h1 class="ed-article-title" dir="auto">{entry.data.title}</h1>
+      {
+        entry.data.excerpt && (
+          <p class="ed-subtitle" dir="auto">
+            {entry.data.excerpt}
+          </p>
+        )
+      }
+      <span class="ed-byline num">
+        {entry.data.category && <span class="ed-meta-cap">{entry.data.category} · </span>}
+        <time datetime={entry.data.date.toISOString()}>
+          {formatNewsDate(entry.data.date, entry.data.datePrecision, config.lang)}
+        </time>
+      </span>
+    </header>
+
+    {
+      coverImg && (
+        <figure class="ed-cover ed-figure-box">
+          <img
+            src={coverImg.src}
+            srcset={coverImg.srcset}
+            sizes={COVER_SIZES}
+            alt=""
+            width={coverImg.width ?? facts.width}
+            height={coverImg.height ?? facts.height}
+            class:list={[facts.ink && 'ed-ink']}
+            fetchpriority="high"
+            decoding="async"
+          />
+        </figure>
+      )
+    }
+
+    <div class="ed-prose" dir="auto"><EntryBody entry={entry} /></div>
+    <ProseEnhancements />
+
+    {
+      people.length > 0 && (
+        <aside class="ed-tl-people" aria-labelledby="news-people">
+          <span id="news-people" class="ed-label">
+            {t('news.people')}
+          </span>
+          <ul>
+            {people.map((p) => (
+              <li>
+                <a href={`/people/${p.id}`} class="ul" dir="auto">
+                  {p.data.name}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </aside>
+      )
+    }
+  </article>
+</Layout>

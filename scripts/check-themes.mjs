@@ -1,0 +1,229 @@
+// Builds the site with both themes and checks the designed pages.
+//   node scripts/check-themes.mjs            build dist-classic/ + dist-editorial/, then check
+//   node scripts/check-themes.mjs --no-build check existing builds only
+//   --structural  only builds + the data-theme marker on designed pages that exist (no demo-content
+//                 assertions, no blog post required). Safe for customised forks; CI uses it there.
+//                 Default mode also asserts the demo content (Prof. Jane Smith etc.): template repo only.
+// The baseline comparison is a local one-time pre-merge gate: dist-baseline/ is gitignored, so CI
+// never has it and skips the comparison.
+// If dist-baseline/ exists (a classic build from before the theme refactor), every classic page
+// must match it after normalizing asset hashes, scoped-style ids, styles and whitespace.
+import assert from 'node:assert/strict';
+import { execSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+
+const THEMES = ['classic', 'editorial'];
+const STRUCTURAL = process.argv.includes('--structural');
+const PAGES = ['index.html', 'research/index.html', 'publications/index.html', 'cv/index.html', 'blog/index.html'];
+
+if (!process.argv.includes('--no-build')) {
+  for (const theme of THEMES) {
+    execSync(`pnpm astro build --outDir dist-${theme}`, {
+      stdio: 'inherit',
+      env: { ...process.env, SCHOLAROS_THEME: theme },
+    });
+  }
+}
+
+const read = (theme, page) => fs.readFileSync(path.join(`dist-${theme}`, page), 'utf8');
+const ed = (page) => read('editorial', page);
+
+function firstPost(theme) {
+  const dir = path.join(`dist-${theme}`, 'blog');
+  const id = fs.existsSync(dir)
+    ? fs.readdirSync(dir).find((d) => d !== 'tag' && fs.existsSync(path.join(dir, d, 'index.html')))
+    : undefined;
+  // Structural mode tolerates a site with no posts; the demo site must have one.
+  assert.ok(id || STRUCTURAL, `no blog post page in dist-${theme}/blog`);
+  return id && `blog/${id}/index.html`;
+}
+
+for (const theme of THEMES) {
+  for (const page of [...PAGES, firstPost(theme)]) {
+    if (!page || (STRUCTURAL && !fs.existsSync(path.join(`dist-${theme}`, page)))) continue;
+    assert.match(read(theme, page), new RegExp(`<html[^>]*data-theme="${theme}"`), `${theme} ${page}: theme marker`);
+  }
+}
+
+// --- editorial page checks (one block per page; demo content, skipped in --structural) ---
+
+if (!STRUCTURAL) {
+  {
+    const html = ed('contact/index.html');
+    assert.match(html, /<header class="ed-header">/, 'editorial /contact: editorial header on an undesigned page');
+    assert.match(
+      html,
+      /<a href="\/contact" aria-current="page">\s*Contact\s*<\/a>/,
+      'editorial /contact: active nav item',
+    );
+    assert.match(html, /<footer class="ed-footer">/, 'editorial /contact: light footer');
+    assert.doesNotMatch(html, /ThemeToggle/, 'editorial: no theme toggle');
+    assert.doesNotMatch(read('classic', 'contact/index.html'), /class="ed-header"/, 'classic /contact: classic header');
+  }
+
+  {
+    const html = read('classic', 'index.html');
+    const h2s = [...html.matchAll(/<h2[^>]*>\s*([^<]+?)\s*<\/h2>/g)].map((m) => m[1]);
+    assert.deepEqual(
+      h2s.slice(0, 5),
+      ['Publications', 'Research', 'About', 'News', 'Blog'],
+      'classic /: journal block order (personal: papers, research, then updates), About after the proof',
+    );
+    assert.match(html, /href="\/research#nlp"/, 'classic /: research rows link to their area');
+    assert.match(read('classic', 'research/index.html'), /<div id="nlp"/, 'classic /research: area anchors');
+    assert.match(html, /<bdi>Prof\. Jane Smith<\/bdi>/, 'classic footer: site name isolated for RTL');
+  }
+
+  {
+    const html = ed('index.html');
+    assert.match(html, /<h1 class="ed-hero-name"[^>]*>\s*Prof\. Jane Smith\s*<\/h1>/, 'editorial /: hero name');
+    assert.match(
+      html,
+      /<div class="ed-bio"[^>]*><p>I lead the Smith Research Lab at the <strong>/,
+      'editorial /: bio rendered from Markdown',
+    );
+    assert.match(html, /"@type":"Person"/, 'editorial /: Person JSON-LD');
+    assert.match(
+      html,
+      /class="ed-affil"[^>]*>[\s\S]*?University of Technology</,
+      'editorial /: affiliations in the hero',
+    );
+    assert.match(
+      html,
+      /<ol class="ed-topics">[\s\S]*?<h3 class="ed-topic-title"[^>]*>\s*<a href="\/research#nlp">/,
+      'editorial /: research row title links to its area',
+    );
+    assert.doesNotMatch(html, /class="ed-links"/, 'editorial /: profile links only in the contact band, not the hero');
+    assert.ok(
+      html.indexOf('id="home-papers"') < html.indexOf('class="ed-news"'),
+      'editorial /: selected papers come before news',
+    );
+    assert.match(html, /All 5 publications/, 'editorial /: publication count');
+    assert.match(
+      html,
+      /<details class="ed-bib">\s*<summary class="ul">Cite<\/summary>[\s\S]*?data-bib-copy/,
+      'editorial /: Cite opens BibTeX in place',
+    );
+    assert.doesNotMatch(html, /href="\/publications#/, 'editorial /: Cite no longer links away');
+    assert.match(html, /<strong>Jane Smith<\/strong>/, 'editorial /: owner bold in author lists');
+    assert.match(
+      html,
+      /class="ed-news-date num">\s*<span aria-hidden="true">2024<\/span>\s*<span class="ed-sr-only">\s*In 2024\s*</,
+      'editorial /: year-precision news date',
+    );
+    assert.match(html, /<footer class="ed-contact">/, 'editorial /: contact footer');
+    assert.doesNotMatch(html, /astro-island/, 'editorial /: no framework islands');
+  }
+
+  {
+    const html = ed('research/index.html');
+    for (const id of ['nlp', 'multimodal', 'safety']) {
+      assert.match(html, new RegExp(`<section id="${id}" class="ed-area"`), `editorial /research: section #${id}`);
+    }
+    assert.match(html, /<nav class="ed-toc" aria-label="On this page">/, 'editorial /research: on-this-page nav');
+    assert.match(html, /<strong>parameter-efficient fine-tuning<\/strong>/, 'editorial /research: Markdown body');
+    assert.match(html, /<b>Result\.<\/b>/, 'editorial /research: result aside');
+    assert.match(html, /<b>Fig\. 1\.<\/b>/, 'editorial /research: numbered figure caption');
+    assert.match(html, /href="\/publications#garcia2024safe"/, 'editorial /research: related paper rows');
+    assert.match(html, /<section id="software" class="ed-software"/, 'editorial /research: software grid');
+    assert.match(html, /Python · Transformers/, 'editorial /research: software tech line from tags');
+  }
+
+  {
+    const html = ed('publications/index.html');
+    assert.equal(
+      (html.match(/data-topic="/g) ?? []).length,
+      5,
+      'editorial /publications: one filterable row per paper',
+    );
+    assert.match(html, /<li id="smith2024adaptive"/, 'editorial /publications: row anchors for Cite links');
+    assert.match(html, /data-topic="other"/, 'editorial /publications: unmatched topic → Other');
+    assert.match(
+      html,
+      /data-filter="nlp"[^>]*>\s*NLP <span class="ed-tab-count num">1<\/span>/,
+      'editorial /publications: topic filter with count',
+    );
+    assert.match(html, /data-filter="other"/, 'editorial /publications: Other filter');
+    assert.match(
+      html,
+      /<details class="ed-bib">\s*<summary class="ul">Cite<\/summary>\s*<div class="ed-bib-body">\s*<pre>@inproceedings\{smith2024adaptive,/,
+      'editorial /publications: BibTeX expander',
+    );
+    assert.match(html, /@article\{smith2023fairness,/, 'editorial /publications: bibtex field used as-is');
+    assert.match(html, /"@type":"ScholarlyArticle"/, 'editorial /publications: ScholarlyArticle JSON-LD');
+    assert.match(
+      html,
+      /https:\/\/arxiv\.org\/abs\/2024\.00003/,
+      'editorial /publications: arXiv prefix stripped in sameAs',
+    );
+    assert.match(html, /data-first-only/, 'editorial /publications: first-author toggle');
+  }
+
+  {
+    const html = ed('cv/index.html');
+    assert.match(html, /<h1 class="ed-cv-title">Curriculum Vitae<\/h1>/, 'editorial /cv: title');
+    assert.match(html, /<h2 id="cv-education">Education<\/h2>/, 'editorial /cv: section label');
+    assert.match(html, /Ph\.D\. in Computer Science/, 'editorial /cv: education entry');
+    assert.match(html, /2020-01 – Present/, 'editorial /cv: date range');
+    assert.doesNotMatch(html, /Download PDF/, 'editorial /cv: no PDF button without cv.json pdfPath');
+  }
+  {
+    const html = ed('blog/index.html');
+    assert.match(html, /<li class="ed-entry" data-kind="site">/, 'editorial /blog: site rows');
+    assert.match(html, /<li class="ed-entry" data-kind="external">/, 'editorial /blog: external rows');
+    assert.match(
+      html,
+      /data-filter="external"[^>]*>\s*Elsewhere\s*</,
+      'editorial /blog: mixed feed sources → "Elsewhere"',
+    );
+    assert.match(html, /Published on Medium ↗/, 'editorial /blog: external rows link out');
+    assert.match(html, /href="\/feed\.xml"/, 'editorial /blog: RSS link');
+    const post = ed('blog/research-update-summer-2024/index.html');
+    assert.match(
+      post,
+      /<p class="ed-subtitle"[^>]*>\s*Three papers, a toolkit release and two new lab members\.\s*<\/p>/,
+      'editorial post: subtitle',
+    );
+    assert.match(post, /<span class="ed-aside-label">Related paper<\/span>/, 'editorial post: related paper');
+    assert.match(post, /\d+ min read/, 'editorial post: reading time');
+    assert.match(post, /<div class="ed-prose"[^>]*>/, 'editorial post: prose wrapper');
+    assert.match(post, /href="\/blog\/welcome-to-our-lab"/, 'editorial post: previous post link');
+  }
+}
+
+// --- classic regression ---
+const BASELINE = 'dist-baseline';
+
+/**
+ * Stylesheets are dropped because editorial.css is bundled into classic pages too (scoped, inert);
+ * whitespace runs collapse because moving markup between components changes indentation only.
+ */
+function normalize(html) {
+  return html
+    .replace(/<link rel="stylesheet"[^>]*>/g, '')
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/g, '')
+    .replace(/\/_astro\/([\w.-]+?)\.[\w-]{8,}\.(\w+)/g, '/_astro/$1.$2')
+    .replace(/ data-astro-cid-\w+(="[^"]*")?/g, '')
+    .replace(/ data-theme="classic"/g, '')
+    .replace(/ uid="[^"]*"/g, '')
+    .replace(/\s+/g, ' ');
+}
+
+if (fs.existsSync(BASELINE)) {
+  const pages = fs.readdirSync(BASELINE, { recursive: true }).filter((f) => String(f).endsWith('.html'));
+  for (const rel of pages) {
+    const current = path.join('dist-classic', rel);
+    assert.ok(fs.existsSync(current), `classic build is missing ${rel}`);
+    assert.equal(
+      normalize(fs.readFileSync(current, 'utf8')),
+      normalize(fs.readFileSync(path.join(BASELINE, rel), 'utf8')),
+      `classic ${rel} differs from ${BASELINE}/`,
+    );
+  }
+  console.log(`check-themes: ${pages.length} classic pages match ${BASELINE}/`);
+} else {
+  console.log(`check-themes: no ${BASELINE}/, skipping the classic regression check`);
+}
+
+console.log('check-themes: OK');

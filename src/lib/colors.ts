@@ -34,11 +34,11 @@ function palette(hex: string, prefix: string): Record<string, string> {
       if (s === 600) {
         result[`--color-${prefix}-${shade}`] = hex;
       } else {
-        result[`--color-${prefix}-${shade}`] = `color-mix(in oklch, ${hex}, white ${whitePct}%)`;
+        result[`--color-${prefix}-${shade}`] = `color-mix(in oklab, ${hex}, white ${whitePct}%)`;
       }
     } else {
       const blackPct = darkShades[s] ?? 0;
-      result[`--color-${prefix}-${shade}`] = `color-mix(in oklch, ${hex}, black ${blackPct}%)`;
+      result[`--color-${prefix}-${shade}`] = `color-mix(in oklab, ${hex}, black ${blackPct}%)`;
     }
   }
   return result;
@@ -93,7 +93,8 @@ export function generateColorOverrides(config: SiteConfig): string {
   }
 
   // ── Dark mode overrides ──
-  const darkPrimary = colors?.dark?.primary;
+  // Classic's dark accent when the owner sets none; the journal's dark block overrides these.
+  const darkPrimary = colors?.dark?.primary || '#22d3ee';
   const darkSecondary = colors?.dark?.secondary;
   const darkBgColor = bg?.dark?.color;
   const darkBgImage = bg?.dark?.image;
@@ -116,14 +117,14 @@ export function generateColorOverrides(config: SiteConfig): string {
   // Derive dm-* tokens from dark background color
   if (darkBgColor) {
     darkVars.push(`  --color-dm: ${darkBgColor};`);
-    darkVars.push(`  --color-dm-alt: color-mix(in oklch, ${darkBgColor}, white 5%);`);
-    darkVars.push(`  --color-dm-hover: color-mix(in oklch, ${darkBgColor}, white 8%);`);
-    darkVars.push(`  --color-dm-heading: color-mix(in oklch, ${darkBgColor}, white 92%);`);
-    darkVars.push(`  --color-dm-text: color-mix(in oklch, ${darkBgColor}, white 78%);`);
-    darkVars.push(`  --color-dm-muted: color-mix(in oklch, ${darkBgColor}, white 52%);`);
-    darkVars.push(`  --color-dm-faint: color-mix(in oklch, ${darkBgColor}, white 28%);`);
-    darkVars.push(`  --color-dm-border: color-mix(in oklch, ${darkBgColor}, white 12%);`);
-    darkVars.push(`  --color-dm-border-alt: color-mix(in oklch, ${darkBgColor}, white 18%);`);
+    darkVars.push(`  --color-dm-alt: color-mix(in oklab, ${darkBgColor}, white 5%);`);
+    darkVars.push(`  --color-dm-hover: color-mix(in oklab, ${darkBgColor}, white 8%);`);
+    darkVars.push(`  --color-dm-heading: color-mix(in oklab, ${darkBgColor}, white 92%);`);
+    darkVars.push(`  --color-dm-text: color-mix(in oklab, ${darkBgColor}, white 78%);`);
+    darkVars.push(`  --color-dm-muted: color-mix(in oklab, ${darkBgColor}, white 62%);`);
+    darkVars.push(`  --color-dm-faint: color-mix(in oklab, ${darkBgColor}, white 54%);`);
+    darkVars.push(`  --color-dm-border: color-mix(in oklab, ${darkBgColor}, white 12%);`);
+    darkVars.push(`  --color-dm-border-alt: color-mix(in oklab, ${darkBgColor}, white 18%);`);
   }
 
   if (darkVars.length > 0) {
@@ -146,4 +147,65 @@ export function generateColorOverrides(config: SiteConfig): string {
   }
 
   return parts.join('\n');
+}
+
+/** The journal's night palettes, chosen by editorial.night. Lamplight is the default. */
+export const NIGHT_PALETTES = ['lamplight', 'inkwell', 'galley'] as const;
+export type NightPalette = (typeof NIGHT_PALETTES)[number];
+
+/**
+ * Each night palette's Hover (`--ed-hover`), the lightest surface accent text sits on in dark mode (row
+ * hover; the contact band, a step lighter, carries no accent text). Mirrors the palette blocks in editorial.css; colors.test.ts asserts they match.
+ */
+export const NIGHT_HOVER: Record<NightPalette, string> = {
+  lamplight: '#27231e',
+  inkwell: '#1e2230',
+  galley: '#272623',
+};
+
+const channels = (hex: string) => [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+const luminance = (rgb: number[]) => {
+  const [r, g, b] = rgb.map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+
+/**
+ * Lifts an owner's dark-mode accent toward white until it clears 4.5:1 on the palette's Hover, so links,
+ * venue tiles and the focus ring stay AA on every night surface. Values that already pass, and anything
+ * that is not a 3- or 6-digit hex, are returned unchanged.
+ */
+export function clampNightAccent(color: string, night: NightPalette): string {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color);
+  if (!m) return color;
+  const hex = m[1].length === 3 ? `#${[...m[1]].map((c) => c + c).join('')}` : color;
+  const base = channels(hex);
+  const floor = 4.5 * (luminance(channels(NIGHT_HOVER[night])) + 0.05) - 0.05;
+  if (luminance(base) >= floor) return color;
+  for (let p = 1; p <= 100; p++) {
+    // Measured after rounding to 8-bit channels: the emitted hex is what has to pass.
+    const rgb = base.map((c) => Math.round((c + (1 - c) * (p / 100)) * 255));
+    if (luminance(rgb.map((c) => c / 255)) >= floor)
+      return `#${rgb.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+  }
+  return '#ffffff';
+}
+
+/**
+ * Journal (editorial) accent from colors.light.primary, and the dark-mode accent from colors.dark.primary
+ * (lifted by clampNightAccent for the chosen night palette). When unset, editorial.css supplies the defaults.
+ * `html:root[…]` outranks the `:root[…]` defaults in editorial.css, and the doubled `:root` outranks its
+ * `html.dark:root[…]` block, regardless of stylesheet order.
+ */
+export function editorialAccentCss(config: SiteConfig): string {
+  const light = config.colors?.light?.primary?.trim();
+  const owner = config.colors?.dark?.primary?.trim();
+  const dark = owner && clampNightAccent(owner, config.editorial?.night ?? 'lamplight');
+  let css = '';
+  if (light) {
+    css += `\nhtml:root[data-theme='editorial'] {\n  --ed-accent: ${light};\n  --ed-accent-hover: color-mix(in oklab, ${light}, black 25%);\n  --ed-accent-border: color-mix(in oklab, ${light}, white 75%);\n  --ed-selection: color-mix(in oklab, ${light}, white 84%);\n}`;
+  }
+  if (dark) {
+    css += `\nhtml.dark:root:root[data-theme='editorial'] {\n  --ed-accent: ${dark};\n  --ed-accent-hover: color-mix(in oklab, ${dark}, white 35%);\n}`;
+  }
+  return css;
 }

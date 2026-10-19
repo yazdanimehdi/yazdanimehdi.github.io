@@ -1,25 +1,48 @@
+import fs from 'node:fs';
 import { defineConfig } from 'astro/config';
 import vue from '@astrojs/vue';
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
+import vercel from '@astrojs/vercel';
 import tailwindcss from '@tailwindcss/vite';
-import remarkMath from 'remark-math';
-import { rehypeExternalLinks } from './src/lib/rehype-external-links';
-import { rehypeMathJaxPassthrough } from './src/lib/rehype-mathjax-passthrough';
+import { markdownOptions } from './src/lib/markdown';
+import admin from './src/integrations/admin';
+import { modeFromEnv } from './src/lib/mode';
+
+const mode = modeFromEnv(process.env);
+
+// Postgres mode renders the CV PDF in the function, which reads these from process.cwd() at runtime. Listed only in
+// that mode, so a fork without the fonts directory still builds statically or in git mode.
+const cvPdfFonts =
+  mode === 'postgres'
+    ? fs
+        .readdirSync('src/lib/cv-pdf/fonts')
+        .filter((f) => f.endsWith('.ttf'))
+        .map((f) => `./src/lib/cv-pdf/fonts/${f}`)
+    : [];
 
 export default defineConfig({
   site: 'https://example.com',
-  integrations: [vue({ appEntrypoint: '/src/pages/_app.ts' }), mdx(), sitemap()],
-  markdown: {
-    remarkPlugins: [remarkMath],
-    rehypePlugins: [rehypeExternalLinks, rehypeMathJaxPassthrough],
-    shikiConfig: {
-      themes: {
-        light: 'github-light',
-        dark: 'github-dark',
-      },
-    },
-  },
+  // Vercel only. Git mode: admin routes are functions, public pages prerendered. Postgres mode: every page is a
+  // function, and Blob images are optimized by /_vercel/image.
+  // Postgres maxDuration 60 s: the daily cron runs feeds then backup in one request; the PDF renders on save.
+  adapter:
+    mode === 'static'
+      ? undefined
+      : mode === 'postgres'
+        ? vercel({ imageService: true, includeFiles: cvPdfFonts, maxDuration: 60 })
+        : vercel(),
+  ...(mode === 'postgres'
+    ? { image: { remotePatterns: [{ protocol: 'https', hostname: '*.public.blob.vercel-storage.com' }] } }
+    : {}),
+  // @astrojs/sitemap only sees prerendered pages; Postgres mode serves its own /sitemap-index.xml.
+  integrations: [
+    vue({ appEntrypoint: '/src/pages/_app.ts' }),
+    mdx(),
+    ...(mode === 'postgres' ? [] : [sitemap()]),
+    admin(),
+  ],
+  markdown: markdownOptions,
   vite: {
     plugins: [tailwindcss()],
     build: {

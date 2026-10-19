@@ -1,26 +1,35 @@
 ---
-import { getSiteConfig } from '../../lib/config';
+import { getHomepageSections, getSiteConfig, isLabMode, isPersonalMode } from '../../lib/config';
+import { uiStrings } from '../../lib/ui-strings';
 
 const config = getSiteConfig();
 const topBar = config.topBar;
-
-const show = topBar?.enabled ?? false;
+const t = uiStrings(config);
+// Admissions and campus links speak for a lab; a personal site's bar carries only the affiliation line,
+// which the home hero's role line already says when the site sets one.
+const heroSaysAffiliation =
+  isPersonalMode() &&
+  getHomepageSections().includes('hero') &&
+  !!(config.editorial?.eyebrow || config.department || config.university);
+const show = (topBar?.enabled ?? false) && !heroSaysAffiliation;
+const links = isLabMode() ? (topBar?.links ?? []) : [];
 ---
 
 {
   show && topBar && (
-    <div class="h-8 w-full bg-primary-600 text-xs text-white dark:bg-dm-alt dark:text-dm-muted">
-      <div class="mx-auto flex h-full max-w-[930px] items-center justify-between px-4 sm:px-6">
-        <span class="hidden truncate sm:inline">{topBar.text}</span>
-        {topBar.links?.length > 0 && (
-          <div class="ms-auto flex items-center gap-3">
-            {topBar.links.map((link) => (
+    <div class="w-full bg-primary-600 text-xs text-white dark:bg-dm-alt dark:text-dm-muted">
+      <div class="mx-auto flex min-h-8 max-w-[930px] items-center justify-between gap-4 px-4 sm:px-6">
+        {topBar.text && <span class="min-w-0 truncate py-2">{topBar.text}</span>}
+        {links.length > 0 && (
+          <div class="ms-auto flex shrink-0 items-center gap-3">
+            {links.map((link) => (
               <a
                 href={link.href}
-                class="whitespace-nowrap text-white/90 transition-colors hover:text-white dark:text-dm-text dark:hover:text-white"
+                class="inline-flex min-h-11 items-center whitespace-nowrap text-white/90 transition-colors hover:text-white dark:text-dm-text dark:hover:text-white"
                 {...(link.external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
               >
                 {link.label}
+                {link.external && <span class="sr-only"> {t('a11y.newTab')}</span>}
               </a>
             ))}
           </div>

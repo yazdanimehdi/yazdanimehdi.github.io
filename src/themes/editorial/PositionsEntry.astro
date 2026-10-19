@@ -1,0 +1,155 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import EntryBody from '../../components/astro/EntryBody.astro';
+import ApplicationForm from '../../components/vue/ApplicationForm.vue';
+import Layout from './Layout.astro';
+import { getSiteConfig } from '../../lib/config';
+import { formatNewsDate } from '../../lib/utils';
+import { uiStrings } from '../../lib/ui-strings';
+import './timeline.css';
+
+interface Props {
+  position: CollectionEntry<'positions'>;
+  contactEmail: string;
+  web3formsKey?: string;
+  formatType: (type: string) => string;
+}
+
+const { position, contactEmail, web3formsKey, formatType } = Astro.props;
+const { title, excerpt, status, type, deadline, tags } = position.data;
+const config = getSiteConfig();
+const t = uiStrings(config);
+const label = config.nav.find((n) => n.href === '/positions')?.label ?? t('positions.label');
+const isOpen = status === 'open';
+const mailto = contactEmail ? `mailto:${contactEmail}` : undefined;
+const applyByEmail = t('positions.applyByEmail').split(/(\{email\})/);
+const inquiries = t('positions.inquiries').split(/(\{email\})/);
+---
+
+<Layout title={title} description={excerpt}>
+  <article class="ed-article">
+    <a href="/positions" class="ed-back"><span class="arr" aria-hidden="true">←</span> {label}</a>
+    <header class="ed-article-head">
+      <h1 class="ed-article-title" dir="auto">{title}</h1>
+      {
+        excerpt && (
+          <p class="ed-subtitle" dir="auto">
+            {excerpt}
+          </p>
+        )
+      }
+    </header>
+
+    <dl class="ed-tl-facts">
+      <div>
+        <dt>{t('positions.type')}</dt>
+        <dd>{formatType(type)}</dd>
+      </div>
+      <div>
+        <dt>{t('positions.status')}</dt>
+        <dd>{t(isOpen ? 'positions.open' : 'positions.closed')}</dd>
+      </div>
+      {
+        deadline && (
+          <div>
+            <dt>{t('positions.deadline')}</dt>
+            <dd class="num">
+              <time datetime={deadline.toISOString()}>{formatNewsDate(deadline, 'day', config.lang)}</time>
+            </dd>
+          </div>
+        )
+      }
+      {
+        tags && tags.length > 0 && (
+          <div>
+            <dt>{t('positions.topics')}</dt>
+            <dd dir="auto">{tags.join(' · ')}</dd>
+          </div>
+        )
+      }
+      {
+        isOpen && (web3formsKey || mailto) && (
+          <div>
+            <dt>{t('positions.howToApply')}</dt>
+            <dd>
+              {web3formsKey ? (
+                <a href="#apply" class="ul">
+                  {t('positions.useForm')}
+                </a>
+              ) : (
+                <a href={mailto} class="ul">
+                  {contactEmail}
+                </a>
+              )}
+            </dd>
+          </div>
+        )
+      }
+    </dl>
+
+    <div class="ed-prose" dir="auto"><EntryBody entry={position} /></div>
+
+    {
+      isOpen && (
+        <section id="apply" class="ed-tl-apply" aria-labelledby="apply-title">
+          <h2 id="apply-title">{t('positions.applyTitle')}</h2>
+          {web3formsKey ? (
+            <div class="ed-tl-form">
+              <ApplicationForm
+                client:visible
+                positionTitle={title}
+                contactEmail={contactEmail}
+                accessKey={web3formsKey}
+              />
+            </div>
+          ) : (
+            <>
+              <p>
+                {applyByEmail.map((part) =>
+                  part !== '{email}' ? (
+                    part
+                  ) : mailto ? (
+                    <a href={mailto} class="ul">
+                      {contactEmail}
+                    </a>
+                  ) : (
+                    t('positions.us')
+                  ),
+                )}
+              </p>
+              {mailto && (
+                <a href={mailto} class="ed-btn">
+                  {t('positions.emailButton')}
+                </a>
+              )}
+            </>
+          )}
+        </section>
+      )
+    }
+
+    {
+      !isOpen && (
+        <section class="ed-tl-apply">
+          <p>
+            {t('positions.closedText')}
+            {mailto && (
+              <>
+                {' '}
+                {inquiries.map((part) =>
+                  part === '{email}' ? (
+                    <a href={mailto} class="ul">
+                      {contactEmail}
+                    </a>
+                  ) : (
+                    part
+                  ),
+                )}
+              </>
+            )}
+          </p>
+        </section>
+      )
+    }
+  </article>
+</Layout>

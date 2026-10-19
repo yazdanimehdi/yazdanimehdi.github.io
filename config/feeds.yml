@@ -1,9 +1,15 @@
-mediumUrl: https://medium.com/feed/@myjahromi
-feeds:
-  - name: medium.com
-    url: https://medium.com/feed/@myjahromi
-    author: mehdi-yazdani-jahromi
-    tags:
-      - medium
-syncInterval: daily
+mediumUrl: 'https://medium.com/feed/@myjahromi'
+
+# RSS/Atom feeds shown on the Writing page. Examples:
+#   - name: "Jane Smith's Blog"
+#     url: 'https://example.com/feed.xml'
+#     author: 'jane-smith'
+#     tags: ['blog']
+#   - name: 'Lab Medium Publication'
+#     url: 'https://medium.com/feed/@example-lab'
+#     author: null
+#     tags: ['medium']
+feeds: []
+
+syncInterval: 'daily'
 maxItemsPerFeed: 20

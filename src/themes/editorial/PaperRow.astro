@@ -1,0 +1,125 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import { bibtexFor } from '../../lib/bibtex';
+import { getSiteConfig } from '../../lib/config';
+import { isOwner, paperLink } from '../../lib/editorial';
+import { uiStrings } from '../../lib/ui-strings';
+
+interface Props {
+  pub: CollectionEntry<'publications'>;
+  /** Names bolded in the author list: the site author, plus current members on a lab site. */
+  owners: string[];
+  /** home: venue tile. list: publications page row with filter data and an anchor. */
+  variant?: 'home' | 'list';
+  topic?: string;
+  first?: boolean;
+}
+
+const { pub, owners, variant = 'home', topic, first = false } = Astro.props;
+const p = pub.data;
+const link = paperLink(p);
+const list = variant === 'list';
+const t = uiStrings(getSiteConfig());
+const offSite = !!link && /^https?:\/\//.test(link);
+const venue = p.venue.includes(String(p.year)) ? p.venue : `${p.venue}, ${p.year}`;
+---
+
+<li
+  id={list ? pub.id : undefined}
+  class:list={['row ed-paper', { 'ed-paper--list': list }]}
+  data-topic={list ? topic : undefined}
+  data-first={list ? String(first) : undefined}
+>
+  {
+    !list && (
+      <div class="ed-venue-tile" aria-hidden="true">
+        <span class:list={['ed-venue-tile-short', { 'ed-venue-tile-short--long': !p.venueShort }]}>
+          {p.venueShort ?? p.venue}
+        </span>
+        <span class="ed-venue-tile-year num">{p.year}</span>
+      </div>
+    )
+  }
+  <div class="ed-paper-body">
+    {
+      link ? (
+        <a href={link} class="ed-paper-title">
+          <span dir="auto">{p.title}</span>
+          {offSite && (
+            <>
+              <span class="arr" aria-hidden="true">
+                ↗
+              </span>
+              <span class="ed-sr-only">{t('link.external')}</span>
+            </>
+          )}
+        </a>
+      ) : (
+        <span class="ed-paper-title" dir="auto">
+          {p.title}
+        </span>
+      )
+    }
+    <span class="ed-authors" dir="auto">
+      {
+        p.authors.map((a, i) => (
+          <>
+            {i > 0 && ', '}
+            {isOwner(a, owners) ? <strong>{a}</strong> : a}
+          </>
+        ))
+      }
+    </span>
+    <div class="ed-paper-meta">
+      {
+        /* When the home row's tile already shows the full venue, wider screens keep this line for screen readers only. */
+      }
+      <span
+        class:list={['ed-venue', { 'ed-venue--tiled': !list && (!p.venueShort || p.venueShort === p.venue) }]}
+        dir="auto"
+      >
+        {venue}
+      </span>
+      {p.note && <span class="ed-note">{p.note}</span>}
+      {
+        p.code && (
+          <a href={p.code} class="ul">
+            {t('paper.code')}
+          </a>
+        )
+      }
+      <details class="ed-bib">
+        <summary class="ul">{t('paper.cite')}</summary>
+        <div class="ed-bib-body">
+          <pre>{bibtexFor(p)}</pre>
+          <button
+            type="button"
+            class="ed-bib-copy"
+            data-bib-copy
+            data-copied={t('paper.copied')}
+            data-failed={t('paper.copyFailed')}
+          >
+            {t('paper.copy')}
+          </button>
+        </div>
+      </details>
+    </div>
+  </div>
+</li>
+
+<script>
+  // BibTeX copy: one delegated listener for every expander on the page.
+  document.addEventListener('click', async (event) => {
+    const button = (event.target as Element | null)?.closest<HTMLButtonElement>('[data-bib-copy]');
+    const text = button?.previousElementSibling?.textContent;
+    if (!button || !text) return;
+    const label = (button.dataset.label ??= button.textContent ?? '');
+    try {
+      await navigator.clipboard.writeText(text.trim());
+      button.textContent = button.dataset.copied ?? '';
+    } catch {
+      button.textContent = button.dataset.failed ?? '';
+    }
+    setTimeout(() => (button.textContent = label), 1600);
+  });
+</script>

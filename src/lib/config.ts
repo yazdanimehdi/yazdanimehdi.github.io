@@ -1,17 +1,69 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import yaml from 'js-yaml';
-import type { SiteConfig, HomepageSectionId, HomepageSectionEntry } from './types';
+import { memo, readSiteFile } from './content/context';
+import { getMode } from './mode';
+import { NIGHT_PALETTES, type NightPalette } from './colors';
+import {
+  NEWS_ART_STYLES,
+  type NewsArtStyle,
+  type SiteConfig,
+  type HomepageSectionId,
+  type HomepageSectionEntry,
+  type ThemeName,
+} from './types';
 
 let _siteConfig: SiteConfig | null = null;
 
-export function getSiteConfig(): SiteConfig {
-  if (_siteConfig) return _siteConfig;
+/**
+ * '' or missing → 'classic' (the CMS writes '' for untouched fields, and older forks have no key).
+ * 'journal' is the merged theme's name; it is the editorial theme, so both names resolve to 'editorial'.
+ * Any other unknown value is a config error.
+ */
+export function normalizeTheme(value: unknown, source: string): ThemeName {
+  if (value === undefined || value === null || value === '') return 'classic';
+  if (value === 'journal' || value === 'editorial') return 'editorial';
+  if (value === 'classic') return value;
+  throw new Error(`${source}: theme must be 'journal' or 'classic', got '${String(value)}'`);
+}
 
-  const configPath = path.resolve(process.cwd(), 'config/site.yml');
-  const raw = fs.readFileSync(configPath, 'utf-8');
-  _siteConfig = yaml.load(raw) as SiteConfig;
-  return _siteConfig;
+/** '' or missing → 'lamplight', the default night palette. Any other unknown value is a config error. */
+export function normalizeNight(value: unknown, source: string): NightPalette {
+  if (value === undefined || value === null || value === '') return 'lamplight';
+  if ((NIGHT_PALETTES as readonly unknown[]).includes(value)) return value as NightPalette;
+  throw new Error(`${source}: editorial.night must be one of ${NIGHT_PALETTES.join(', ')}, got '${String(value)}'`);
+}
+
+/** '' or missing → the theme's own style (journal: ink plates, classic: flat geometric). Unknown values are a config error. */
+export function normalizeNewsArt(value: unknown, theme: ThemeName, source: string): NewsArtStyle {
+  if (value === undefined || value === null || value === '') return theme === 'editorial' ? 'ink' : 'geometric';
+  if ((NEWS_ART_STYLES as readonly unknown[]).includes(value)) return value as NewsArtStyle;
+  throw new Error(`${source}: newsArt must be one of ${NEWS_ART_STYLES.join(', ')}, got '${String(value)}'`);
+}
+
+function readConfigFile(filename: string): string {
+  const raw = readSiteFile(`config/${filename}`);
+  if (raw === null) throw new Error(`config/${filename} not found`);
+  return raw;
+}
+
+function parseSiteConfig(): SiteConfig {
+  const config = yaml.load(readConfigFile('site.yml')) as SiteConfig;
+  const envTheme = process.env.SCHOLAROS_THEME;
+  config.theme = envTheme
+    ? normalizeTheme(envTheme, 'SCHOLAROS_THEME')
+    : normalizeTheme(config.theme, 'config/site.yml');
+  config.editorial = { ...config.editorial, night: normalizeNight(config.editorial?.night, 'config/site.yml') };
+  config.newsArt = normalizeNewsArt(config.newsArt, config.theme, 'config/site.yml');
+  return config;
+}
+
+export function getSiteConfig(): SiteConfig {
+  // Postgres mode: site.yml can change between two requests to one warm function, so cache per request.
+  if (getMode() === 'postgres') return memo('config:site', parseSiteConfig);
+  return (_siteConfig ??= parseSiteConfig());
+}
+
+export function getTheme(): ThemeName {
+  return getSiteConfig().theme ?? 'classic';
 }
 
 export function isLabMode(): boolean {
@@ -69,7 +121,14 @@ export function normalizeKeys<T>(obj: T): T {
 }
 
 export function loadYamlConfig<T>(filename: string): T {
-  const configPath = path.resolve(process.cwd(), `config/${filename}`);
-  const raw = fs.readFileSync(configPath, 'utf-8');
-  return yaml.load(raw) as T;
+  return yaml.load(readConfigFile(filename)) as T;
+}
+
+/** Feed item ids hidden from the site (`hidden:` in config/feeds.yml). */
+export function hiddenFeedIds(): string[] {
+  try {
+    return loadYamlConfig<{ hidden?: string[] } | null>('feeds.yml')?.hidden ?? [];
+  } catch {
+    return [];
+  }
 }

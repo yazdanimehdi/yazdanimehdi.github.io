@@ -1,0 +1,72 @@
+---
+import Layout from './Layout.astro';
+import type { CvPageData } from './data';
+import { formatMonthYear, slugify } from '../../lib/utils';
+import { getSiteConfig } from '../../lib/config';
+import { uiStrings } from '../../lib/ui-strings';
+
+type Props = CvPageData;
+
+const { name, sections, pdfHref, updated } = Astro.props;
+const config = getSiteConfig();
+const t = uiStrings(config);
+---
+
+<Layout title={t('cv.title')} description={t('cv.description', { name })}>
+  <div class="ed-wrap ed-main ed-main--narrow ed-main--flush">
+    <div class="ed-cv-head">
+      <div class="ed-stack">
+        <h1 class="ed-cv-title">{t('cv.heading')}</h1>
+        <p class="ed-meta" dir="auto">{name}</p>
+        {
+          updated && (
+            <span class="ed-cv-updated">
+              {t('cv.updated', {
+                date: formatMonthYear(updated, config.lang),
+              })}
+            </span>
+          )
+        }
+      </div>
+      {
+        pdfHref && (
+          <a href={pdfHref} class="ed-btn-outline" download="cv.pdf">
+            {t('cv.download')}
+          </a>
+        )
+      }
+    </div>
+
+    {
+      sections.map((s) => (
+        <section class="ed-cv-section" aria-labelledby={`cv-${slugify(s.key)}`}>
+          <h2 id={`cv-${slugify(s.key)}`}>{s.title}</h2>
+          <div class="ed-cv-entries">
+            {s.entries.map((e) => (
+              <div class="ed-cv-entry">
+                <div class="ed-cv-entry-top">
+                  <span class="ed-cv-entry-title" dir="auto">
+                    {e.title}
+                  </span>
+                  {e.when && <span class="ed-cv-when num">{e.when}</span>}
+                </div>
+                {e.org && (
+                  <span class="ed-cv-org" dir="auto">
+                    {e.org}
+                  </span>
+                )}
+                {e.points.length > 0 && (
+                  <ul class="ed-cv-points">
+                    {e.points.map((p) => (
+                      <li dir="auto">{p}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      ))
+    }
+  </div>
+</Layout>

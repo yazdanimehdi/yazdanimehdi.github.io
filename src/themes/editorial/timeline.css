@@ -1,0 +1,306 @@
+/*
+ * Journal news, talks, positions and join pages: dated rows (a right-aligned tabular date column beside the
+ * content, no dots or lines), year groups and the position facts block. Scoped like editorial.css.
+ */
+:root[data-theme='editorial'] {
+  /* Category filter: links rather than buttons, so the active state is aria-current. */
+  & .ed-tl-tabs .ed-tab {
+    display: inline-flex;
+    align-items: center;
+    text-transform: capitalize;
+  }
+  & .ed-tl-tabs .ed-tab:hover {
+    color: var(--ed-ink);
+  }
+  & .ed-tl-tabs .ed-tab[aria-current='page'] {
+    border-bottom-color: var(--ed-ink);
+    color: var(--ed-ink);
+    font-weight: 500;
+  }
+
+  & .ed-tl-empty {
+    margin: 0;
+    font-size: 15px;
+    color: var(--ed-caption);
+  }
+
+  /* Year groups reuse .ed-year; the quiet "Pinned" group swaps the serif year for a label. */
+  & .ed-tl-year .ed-tl-list {
+    flex: 1 1 600px;
+    min-width: 0;
+  }
+  & .ed-year h2.ed-tl-pinned {
+    font-family: var(--font-sans);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: var(--ed-caption);
+    padding-top: 24px;
+  }
+
+  /* ── Rows ── */
+  & .ed-tl-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  & .ed-tl-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px 24px;
+    margin-inline: -16px;
+    padding: 20px 16px;
+    --ed-row-rule: var(--ed-rule-soft);
+    /* The row's hover tint bleeds 16px past the column; its rule does not, so every rule shares the column edge. */
+    background: linear-gradient(var(--ed-row-rule), var(--ed-row-rule)) center bottom / calc(100% - 32px) 1px no-repeat;
+    border-radius: 6px;
+  }
+  & .ed-tl-date {
+    flex: 0 0 112px;
+    padding-top: 3px;
+    font-size: 14px;
+    line-height: 1.5;
+    text-align: end;
+    color: var(--ed-caption);
+  }
+  & .ed-tl-body {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  & .ed-tl-title {
+    font-family: var(--font-serif);
+    font-size: 19px;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--ed-ink);
+  }
+  & h3.ed-tl-title {
+    margin: 0;
+  }
+  & a.ed-tl-title:hover {
+    color: var(--ed-accent);
+  }
+  & .ed-tl-excerpt {
+    margin: 0;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--ed-muted);
+  }
+  & .ed-tl-venue {
+    font-family: var(--font-serif);
+    font-size: 15px;
+    font-style: italic;
+    color: var(--ed-caption);
+  }
+  & .ed-tl-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 18px;
+    padding-top: 2px;
+    font-size: 14px;
+    color: var(--ed-caption);
+  }
+  & .ed-tl-meta a {
+    padding-block: 3px;
+  }
+  & .ed-tl-thumb {
+    flex: 0 0 120px;
+    padding: 6px;
+    background: var(--ed-tint);
+    border: 1px solid var(--ed-rule);
+    border-radius: 4px;
+  }
+  & .ed-tl-thumb img {
+    display: block;
+    width: 100%;
+    height: auto;
+    border-radius: 3px;
+  }
+
+  /* ── Positions ── */
+  & .ed-tl-titleline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 12px;
+  }
+  & .ed-tl-deadline {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 8px;
+  }
+  & .ed-tl-deadline .ed-label {
+    font-size: 11px;
+    letter-spacing: 1.2px;
+  }
+  & .ed-tl-more {
+    margin-inline-start: auto;
+    font-weight: 500;
+  }
+  & .ed-tl-group {
+    margin: 0;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--ed-rule);
+  }
+  & .ed-tl-closed {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+  & .ed-tl-closed .ed-tl-row {
+    padding-block: 14px;
+  }
+  & .ed-tl-closed .ed-tl-title {
+    font-size: 17px;
+    color: var(--ed-muted);
+  }
+  & .ed-tl-closed a.ed-tl-title:hover {
+    color: var(--ed-accent);
+  }
+
+  /* Facts: a two-column definition list over hairlines. */
+  & .ed-tl-facts {
+    margin: 0;
+  }
+  /* Directly under the article head its rule already opens the list. */
+  & .ed-tl-facts:not(.ed-article-head + *) {
+    border-top: 1px solid var(--ed-rule);
+  }
+  & .ed-tl-facts > div {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 24px;
+    padding-block: 12px;
+    border-bottom: 1px solid var(--ed-rule);
+  }
+  & .ed-tl-facts dt {
+    flex: 0 0 140px;
+    padding-top: 2px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: var(--ed-caption);
+  }
+  & .ed-tl-facts dd {
+    flex: 1 1 240px;
+    min-width: 0;
+    margin: 0;
+    font-size: 15px;
+    color: var(--ed-ink);
+  }
+
+  /* Apply section: no tint, a hairline on top. */
+  & .ed-tl-apply {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    margin-top: 16px;
+    padding-top: 28px;
+    border-top: 1px solid var(--ed-rule);
+  }
+  & .ed-tl-apply h2 {
+    margin: 0;
+    font-family: var(--font-serif);
+    font-size: 26px;
+    font-weight: 500;
+    line-height: 1.3;
+    color: var(--ed-ink);
+  }
+  & .ed-tl-apply p {
+    margin: 0;
+    font-size: 16px;
+    line-height: 1.65;
+    color: var(--ed-muted);
+  }
+  & .ed-tl-form {
+    align-self: stretch;
+    font-family: var(--font-sans);
+  }
+
+  /* People linked from a news item. */
+  & .ed-tl-people {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 8px 20px;
+    padding-top: 20px;
+    border-top: 1px solid var(--ed-rule);
+  }
+  & .ed-tl-people ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  & .ed-tl-people a {
+    font-family: var(--font-serif);
+    font-size: 17px;
+  }
+
+  /* ── Join ── */
+  & .ed-tl-section {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  & .ed-tl-section p {
+    margin: 0;
+    max-width: 680px;
+    font-size: 16px;
+    line-height: 1.65;
+    color: var(--ed-muted);
+  }
+  & .ed-tl-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin: 0;
+    padding-inline-start: 22px;
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--ed-body-2);
+  }
+  & .ed-tl-steps li::marker {
+    color: var(--ed-caption);
+    font-variant-numeric: tabular-nums;
+  }
+  & .ed-tl-section .ed-tl-fine {
+    font-size: 14px;
+    color: var(--ed-caption);
+  }
+  & .ed-tl-code {
+    padding: 1px 6px;
+    background: var(--ed-hover);
+    border: 1px solid var(--ed-rule);
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--ed-code);
+  }
+
+  @media (max-width: 640px) {
+    & .ed-tl-row {
+      flex-wrap: wrap;
+    }
+    & .ed-tl-date {
+      flex-basis: 100%;
+      padding-top: 0;
+      text-align: start;
+    }
+    & .ed-tl-thumb {
+      flex-basis: 96px;
+    }
+    & .ed-tl-facts dt {
+      flex-basis: 100%;
+    }
+  }
+}

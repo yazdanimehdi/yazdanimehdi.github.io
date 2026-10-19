@@ -1,19 +1,58 @@
-description: |
-  Graduate Research Assistant at the University of Central Florida.
+# Editorial theme: heading of the home research section and the Research page
+headline: 'Models that respect the structure of biology.'
+description: 'Biology has structure: codons encode amino acids, proteins fold into binding pockets, data carries the biases of how it was collected. My work builds that structure into machine learning models, so they are more accurate, more efficient and easier to trust.'
+
 areas:
-  - title: AI
-    description: ""
+  - id: 'mrna'
+    label: 'mRNA'
+    title: 'Language models for mRNA'
+    description: 'Encodings that reflect codon hierarchy and protein translation, improving property prediction and sequence design.'
+    body: |
+      mRNA therapeutics and vaccines depend on sequence design, but most sequence models treat mRNA as flat text. I develop encodings that reflect how mRNA is read: nucleotides form codons, codons map to amino acids, and synonymous codons are interchangeable at the protein level.
+
+      **HELM** introduces a hierarchy-aware training objective; **Equi-mRNA** makes the encoder equivariant to protein-preserving codon changes.
+    result: 'Up to 8% higher prediction accuracy than standard pre-training, with more diverse and biologically plausible generated sequences (HELM, ICLR 2025).'
+    figure: '/images/research-mrna.webp'
+    caption: 'GCU and GCC are synonymous; a hierarchy-aware model treats confusing them as a smaller error than confusing alanine with threonine.'
+    publications:
+      - 'yazdani2025equi'
+      - 'yazdani2024helm'
     tags:
-      - AI
-      - Artificial Intelligence
-      - Transformers
-  - title: Drug Discovery
-    description: ""
+      - 'mRNA'
+      - 'Language Models'
+      - 'Equivariance'
+  - id: 'dti'
+    label: 'Drug discovery'
+    title: 'Drug–target interaction & molecule design'
+    description: 'Interpretable models over 3D binding sites and fragments, and diffusion-based generation of target-specific molecules.'
+    body: |
+      Predicting whether, and how strongly, a molecule binds a protein is a bottleneck in drug discovery. I model proteins through the 3D structure of their binding sites and molecules through their fragments, using attention so predictions point to the residues and substructures responsible. More recently, **BoKDiff** aligns diffusion models to generate 3D molecules tailored to a specific target.
+
+      These architectures are collected in [DeepDrugDomain](https://github.com/yazdanimehdi/DeepDrugDomain), a Python package for building and benchmarking DTI models.
+    figure: '/images/research-dti.webp'
+    caption: 'Cross-attention between ligand fragments and binding-site residues makes each prediction inspectable.'
+    publications:
+      - 'yalabadi2025bokdiffbestofkdiffusionalignment'
+      - 'khodabandeh2024fragxsitedti'
+      - 'yazdani2022attentionsitedti'
     tags:
-      - Drug Discovery
-      - DTI
-      - DTA
-  - title: Fairness
-    description: ""
+      - 'Drug Discovery'
+      - 'DTI'
+      - 'Graph Neural Networks'
+  - id: 'fair'
+    label: 'Trustworthy ML'
+    title: 'Trustworthy & agentic ML'
+    description: 'Fair representation learning with bilevel formulations, and agents that retrieve, reason and cite over biomedical data.'
+    body: |
+      Models trained on real-world data inherit its biases. **FairBiNN** frames fairness and accuracy as a leader–follower (Stackelberg) game and solves it with bilevel optimization, rather than trading them off through a single weighted loss.
+
+      At Microsoft and DeepBio I build agentic systems for biomedical data: planning, tool use, hybrid retrieval with reranking, and answers that cite their sources, along with the benchmarks needed to evaluate them.
+    figure: '/images/research-fair.webp'
+    caption: 'FairBiNN’s bilevel formulation: the follower’s best response to the leader defines the equilibrium.'
+    publications:
+      - 'yazdani2024fair'
+      - 'tayebi2022unbiaseddti'
     tags:
-      - Fairness
+      - 'Fairness'
+      - 'Bilevel Optimization'
+      - 'Agentic AI'

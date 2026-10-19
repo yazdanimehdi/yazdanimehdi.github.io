@@ -8,14 +8,23 @@ const supportedProviders = ['github', 'gitlab'];
 
 const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const outputHTML = ({ provider = 'unknown', token, error, errorCode }) => {
+// A site_id is a hostname (Sveltia sends location.hostname); anything else is refused before it reaches a cookie or the page.
+const DOMAIN = /^[a-z0-9.-]+$/i;
+
+/**
+ * The popup answers only its opener, and only when the opener's host is the site_id the flow started with. Without
+ * this, any page could open /auth with an allowed site_id and collect the token.
+ */
+const outputHTML = ({ provider = 'unknown', token, error, errorCode, domain = '' }) => {
   const state = error ? 'error' : 'success';
   const content = error ? { provider, error, errorCode } : { provider, token };
 
   return new Response(
     `<!doctype html><html><body><script>
       (() => {
-        window.addEventListener('message', ({ data, origin }) => {
+        const domain = ${JSON.stringify(domain)};
+        window.addEventListener('message', ({ data, origin, source }) => {
+          if (source !== window.opener || !domain || new URL(origin).hostname !== domain) return;
           if (data === 'authorizing:${provider}') {
             window.opener?.postMessage(
               'authorization:${provider}:${state}:${JSON.stringify(content)}',
@@ -47,6 +56,10 @@ const handleAuth = async (request, env) => {
     });
   }
 
+  if (!domain || !DOMAIN.test(domain)) {
+    return outputHTML({ provider, error: 'Missing or invalid site_id.', errorCode: 'UNSUPPORTED_DOMAIN' });
+  }
+
   const {
     ALLOWED_DOMAINS,
     GITHUB_CLIENT_ID,
@@ -65,6 +78,7 @@ const handleAuth = async (request, env) => {
   ) {
     return outputHTML({
       provider,
+      domain,
       error: 'Your domain is not allowed to use the authenticator.',
       errorCode: 'UNSUPPORTED_DOMAIN',
     });
@@ -77,6 +91,7 @@ const handleAuth = async (request, env) => {
     if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) {
       return outputHTML({
         provider,
+        domain,
         error: 'OAuth app client ID or secret is not configured.',
         errorCode: 'MISCONFIGURED_CLIENT',
       });
@@ -95,6 +110,7 @@ const handleAuth = async (request, env) => {
     if (!GITLAB_CLIENT_ID || !GITLAB_CLIENT_SECRET) {
       return outputHTML({
         provider,
+        domain,
         error: 'OAuth app client ID or secret is not configured.',
         errorCode: 'MISCONFIGURED_CLIENT',
       });
@@ -116,7 +132,9 @@ const handleAuth = async (request, env) => {
     status: 302,
     headers: {
       Location: authURL,
-      'Set-Cookie': `csrf-token=${provider}_${csrfToken}; ` + `HttpOnly; Path=/; Max-Age=600; SameSite=Lax; Secure`,
+      'Set-Cookie':
+        `csrf-token=${provider}_${csrfToken}_${domain.toLowerCase()}; ` +
+        `HttpOnly; Path=/; Max-Age=600; SameSite=Lax; Secure`,
     },
   });
 };
@@ -126,7 +144,8 @@ const handleCallback = async (request, env) => {
   const { origin, searchParams } = new URL(url);
   const { code, state } = Object.fromEntries(searchParams);
 
-  const [, provider, csrfToken] = headers.get('Cookie')?.match(/\bcsrf-token=([a-z-]+?)_([0-9a-f]{32})\b/) ?? [];
+  const [, provider, csrfToken, domain] =
+    headers.get('Cookie')?.match(/\bcsrf-token=([a-z-]+?)_([0-9a-f]{32})_([a-z0-9.-]+)/) ?? [];
 
   if (!provider || !supportedProviders.includes(provider)) {
     return outputHTML({
@@ -138,6 +157,7 @@ const handleCallback = async (request, env) => {
   if (!code || !state) {
     return outputHTML({
       provider,
+      domain,
       error: 'Failed to receive an authorization code. Please try again later.',
       errorCode: 'AUTH_CODE_REQUEST_FAILED',
     });
@@ -146,6 +166,7 @@ const handleCallback = async (request, env) => {
   if (!csrfToken || state !== csrfToken) {
     return outputHTML({
       provider,
+      domain,
       error: 'Potential CSRF attack detected. Authentication flow aborted.',
       errorCode: 'CSRF_DETECTED',
     });
@@ -167,6 +188,7 @@ const handleCallback = async (request, env) => {
     if (!GITHUB_CLIENT_ID || !GITHUB_CLIENT_SECRET) {
       return outputHTML({
         provider,
+        domain,
         error: 'OAuth app client ID or secret is not configured.',
         errorCode: 'MISCONFIGURED_CLIENT',
       });
@@ -184,6 +206,7 @@ const handleCallback = async (request, env) => {
     if (!GITLAB_CLIENT_ID || !GITLAB_CLIENT_SECRET) {
       return outputHTML({
         provider,
+        domain,
         error: 'OAuth app client ID or secret is not configured.',
         errorCode: 'MISCONFIGURED_CLIENT',
       });
@@ -217,6 +240,7 @@ const handleCallback = async (request, env) => {
   if (!response) {
     return outputHTML({
       provider,
+      domain,
       error: 'Failed to request an access token. Please try again later.',
       errorCode: 'TOKEN_REQUEST_FAILED',
     });
@@ -230,12 +254,13 @@ const handleCallback = async (request, env) => {
   } catch {
     return outputHTML({
       provider,
+      domain,
       error: 'Server responded with malformed data. Please try again later.',
       errorCode: 'MALFORMED_RESPONSE',
     });
   }
 
-  return outputHTML({ provider, token, error });
+  return outputHTML({ provider, token, error, domain });
 };
 
 export default {

@@ -16,6 +16,7 @@ pnpm-debug.log*
 # environment variables
 .env
 .env.production
+.env*.local
 
 # macOS
 .DS_Store
@@ -30,3 +31,14 @@ pnpm-debug.log*
 
 # template init marker (created by CI, should not be in template)
 .template-initialized
+
+# theme check builds (scripts/check-themes.mjs)
+dist-*/
+
+# Vercel build output (VERCEL=1 pnpm build)
+.vercel/
+
+# Playwright
+test-results/
+playwright-report/
+__pycache__/

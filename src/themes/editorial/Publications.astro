@@ -1,0 +1,171 @@
+---
+import Layout from './Layout.astro';
+import PaperRow from './PaperRow.astro';
+import { bareArxiv, bareDoi, jsonLd } from '../../lib/editorial';
+import { uiStrings } from '../../lib/ui-strings';
+import type { PublicationsData } from './data';
+
+type Props = PublicationsData;
+
+const { config, owners, groups, filters, total, firstCount } = Astro.props;
+const personal = config.siteMode === 'personal';
+const scholar = config.socials?.scholar;
+const t = uiStrings(config);
+const filterLabel = (f: { id: string; label: string }) =>
+  f.id === 'all' ? t('filter.all') : f.id === 'other' ? t('filter.other') : f.label;
+
+const ld = {
+  '@context': 'https://schema.org',
+  '@type': 'ItemList',
+  itemListElement: groups
+    .flatMap((g) => g.items)
+    .map(({ pub }, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      item: {
+        '@type': 'ScholarlyArticle',
+        headline: pub.data.title,
+        author: pub.data.authors.map((name) => ({ '@type': 'Person', name })),
+        datePublished: String(pub.data.year),
+        isPartOf: { '@type': 'Periodical', name: pub.data.venue },
+        sameAs: [
+          pub.data.doi && `https://doi.org/${bareDoi(pub.data.doi)}`,
+          pub.data.arxiv && `https://arxiv.org/abs/${bareArxiv(pub.data.arxiv)}`,
+        ].filter(Boolean),
+      },
+    })),
+};
+---
+
+<Layout title={t('pubs.title')} description={t(personal ? 'pubs.descriptionPersonal' : 'pubs.descriptionLab')}>
+  <script type="application/ld+json" set:html={jsonLd(ld)} />
+  <div class="ed-wrap ed-main">
+    <div class="ed-pubs-head">
+      <div class="ed-stack">
+        <h1 class="ed-h1">{t('pubs.heading')}</h1>
+        {
+          (personal || scholar) && (
+            <p class="ed-intro">
+              {personal && `${t('pubs.ownerBold')} `}
+              {scholar && (
+                <>
+                  {t('pubs.seeAlso')}{' '}
+                  <span class="ed-link-punct">
+                    <a href={scholar} class="ul">
+                      Google Scholar
+                    </a>
+                    .
+                  </span>
+                </>
+              )}
+            </p>
+          )
+        }
+      </div>
+      <div class="ed-stats">
+        <div class="ed-stat">
+          <span class="ed-stat-num num">{total}</span><span class="ed-stat-label">{t('pubs.count')}</span>
+        </div>
+        {
+          personal && (
+            <div class="ed-stat">
+              <span class="ed-stat-num num">{firstCount}</span>
+              <span class="ed-stat-label">{t('pubs.firstAuthorCount')}</span>
+            </div>
+          )
+        }
+      </div>
+    </div>
+
+    <div class="ed-filterbar" data-pub-filters>
+      {
+        filters.length > 2 ? (
+          <div class="ed-tabs" role="group" aria-label={t('pubs.filterByTopic')}>
+            {filters.map((f) => (
+              <button type="button" class="ed-tab" data-filter={f.id} aria-pressed={f.id === 'all' ? 'true' : 'false'}>
+                {filterLabel(f)} <span class="ed-tab-count num">{f.count}</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <span />
+        )
+      }
+      {
+        personal && (
+          <label class="ed-toggle">
+            <input type="checkbox" data-first-only /> {t('pubs.firstAuthorOnly')}
+          </label>
+        )
+      }
+    </div>
+
+    <p class="ed-intro" data-pub-empty hidden>{t('pubs.empty')}</p>
+
+    {
+      groups.map((g) => (
+        <section class="ed-year" data-year={g.year} aria-labelledby={`y${g.year}`}>
+          <h2 id={`y${g.year}`} class="num">
+            {g.year}
+          </h2>
+          <ol class="ed-papers">
+            {g.items.map((i) => (
+              <PaperRow pub={i.pub} {owners} variant="list" topic={i.topic} first={i.first} />
+            ))}
+          </ol>
+        </section>
+      ))
+    }
+  </div>
+</Layout>
+
+<script>
+  function initPublicationFilters() {
+    const bar = document.querySelector<HTMLElement>('[data-pub-filters]');
+    if (!bar) return;
+    const buttons = [...bar.querySelectorAll<HTMLButtonElement>('[data-filter]')];
+    const firstOnly = bar.querySelector<HTMLInputElement>('[data-first-only]');
+    const empty = document.querySelector<HTMLElement>('[data-pub-empty]');
+    let topic = 'all';
+
+    const apply = () => {
+      document.querySelectorAll<HTMLElement>('li[data-topic]').forEach((li) => {
+        const offTopic = topic !== 'all' && li.dataset.topic !== topic;
+        const notFirst = !!firstOnly?.checked && li.dataset.first !== 'true';
+        li.hidden = offTopic || notFirst;
+      });
+      let anyVisible = false;
+      document.querySelectorAll<HTMLElement>('section[data-year]').forEach((section) => {
+        section.hidden = !section.querySelector('li[data-topic]:not([hidden])');
+        anyVisible ||= !section.hidden;
+      });
+      if (empty) empty.hidden = anyVisible;
+    };
+
+    buttons.forEach((button) =>
+      button.addEventListener('click', () => {
+        topic = button.dataset.filter ?? 'all';
+        buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === button)));
+        apply();
+      }),
+    );
+    firstOnly?.addEventListener('change', apply);
+    apply(); // honours a checkbox state restored by the browser
+  }
+
+  document.addEventListener('astro:page-load', initPublicationFilters);
+
+  // A link to /publications#id (research pages, other sites) opens that row's BibTeX and marks the row.
+  // :target alone misses client-side navigations, which change the hash through the History API.
+  function openCited() {
+    document.querySelector('[data-cited]')?.removeAttribute('data-cited');
+    const id = location.hash.slice(1);
+    const row = id ? document.getElementById(id) : null;
+    if (!row?.matches('li.ed-paper')) return;
+    row.setAttribute('data-cited', '');
+    row.querySelector('details')?.setAttribute('open', '');
+  }
+
+  document.addEventListener('astro:page-load', openCited);
+  window.addEventListener('hashchange', openCited);
+</script>

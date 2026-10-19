@@ -1,10 +1,10 @@
 ---
-title: I have joined Microsoft Research as a Research Intern in the Health Futures...
+title: 'Joined Microsoft Research (Health Futures) as a Research Intern.'
 date: 2025-06-30
 category: media
 pinned: false
 featured: false
-excerpt: "I have joined Microsoft Research as a Research Intern in the Health Futures group, where I’m working on AI-driven solutions for biomedical and clinical challenges."
+excerpt: 'I have joined Microsoft Research as a Research Intern in the Health Futures group, where I’m working on AI-driven solutions for biomedical and clinical challenges.'
 ---
 
 I have joined Microsoft Research as a Research Intern in the Health Futures group, where I’m working on AI-driven solutions for biomedical and clinical challenges.

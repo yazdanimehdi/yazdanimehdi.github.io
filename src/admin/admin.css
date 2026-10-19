@@ -1,0 +1,1460 @@
+/* Admin UI. Tokens come from src/themes/editorial/editorial.css; layout follows personal-site-handoff/design/Admin*. */
+:root {
+  --font-sans: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-serif: 'Source Serif 4', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+.adm {
+  --adm-ink: var(--ed-ink, #15192b);
+  --adm-muted: var(--ed-caption, #656b80);
+  --adm-rule: var(--ed-rule, #e4e7ee);
+  --adm-tint: var(--ed-tint, #f3f5fa);
+  --adm-hover: var(--ed-hover, #f6f8fc);
+  --adm-accent: var(--ed-accent, #1f3c88);
+  --adm-accent-hover: var(--ed-accent-hover, #142a63);
+  --adm-danger: #a12a2a;
+  /* Admin-only values: the admin stays light, so these are not theme tokens. */
+  --adm-paper: #fff;
+  --adm-on-ink: #fff;
+  --adm-on-ink-link: #c9d4ff;
+  --adm-selected: #e9ecf3;
+  --adm-warn-bg: #fdf8e7;
+  --adm-warn-rule: #e8d9a8;
+  --adm-danger-bg: #fdf1f1;
+  --adm-danger-rule: #e9b8b8;
+  --adm-add-bg: #e9f5ec;
+  --adm-add-ink: #1d5e33;
+  --adm-scrim: rgb(21 25 43 / 0.45);
+  --adm-float: 0 6px 20px rgb(21 25 43 / 0.12);
+  --adm-touch: 44px;
+  margin: 0;
+  background: var(--adm-paper);
+  color: var(--adm-ink);
+}
+.adm *,
+.adm *::before,
+.adm *::after {
+  box-sizing: border-box;
+}
+.adm a {
+  color: var(--adm-accent);
+  text-decoration: none;
+}
+.adm a:hover {
+  text-decoration: underline;
+}
+.adm :focus-visible {
+  outline: 2px solid var(--adm-accent);
+  outline-offset: 2px;
+}
+.adm-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.adm ::selection {
+  background: var(--ed-selection, #dce3f5);
+}
+.adm-skip {
+  position: absolute;
+  inset-inline-start: 8px;
+  inset-block-start: 8px;
+  z-index: 60;
+  padding: 10px 14px;
+  border-radius: 6px;
+  background: var(--adm-paper);
+  transform: translateY(-200%);
+}
+.adm-skip:focus {
+  transform: none;
+}
+.adm-main:focus {
+  outline: none;
+}
+.adm time,
+.adm-count {
+  font-variant-numeric: tabular-nums;
+}
+.adm-layout {
+  display: flex;
+  min-height: 100vh;
+}
+.adm-side {
+  flex: 0 0 232px;
+  background: var(--adm-tint);
+  border-inline-end: 1px solid var(--adm-rule);
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.adm-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  flex: 1;
+}
+.adm-side nav,
+.adm-side nav ul {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.adm-side nav ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.adm-side nav a {
+  display: block;
+  padding: 7px 10px;
+  border-radius: 6px;
+  color: var(--adm-ink);
+  font-size: 15px;
+}
+.adm-side nav a[aria-current='page'] {
+  background: var(--adm-selected);
+  font-weight: 500;
+}
+.adm-nav-label {
+  margin-block-start: 14px;
+  padding: 0 10px 4px;
+  color: var(--adm-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+.adm-side-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.adm-side .adm-menu-btn {
+  display: none;
+}
+.adm-nav-more summary {
+  padding: 7px 10px;
+  border-radius: 6px;
+  color: var(--adm-muted);
+  font-size: 14px;
+  cursor: pointer;
+}
+.adm-nav-more summary:hover {
+  background: var(--adm-hover);
+}
+.adm-nav-more ul {
+  padding-inline-start: 10px;
+}
+.adm-side-foot {
+  margin-block-start: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.adm-main {
+  flex: 1;
+  min-width: 0;
+  padding: 32px 40px 56px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+/* Keep a row's label and its action within one glance: forms at 1080px, the dashboard at reading width. */
+.adm-main > :not(.adm-modal) {
+  max-inline-size: 1080px;
+}
+.adm-main.is-narrow > :not(.adm-modal) {
+  max-inline-size: 880px;
+}
+.adm-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+.adm-head h1 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+.adm-h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+.adm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.adm-grow {
+  flex: 1;
+}
+.adm-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+  background: var(--adm-paper);
+  color: var(--adm-ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.adm a.adm-btn {
+  color: var(--adm-ink);
+}
+.adm-btn:hover {
+  background: var(--adm-hover);
+  text-decoration: none;
+}
+.adm-btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.adm-btn-primary,
+.adm a.adm-btn-primary {
+  background: var(--adm-accent);
+  border-color: var(--adm-accent);
+  color: var(--ed-on-accent, #fff);
+}
+.adm-btn-primary:hover {
+  background: var(--adm-accent-hover);
+}
+.adm-btn-danger {
+  color: var(--adm-danger);
+}
+.adm-btn-small {
+  min-height: 30px;
+  padding: 0 10px;
+  font-size: 13px;
+}
+.adm-add {
+  align-self: flex-start;
+}
+.adm-banner {
+  padding: 12px 16px;
+  border: 1px solid var(--adm-warn-rule);
+  background: var(--adm-warn-bg);
+  border-radius: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 0;
+}
+.adm-banner-error {
+  border-color: var(--adm-danger-rule);
+  background: var(--adm-danger-bg);
+}
+.adm-card {
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+  padding: 16px;
+}
+.adm-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-block-start: 1px solid var(--adm-rule);
+  font-size: 14px;
+}
+.adm-rows > li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px 16px;
+  padding: 10px 0;
+  border-block-end: 1px solid var(--adm-rule);
+}
+.adm-row-title,
+.adm-row-main {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.adm-row-label {
+  flex: 0 0 9.5rem;
+  font-weight: 500;
+}
+.adm-row-detail {
+  display: block;
+  color: var(--adm-muted);
+  font-size: 13px;
+}
+.adm-row-date {
+  flex: 0 0 auto;
+  min-width: 6.5rem;
+  color: var(--adm-muted);
+  font-size: 13px;
+  text-align: end;
+}
+.adm-rows .adm-btn {
+  min-width: 5.5rem;
+  justify-content: center;
+}
+.adm-row-action:empty {
+  display: none;
+}
+.adm-status-rows .adm-row-label {
+  margin: 0;
+  font-size: inherit;
+}
+.adm-status-rows time {
+  color: var(--adm-muted);
+}
+.adm-status-rows .is-attention .adm-row-state {
+  color: var(--adm-danger);
+  font-weight: 500;
+}
+.adm-status-rows .is-unseen .adm-row-state,
+.adm-status-rows .is-unknown .adm-row-state,
+.adm-status-rows .is-off .adm-row-state {
+  color: var(--adm-muted);
+}
+/* A running or watched action stays focusable (aria-disabled) but reads as unavailable. */
+.adm-status-rows .adm-btn[aria-disabled='true'] {
+  opacity: 0.55;
+  cursor: default;
+}
+.adm-status-rows .adm-status-tone {
+  margin-inline-end: 6px;
+}
+.adm-status-rows .is-nudge .adm-status-tone {
+  background: var(--adm-warn-bg);
+}
+.adm-status-rows .is-off .adm-status-tone {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--adm-rule);
+  color: var(--adm-muted);
+}
+.adm-row-abs {
+  color: var(--adm-muted);
+  font-size: 13px;
+}
+.adm-row-raw {
+  margin-block-start: 4px;
+  color: var(--adm-muted);
+  font-size: 13px;
+}
+.adm-row-raw summary {
+  cursor: pointer;
+}
+.adm-row-raw code {
+  display: block;
+  margin-block-start: 4px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.adm-row-link {
+  display: inline-block;
+  margin-block-start: 4px;
+  font-size: 13px;
+}
+.adm-row-action a {
+  white-space: nowrap;
+}
+/* The dashboard's verdict: one line under the title, a danger wash only when something needs fixing. */
+.adm-verdict {
+  margin: 0;
+  padding: 10px 14px;
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+  background: var(--adm-tint);
+  font-size: 15px;
+  font-weight: 500;
+}
+.adm-verdict.is-attention {
+  border-color: var(--adm-danger-rule);
+  background: var(--adm-danger-bg);
+  color: var(--adm-danger);
+}
+.adm-verdict a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.adm-jobs-desc,
+.adm-next-note {
+  margin: 0;
+  font-size: 13px;
+}
+/* Loading: the status section's shape at its real row height, so nothing moves when the rows arrive. */
+.adm-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.adm-skeleton .adm-rows > li {
+  align-items: flex-start;
+  min-block-size: 65px;
+}
+.adm-skel-bar {
+  display: block;
+  block-size: 12px;
+  inline-size: 60%;
+  margin-block: 4px;
+  border-radius: 3px;
+  background: var(--adm-tint);
+}
+.adm-skel-bar.is-short {
+  inline-size: 35%;
+}
+.adm-verdict .adm-skel-bar {
+  margin-block: 6px;
+  inline-size: 14rem;
+  max-inline-size: 100%;
+  background: var(--adm-rule);
+}
+.adm-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 20px;
+  border-block-end: 1px solid var(--adm-rule);
+}
+.adm-filter button {
+  min-height: var(--adm-touch);
+  padding: 0;
+  border: 0;
+  border-block-end: 2px solid transparent;
+  margin-block-end: -1px;
+  background: none;
+  color: var(--adm-muted);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+.adm-filter button[aria-pressed='true'] {
+  border-block-end-color: var(--adm-ink);
+  color: var(--adm-ink);
+  font-weight: 500;
+}
+.adm-count {
+  color: var(--adm-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.adm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.adm-table th,
+.adm-table td {
+  text-align: start;
+  padding: 10px 8px;
+  border-block-end: 1px solid var(--adm-rule);
+  vertical-align: top;
+}
+.adm-table th {
+  color: var(--adm-muted);
+  font-weight: 500;
+  font-size: 13px;
+}
+.adm-status {
+  font-size: 12px;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: var(--adm-tint);
+  white-space: nowrap;
+}
+.adm-status-draft {
+  background: var(--adm-warn-bg);
+}
+.adm-status-scheduled {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--adm-accent);
+  color: var(--adm-accent);
+}
+.adm-status-hidden {
+  background: none;
+  box-shadow: inset 0 0 0 1px var(--adm-rule);
+  color: var(--adm-muted);
+}
+.adm-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.adm-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.adm-field > span:first-child {
+  font-size: 13px;
+  font-weight: 500;
+}
+.adm-field small,
+.adm-muted {
+  color: var(--adm-muted);
+  font-size: 13px;
+}
+.adm-err,
+.adm-error {
+  color: var(--adm-danger);
+  font-size: 13px;
+}
+.adm input[type='text'],
+.adm input[type='date'],
+.adm input[type='number'],
+.adm input[type='search'],
+.adm select,
+.adm textarea {
+  width: 100%;
+  font: inherit;
+  font-size: 14px;
+  padding: 8px 10px;
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+  background: var(--adm-paper);
+  color: var(--adm-ink);
+}
+.adm textarea {
+  resize: vertical;
+}
+.adm input[type='color'] {
+  width: 44px;
+  height: 36px;
+  padding: 2px;
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+  background: var(--adm-paper);
+}
+.adm-owner {
+  font-weight: 600;
+  color: var(--adm-accent) !important;
+}
+.adm-check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+}
+.adm-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.adm-list-row {
+  display: flex;
+  gap: 6px;
+  align-items: flex-start;
+}
+.adm-list-row > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+.adm-plain-fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+}
+.adm-color-row {
+  align-items: flex-end;
+}
+.adm-group {
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+  padding: 14px;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.adm-group > legend {
+  font-weight: 600;
+  padding: 0 6px;
+}
+/* Repeated objects (menu items, page sections): a rule between entries so their fields don't run together. */
+.adm-group > .adm-list > .adm-list-row + .adm-list-row {
+  padding-block-start: 12px;
+  border-block-start: 1px solid var(--adm-rule);
+}
+.adm-split {
+  display: grid;
+  grid-template-columns: minmax(220px, 300px) minmax(0, 1fr);
+  gap: 24px;
+  align-items: start;
+}
+.adm-split-wide {
+  grid-template-columns: minmax(0, 1fr) 280px;
+}
+.adm-cols3 {
+  display: grid;
+  grid-template-columns: 220px 260px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.adm-pick {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.adm-pick button,
+.adm-pick a {
+  width: 100%;
+  text-align: start;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  color: var(--adm-ink);
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+.adm-pick button:hover {
+  background: var(--adm-hover);
+}
+.adm-pick time {
+  flex: none;
+  white-space: nowrap;
+  font-size: 13px;
+}
+.adm-pick button[aria-current='true'] {
+  background: var(--adm-selected);
+  font-weight: 500;
+}
+.adm-pre {
+  white-space: pre-wrap;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  margin: 0;
+}
+.adm-toasts {
+  position: fixed;
+  inset-inline-end: 16px;
+  inset-block-end: 16px;
+  z-index: 50;
+  width: min(400px, calc(100vw - 32px));
+}
+.adm-toast-region {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.adm-toast-region:not(:empty) + .adm-toast-region:not(:empty) {
+  margin-block-start: 8px;
+}
+.adm-toast {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  background: var(--adm-ink);
+  color: var(--adm-on-ink);
+  padding-block: 8px;
+  padding-inline: 14px 8px;
+  border-radius: 6px;
+  box-shadow: var(--adm-float);
+  font-size: 14px;
+}
+.adm-toast-error {
+  background: var(--adm-danger);
+}
+.adm-toast-text {
+  flex: 1 1 12rem;
+}
+.adm-toast-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-inline-start: auto;
+}
+.adm .adm-toast a,
+.adm-toast-close {
+  color: var(--adm-on-ink-link);
+}
+.adm-toast-close {
+  min-height: 30px;
+  padding: 0 6px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.adm-toast-close:hover {
+  text-decoration: underline;
+}
+.adm .adm-toast :focus-visible {
+  outline-color: var(--adm-on-ink);
+}
+.adm-modal {
+  position: fixed;
+  inset: 0;
+  background: var(--adm-scrim);
+  display: grid;
+  place-items: center;
+  z-index: 40;
+  padding: 16px;
+}
+.adm-modal > div {
+  background: var(--adm-paper);
+  border-radius: 8px;
+  padding: 20px;
+  width: min(760px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.adm-media {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+.adm-media figure {
+  margin: 0;
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  word-break: break-all;
+}
+.adm-media img,
+.adm-thumb {
+  width: 100%;
+  height: 100px;
+  object-fit: contain;
+  background: var(--adm-tint);
+}
+.adm-thumb {
+  display: grid;
+  place-items: center;
+  color: var(--adm-muted);
+}
+.adm-drop {
+  border: 2px dashed var(--adm-rule);
+  border-radius: 6px;
+  padding: 18px;
+  text-align: center;
+  color: var(--adm-muted);
+  cursor: pointer;
+}
+.adm-drop.is-over {
+  border-color: var(--adm-accent);
+  color: var(--adm-accent);
+}
+.adm-editor {
+  position: relative;
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+}
+.adm-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 6px;
+  border-block-end: 1px solid var(--adm-rule);
+  background: var(--adm-tint);
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 2;
+}
+.adm-toolbar button {
+  min-width: 32px;
+  height: 30px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.adm-toolbar button.is-active {
+  background: var(--adm-paper);
+  border-color: var(--adm-rule);
+}
+.adm-editor .tiptap {
+  min-height: 320px;
+  padding: 16px 18px;
+  outline: none;
+}
+.adm-editor.is-compact .tiptap {
+  min-height: 140px;
+}
+.adm .adm-md-plain {
+  display: block;
+  min-height: 320px;
+  border: 0;
+  font-family: var(--font-mono);
+}
+.adm-editor.is-compact .adm-md-plain {
+  min-height: 140px;
+}
+.adm-editor .tiptap table {
+  border-collapse: collapse;
+}
+.adm-editor .tiptap td,
+.adm-editor .tiptap th {
+  border: 1px solid var(--adm-rule);
+  padding: 4px 8px;
+}
+.adm-editor .tiptap img {
+  max-width: 100%;
+}
+.adm-slash {
+  position: absolute;
+  z-index: 30;
+  background: var(--adm-paper);
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+  box-shadow: var(--adm-float);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+}
+.adm-slash button {
+  text-align: start;
+  padding: 6px 10px;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.adm-slash button:hover,
+.adm-slash button:focus-visible {
+  background: var(--adm-tint);
+}
+.adm .adm-title-input {
+  font-family: var(--font-serif);
+  font-size: 30px;
+  border: 0;
+  padding: 4px 0;
+}
+.adm .adm-subtitle-input {
+  font-size: 18px;
+  border: 0;
+  padding: 2px 0;
+  color: var(--adm-muted);
+}
+.adm-login {
+  max-width: 380px;
+  margin: 14vh auto;
+  padding: 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: flex-start;
+}
+.adm-login h1 {
+  margin: 0;
+  font-size: 24px;
+}
+@media (max-width: 860px) {
+  .adm-layout {
+    flex-direction: column;
+  }
+  .adm-side {
+    flex: none;
+    padding: 12px 16px;
+    gap: 10px;
+    border-inline-end: 0;
+    border-block-end: 1px solid var(--adm-rule);
+  }
+  .adm-side .adm-menu-btn {
+    display: inline-flex;
+    min-height: var(--adm-touch);
+  }
+  .adm-menu:not(.is-open) {
+    display: none;
+  }
+  .adm-side nav a,
+  .adm-row-action a,
+  .adm-row-link {
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+    min-height: var(--adm-touch);
+  }
+  /* Disclosures stay list items, so the browser keeps (and mirrors in RTL) their open/closed marker. */
+  .adm-nav-more summary,
+  .adm-row-raw summary {
+    display: list-item;
+    min-height: var(--adm-touch);
+    padding-block: 12px;
+  }
+  .adm-row-link {
+    display: inline-flex;
+    margin-block-start: 0;
+  }
+  .adm-side-foot {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    margin-block-start: 0;
+    padding-block-start: 12px;
+    border-block-start: 1px solid var(--adm-rule);
+  }
+  .adm-side-foot .adm-btn,
+  .adm-side-foot a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--adm-touch);
+  }
+  .adm-main {
+    padding: 20px 16px 40px;
+  }
+  .adm-split,
+  .adm-split-wide,
+  .adm-cols3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 640px) {
+  .adm-rows > li {
+    flex-wrap: wrap;
+  }
+  .adm-row-title,
+  .adm-row-main,
+  .adm-row-label {
+    flex: 1 0 100%;
+  }
+  .adm-row-date {
+    min-width: 0;
+    text-align: start;
+  }
+  /* Status rows: the action shares the label's line instead of taking one of its own. */
+  .adm-status-rows > li {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .adm-status-rows .adm-row-action {
+    grid-area: 1 / 2;
+  }
+  .adm-status-rows .adm-row-main {
+    grid-column: 1 / -1;
+  }
+  .adm-skeleton .adm-rows > li {
+    min-block-size: 95px;
+  }
+  .adm button,
+  .adm .adm-btn,
+  .adm input:not([type='checkbox'], [type='radio']),
+  .adm select {
+    min-height: var(--adm-touch);
+  }
+  /* iOS Safari zooms into focused fields under 16px. */
+  .adm input:not([type='checkbox'], [type='radio']),
+  .adm select,
+  .adm textarea {
+    font-size: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .adm * {
+    transition: none !important;
+  }
+}
+
+.adm-history-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin: 0 0 8px;
+}
+.adm-history {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  max-height: 50vh;
+  overflow: auto;
+}
+.adm-history li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  border-block-end: 1px solid var(--adm-rule);
+}
+.adm-history-preview {
+  max-height: 40vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 13px;
+}
+/* Site editor (Editor.vue). */
+.adm-editor-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+.adm-editor-page p {
+  margin: 0;
+}
+.adm-editor-intro {
+  font-size: 15px;
+  line-height: 1.55;
+}
+.adm-editor-how {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.adm-editor-how > p {
+  /* Plex Sans runs about 88 characters to 65ch; 29rem keeps these under 75. */
+  max-inline-size: 29rem;
+}
+.adm-editor-how > summary,
+.adm-editor-ask > summary,
+.adm-editor-details > summary,
+.adm-editor-logbox > summary,
+.adm-editor-diffbox > summary {
+  cursor: pointer;
+  inline-size: fit-content;
+  font-size: 14px;
+  font-weight: 500;
+}
+details.adm-editor-how > summary {
+  color: var(--adm-muted);
+  font-weight: 400;
+}
+details.adm-editor-how[open] > summary,
+details.adm-editor-ask[open] > summary {
+  margin-block-end: 4px;
+}
+.adm-editor-status {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.adm-editor-line {
+  display: flex;
+  gap: 8px;
+  font-weight: 500;
+}
+/* A drawn marker per state (working, done, failed, ready), so the state never rests on colour alone. */
+.adm-editor-line::before {
+  content: '';
+  flex: none;
+  inline-size: 14px;
+  block-size: 14px;
+  margin-block-start: 0.2em;
+  background: currentColor;
+  mask: var(--adm-editor-mark) center / contain no-repeat;
+}
+.adm-editor-line.is-working::before {
+  --adm-editor-mark: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M8 2a6 6 0 1 1-6 6'/></svg>");
+  color: var(--adm-accent);
+  animation: adm-editor-spin 0.9s linear infinite;
+}
+.adm-editor-line.is-done::before {
+  --adm-editor-mark: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3 8.5l3.2 3.2L13 4.5'/></svg>");
+  color: var(--adm-accent);
+}
+.adm-editor-line.is-failed {
+  color: var(--adm-danger);
+}
+.adm-editor-line.is-failed::before {
+  --adm-editor-mark: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='8' cy='8' r='6.5'/><path d='M8 4.5v4.2M8 11.4v.1'/></svg>");
+}
+.adm-editor-line.is-ready::before {
+  --adm-editor-mark: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><circle cx='8' cy='8' r='5'/></svg>");
+  color: var(--adm-muted);
+}
+@keyframes adm-editor-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .adm-editor-line.is-working::before {
+    animation: none;
+  }
+}
+.adm-editor-last {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+/* Headings script focuses (after a run, after Publish) are landmarks for screen readers, not targets: no box. */
+.adm-editor-page h2[tabindex='-1']:focus {
+  outline: none;
+}
+.adm-editor-session {
+  position: relative;
+}
+.adm-editor-session > summary {
+  list-style: none;
+}
+.adm-editor-session > summary::-webkit-details-marker {
+  display: none;
+}
+.adm-editor-session > summary::after {
+  content: '';
+  inline-size: 10px;
+  block-size: 10px;
+  background: currentColor;
+  mask: url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='M3.5 6l4.5 4.5L12.5 6'/></svg>")
+    center / contain no-repeat;
+}
+.adm-editor-session[open] > summary::after {
+  transform: rotate(180deg);
+}
+.adm-editor-session-menu {
+  position: absolute;
+  inset-inline-end: 0;
+  inset-block-start: calc(100% + 6px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-inline-size: 12rem;
+  padding: 8px;
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+  background: var(--adm-paper);
+  box-shadow: var(--adm-float);
+}
+.adm-editor-session-menu p {
+  margin: 0;
+  font-size: 13px;
+}
+.adm-editor-notice {
+  align-items: flex-start;
+}
+.adm-editor-notice-text {
+  flex: 1 1 26rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.adm-editor-notice-text p {
+  max-inline-size: 65ch;
+  font-size: 15px;
+}
+.adm-editor-steps {
+  margin: 0;
+  padding-inline-start: 20px;
+  max-inline-size: 65ch;
+  font-size: 14px;
+}
+.adm-editor-steps > li + li {
+  margin-block-start: 4px;
+}
+.adm-editor-notice-text .adm-muted {
+  font-size: 13px;
+}
+.adm-editor-notice summary,
+.adm-editor-tech summary,
+.adm-editor-logbox summary,
+.adm-editor-diffbox summary {
+  cursor: pointer;
+}
+.adm-editor-notice summary,
+.adm-editor-tech summary {
+  inline-size: fit-content;
+  color: var(--adm-muted);
+  font-size: 13px;
+}
+.adm-editor-notice pre,
+.adm-editor-tech pre {
+  margin-block-start: 6px;
+  overflow-wrap: anywhere;
+}
+.adm-editor-pages {
+  font-size: 14px;
+}
+.adm-editor-pages a[aria-current] {
+  color: var(--adm-ink);
+  font-weight: 500;
+}
+.adm-editor-ask label {
+  font-size: 13px;
+  font-weight: 500;
+}
+.adm-editor-kbd kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--adm-rule);
+  border-radius: 4px;
+  background: var(--adm-tint);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.adm-editor-elapsed {
+  color: var(--adm-muted);
+  font-size: 14px;
+}
+.adm-editor-time {
+  color: var(--adm-ink);
+  font-variant-numeric: tabular-nums;
+}
+.adm-editor-request {
+  max-inline-size: 70ch;
+}
+.adm-editor-run,
+.adm-editor-done {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.adm-editor-summary {
+  max-inline-size: 70ch;
+  white-space: pre-line;
+  font-size: 14px;
+}
+.adm-editor-summary-label {
+  font-weight: 500;
+}
+.adm-editor-requests > li + li {
+  margin-block-start: 10px;
+}
+.adm-editor-requests .adm-editor-summary {
+  margin-block-start: 4px;
+}
+.adm-editor-by {
+  color: var(--adm-muted);
+  font-size: 13px;
+}
+/* Review mode: the review rail, then the preview, then the diff; side by side from 1400px, past the 1080px cap.
+   The page header (title and Session) lifts the cap with it, so Session ends on the review area's edge. */
+.adm-main:has(> .adm-editor-page.is-review) > :not(.adm-modal) {
+  max-inline-size: none;
+}
+.adm-editor-work,
+.adm-editor-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+}
+.adm-editor-preview-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+.adm-editor-preview-title p {
+  font-size: 13px;
+}
+.adm-editor-details .adm-field {
+  margin-block-start: 8px;
+}
+@media (max-width: 1399px) {
+  /* One column: the bar's sticky range is the whole work area, so it stays in reach over the preview and diff. */
+  .adm-editor-work.is-review .adm-editor-rail {
+    display: contents;
+  }
+}
+/*
+ * 1400px less the 232px sidebar and 80px of padding leaves 1088px: an 18rem rail, the gap, and the preview at its
+ * 0.6 floor (768px, plus its 2px border). The rail grows toward 22rem only from what the preview doesn't need.
+ */
+@media (min-width: 1400px) {
+  .adm-editor-work.is-review {
+    display: grid;
+    grid-template-columns: clamp(18rem, 100% - 802px, 22rem) minmax(0, 1fr);
+    align-items: start;
+    gap: 24px 32px;
+  }
+  .adm-editor-work.is-review .adm-editor-preview {
+    position: sticky;
+    inset-block-start: 12px;
+  }
+  .adm-editor-work.is-review .adm-editor-diffbox {
+    grid-column: 1 / -1;
+  }
+  .adm-editor-work.is-review .adm-editor-bar-text {
+    flex-basis: 100%;
+  }
+}
+.adm-editor-log,
+.adm-editor-diff {
+  max-height: 40vh;
+  overflow: auto;
+  padding: 12px;
+  background: var(--adm-tint);
+  border-radius: 6px;
+}
+.adm-editor-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+/*
+ * Desktop lays the site out 1280px wide (--adm-preview-width) and scales it to the column (--adm-preview-scale, set
+ * from its width, never below 0.6); a column narrower than that scrolls sideways.
+ */
+.adm-editor-viewport {
+  block-size: 70vh;
+  overflow: auto hidden;
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+  background: var(--adm-paper);
+}
+.adm-editor-viewport.is-phone {
+  inline-size: min(390px, 100%);
+  margin-inline: auto;
+}
+/* The page's scaled size: it clips the iframe's unscaled box, which would otherwise widen the scroll range. */
+.adm-editor-frame {
+  inline-size: calc(var(--adm-preview-width, 100%) * var(--adm-preview-scale, 1));
+  block-size: 100%;
+  overflow: hidden;
+}
+.adm-editor-frame > iframe {
+  display: block;
+  inline-size: var(--adm-preview-width, 100%);
+  block-size: calc(100% / var(--adm-preview-scale, 1));
+  border: 0;
+  transform: scale(var(--adm-preview-scale, 1));
+  transform-origin: 0 0;
+}
+.adm-editor-frame > iframe:dir(rtl) {
+  transform-origin: 100% 0;
+}
+.adm-editor-review,
+.adm-editor-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.adm-editor-confirm p {
+  margin: 0;
+}
+.adm-editor-h3 {
+  margin: 0 0 6px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.adm-editor-requests {
+  margin: 0;
+  padding-inline-start: 20px;
+  max-inline-size: 70ch;
+}
+.adm-editor-files > li {
+  align-items: center;
+  padding-block: 6px;
+}
+.adm-editor-files code,
+.adm-editor-confirm-files code {
+  font-size: 13px;
+}
+/* Paths break after a slash (the <wbr> in Editor.vue); mid-segment only when one segment can't fit. */
+.adm-editor-files .adm-row-main,
+.adm-editor-files code,
+.adm-editor-confirm-files code {
+  overflow-wrap: break-word;
+}
+.adm-editor-confirm-files {
+  max-height: 30vh;
+  overflow: auto;
+  margin: 0;
+  padding-inline-start: 18px;
+  font-size: 14px;
+}
+.adm-editor-note {
+  justify-content: flex-start;
+  font-size: 14px;
+}
+.adm-editor-logbox > pre {
+  margin-block-start: 8px;
+}
+.adm-editor-diffbox > pre {
+  max-height: 60vh;
+  margin-block-start: 8px;
+}
+.adm-editor-diff > span {
+  display: block;
+}
+.adm-editor-diff .is-add {
+  background: var(--adm-add-bg);
+  color: var(--adm-add-ink);
+}
+.adm-editor-diff .is-del {
+  background: var(--adm-danger-bg);
+  color: var(--adm-danger);
+}
+.adm-editor-diff .is-hunk {
+  color: var(--adm-accent);
+}
+.adm-editor-diff .is-meta {
+  color: var(--adm-muted);
+  font-weight: 500;
+}
+/* Discard and Publish stay in reach while the preview scrolls past. */
+.adm-editor-bar {
+  position: sticky;
+  inset-block: 12px;
+  z-index: 10;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding-block: 10px;
+  padding-inline: 16px 12px;
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+  background: var(--adm-paper);
+  box-shadow: var(--adm-float);
+}
+.adm-editor-bar-text {
+  flex: 1 1 14rem;
+  font-size: 14px;
+}
+/* Not a publisher: what happens next follows the file count, before Discard…, so the bar ends on its action. */
+.adm-editor-bar-review {
+  font-weight: 500;
+}
+/* A disabled primary reads as waiting, not broken: the reason sits next to it. */
+.adm:has(.adm-editor-page) .adm-btn-primary:disabled {
+  opacity: 1;
+  border-color: var(--adm-rule);
+  background: var(--adm-tint);
+  color: var(--adm-muted);
+}
+@media (max-width: 640px) {
+  .adm-editor-widths {
+    display: none;
+  }
+  .adm-editor-bar {
+    padding-block: 8px;
+    padding-inline: 12px 8px;
+  }
+  .adm-editor-bar-text {
+    flex-basis: 100%;
+  }
+  .adm-editor-bar .adm-btn {
+    flex: 1 1 0;
+    justify-content: center;
+    min-height: var(--adm-touch);
+  }
+}
+@media (pointer: coarse), (max-width: 640px) {
+  .adm-editor-kbd {
+    display: none;
+  }
+}
+.adm-btn[aria-pressed='true'] {
+  border-color: var(--adm-accent);
+  color: var(--adm-accent);
+}

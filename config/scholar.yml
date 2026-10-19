@@ -1,5 +1,6 @@
 authors:
-  - name: Mehdi Yazdani-Jahromi
-    scholar_id: iLu_fEcAAAAJ
-syncInterval: weekly
+  - name: 'Mehdi Yazdani-Jahromi'
+    scholar_id: 'iLu_fEcAAAAJ' # Google Scholar author ID
+
+syncInterval: 'weekly'
 maxResults: 100

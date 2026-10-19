@@ -1,5 +1,5 @@
 ---
-title: "I will be presenting our work at RECOMB 2024 in Cambridge Boston at MIT campus!"
+title: 'Presenting FragXsiteDTI at RECOMB 2024 at MIT.'
 date: 2024-04-20
 category: paper
 pinned: false

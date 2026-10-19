@@ -1,0 +1,104 @@
+import { adminSettings } from './settings';
+
+export const COLLECTIONS = [
+  'posts',
+  'publications',
+  'announcements',
+  'people',
+  'projects',
+  'talks',
+  'positions',
+] as const;
+export type CollectionName = (typeof COLLECTIONS)[number];
+export const CONFIG_FILES = ['site', 'research', 'feeds', 'cv', 'cv-upload', 'ai', 'scholar'] as const;
+export type ConfigFile = (typeof CONFIG_FILES)[number];
+export const FEEDS_JSON = 'src/data/feeds.json';
+/** Last daily-jobs results (Postgres mode): admin-only, never rendered. */
+export const JOBS_JSON = 'src/data/jobs.json';
+/** Google Scholar citation ids already handled by the papers sync, and its last run: admin-only, never rendered. */
+export const SCHOLAR_JSON = 'src/data/scholar.json';
+/** Images referenced by plain URLs (config files, Markdown bodies): served from public/. */
+export const SITE_MEDIA = { dir: 'public/images', url: '/images' };
+
+/** A path or name outside the allowlist; the API answers 400. */
+export class PathError extends Error {}
+
+const SLUG = /^[a-z0-9-]{1,80}$/;
+const SEGMENT = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
+const IMAGE = /\.(png|jpe?g|webp|gif|avif|svg)$/i;
+
+export function assertSlug(slug: unknown): string {
+  if (typeof slug !== 'string' || !SLUG.test(slug)) {
+    throw new PathError('A slug is 1–80 lowercase letters, digits or dashes');
+  }
+  return slug;
+}
+
+export function assertCollection(name: unknown): CollectionName {
+  if (!COLLECTIONS.includes(name as CollectionName)) throw new PathError(`Unknown collection "${String(name)}"`);
+  return name as CollectionName;
+}
+
+export function assertConfigFile(file: unknown): ConfigFile {
+  if (!CONFIG_FILES.includes(file as ConfigFile)) throw new PathError(`Unknown config file "${String(file)}"`);
+  return file as ConfigFile;
+}
+
+export const collectionDir = (name: CollectionName) => `src/content/${name}`;
+export const collectionPath = (name: CollectionName, slug: string, ext: 'md' | 'mdx' = 'md') =>
+  `${collectionDir(name)}/${assertSlug(slug)}.${ext}`;
+export const configPath = (file: ConfigFile) => `config/${file}.yml`;
+
+/** An image file inside `dir` whose every segment is a plain name (no dot-files, so no `..`). */
+function isImageUnder(path: string, dir: string): boolean {
+  return (
+    path.startsWith(`${dir}/`) &&
+    IMAGE.test(path) &&
+    path
+      .slice(dir.length + 1)
+      .split('/')
+      .every((segment) => SEGMENT.test(segment))
+  );
+}
+
+export function isMediaPath(path: string): boolean {
+  return isImageUnder(path, adminSettings().mediaFolder) || isImageUnder(path, SITE_MEDIA.dir);
+}
+
+export function assertMediaPath(path: unknown): string {
+  if (typeof path !== 'string' || !isMediaPath(path)) throw new PathError('Not a media file path');
+  return path;
+}
+
+/** The write allowlist: every path the admin may commit. */
+export function assertAllowed(path: string): void {
+  if (
+    CONFIG_FILES.some((file) => path === configPath(file)) ||
+    path === FEEDS_JSON ||
+    path === JOBS_JSON ||
+    path === SCHOLAR_JSON ||
+    isMediaPath(path)
+  )
+    return;
+  const entry = /^src\/content\/([^/]+)\/([^/]+)\.md$/.exec(path);
+  if (entry && COLLECTIONS.includes(entry[1] as CollectionName) && SLUG.test(entry[2])) return;
+  throw new PathError(`Path not allowed: ${path}`);
+}
+
+/** Read-only data files Postgres mode keeps beside the editable ones: pages read them, the admin never writes them. */
+/** CV PDF metadata: the RenderCV Action writes it in git mode, the admin in Postgres mode. */
+export const CV_JSON = 'src/data/cv.json';
+export const DATA_FILES = [CV_JSON, 'src/data/cv-people.json'];
+
+/** A file Postgres mode stores as a document: the write allowlist without images, plus MDX entries and DATA_FILES. */
+export function isDocumentPath(path: string): boolean {
+  if (DATA_FILES.includes(path)) return true;
+  const mdx = /^src\/content\/([^/]+)\/([^/]+)\.mdx$/.exec(path);
+  if (mdx) return COLLECTIONS.includes(mdx[1] as CollectionName) && SLUG.test(mdx[2]);
+  try {
+    assertAllowed(path);
+  } catch {
+    return false;
+  }
+  return !isMediaPath(path);
+}

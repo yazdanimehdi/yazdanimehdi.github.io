@@ -1,0 +1,227 @@
+<script setup lang="ts">
+/* eslint-disable @typescript-eslint/no-explicit-any -- front matter is user data */
+import { computed, onMounted, ref } from 'vue';
+import AdminShell from './AdminShell.vue';
+import AiAssist from './AiAssist.vue';
+import DocBanners from './DocBanners.vue';
+import FormFields from './FormFields.vue';
+import MarkdownEditor from './MarkdownEditor.vue';
+import { api, committed, report, toast } from './api';
+import { formatDate } from './dates';
+import { COLLECTIONS, resolveOptions, type Option } from './fields';
+import { useDocument } from './useDocument';
+import type { AdminCtx, CommitResult, Entry } from './types';
+import { normalizeAreas, type ResearchAreaInput } from '../lib/editorial';
+import { suggestSlug } from '../lib/utils';
+
+type Doc = { data: Record<string, any>; body: string };
+
+const props = defineProps<{ ctx: AdminCtx; name: string }>();
+const cfg = COLLECTIONS[props.name];
+const entries = ref<Entry[]>([]);
+const selected = ref<string | null>(null);
+const creating = ref(false);
+const newSlug = ref('');
+const confirmDelete = ref(false);
+const filters = ref<Record<string, string>>({});
+const topics = ref<Option[]>([]);
+const doc = useDocument<Doc>();
+
+const path = (slug: string) => `src/content/${props.name}/${slug}.md`;
+const fields = computed(() => resolveOptions(cfg.fields, { topics: topics.value }));
+/** A new entry's form: the title, then the slug derived from it, then everything else. */
+const titleFields = computed(() => fields.value.filter((f) => f.key === cfg.titleKey));
+const otherFields = computed(() => fields.value.filter((f) => f.key !== cfg.titleKey));
+const title = (e: Entry) => String(e.data[cfg.titleKey] || e.slug);
+const when = (e: Entry) => (cfg.dateKey ? String(e.data[cfg.dateKey] ?? '').slice(0, 10) : '');
+const filterOptions = (key: string) =>
+  [...new Set(entries.value.map((e) => String(e.data[key] ?? '')).filter(Boolean))].sort().reverse();
+const visible = computed(() =>
+  entries.value
+    .filter((e) => Object.entries(filters.value).every(([k, v]) => !v || String(e.data[k] ?? '') === v))
+    .sort((a, b) => when(b).localeCompare(when(a)) || title(a).localeCompare(title(b))),
+);
+const typedTitle = computed(() => String(doc.current?.data[cfg.titleKey] ?? '').trim());
+const suggested = computed(() => suggestSlug(typedTitle.value));
+/** A title with no ASCII letters or digits (e.g. Persian) gives no slug, so the field asks for one. */
+const slugNeeded = computed(() => !newSlug.value && !suggested.value && !!typedTitle.value);
+
+onMounted(async () => {
+  try {
+    entries.value = await api<Entry[]>(`collections/${props.name}`);
+  } catch (e) {
+    report(e);
+  }
+  if (props.name === 'publications') {
+    api<{ data: { areas?: ResearchAreaInput[] } }>('config/research').then(({ data }) => {
+      topics.value = [
+        ...normalizeAreas(data.areas).map((a) => ({ value: a.id, label: a.title })),
+        { value: 'other', label: 'Other' },
+      ];
+    }, report);
+  }
+  const query = new URLSearchParams(location.search);
+  const wanted = query.get('slug');
+  if (wanted) await select(wanted);
+  else if (query.has('new')) startNew();
+});
+
+async function select(slug: string) {
+  creating.value = false;
+  confirmDelete.value = false;
+  selected.value = slug;
+  history.replaceState(null, '', `?slug=${encodeURIComponent(slug)}`);
+  await doc.open(`${props.name}/${slug}`, loadEntry(slug));
+}
+
+const loadEntry = (slug: string) => async () => {
+  const entry = await api<Doc & { version: string; readonly: boolean }>(`collections/${props.name}/${slug}`);
+  return { value: { data: entry.data, body: entry.body }, version: entry.version, readonly: entry.readonly };
+};
+
+function startNew() {
+  creating.value = true;
+  selected.value = null;
+  newSlug.value = '';
+  history.replaceState(null, '', location.pathname);
+  doc.open(`${props.name}/new`, async () => ({ value: { data: structuredClone(cfg.blank), body: '' }, version: null }));
+}
+
+async function save() {
+  if (!doc.current) return;
+  const slug = creating.value ? newSlug.value || suggested.value : selected.value!;
+  if (!/^[a-z0-9-]{1,80}$/.test(slug)) {
+    toast('The slug needs 1–80 lowercase letters, digits or dashes');
+    return;
+  }
+  const result = await doc.save(
+    (v, version) =>
+      api<CommitResult>(`collections/${props.name}/${slug}`, {
+        method: 'PUT',
+        body: { data: v.data, body: v.body, version },
+      }),
+    path(slug),
+  );
+  if (!result) return;
+  const entry: Entry = { slug, data: { ...doc.current.data }, version: result.versions[path(slug)] ?? '' };
+  entries.value = [...entries.value.filter((e) => e.slug !== slug), entry];
+  if (creating.value) {
+    creating.value = false;
+    selected.value = slug;
+    doc.retarget(`${props.name}/${slug}`, loadEntry(slug));
+    history.replaceState(null, '', `?slug=${encodeURIComponent(slug)}`);
+  }
+}
+
+async function remove() {
+  if (!selected.value || !doc.version) return;
+  if (!confirmDelete.value) {
+    confirmDelete.value = true;
+    return;
+  }
+  confirmDelete.value = false;
+  try {
+    committed(
+      await api<CommitResult>(`collections/${props.name}/${selected.value}`, {
+        method: 'DELETE',
+        body: { version: doc.version },
+      }),
+    );
+    entries.value = entries.value.filter((e) => e.slug !== selected.value);
+    selected.value = null;
+    doc.current = null;
+    history.replaceState(null, '', location.pathname);
+  } catch (e) {
+    report(e);
+  }
+}
+</script>
+
+<template>
+  <AdminShell :ctx="ctx" :active="name === 'publications' ? 'publications' : `content/${name}`" :title="cfg.label">
+    <template #actions>
+      <button type="button" class="adm-btn adm-btn-primary" @click="startNew">New {{ cfg.singular }}</button>
+    </template>
+    <div class="adm-split">
+      <section aria-label="Entries" class="adm-form">
+        <div v-if="cfg.filters" class="adm-actions">
+          <label v-for="key in cfg.filters" :key="key" class="adm-field adm-grow">
+            <span>{{ key[0].toUpperCase() + key.slice(1) }}</span>
+            <select v-model="filters[key]">
+              <option value="">All</option>
+              <option v-for="o in filterOptions(key)" :key="o" :value="o">{{ o }}</option>
+            </select>
+          </label>
+        </div>
+        <ul class="adm-pick">
+          <li v-for="e in visible" :key="e.slug">
+            <button type="button" :aria-current="selected === e.slug" @click="select(e.slug)">
+              <span>{{ title(e) }}</span
+              ><time v-if="when(e)" class="adm-muted" :datetime="when(e)">{{ formatDate(when(e)) }}</time>
+            </button>
+          </li>
+        </ul>
+        <p v-if="!visible.length" class="adm-muted">Nothing here yet.</p>
+      </section>
+      <section v-if="doc.current" aria-label="Editor" class="adm-form">
+        <DocBanners
+          :draft="!!doc.draft"
+          :path="selected && !creating ? path(selected) : undefined"
+          :version="doc.version"
+          :conflict="doc.conflict"
+          :stale="doc.draftStale ? doc.draftChanges : null"
+          @restore="doc.restore()"
+          @discard="doc.discard()"
+          @reload="doc.reload()"
+        />
+        <p v-if="doc.readonly" class="adm-banner">This entry is MDX: read-only here, edit it in the repository.</p>
+        <fieldset class="adm-plain-fieldset adm-form" :disabled="doc.readonly">
+          <template v-if="creating">
+            <FormFields :fields="titleFields" :model="doc.current.data" :errors="doc.errors" :owner="ctx.siteName" />
+            <label class="adm-field">
+              <span>Slug (file name)</span>
+              <!-- Follows the title until edited by hand; clearing it follows the title again. -->
+              <input
+                type="text"
+                :value="newSlug || suggested"
+                :aria-describedby="slugNeeded ? 'adm-slug-hint' : undefined"
+                @input="newSlug = ($event.target as HTMLInputElement).value"
+              />
+              <small v-if="slugNeeded" id="adm-slug-hint"
+                >Type a slug: lowercase letters, digits or dashes. The title has none to suggest one from.</small
+              >
+            </label>
+            <FormFields :fields="otherFields" :model="doc.current.data" :errors="doc.errors" :owner="ctx.siteName" />
+          </template>
+          <FormFields v-else :fields="fields" :model="doc.current.data" :errors="doc.errors" :owner="ctx.siteName" />
+          <div class="adm-field" role="group" aria-labelledby="adm-body-label">
+            <span id="adm-body-label">Body</span>
+            <MarkdownEditor v-model="doc.current.body" compact :preview="doc.readonly" />
+          </div>
+          <AiAssist
+            v-if="name === 'announcements' && !doc.readonly"
+            collection="announcements"
+            :doc="doc.current"
+            image-key="image"
+            @body="doc.current.body = $event"
+          />
+        </fieldset>
+        <div class="adm-actions">
+          <button type="button" class="adm-btn adm-btn-primary" :disabled="doc.saving || doc.readonly" @click="save">
+            {{ creating ? 'Create' : 'Publish' }}
+          </button>
+          <button
+            v-if="!creating"
+            type="button"
+            class="adm-btn adm-btn-danger"
+            :disabled="doc.readonly"
+            @click="remove"
+          >
+            {{ confirmDelete ? 'Click again to delete' : 'Delete' }}
+          </button>
+        </div>
+      </section>
+      <p v-else class="adm-muted">Choose an entry or create a new one.</p>
+    </div>
+  </AdminShell>
+</template>

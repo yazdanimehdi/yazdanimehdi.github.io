@@ -34,7 +34,7 @@
   --color-surface-100: #f3f4f6;
   --color-surface-200: #e5e7eb;
   --color-surface-300: #d1d5db;
-  --color-surface-400: #9ca3af;
+  --color-surface-400: #687080; /* used as meta text: keep >= 4.5:1 on white and surface-100 */
   --color-surface-500: #6b7280;
   --color-surface-600: #4b5563;
   --color-surface-700: #374151;
@@ -49,13 +49,16 @@
   --color-dm-heading: #e6edf3;
   --color-dm-text: #c9d1d9;
   --color-dm-muted: #8b949e;
-  --color-dm-faint: #484f58;
+  --color-dm-faint: #7d8590; /* used as meta text: keep >= 4.5:1 on dm and dm-alt */
   --color-dm-border: #21262d;
   --color-dm-border-alt: #30363d;
 
   /* Font families */
-  --font-sans: 'Roboto', ui-sans-serif, system-ui, -apple-system, sans-serif;
-  --font-serif: 'Roboto Slab', ui-serif, Georgia, serif;
+  /* --font-script is set for Arabic-script languages (end of file); unset, the fallback repeats the next family.
+     A Latin-only fallback sits before it, so Latin text never takes the script face's Latin while the web face loads. */
+  --font-sans:
+    'Roboto', 'Helvetica Neue', var(--font-script, ui-sans-serif), ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-serif: 'Roboto Slab', Georgia, var(--font-script, ui-serif), ui-serif, serif;
   --font-mono: 'Roboto Mono', ui-monospace, monospace;
 }
 
@@ -264,7 +267,7 @@
   }
 
   .prose th {
-    text-align: left;
+    text-align: start;
     padding: 0.5rem 0.75rem;
     border-bottom: 2px solid var(--color-surface-300);
     font-weight: 500;
@@ -564,6 +567,13 @@
     font-size: 0.875rem;
   }
 
+  /* Owner text marked dir="auto" takes its own direction but keeps the page's alignment (an English
+     title on an RTL site stays right-aligned). */
+  :root[data-theme='classic'] [dir='auto'] {
+    text-align: -webkit-match-parent; /* Chrome, Safari */
+    text-align: match-parent;
+  }
+
   /* ===== Focus ===== */
   :focus-visible {
     outline: 2px solid var(--color-primary-500);
@@ -589,7 +599,7 @@
     display: inline-block;
     min-width: 60px;
     padding: 0.2rem 0.5rem;
-    font-size: 0.7rem;
+    font-size: 0.75rem;
     font-weight: 500;
     text-align: center;
     letter-spacing: 0.03em;
@@ -600,6 +610,7 @@
 
   html.dark .pub-badge {
     background-color: var(--color-accent-700);
+    color: var(--color-dm);
   }
 
   /* ===== Dark mode hero with cosmic bg ===== */
@@ -674,8 +685,15 @@
   }
 
   /* ===== Hero CSS patterns ===== */
+  /* Patterns fade out toward the hero text's start edge, so the text never sits on full-strength lines
+     (waves keeps its own wave-shaped mask). */
   .hero-pattern {
     pointer-events: none;
+    mask-image: linear-gradient(to left, #000 15%, transparent 85%);
+  }
+
+  [dir='rtl'] .hero-pattern {
+    mask-image: linear-gradient(to right, #000 15%, transparent 85%);
   }
 
   /* Dots */
@@ -689,17 +707,17 @@
   }
 
   /* Grid */
+  /* Half the contrast of a surface-200 rule. */
   .hero-pattern--grid {
+    --grid-line: color-mix(in srgb, var(--color-surface-200) 50%, transparent);
     background-image:
-      linear-gradient(var(--color-surface-200) 1px, transparent 1px),
-      linear-gradient(90deg, var(--color-surface-200) 1px, transparent 1px);
+      linear-gradient(var(--grid-line) 1px, transparent 1px),
+      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
     background-size: 40px 40px;
   }
 
   html.dark .hero-pattern--grid {
-    background-image:
-      linear-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+    --grid-line: rgba(255, 255, 255, 0.03);
   }
 
   /* Waves */
@@ -864,3 +882,16 @@
 }
 
 /* end @layer components */
+
+/* Arabic-script languages, both themes: no tracking, case transforms or synthetic italics; they break joined letterforms. */
+:root:is(:lang(ar), :lang(fa), :lang(ur), :lang(ps), :lang(ckb), :lang(sd), :lang(ug)) * {
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  font-style: normal !important;
+}
+
+/* Arabic-script fallback, both themes: the Latin faces have no Arabic glyphs, so the sans and serif stacks reach
+   these next. Vazirmatn is fetched only for these languages (FontStyles.astro); the rest are system faces. */
+:root:is(:lang(ar), :lang(fa), :lang(ur), :lang(ps), :lang(ckb), :lang(sd), :lang(ug)) {
+  --font-script: 'Vazirmatn', 'Geeza Pro', 'Noto Naskh Arabic', 'Segoe UI', Tahoma;
+}

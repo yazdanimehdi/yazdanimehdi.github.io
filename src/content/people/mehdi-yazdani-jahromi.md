@@ -1,13 +1,13 @@
 ---
 name: Mehdi Yazdani-Jahromi
-role: "pi"
-title: Computer Science PhD Student at University of Central Florida
+role: 'pi'
+title: Senior Research Scientist, DeepBio Scientific
 photo: ../../assets/images/people/profile.jpg
-email: "yazdani@ucf.edu"
+email: 'yazdani@ucf.edu'
 socials:
-  github: "https://github.com/yazdanimehdi"
-  scholar: "https://scholar.google.com/citations?user=iLu_fEcAAAAJ"
-  linkedin: "https://www.linkedin.com/in/yazdanimehdi"
+  github: 'https://github.com/yazdanimehdi'
+  scholar: 'https://scholar.google.com/citations?user=iLu_fEcAAAAJ'
+  linkedin: 'https://www.linkedin.com/in/yazdanimehdi'
 sortOrder: 1
 active: true
 ---

@@ -11,8 +11,11 @@ interface Props {
 }
 
 const config = getSiteConfig();
-const { title, description = config.description, ogImage, keywords } = Astro.props;
-const fullTitle = title === config.title ? title : `${title} | ${config.title}`;
+const { title, description = config.description, keywords } = Astro.props;
+const ogImage = Astro.props.ogImage || config.seo?.ogImage || undefined;
+// Personal sites are named for the person; a lab site keeps its configured title.
+const suffix = config.siteMode === 'personal' ? getSiteName() : config.title;
+const fullTitle = title === suffix ? title : `${title} | ${suffix}`;
 const canonicalURL = new URL(Astro.url.pathname, Astro.site);
 const lang = config.lang ?? 'en';
 
@@ -37,7 +40,7 @@ const twitterUsername = twitterUrl
 <meta http-equiv="Permissions-Policy" content="interest-cohort=()" />
 
 <!-- Favicon -->
-<link rel="icon" type="image/x-icon" href="/favicon.ico" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
 <!-- Fonts (driven by config/site.yml) -->
 <FontStyles />

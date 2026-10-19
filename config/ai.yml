@@ -1,0 +1,11 @@
+# AI assist (admin): which provider writes and which draws. API keys never go here: set them on the admin's AI
+# screen (Postgres mode) or as environment variables. Empty models use each provider's current default.
+text:
+  provider: anthropic # anthropic | openai | google
+  model: ''
+image:
+  provider: openai # openai | google | higgsfield
+  model: ''
+papers:
+  autoPost: true # write a draft post for each new paper found on Google Scholar
+  maxPostsPerRun: 3 # bounds one daily run's time and spend; more new papers wait for the next run

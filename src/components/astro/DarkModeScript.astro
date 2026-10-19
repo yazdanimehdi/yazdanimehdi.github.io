@@ -1,0 +1,17 @@
+<script is:inline>
+  // Stored choice ('light' | 'dark' | 'system'), else the configured default; 'system' follows the OS.
+  function applyTheme() {
+    const root = document.documentElement;
+    let saved = null;
+    try {
+      saved = localStorage.getItem('theme');
+    } catch {
+      /* storage blocked: use the site default */
+    }
+    const mode = ['light', 'dark', 'system'].includes(saved) ? saved : root.getAttribute('data-default-theme');
+    const dark = mode === 'dark' || (mode !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    root.classList.toggle('dark', dark);
+  }
+  applyTheme();
+  document.addEventListener('astro:after-swap', applyTheme);
+</script>

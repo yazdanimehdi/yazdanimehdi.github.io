@@ -1,40 +1,131 @@
-siteMode: personal
-lang: en
-direction: ltr
-defaultTheme: system
-title: Mehdi Yazdani-Jahromi
-description: PhD in Computer Science
-author: Mehdi Yazdani-Jahromi
-labName: ''
-university: ''
-department: ''
-siteUrl: https://yazdanimehdi.com
-imageShape: rectangular
+# Site Configuration
+# Edit this file to customize your academic website
+
+# "personal" = individual academic site, "lab" = research group site
+siteMode: 'personal'
+
+# Language and direction
+lang: 'en' # BCP 47 language tag (e.g. "en", "fa", "ar", "zh")
+direction: 'ltr' # "ltr" (left-to-right) or "rtl" (right-to-left)
+
+# Interface text for both themes, by string id (see src/lib/ui-strings.ts for every id and its English default).
+# Set only what you want to change, e.g. to translate a site whose `lang` has no built-in table.
+# ui:
+#   home.viewPublications: 'View publications'
+#   home.allPublications: 'All {count} publications'
+#   contact.heading: 'Get in touch'
+#   about.personal: 'Biography' # classic: the About heading on a personal site
+
+# Default theme when no user preference is saved
+defaultTheme: 'system' # "light" | "dark" | "system"
+
+# Visual theme: "journal" (default) or "classic" (legacy). "editorial" is an older name for journal.
+# Build-time override: SCHOLAROS_THEME=classic pnpm build
+theme: 'journal'
+
+# Built-in picture for news items that have no image of their own, one per category (paper, grant, award, talk,
+# media, general). Unset follows the theme: journal → "ink" line plates, classic → "geometric".
+# newsArt: 'ink' # "ink" | "engraving" | "watercolor" | "geometric"
+
+# Journal theme content. Name, email and links come from author/socials below. Without `figure` the
+# home hero is a single column. The classic hero also reads eyebrow (personal role) and tagline,
+# and its closing block reads contact.
+editorial:
+  # night: 'lamplight' # dark-mode palette: "lamplight" (default) | "inkwell" | "galley"
+  # labRole: 'Department of Computer Science · University of Technology' # lab mode's line under the name; default: department · university
+  eyebrow: 'AI Research Scientist · Computational Biology'
+  tagline: 'Representation learning for biological systems, from mRNA language models to drug–target interaction.'
+  bio: 'I’m a Senior Research Scientist at **DeepBio Scientific**, where I lead research on machine learning for biomedical data and agentic systems for retrieval and reasoning. Previously I was at **Microsoft** and **Johnson & Johnson**, and earned my PhD in Computer Science at UCF.'
+  figure:
+    image: '/images/hero-figure.webp'
+    alt: 'Line drawing of a protein binding-site graph with highlighted attention nodes'
+    caption: 'Attention concentrates on a few residues of a protein binding-site graph, the idea behind AttentionSiteDTI.'
+  affiliations:
+    - 'DeepBio Scientific'
+    - 'Microsoft'
+    - 'Johnson & Johnson'
+    - 'University of Central Florida'
+  contact:
+    heading: 'Interested in collaborating?'
+    text: 'I’m open to research collaborations, talks and conversations about machine learning for biology and drug discovery.'
+    # links: # optional onward links in the home contact band, e.g. for prospective students
+    #   - label: 'Prospective students'
+    #     href: '/join'
+
+# Top bar (thin bar above header, classic theme). `links` show on lab sites only; a personal
+# site's bar carries just `text`.
 topBar:
   enabled: false
   text: ''
   links: []
+
+# Hero background configuration
 hero:
-  type: animation
+  type: 'pattern' # "image" | "video" | "pattern" | "animation" | "none"
   light:
     bgColor: '#ffffff'
-    bgImage: ''
+    bgImage: '' # e.g. "/images/hero-light.jpg"
   dark:
     bgColor: '#0d1117'
-    bgImage: ''
+    bgImage: '' # e.g. "/images/hero-dark.jpg"
   video:
-    src: ''
-    poster: ''
+    src: '/videos/hero-bg.mp4'
+    poster: '/images/hero-poster.jpg'
   pattern:
-    name: hexagons
+    name: 'grid' # "dots" | "grid" | "waves" | "diagonal" | "hexagons"
   animation:
-    preset: particles
-    customScript: ''
+    preset: 'wave-lines' # "particles" | "gradient-morph" | "geometric" | "wave-lines" | "custom"
+    customScript: '' # path to JS file in /public (when preset: "custom")
+  # portrait: # optional photo beside the classic hero text
+  #   image: '/images/portrait.jpg'
+  #   alt: 'Jane Smith'
+
+# Typography
+fonts:
+  # families:                 # optional; theme defaults when unset
+  #   sans: 'Roboto'          # classic default; editorial default 'IBM Plex Sans'
+  #   serif: 'Roboto Slab'    # classic default; editorial default 'Source Serif 4'
+  #   mono: 'Roboto Mono'     # classic default; editorial default 'IBM Plex Mono'
+  sizes:
+    base: '1.2rem' # Body text (default: 1rem / 16px)
+    sm: '0.95rem' # Meta text, dates, tags (default: 0.875rem / 14px)
+    lg: '1.3rem' # Lead paragraphs (default: 1.125rem / 18px)
+    h1: '2.3rem' # Page titles in prose (default: 2rem / 32px)
+    h2: '1.7rem' # Section headings in prose (default: 1.5rem / 24px)
+    h3: '1.5rem' # Subsection headings in prose (default: 1.25rem / 20px)
+
+# Colors
+colors:
+  light:
+    primary: '#1f3c88'
+    secondary: '#06b6d4'
+  dark:
+    # primary: unset, so the journal uses its night blue and classic its cyan. A journal accent set here
+    # is lifted until it reads at 4.5:1 on the chosen night palette (editorial.night).
+    secondary: '#2c5282'
+
+# Page background
+background:
+  light:
+    color: '#ffffff'
+    image: ''
+  dark:
+    color: '#0d1117'
+    image: ''
+
+# Image shape for people photos and about section
+imageShape: 'rectangular' # "rectangular" | "circular" | "oval"
+
+# About section (shown on homepage between hero and content grid)
 about:
   enabled: true
-  title: About Mehdi Yazdani-Jahromi
-  text: AI research scientist and PhD in Computer Science specializing in representation learning, with primary applications in computational biology and drug discovery. Industry experience at Johnson and Johnson and Microsoft, where I developed language models for mRNA and machine learning systems for large scale biomedical data. Strong programming background in Python, and JavaScript, with deep experience in PyTorch, Transformers and graph neural networks. Published in NeurIPS, ICLR and Briefings in Bioinformatics, with work spanning mRNA modeling, drug target interaction prediction and algorithmic fairness.
-  image: /images/people/profile.jpg
+  title: 'About Mehdi Yazdani-Jahromi'
+  text: 'AI research scientist and PhD in Computer Science specializing in representation learning, with primary applications in computational biology and drug discovery. Industry experience at Johnson and Johnson and Microsoft, where I developed language models for mRNA and machine learning systems for large scale biomedical data. Published in NeurIPS, ICLR and Briefings in Bioinformatics, with work spanning mRNA modeling, drug target interaction prediction and algorithmic fairness.'
+  image: '/images/people/profile.jpg'
+  imageAlt: 'Mehdi Yazdani-Jahromi'
+
+# Homepage section order and visibility
+# Drag to reorder in the CMS; set enabled: false to hide a section
 homepageSections:
   - id: hero
     enabled: true
@@ -46,82 +137,99 @@ homepageSections:
     enabled: true
   - id: blog
     enabled: true
-fonts:
-  families:
-    sans: Roboto
-    serif: Roboto Slab
-    mono: Roboto Mono
-  sizes:
-    base: 1.2rem
-    sm: 0.95rem
-    lg: 1.3rem
-    h1: 2.3rem
-    h2: 1.7rem
-    h3: 1.5rem
-colors:
-  light:
-    primary: '#2c5282'
-    secondary: '#06b6d4'
-  dark:
-    primary: '#22d3ee'
-    secondary: '#2c5282'
-background:
-  light:
-    color: '#ffffff'
-    image: ''
-  dark:
-    color: '#0d1117'
-    image: ''
+
+title: 'Mehdi Yazdani-Jahromi'
+description: 'Senior Research Scientist at DeepBio Scientific. Representation learning for biological systems, from mRNA language models to drug–target interaction.'
+author: 'Mehdi Yazdani-Jahromi'
+labName: ''
+university: ''
+department: ''
+siteUrl: 'https://yazdanimehdi.com'
+
+# Navigation items
 nav:
-  - label: Blog
-    href: /blog
-  - label: Publications
-    href: /publications
-  - label: Repositories
-    href: /repositories
-  - label: CV
-    href: /cv
-socials:
-  email: yazdani@ucf.edu
-  github: https://github.com/yazdanimehdi
-  scholar: https://scholar.google.com/citations?user=iLu_fEcAAAAJ
-  linkedin: https://www.linkedin.com/in/yazdanimehdi
+  - label: 'Research'
+    href: '/research'
+  - label: 'Publications'
+    href: '/publications'
+  - label: 'Writing'
+    href: '/blog'
+  - label: 'CV'
+    href: '/cv'
+  - label: 'Repositories'
+    href: '/repositories'
+
+# GitHub repositories page
 github:
-  username: yazdanimehdi
+  username: 'yazdanimehdi'
   stats: true
   trophies: true
+  showPinnedRepos: true
   pinnedRepos:
-    - DeepDrugDomain
-    - AttentionSiteDTI
-    - FragXsiteDTI
-    - FairBiNN
+    - 'DeepDrugDomain'
+    - 'AttentionSiteDTI'
+    - 'FragXsiteDTI'
+    - 'FairBiNN'
+
+# Social links
+socials:
+  email: 'yazdani@ucf.edu'
+  github: 'https://github.com/yazdanimehdi'
+  scholar: 'https://scholar.google.com/citations?user=iLu_fEcAAAAJ'
+  linkedin: 'https://www.linkedin.com/in/yazdanimehdi'
+
+# Analytics (all disabled by default, opt-in)
 analytics:
-  googleAnalytics: G-6LCTWY4M84
-  googleTagManager: ''
-  cronitor: ''
-  openpanel: ''
-  pirsch: ''
-  microsoftClarity: ''
+  googleAnalytics: 'G-6LCTWY4M84'
+  googleTagManager: '' # GTM-XXXXXXX
+  cronitor: '' # site ID
+  openpanel: '' # client UUID
+  pirsch: '' # site ID
+  microsoftClarity: '' # project ID
+
+# Web3Forms (contact & application forms)
+# Get your free access key at https://web3forms.com
 web3forms:
-  accessKey: ''
+  accessKey: '' # Your Web3Forms access key (leave empty to disable forms)
+
+# Newsletter signup
 newsletter:
   enabled: false
   accessKey: ''
-  heading: Stay Updated
-  text: Subscribe to get notified about new publications and news.
+  heading: 'Stay Updated'
+  text: 'Subscribe to get notified about new publications and news.'
+
+# SEO
 seo:
-  keywords: fairness, interaction, drug discovery, fair, drug-target, mitigating, prediction, drug, encoding, mrna, language, research, international, conference, bias, learning, interpretable, models, artificial intelligence, transformers, discovery, dti, dta, fragxsitedti, human-computer, arxiv, briefings, bioinformatics, bilevel, neural
-  googleSiteVerification: ''
-  bingSiteVerification: ''
-footer:
-  text: Built with <a href="https://scholaros.com">ScholarOS</a>
-  links:
-    - label: Privacy
-      href: /privacy
-    - label: Sitemap
-      href: /sitemap-index.xml
-adminPath: admin
+  ogImage: '/images/og-default.jpg' # default social card for pages without their own image; '' for none
+  keywords: 'drug discovery, drug-target interaction, mrna language models, representation learning, computational biology, fairness, transformers, graph neural networks, bioinformatics, machine learning, artificial intelligence, agentic ai'
+  googleSiteVerification: '' # Google Search Console verification code
+  bingSiteVerification: '' # Bing Webmaster verification code
+
+# CMS admin panel path (change this to a custom secret path for security)
+adminPath: 'admin'
+
 adminUsers:
-  - yazdanimehdi
+  - 'yazdanimehdi'
+
+# Who can publish from the Site editor: GitHub usernames like adminUsers, or 'password:<username>' for a password
+# account (Postgres mode). Other admins can still ask for changes, which wait for a publisher. Empty: every admin.
+publishers: []
+
+# GDPR cookie consent banner
 cookieConsent: false
+
+# Footer
+footer:
+  text: 'Built with <a href="https://scholaros.com">ScholarOS</a>'
+  links:
+    - label: 'Privacy'
+      href: '/privacy'
+    - label: 'Sitemap'
+      href: '/sitemap-index.xml'
+
+# Migration: al-folio
+# Set this to a GitHub URL of an al-folio site to auto-migrate all content on first push.
+# Example: "https://github.com/username/al-folio-site"
+# After migration completes, this field is cleared automatically.
 alfolioRepo: ''

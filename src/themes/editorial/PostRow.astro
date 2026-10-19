@@ -1,0 +1,32 @@
+---
+import Arrow from './Arrow.astro';
+import type { WritingItem } from '../../lib/editorial';
+import { getSiteConfig } from '../../lib/config';
+import { formatNewsDate } from '../../lib/utils';
+import { uiStrings } from '../../lib/ui-strings';
+
+interface Props {
+  item: WritingItem;
+}
+
+const { item } = Astro.props;
+const config = getSiteConfig();
+const t = uiStrings(config);
+const external = item.kind === 'external';
+const meta = [
+  formatNewsDate(item.date, 'month', config.lang),
+  external ? item.source : t('post.minutes', { n: item.minutes ?? 0 }),
+]
+  .filter(Boolean)
+  .join(' · ');
+---
+
+<li>
+  <a href={item.href} class="row ed-post-link" rel={external ? 'noopener' : undefined}>
+    <span>
+      <span class="ed-post-title" dir="auto">{item.title}</span>
+      <span class="ed-post-meta">{meta}</span>
+    </span>
+    <Arrow external={external} />
+  </a>
+</li>

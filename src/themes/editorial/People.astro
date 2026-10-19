@@ -1,0 +1,93 @@
+---
+import type { CollectionEntry } from 'astro:content';
+import Layout from './Layout.astro';
+import PeoplePortrait from './PeoplePortrait.astro';
+import { getRoleName } from '../../lib/utils';
+import { getSiteConfig } from '../../lib/config';
+import { uiStrings } from '../../lib/ui-strings';
+import './people.css';
+
+interface Props {
+  personal: boolean;
+  /** Non-empty groups in display order (Faculty, Researchers, Students, Alumni). */
+  groups: { name: string; people: CollectionEntry<'people'>[] }[];
+}
+
+const { personal, groups } = Astro.props;
+const t = uiStrings(getSiteConfig());
+const description = t(personal ? 'people.descriptionPersonal' : 'people.descriptionLab');
+
+/** "2019–2023", "2021", or "" from the optional start/end dates. */
+function years({ startDate, endDate }: CollectionEntry<'people'>['data']): string {
+  const from = startDate?.getFullYear();
+  const to = endDate?.getFullYear();
+  return [...new Set([from, to].filter(Boolean))].join('–');
+}
+---
+
+<Layout title={t('people.title')} description={description}>
+  <div class="ed-wrap ed-main">
+    <div class="ed-stack">
+      <h1 class="ed-h1">{t(personal ? 'people.headingPersonal' : 'people.headingLab')}</h1>
+      <p class="ed-intro">{description}</p>
+    </div>
+
+    {groups.length === 0 && <p class="ed-ppl-empty">{t('people.empty')}</p>}
+
+    {
+      groups.map(({ name, people }) => (
+        <section class="ed-ppl-group" aria-labelledby={`ppl-${name.toLowerCase()}`}>
+          <h2 class="ed-ppl-head" id={`ppl-${name.toLowerCase()}`}>
+            <span>{name}</span>
+            <span class="num">{people.length}</span>
+          </h2>
+          {name === 'Alumni' ? (
+            <ul class="ed-ppl-alumni">
+              {people.map((p) => {
+                const role = p.data.title || (p.data.role === 'alumni' ? undefined : getRoleName(p.data.role));
+                return (
+                  <li class="row ed-ppl-alum">
+                    <span class="ed-ppl-years num">{years(p.data)}</span>
+                    <span class="ed-ppl-alum-text">
+                      <a href={`/people/${p.id}`} class="ed-ppl-alum-name" dir="auto">
+                        {p.data.name}
+                      </a>
+                      {role && (
+                        <span class="ed-ppl-role" dir="auto">
+                          {role}
+                        </span>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <ul class="ed-ppl-grid">
+              {people.map((p) => (
+                <li class="ed-ppl-card">
+                  <PeoplePortrait person={p} width={400} />
+                  <div class="ed-ppl-text">
+                    <h3 class="ed-ppl-name">
+                      <a href={`/people/${p.id}`} dir="auto">
+                        {p.data.name}
+                      </a>
+                    </h3>
+                    <span class="ed-ppl-role" dir="auto">
+                      {p.data.title || getRoleName(p.data.role)}
+                    </span>
+                    {p.data.researchInterests?.length ? (
+                      <span class="ed-ppl-focus" dir="auto">
+                        {p.data.researchInterests.join(' · ')}
+                      </span>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ))
+    }
+  </div>
+</Layout>

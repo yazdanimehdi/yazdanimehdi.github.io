@@ -1,0 +1,235 @@
+import { expect, test, type Page } from '@playwright/test';
+
+/** The template's adminPath (config/site.yml). */
+const ADMIN = '/admin';
+const COMMITTED = 'Committed · live in about a minute';
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
+  'base64',
+);
+
+/** The dev-only session stub (src/admin/routes/api/auth/dev.ts) sets the cookie. */
+async function signIn(page: Page) {
+  await page.goto('/api/admin/auth/dev');
+}
+
+test('media: upload a site image, then delete it', async ({ page }) => {
+  await signIn(page);
+  await page.goto(`${ADMIN}/media`);
+  await page.getByRole('tab', { name: 'Site images' }).click();
+  await page.getByLabel('Upload images').setInputFiles({ name: 'E2E Figure.png', mimeType: 'image/png', buffer: PNG });
+  await expect(page.getByText(COMMITTED)).toBeVisible();
+  const tile = page.getByRole('figure').filter({ hasText: /e2e-figure-[0-9a-f]{6}\.png/ });
+  await expect(tile).toBeVisible();
+  await tile.getByRole('button', { name: 'Delete' }).click();
+  await tile.getByRole('button', { name: 'Confirm delete' }).click();
+  await expect(tile).toHaveCount(0);
+});
+
+test('posts: create, save a draft, then publish', async ({ page }) => {
+  await signIn(page);
+  await page.goto(`${ADMIN}/posts/new`);
+  const title = `E2E post ${Date.now()}`;
+  await page.getByLabel('Title', { exact: true }).fill(title);
+  await page.locator('.tiptap').click();
+  await page.keyboard.type('Hello from the admin.');
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText(COMMITTED)).toBeVisible();
+  await expect(page).toHaveURL(/\/admin\/posts\/e2e-post-\d+$/);
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  await expect(page.getByText(COMMITTED)).toHaveCount(2);
+  await page.goto(`${ADMIN}/posts`);
+  await expect(page.getByRole('row', { name: new RegExp(title) }).getByText('Published')).toBeVisible();
+});
+
+test('posts: a body with raw HTML opens as plain Markdown and is kept', async ({ page, baseURL }) => {
+  await signIn(page);
+  const slug = `e2e-html-${Date.now()}`;
+  const body = 'Watch:\n\n<iframe src="https://example.com/embed"></iframe>\n';
+  const created = await page.request.put(`/api/admin/collections/posts/${slug}`, {
+    headers: { Origin: baseURL! },
+    data: { data: { title: 'HTML body', date: '2024-06-01', draft: true }, body, version: null },
+  });
+  expect(created.ok()).toBe(true);
+  await page.goto(`${ADMIN}/posts/${slug}`);
+  await expect(page.getByText("This text uses Markdown the visual editor can't keep")).toBeVisible();
+  const markdown = page.getByLabel('Markdown', { exact: true });
+  await expect(markdown).toHaveValue(/<iframe src="https:\/\/example.com\/embed"><\/iframe>/);
+  await markdown.press('End');
+  await markdown.type(' More.');
+  await page.getByRole('button', { name: 'Save draft' }).click();
+  await expect(page.getByText(COMMITTED)).toBeVisible();
+  const saved = await (await page.request.get(`/api/admin/collections/posts/${slug}`)).json();
+  expect(saved.body).toContain('<iframe src="https://example.com/embed"></iframe>');
+});
+
+test('dashboard: hide and unhide an imported post', async ({ page }) => {
+  await signIn(page);
+  await page.goto(ADMIN);
+  const hide = page.getByRole('button', { name: 'Hide', exact: true });
+  const row = page.getByRole('row').filter({ has: hide }).first();
+  const title = (await row.getByRole('cell').first().innerText()).trim();
+  await row.getByRole('button', { name: 'Hide', exact: true }).click();
+  const same = page.getByRole('row').filter({ hasText: title });
+  await expect(same.getByText('Hidden')).toBeVisible();
+  await same.getByRole('button', { name: 'Unhide' }).click();
+  await expect(same.getByText('Published')).toBeVisible();
+});
+
+test('publications: edit a field, regenerate BibTeX, publish', async ({ page }) => {
+  await signIn(page);
+  await page.goto(`${ADMIN}/publications`);
+  await page.getByRole('region', { name: 'Entries' }).getByRole('button').first().click();
+  await page.getByLabel('Note', { exact: true }).fill('E2E note');
+  await page.getByRole('button', { name: 'Regenerate' }).click();
+  await expect(page.getByLabel('BibTeX (leave empty to generate)')).toHaveValue(/^@(article|inproceedings)\{/);
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  await expect(page.getByText(COMMITTED)).toBeVisible();
+});
+
+test('news: create an item', async ({ page }) => {
+  await signIn(page);
+  await page.goto(`${ADMIN}/content/announcements`);
+  await page.getByRole('button', { name: 'New news item' }).click();
+  await page.getByLabel('Title', { exact: true }).fill(`E2E news ${Date.now()}`);
+  await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page.getByText(COMMITTED)).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Entries' }).getByText(/E2E news/)).toBeVisible();
+});
+
+test('news: edit an item right after creating it', async ({ page }) => {
+  await signIn(page);
+  await page.goto(`${ADMIN}/content/announcements`);
+  await page.getByRole('button', { name: 'New news item' }).click();
+  await page.getByLabel('Title', { exact: true }).fill(`E2E again ${Date.now()}`);
+  await page.getByRole('button', { name: 'Create' }).click();
+  await expect(page.getByText(COMMITTED)).toBeVisible();
+  await page.getByLabel('Title', { exact: true }).fill(`E2E again edited ${Date.now()}`);
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  await expect(page.getByText(COMMITTED)).toHaveCount(2);
+  await expect(page.getByText(/changed|conflict/i)).toHaveCount(0);
+});
+
+test('cv: edit an entry, see the preview, publish', async ({ page }) => {
+  await signIn(page);
+  await page.goto(`${ADMIN}/cv`);
+  await page
+    .getByRole('region', { name: 'Sections' })
+    .getByRole('button', { name: /^Experience/ })
+    .click();
+  await page.getByRole('region', { name: 'Entries' }).getByRole('button').first().click();
+  await page.getByLabel('Position', { exact: true }).fill('Professor (e2e)');
+  await expect(page.getByLabel('Preview')).toContainText('Professor (e2e)');
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  await expect(page.getByText(COMMITTED)).toBeVisible();
+});
+
+test('cv: a stale save shows the conflict dialog and keeps the edits', async ({ page }) => {
+  await signIn(page);
+  await page.goto(`${ADMIN}/cv`);
+  await expect(page.getByRole('region', { name: 'Sections' }).getByRole('button').first()).toBeVisible();
+  // Someone else commits config/cv.yml after this page loaded it.
+  const current = await (await page.request.get('/api/admin/config/cv')).json();
+  const origin = new URL(page.url()).origin;
+  const res = await page.request.put('/api/admin/config/cv', {
+    headers: { Origin: origin },
+    data: { data: { ...current.data, cv: { ...current.data.cv, phone: '+1-555-0199' } }, version: current.version },
+  });
+  expect(res.ok()).toBeTruthy();
+  await page
+    .getByRole('region', { name: 'Sections' })
+    .getByRole('button', { name: /^Education/ })
+    .click();
+  await page.getByRole('region', { name: 'Entries' }).getByRole('button').first().click();
+  await page.getByLabel('Institution', { exact: true }).fill('Changed University');
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'This file changed since you opened it' })).toBeVisible();
+  await page.getByRole('button', { name: 'Reload' }).click();
+  await expect(page.getByRole('button', { name: 'Restore edits' })).toBeVisible();
+});
+
+test('pages: reorder home sections and publish', async ({ page }) => {
+  await signIn(page);
+  await page.goto(`${ADMIN}/pages`);
+  const sections = page.getByRole('group', { name: 'Home page sections' });
+  await sections.getByRole('button', { name: 'Move down' }).first().click();
+  await page.getByRole('button', { name: 'Publish home page' }).click();
+  await expect(page.getByText(COMMITTED)).toBeVisible();
+});
+
+test('settings: change the site title and publish', async ({ page }) => {
+  await signIn(page);
+  await page.goto(`${ADMIN}/settings`);
+  await page.getByLabel('Site title', { exact: true }).fill('E2E Lab');
+  await page.getByRole('button', { name: 'Publish settings' }).click();
+  await expect(page.getByText(COMMITTED)).toBeVisible();
+});
+
+test('posts: edits restored after a conflict survive the next keystroke', async ({ page, baseURL }) => {
+  await signIn(page);
+  const slug = `e2e-restore-${Date.now()}`;
+  const url = `/api/admin/collections/posts/${slug}`;
+  const created = await page.request.put(url, {
+    headers: { Origin: baseURL! },
+    data: { data: { title: 'Restore', date: '2024-06-01', draft: true }, body: 'First line.\n', version: null },
+  });
+  expect(created.ok()).toBe(true);
+  await page.goto(`${ADMIN}/posts/${slug}`);
+  const editor = page.locator('.tiptap');
+  await editor.click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.type(' Mine.');
+  await expect(editor).toContainText('First line. Mine.');
+  // Someone else commits the post after this page loaded it.
+  const current = await (await page.request.get(url)).json();
+  const other = await page.request.put(url, {
+    headers: { Origin: baseURL! },
+    data: { data: current.data, body: 'Their line.\n', version: current.version },
+  });
+  expect(other.ok()).toBe(true);
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'This file changed since you opened it' })).toBeVisible();
+  await page.getByRole('button', { name: 'Reload' }).click();
+  await expect(editor).toContainText('Their line.');
+  await page.getByRole('button', { name: 'Restore edits' }).click();
+  await expect(editor).toContainText('First line. Mine.');
+  await editor.click();
+  await page.keyboard.press('ControlOrMeta+End');
+  await page.keyboard.type('!');
+  await expect(editor).toContainText('First line. Mine.!');
+  await page.getByRole('button', { name: 'Publish', exact: true }).click();
+  await expect(page.getByText(COMMITTED)).toBeVisible();
+  const saved = await (await page.request.get(url)).json();
+  expect(saved.body).toContain('First line. Mine.!');
+});
+
+test('phone layout: the nav collapses behind a Menu button', async ({ page }) => {
+  await page.setViewportSize({ width: 375, height: 800 });
+  await signIn(page);
+  await page.goto(`${ADMIN}/cv`);
+  const nav = page.getByRole('navigation', { name: 'Admin' });
+  const menu = page.locator('.adm-side').getByRole('button', { name: 'Menu' });
+  await expect(menu).toHaveAttribute('aria-expanded', 'false');
+  await expect(nav.getByRole('link', { name: 'Posts' })).toBeHidden();
+  await menu.click();
+  await expect(menu).toHaveAttribute('aria-expanded', 'true');
+  await expect(nav.getByRole('link', { name: 'Posts' })).toBeVisible();
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(0);
+});
+
+test('cv: Tab stays inside the import dialog', async ({ page }) => {
+  await signIn(page);
+  await page.goto(`${ADMIN}/cv`);
+  const open = page.getByRole('button', { name: 'Import YAML' });
+  await open.click();
+  const dialog = page.getByRole('dialog', { name: 'Import a RenderCV YAML file' });
+  await expect(dialog).toBeVisible();
+  const inside = () => dialog.evaluate((el) => el.contains(document.activeElement));
+  for (const key of ['Tab', 'Tab', 'Tab', 'Tab', 'Tab', 'Shift+Tab', 'Shift+Tab', 'Shift+Tab', 'Shift+Tab']) {
+    await page.keyboard.press(key);
+    expect(await inside()).toBe(true);
+  }
+  await page.getByRole('button', { name: 'Cancel' }).click();
+  await expect(open).toBeFocused();
+});
