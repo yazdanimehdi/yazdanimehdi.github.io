@@ -272,6 +272,15 @@ collections:
           hint: 'Research area id from Research Areas, e.g. nlp. Unmatched topics are filed under Other.',
         }
       - { label: 'Note', name: 'note', widget: 'string', required: false, hint: 'e.g. Oral, Spotlight' }
+      - {
+          label: 'Joint First Authors',
+          name: 'equalContribution',
+          widget: 'number',
+          value_type: 'int',
+          min: 2,
+          required: false,
+          hint: 'How many leading authors contributed equally, e.g. 2',
+        }
       - { label: 'arXiv ID', name: 'arxiv', widget: 'string', required: false, hint: 'e.g. 2410.12459' }
       - { label: 'Code URL', name: 'code', widget: 'string', required: false }
       - { label: 'Abstract', name: 'abstract', widget: 'text', required: false }

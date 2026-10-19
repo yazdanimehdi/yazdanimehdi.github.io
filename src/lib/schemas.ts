@@ -120,6 +120,11 @@ export const publicationsSchema = <I extends z.ZodTypeAny>(image: ImageFn<I>) =>
     note: emptyToUndefined,
     arxiv: emptyToUndefined,
     code: optionalUrl,
+    // Joint first authorship: how many leading authors contributed equally. The admin writes '' or null when cleared.
+    equalContribution: z.preprocess(
+      (v) => (v === '' || v === null ? undefined : v),
+      z.number().int().min(2).optional(),
+    ),
   });
 
 export const positionsSchema = z.object({

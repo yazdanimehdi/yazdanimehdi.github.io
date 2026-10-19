@@ -15,6 +15,11 @@ export function isOwner(author: string, owners: string | readonly string[]): boo
   return (typeof owners === 'string' ? [owners] : owners).some((o) => stripHonorific(o) === name);
 }
 
+/** First author, or one of the `equalContribution` leading authors who share first authorship. */
+export function isFirstAuthor(authors: readonly string[], owners: string | readonly string[], equalContribution = 1) {
+  return authors.slice(0, Math.max(1, equalContribution)).some((a) => isOwner(a, owners));
+}
+
 /**
  * Names bolded in author lists: the site author, and on a lab site every current member too. A member is past
  * when their role is alumni, they are marked inactive, or their end date has passed.

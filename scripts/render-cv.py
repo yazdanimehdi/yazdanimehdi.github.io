@@ -98,7 +98,7 @@ def sync_upload_to_structured(uploaded: dict) -> None:
 
     CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
     with open(CONFIG_PATH, "w") as f:
-        yaml.dump(camel_data, f, default_flow_style=False, allow_unicode=True)
+        yaml.dump(camel_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
     print(f"Synced upload to structured config at {CONFIG_PATH}")
 
     # Disable the upload so structured config takes over
@@ -107,7 +107,7 @@ def sync_upload_to_structured(uploaded: dict) -> None:
             upload_data = yaml.safe_load(f) or {}
         upload_data["enabled"] = False
         with open(UPLOAD_PATH, "w") as f:
-            yaml.dump(upload_data, f, default_flow_style=False, allow_unicode=True)
+            yaml.dump(upload_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
         print("Disabled cv-upload.yml (enabled: false)")
 
 
@@ -322,7 +322,7 @@ def render_cv(rendercv_input: dict | str) -> Path:
             if isinstance(rendercv_input, str):
                 f.write(rendercv_input)
             else:
-                yaml.dump(rendercv_input, f, default_flow_style=False, allow_unicode=True)
+                yaml.dump(rendercv_input, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
         print(f"Running rendercv render on {input_file}...")
 

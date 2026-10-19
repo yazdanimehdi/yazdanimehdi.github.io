@@ -29,6 +29,7 @@ const en = {
   'figure.label': 'Fig. {n}.',
   'paper.paper': 'Paper',
   'paper.code': 'Code',
+  'paper.equalContribution': '* Equal contribution',
   'paper.cite': 'Cite',
   'paper.copy': 'Copy',
   'paper.copied': 'Copied',

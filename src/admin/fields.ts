@@ -105,6 +105,7 @@ export const COLLECTIONS: Record<string, CollectionConfig> = {
       select('type', 'Type', ['journal', 'conference', 'preprint', 'workshop', 'thesis', 'book-chapter']),
       { key: 'topic', label: 'Topic', type: 'select', optionsFrom: 'topics' },
       text('note', 'Note'),
+      { key: 'equalContribution', label: 'Joint first authors (how many)', type: 'number' },
       text('doi', 'DOI'),
       text('arxiv', 'arXiv id'),
       text('url', 'URL'),

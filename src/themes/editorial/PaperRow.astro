@@ -66,6 +66,7 @@ const venue = p.venue.includes(String(p.year)) ? p.venue : `${p.venue}, ${p.year
           <>
             {i > 0 && ', '}
             {isOwner(a, owners) ? <strong>{a}</strong> : a}
+            {i < (p.equalContribution ?? 0) && '*'}
           </>
         ))
       }
@@ -81,6 +82,7 @@ const venue = p.venue.includes(String(p.year)) ? p.venue : `${p.venue}, ${p.year
         {venue}
       </span>
       {p.note && <span class="ed-note">{p.note}</span>}
+      {p.equalContribution && <span>{t('paper.equalContribution')}</span>}
       {
         p.code && (
           <a href={p.code} class="ul">

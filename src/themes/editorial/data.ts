@@ -15,7 +15,7 @@ import {
   elsewhereLabel,
   featuredFirst,
   homeBlocks,
-  isOwner,
+  isFirstAuthor,
   mergeWriting,
   normalizeAreas,
   topicFilters,
@@ -161,7 +161,7 @@ export async function loadPublications() {
     .map((pub) => ({
       pub,
       topic: topicOf(pub.data.topic, areaIds),
-      first: isOwner(pub.data.authors[0] ?? '', config.author),
+      first: isFirstAuthor(pub.data.authors, config.author, pub.data.equalContribution),
     }));
   const years = [...new Set(items.map((i) => i.pub.data.year))];
   return {
