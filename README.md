@@ -892,6 +892,16 @@ homepageSections:
     enabled: false # hide the blog section
 ```
 
+### Logo
+
+Set a logo in the admin (Settings → Identity → Logo) or in `site.yml`:
+
+```yaml
+logo: '/images/logo.png' # a file in public/images/
+```
+
+It shows beside the name in the header and replaces the default favicon. A square image works best. Dark line art on a transparent background is inverted in dark mode, so an ink logo stays visible.
+
 ### Turning Pages Off
 
 Turn a built-in page off in the admin (Pages → On/off) or in `site.yml`:

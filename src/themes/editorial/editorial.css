@@ -233,6 +233,12 @@
     background: var(--ed-accent);
     transform: rotate(45deg);
   }
+  /* Beats .ed-ink's width: 100% when the logo is ink art. */
+  & .ed-brand .ed-brand-logo {
+    width: 28px;
+    height: 28px;
+    object-fit: contain;
+  }
   & .ed-brand-name {
     font-family: var(--font-serif);
     font-size: 19px;
