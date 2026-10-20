@@ -266,6 +266,22 @@ def collection_publications(directory: Path = PUBLICATIONS_DIR) -> list:
     return sorted(entries, key=lambda e: e.get("date", ""), reverse=True)
 
 
+FONT_SPAN = re.compile(r"\[([^\]]*)\]\{\.[A-Za-z]+\}")
+EMPTY_BOLD = re.compile(r"(?<![*\\])\*{4}(?!\*)")
+
+
+def strip_site_markup(value):
+    """Markup only the site and the built-in PDF understand: `[text]{.mono}` becomes `text` (its `**`/`*` and
+    `[link](url)` stay for RenderCV), and an empty `****` goes. Strings, lists and mappings, recursively."""
+    if isinstance(value, str):
+        return EMPTY_BOLD.sub("", FONT_SPAN.sub(r"\1", value))
+    if isinstance(value, list):
+        return [strip_site_markup(v) for v in value]
+    if isinstance(value, dict):
+        return {k: strip_site_markup(v) for k, v in value.items()}
+    return value
+
+
 def build_rendercv_input(config: dict, with_collection: bool = False) -> dict:
     """Convert our cv.yml format to RenderCV's expected YAML input.
 
@@ -298,7 +314,7 @@ def build_rendercv_input(config: dict, with_collection: bool = False) -> dict:
     if design:
         result["design"] = design
 
-    return result
+    return strip_site_markup(result)
 
 
 def find_output_pdf(output_dir: Path) -> Path | None:
@@ -463,7 +479,7 @@ def main():
         # Sync upload to structured config and disable upload
         sync_upload_to_structured(uploaded)
         # Use the raw YAML string directly to preserve section order and all entries
-        rendercv_input = raw_content
+        rendercv_input = strip_site_markup(raw_content)
     else:
         if not CONFIG_PATH.exists():
             print(f"ERROR: CV config not found at {CONFIG_PATH}")
