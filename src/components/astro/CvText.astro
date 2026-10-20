@@ -2,12 +2,13 @@
 import { CV_FONTS, parseInline } from '../../lib/cv-inline';
 
 interface Props {
-  text?: string | number;
+  /** A CV string with inline markup; YAML may also hand over a number (a year) or nothing. */
+  text?: unknown;
   linkClass?: string;
 }
 
 const { text = '', linkClass = 'ul' } = Astro.props;
-const spans = parseInline(String(text));
+const spans = parseInline(typeof text === 'string' || typeof text === 'number' ? String(text) : '');
 ---
 
 {

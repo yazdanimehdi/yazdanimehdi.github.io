@@ -150,7 +150,7 @@ const formatted = {
       {
         company: 'Lab [Inc]{.mono}',
         position: '**Lead** engineer',
-        highlights: ['Built **Rust** tools, on [GitHub](https://github.com/x/y)', '[Email](mailto:a@b.edu)'],
+        highlights: ['Built **Rust** *tools*, on [GitHub](https://github.com/x/y)', '[Email](mailto:a@b.edu)'],
       },
     ],
     publications: [{ title: 'Paper', authors: ['**Mehdi Yazdani-Jahromi**\\*', 'B'], journal: '****' }],
@@ -167,9 +167,10 @@ test('buildCvDocument: inline markup becomes styled pdfmake text, never raw mark
   assert.doesNotMatch(json, /\*\*|\]\(|\]\{/);
 });
 
-test('renderCvPdf: formatted text embeds IBM Plex Mono and link annotations', async () => {
+test('renderCvPdf: formatted text embeds IBM Plex Mono, a real italic, and link annotations', async () => {
   const pdf = Buffer.from(await renderCvPdf(buildCvDocument(formatted, [], { author: 'N' }))).toString('latin1');
   assert.match(pdf, /IBMPlexMono/);
+  assert.match(pdf, /IBMPlexSans-Italic/);
   assert.match(pdf, /\/URI \(https:\/\/github\.com\/x\/y\)/);
   assert.match(pdf, /\/URI \(mailto:a@b\.edu\)/);
 });

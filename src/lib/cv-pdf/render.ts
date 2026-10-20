@@ -20,8 +20,8 @@ function setUp(): void {
     Sans: {
       normal: font('IBMPlexSans-Regular.ttf'),
       bold: font('IBMPlexSans-SemiBold.ttf'),
-      italics: font('IBMPlexSans-Regular.ttf'),
-      bolditalics: font('IBMPlexSans-SemiBold.ttf'),
+      italics: font('IBMPlexSans-Italic.ttf'),
+      bolditalics: font('IBMPlexSans-SemiBoldItalic.ttf'),
     },
     SansMedium: {
       normal: font('IBMPlexSans-Medium.ttf'),
