@@ -73,6 +73,21 @@ export function imagePrompt(input: { title: string; excerpt?: string }): string 
   );
 }
 
+export function figurePrompt(input: { title: string; abstract?: string }): string {
+  return lines(
+    `A scientific illustration of the central idea of a research paper titled "${input.title}".`,
+    input.abstract && `Abstract: ${input.abstract}`,
+    'Calm, clean, journal-style figure: a simple conceptual diagram or schematic, muted colours on a light ' +
+      'background, landscape composition. No text, letters, numbers, equations, axis labels, logos or watermarks, ' +
+      'and no faces of real people.',
+  );
+}
+
+/** Image-to-video gets the still itself; the prompt only says how it should move. */
+export const MOTION_PROMPT =
+  'Bring this illustration gently to life: slow, subtle, continuous motion that suits its idea, ' +
+  'a steady camera, and the same composition, style and colours throughout. No text appears.';
+
 export interface PaperInput {
   title: string;
   authors: string[];

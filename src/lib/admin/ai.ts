@@ -1,6 +1,11 @@
+import { toAnimatedWebp } from '../ai/animate';
+import { MOTION_PROMPT } from '../ai/prompts';
 import {
+  DEFAULT_MODELS,
   IMAGE_PROVIDERS,
   TEXT_PROVIDERS,
+  higgsfieldImage,
+  higgsfieldVideo,
   resolveAiConfig,
   type AiConfig,
   type ImageOutput,
@@ -41,6 +46,23 @@ export async function generateImage(
 ): Promise<ImageOutput> {
   const provider = IMAGE_PROVIDERS[config.image.provider];
   return provider.run(await providerKey(store, provider.keys), config.image.model, { prompt }, fetchFn);
+}
+
+/**
+ * A Higgsfield still, animated by Higgsfield image-to-video, as an animated WebP. Always Higgsfield, whichever image
+ * provider is chosen: image-to-video takes the still's URL on Higgsfield's CDN.
+ */
+export async function generateAnimation(
+  store: ContentStore,
+  config: AiConfig,
+  prompt: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<ImageOutput> {
+  const key = await providerKey(store, IMAGE_PROVIDERS.higgsfield.keys);
+  const model = config.image.provider === 'higgsfield' ? config.image.model : DEFAULT_MODELS.image.higgsfield;
+  const still = await higgsfieldImage(key, model, { prompt }, fetchFn);
+  const video = await higgsfieldVideo(key, config.video.model, { prompt: MOTION_PROMPT, imageUrl: still.url }, fetchFn);
+  return { bytes: await toAnimatedWebp(video), contentType: 'image/webp' };
 }
 
 /** A generated image through the same checks as an upload (type sniff, 4 MB cap, content-hash name), into the content folder. */
