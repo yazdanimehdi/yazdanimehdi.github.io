@@ -4,6 +4,7 @@ import vue from '@astrojs/vue';
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
 import vercel from '@astrojs/vercel';
+import ffmpegPath from 'ffmpeg-static';
 import tailwindcss from '@tailwindcss/vite';
 import { markdownOptions } from './src/lib/markdown';
 import admin from './src/integrations/admin';
@@ -34,13 +35,14 @@ export default defineConfig({
   site: 'https://example.com',
   // Vercel only. Git mode: admin routes are functions, public pages prerendered. Postgres mode: every page is a
   // function, and Blob images are optimized by /_vercel/image.
-  // Postgres maxDuration 60 s: the daily cron runs feeds then backup in one request; the PDF renders on save.
+  // maxDuration 300 s: Generate GIF waits one to three minutes for Higgsfield's video. The ffmpeg binary turns that
+  // video into an animated WebP; the file trace doesn't see a binary, so it is listed.
   adapter:
     mode === 'static'
       ? undefined
       : mode === 'postgres'
-        ? vercel({ imageService: true, includeFiles: [...cvPdfFonts, ...newsArt], maxDuration: 60 })
-        : vercel(),
+        ? vercel({ imageService: true, includeFiles: [...cvPdfFonts, ...newsArt, ffmpegPath], maxDuration: 300 })
+        : vercel({ includeFiles: [ffmpegPath], maxDuration: 300 }),
   // Astro ignores Host / X-Forwarded-* unless they match allowedDomains, and then Astro.url is http://localhost: every
   // admin write fails the same-origin check. Vercel sets these headers at its edge and routes only the project's own
   // domains, so any https host is trusted there, whichever domain the site is served from.
