@@ -202,7 +202,7 @@ newsletter:
 # SEO
 seo:
   ogImage: '/images/og-default.jpg' # default social card for pages without their own image; '' for none
-  keywords: 'drug discovery, drug-target interaction, mrna language models, representation learning, computational biology, fairness, transformers, graph neural networks, bioinformatics, machine learning, artificial intelligence, agentic ai'
+  keywords: "learning, models, mrna, drug, interaction, model, prediction, language, fairness, fair, dti, bias, target, modeling, drug-target, systems, conference, representations, mitigating, social, protein, information, language models, molecule, design, research, representation, methods, deep, diffusion"
   googleSiteVerification: '' # Google Search Console verification code
   bingSiteVerification: '' # Bing Webmaster verification code
 
