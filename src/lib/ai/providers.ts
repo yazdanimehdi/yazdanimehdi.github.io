@@ -15,12 +15,15 @@ export interface ImageInput {
 export interface ImageOutput {
   bytes: Uint8Array;
   contentType: string;
+  /** Where the provider hosts the image, when it does (Higgsfield). */
+  url?: string;
 }
 
 /** Current model ids (checked against each provider's docs, October 2026); the owner can change them on the AI screen. */
 export const DEFAULT_MODELS = {
   text: { anthropic: 'claude-sonnet-5-5', openai: 'gpt-6-astra', google: 'gemini-3.8-flash' },
   image: { openai: 'gpt-image-2.5-flare', google: 'gemini-3.1-flash-image', higgsfield: 'higgsfield-ai/soul/standard' },
+  video: { higgsfield: 'bytedance/seedance-2.5/image-to-video' },
 } as const;
 export type TextProviderId = keyof typeof DEFAULT_MODELS.text;
 export type ImageProviderId = keyof typeof DEFAULT_MODELS.image;
@@ -34,6 +37,8 @@ interface Provider<I, O> {
 
 const TEXT_TIMEOUT = 90_000;
 const IMAGE_TIMEOUT = 120_000;
+// Image-to-video takes one to three minutes; the admin functions may run for 300 s.
+const VIDEO_TIMEOUT = 240_000;
 
 /** One JSON request; a non-2xx answer or an unreachable host becomes an AiError naming the provider. */
 async function request(
@@ -173,26 +178,34 @@ async function googleImage(key: string, model: string, input: ImageInput, fetchF
 
 const HIGGSFIELD = 'https://api.higgsfield.ai';
 const HIGGSFIELD_MODEL = /^[a-z0-9][a-z0-9._-]*(\/[a-z0-9][a-z0-9._-]*)*$/i;
-const HIGGSFIELD_FAILED: Record<string, string> = {
-  failed: 'Higgsfield could not generate the image',
-  nsfw: 'Higgsfield refused the prompt (flagged as NSFW)',
-  canceled: 'Higgsfield canceled the request',
+const HIGGSFIELD_FAILED: Record<string, (kind: HiggsfieldKind) => string> = {
+  failed: (kind) => `Higgsfield could not generate the ${kind}`,
+  nsfw: () => 'Higgsfield refused the prompt (flagged as NSFW)',
+  canceled: () => 'Higgsfield canceled the request',
 };
+/** Where each kind of request's completed status carries its result, and how long it may take. */
+const HIGGSFIELD_RESULT = {
+  image: { url: (status: any) => status.images?.[0]?.url, timeoutMs: IMAGE_TIMEOUT },
+  video: { url: (status: any) => status.video?.url, timeoutMs: VIDEO_TIMEOUT },
+};
+type HiggsfieldKind = keyof typeof HIGGSFIELD_RESULT;
+type Poll = { everyMs: number; timeoutMs: number };
 
-/** Submits, then polls the request until it is done. `poll` exists for tests. */
-async function higgsfieldImage(
+/** Submits, polls the request until it is done, then downloads the result from Higgsfield's CDN. */
+async function higgsfield(
   key: string,
   model: string,
-  input: ImageInput,
-  fetchFn = fetch,
-  poll = { everyMs: 2000, timeoutMs: IMAGE_TIMEOUT },
-): Promise<ImageOutput> {
+  body: Record<string, unknown>,
+  kind: HiggsfieldKind,
+  fetchFn: typeof fetch,
+  poll: Poll = { everyMs: 2000, timeoutMs: HIGGSFIELD_RESULT[kind].timeoutMs },
+): Promise<ImageOutput & { url: string }> {
   // The model is a path on Higgsfield's host; this keeps it there.
   if (!HIGGSFIELD_MODEL.test(model)) throw new AiError(`"${model}" is not a Higgsfield model path`);
   const headers = { Authorization: `Key ${key}` };
   const submitted = await request('Higgsfield', fetchFn, `${HIGGSFIELD}/${model}`, {
     headers: { ...headers, 'Idempotency-Key': crypto.randomUUID() },
-    body: { prompt: input.prompt, aspect_ratio: '16:9', resolution: '1080p' },
+    body,
     timeout: 30_000,
   });
   const id = submitted.request_id;
@@ -200,23 +213,26 @@ async function higgsfieldImage(
   const deadline = Date.now() + poll.timeoutMs;
   for (let status = submitted; ; ) {
     if (status.status === 'completed') {
-      const url = status.images?.[0]?.url;
-      if (typeof url !== 'string' || !url.startsWith('https://')) throw new AiError('Higgsfield returned no image URL');
+      const url = HIGGSFIELD_RESULT[kind].url(status);
+      if (typeof url !== 'string' || !url.startsWith('https://')) {
+        throw new AiError(`Higgsfield returned no ${kind} URL`);
+      }
       let res: Response;
       try {
         res = await fetchFn(url, { signal: AbortSignal.timeout(30_000) });
       } catch (e) {
-        throw new AiError(`The Higgsfield image could not be downloaded: ${(e as Error).message}`);
+        throw new AiError(`The Higgsfield ${kind} could not be downloaded: ${(e as Error).message}`);
       }
-      if (!res.ok) throw new AiError(`The Higgsfield image could not be downloaded (${res.status})`);
+      if (!res.ok) throw new AiError(`The Higgsfield ${kind} could not be downloaded (${res.status})`);
       return {
         bytes: new Uint8Array(await res.arrayBuffer()),
         contentType: res.headers.get('content-type') ?? 'image/png',
+        url,
       };
     }
     if (HIGGSFIELD_FAILED[status.status]) {
       const why = typeof status.error === 'string' ? `: ${status.error}` : '';
-      throw new AiError(`${HIGGSFIELD_FAILED[status.status]}${why}`);
+      throw new AiError(`${HIGGSFIELD_FAILED[status.status](kind)}${why}`);
     }
     if (Date.now() >= deadline) throw new AiError(`Higgsfield did not finish within ${poll.timeoutMs / 1000} s`);
     await new Promise((r) => setTimeout(r, poll.everyMs));
@@ -225,6 +241,28 @@ async function higgsfieldImage(
       timeout: 30_000,
     });
   }
+}
+
+/** Also returns the image's URL on Higgsfield's CDN, which image-to-video takes as its input. `poll` exists for tests. */
+const higgsfieldImage = (key: string, model: string, input: ImageInput, fetchFn = fetch, poll?: Poll) =>
+  higgsfield(key, model, { prompt: input.prompt, aspect_ratio: '16:9', resolution: '1080p' }, 'image', fetchFn, poll);
+
+/** A short, silent MP4 animating the image at `imageUrl`. `poll` exists for tests. */
+async function higgsfieldVideo(
+  key: string,
+  model: string,
+  input: { prompt: string; imageUrl: string },
+  fetchFn = fetch,
+  poll?: Poll,
+): Promise<Uint8Array> {
+  const body = {
+    prompt: input.prompt,
+    image_url: input.imageUrl,
+    resolution: '480p',
+    duration: 4,
+    generate_audio: false,
+  };
+  return (await higgsfield(key, model, body, 'video', fetchFn, poll)).bytes;
 }
 
 export const TEXT_PROVIDERS: Record<TextProviderId, Provider<TextInput, string>> = {
@@ -242,29 +280,31 @@ export const IMAGE_PROVIDERS: Record<ImageProviderId, Provider<ImageInput, Image
     run: (key, model, input, fetchFn) => higgsfieldImage(key, model, input, fetchFn),
   },
 };
-export { higgsfieldImage };
+export { higgsfieldImage, higgsfieldVideo };
 
 export interface AiConfig {
   text: { provider: TextProviderId; model: string };
   image: { provider: ImageProviderId; model: string };
+  /** Generate GIF always animates with Higgsfield. */
+  video: { model: string };
   papers: { autoPost: boolean; maxPostsPerRun: number };
 }
 
 /** config/ai.yml with every missing or unusable value replaced by its default. */
 export function resolveAiConfig(raw: unknown): AiConfig {
   const r = (raw && typeof raw === 'object' ? raw : {}) as any;
+  const model = (value: any, fallback: string) => (typeof value === 'string' && value.trim() ? value.trim() : fallback);
   /** A known provider keeps its model (or the default); an unknown one falls back to `fallback` and its default. */
   const choose = <T extends string>(models: Record<T, string>, fallback: T, value: any) => {
     const known = typeof value?.provider === 'string' && Object.hasOwn(models, value.provider);
     const provider: T = known ? value.provider : fallback;
-    const model =
-      known && typeof value.model === 'string' && value.model.trim() ? value.model.trim() : models[provider];
-    return { provider, model };
+    return { provider, model: known ? model(value.model, models[provider]) : models[provider] };
   };
   const max = Number(r.papers?.maxPostsPerRun);
   return {
     text: choose<TextProviderId>(DEFAULT_MODELS.text, 'anthropic', r.text),
     image: choose<ImageProviderId>(DEFAULT_MODELS.image, 'openai', r.image),
+    video: { model: model(r.video?.model, DEFAULT_MODELS.video.higgsfield) },
     papers: {
       autoPost: r.papers?.autoPost !== false,
       maxPostsPerRun: Number.isInteger(max) && max >= 0 ? max : 3,
