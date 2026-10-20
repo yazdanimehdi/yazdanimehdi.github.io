@@ -45,20 +45,6 @@ export function safeHref(url: string | undefined): string | undefined {
   return url && /^https?:\/\//i.test(url.trim()) ? url : undefined;
 }
 
-export type ColorMode = 'light' | 'dark' | 'system';
-
-/**
- * The theme toggle's next mode. It starts from what is on screen, so every click flips the page: the OS
- * preference, then its opposite, then system; leaving system goes to the opposite of what system shows.
- */
-export function nextColorMode(stored: ColorMode | null, screenDark: boolean, osDark: boolean): ColorMode {
-  if (stored === 'system') return screenDark ? 'light' : 'dark';
-  const os: ColorMode = osDark ? 'dark' : 'light';
-  const order: ColorMode[] = [os, osDark ? 'light' : 'dark', 'system'];
-  const current = stored ?? (screenDark ? 'dark' : 'light');
-  return order[(order.indexOf(current) + 1) % order.length];
-}
-
 export function getRoleName(role: string): string {
   const roleNames: Record<string, string> = {
     pi: 'Principal Investigator',

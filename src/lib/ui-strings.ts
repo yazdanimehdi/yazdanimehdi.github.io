@@ -10,7 +10,6 @@ const en = {
   'mode.default': '{mode} (site default)',
   'mode.light': 'light',
   'mode.dark': 'dark',
-  'mode.system': 'system',
   'contact.heading': 'Get in touch',
   'home.viewPublications': 'View publications',
   'home.cv': 'Curriculum vitae',

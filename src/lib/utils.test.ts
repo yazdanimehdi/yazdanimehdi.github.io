@@ -8,7 +8,6 @@ import {
   formatShortDate,
   isPublished,
   postStatus,
-  nextColorMode,
   readingTime,
   safeHref,
   suggestSlug,
@@ -159,17 +158,4 @@ test('suggestSlug: at most 80 characters with no trailing dash; empty for a titl
   assert.ok(suggestSlug('word '.repeat(40)).length <= 80);
   assert.match(suggestSlug('word '.repeat(40)), /^[a-z0-9-]{1,80}$/);
   assert.equal(suggestSlug('سلام دنیا'), '');
-});
-
-test('nextColorMode: every click changes what is on screen, including the click that leaves system', () => {
-  // OS light: light → dark → system (light on screen) → dark.
-  assert.equal(nextColorMode(null, false, false), 'dark', 'nothing stored, light on screen');
-  assert.equal(nextColorMode('light', false, false), 'dark');
-  assert.equal(nextColorMode('dark', true, false), 'system');
-  assert.equal(nextColorMode('system', false, false), 'dark', 'leaving system flips, not light again');
-  // OS dark.
-  assert.equal(nextColorMode('system', true, true), 'light');
-  assert.equal(nextColorMode(null, true, true), 'light');
-  // A site default of dark on a light OS: system shows light, which flips.
-  assert.equal(nextColorMode(null, true, false), 'system');
 });
