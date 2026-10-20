@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanMarkdown, imagePrompt, paperPostPrompt, parsePaperPost, rewritePrompt, writePrompt } from './prompts';
+import {
+  cleanMarkdown,
+  figurePrompt,
+  imagePrompt,
+  paperPostPrompt,
+  parsePaperPost,
+  rewritePrompt,
+  writePrompt,
+} from './prompts';
 
 test('writePrompt: title, subtitle, instruction and existing notes all reach the model; Markdown-only rules in system', () => {
   const p = writePrompt({
@@ -42,6 +50,16 @@ test('imagePrompt: names the title and forbids text, logos and real faces', () =
   assert.match(p, /No text/);
   assert.match(p, /logos/);
   assert.match(p, /faces of real people/);
+});
+
+test('figurePrompt: the title and abstract go in; a journal-style figure without text or real faces', () => {
+  const p = figurePrompt({ title: 'Sparse attention', abstract: 'We show attention can be sparse.' });
+  assert.match(p, /"Sparse attention"/);
+  assert.match(p, /Abstract: We show attention can be sparse\./);
+  assert.match(p, /journal-style/);
+  assert.match(p, /No text/);
+  assert.match(p, /faces of real people/);
+  assert.doesNotMatch(figurePrompt({ title: 'T' }), /Abstract/);
 });
 
 test('paperPostPrompt: paper details in, JSON shape requested; abstract optional', () => {

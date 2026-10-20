@@ -1,11 +1,22 @@
 import test, { afterEach, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import ffmpegPath from 'ffmpeg-static';
 import { setStoreForTests } from './get-store';
 import { MemoryStore } from './memory-store';
 import { POST as aiImage } from '../../admin/routes/api/ai/image';
 import { POST as aiText } from '../../admin/routes/api/ai/text';
 
-const KEYS = ['ANTHROPIC_API_KEY', 'OPENAI_API_KEY', 'GEMINI_API_KEY'] as const;
+const KEYS = [
+  'ANTHROPIC_API_KEY',
+  'OPENAI_API_KEY',
+  'GEMINI_API_KEY',
+  'HIGGSFIELD_API_KEY',
+  'HIGGSFIELD_API_SECRET',
+] as const;
 const saved = Object.fromEntries(KEYS.map((k) => [k, process.env[k]]));
 const realFetch = globalThis.fetch;
 let store: MemoryStore;
@@ -93,4 +104,61 @@ test('image: no key is a 400; with one the image is stored as content media and 
   assert.match(upload.path, /\/robots-that-learn-[0-9a-f]{6}\.jpg$/);
   assert.ok(await store.read(upload.path), 'stored');
   assert.match((await sent[0].json()).prompt, /"Robots that learn"[\s\S]*About robots/);
+});
+
+test('image: publications get a figure prompt from the title and abstract', async () => {
+  process.env.OPENAI_API_KEY = 'sk';
+  provider({ data: [{ b64_json: Buffer.from([0xff, 0xd8, 0xff, 0xe0, 1]).toString('base64') }] });
+  const res = await call(aiImage, {
+    collection: 'publications',
+    title: 'Sparse attention',
+    abstract: 'We prune heads.',
+  });
+  assert.equal(res.status, 200);
+  const prompt = (await sent[0].json()).prompt;
+  assert.match(prompt, /research paper titled "Sparse attention"/);
+  assert.match(prompt, /Abstract: We prune heads\./);
+});
+
+test('image: motion needs the Higgsfield keys, whichever image provider is configured; nothing is sent', async () => {
+  process.env.OPENAI_API_KEY = 'sk';
+  provider({});
+  const none = await call(aiImage, { collection: 'posts', title: 'Robots', motion: true });
+  assert.equal(none.status, 400);
+  assert.match((await none.json()).error, /HIGGSFIELD_API_KEY is not set/);
+  process.env.HIGGSFIELD_API_KEY = 'id';
+  const half = await call(aiImage, { collection: 'publications', title: 'Robots', motion: true });
+  assert.equal(half.status, 400);
+  assert.match((await half.json()).error, /HIGGSFIELD_API_SECRET is not set/);
+  assert.equal(sent.length, 0);
+});
+
+test('image: motion animates the Higgsfield still and stores an animated WebP', async () => {
+  process.env.HIGGSFIELD_API_KEY = 'id';
+  process.env.HIGGSFIELD_API_SECRET = 'secret';
+  const dir = mkdtempSync(path.join(os.tmpdir(), 'ai-routes-test-'));
+  const clip = path.join(dir, 'clip.mp4');
+  execFileSync(ffmpegPath!, ['-f', 'lavfi', '-i', 'testsrc=duration=1:size=160x120:rate=10', clip], { stdio: 'pipe' });
+  const mp4 = readFileSync(clip);
+  rmSync(dir, { recursive: true, force: true });
+  const still = 'https://cdn.higgsfield.ai/still.jpg';
+  const replies: Record<string, () => Response> = {
+    'https://api.higgsfield.ai/higgsfield-ai/soul/standard': () =>
+      Response.json({ status: 'completed', request_id: 'i1', images: [{ url: still }] }),
+    [still]: () => new Response(new Uint8Array([0xff, 0xd8, 0xff, 0xe0])),
+    'https://api.higgsfield.ai/bytedance/seedance-2.5/image-to-video': () =>
+      Response.json({ status: 'completed', request_id: 'v1', video: { url: 'https://cdn.higgsfield.ai/v1.mp4' } }),
+    'https://cdn.higgsfield.ai/v1.mp4': () => new Response(mp4),
+  };
+  globalThis.fetch = (async (input: string | URL | Request, init?: RequestInit) => {
+    const req = new Request(input, init);
+    sent.push(req);
+    return replies[req.url]();
+  }) as typeof fetch;
+  const res = await call(aiImage, { collection: 'publications', title: 'Sparse attention', motion: true });
+  assert.equal(res.status, 200);
+  const upload = await res.json();
+  assert.match(upload.path, /\/sparse-attention-[0-9a-f]{6}\.webp$/);
+  assert.ok((await store.read(upload.path))?.content.includes('ANIM'), 'stored as an animated WebP');
+  assert.equal((await sent[2].json()).image_url, still);
 });
