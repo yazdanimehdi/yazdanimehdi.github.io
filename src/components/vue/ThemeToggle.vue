@@ -6,7 +6,7 @@
     :title="label"
     @click="cycle"
   >
-    <!-- The icon shows the current mode, as the label says it: sun, moon, or a screen for system. -->
+    <!-- The icon shows what is on screen, as the label says it: sun or moon. -->
     <svg
       v-if="mode === 'light'"
       aria-hidden="true"
@@ -21,7 +21,7 @@
       />
     </svg>
     <svg
-      v-else-if="mode === 'dark'"
+      v-else
       aria-hidden="true"
       class="h-[18px] w-[18px]"
       fill="none"
@@ -31,35 +31,26 @@
     >
       <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
     </svg>
-    <svg
-      v-else
-      aria-hidden="true"
-      class="h-[18px] w-[18px]"
-      fill="none"
-      viewBox="0 0 24 24"
-      stroke="currentColor"
-      stroke-width="2"
-    >
-      <path
-        d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"
-      />
-    </svg>
   </button>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref } from 'vue';
-import { nextColorMode } from '../../lib/utils';
 
 type Mode = 'light' | 'dark' | 'system';
 const MODES: Mode[] = ['light', 'dark', 'system'];
 
 /** Already translated: `label` holds `{mode}`, `byDefault` wraps the site default's word. */
-const props = defineProps<{ labels: { label: string; byDefault: string; words: Record<Mode, string> } }>();
+const props = defineProps<{ labels: { label: string; byDefault: string; words: Record<'light' | 'dark', string> } }>();
 
 const stored = ref<Mode | null>(null);
 const siteDefault = ref<Mode>('system');
-const mode = computed<Mode>(() => stored.value ?? siteDefault.value);
+const osDark = ref(false);
+// What is on screen: the stored choice, else the site default; "system" follows the OS.
+const mode = computed<'light' | 'dark'>(() => {
+  const preferred = stored.value ?? siteDefault.value;
+  return preferred === 'dark' || (preferred === 'system' && osDark.value) ? 'dark' : 'light';
+});
 const label = computed(() => {
   const word = props.labels.words[mode.value];
   return props.labels.label.replace('{mode}', stored.value ? word : props.labels.byDefault.replace('{mode}', word));
@@ -80,12 +71,13 @@ function read() {
 }
 
 function apply() {
-  root().classList.toggle('dark', mode.value === 'dark' || (mode.value === 'system' && !!media?.matches));
+  osDark.value = !!media?.matches;
+  root().classList.toggle('dark', mode.value === 'dark');
 }
 
-// Same cycle as the journal's ModeToggle.
+// Same as the journal's ModeToggle: every click flips what is on screen.
 function cycle() {
-  const next = nextColorMode(stored.value, root().classList.contains('dark'), !!media?.matches);
+  const next = mode.value === 'dark' ? 'light' : 'dark';
   try {
     localStorage.setItem('theme', next);
   } catch {
@@ -102,6 +94,7 @@ onMounted(() => {
   media.addEventListener('change', apply);
   document.addEventListener('theme-change', read);
   read();
+  osDark.value = media.matches;
 });
 
 onUnmounted(() => {

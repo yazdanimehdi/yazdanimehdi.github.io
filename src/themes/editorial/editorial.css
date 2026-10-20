@@ -486,22 +486,6 @@
   & .ed-mode[data-mode='dark'] .ed-mode-half {
     transform: rotate(180deg);
   }
-  & .ed-mode[data-mode='system'] .ed-mode-half {
-    transform: rotate(90deg);
-  }
-  & .ed-mode-word {
-    display: none;
-    font-size: 13px;
-  }
-  & .ed-mode[data-mode='system'] {
-    grid-auto-flow: column;
-    gap: 6px;
-    width: auto;
-    padding-inline: 8px 13px;
-  }
-  & .ed-mode[data-mode='system'] .ed-mode-word {
-    display: block;
-  }
 
   /* ── Home ── */
   & .ed-hero {
