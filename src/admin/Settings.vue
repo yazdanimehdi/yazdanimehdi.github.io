@@ -31,6 +31,13 @@ const GROUPS: { label: string; fields: FieldDef[] }[] = [
         folder: 'site',
         hint: 'Shown beside the name in the header, 28px tall. Any shape: a wide wordmark keeps its proportions.',
       },
+      {
+        key: 'favicon',
+        label: 'Favicon',
+        type: 'image',
+        folder: 'site',
+        hint: 'The browser-tab and phone home-screen icon. A square PNG, at least 180px, on a solid background. Empty: the built-in icons.',
+      },
       text('lang', 'Language (BCP 47, e.g. en)'),
     ],
   },

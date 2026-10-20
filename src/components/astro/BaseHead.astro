@@ -1,6 +1,7 @@
 ---
 import '../../styles/global.css';
 import { getSiteConfig, getSiteName } from '../../lib/config';
+import Favicon from './Favicon.astro';
 import FontStyles from './FontStyles.astro';
 
 interface Props {
@@ -39,10 +40,7 @@ const twitterUsername = twitterUrl
 <!-- FLoC/Topics API opt-out -->
 <meta http-equiv="Permissions-Policy" content="interest-cohort=()" />
 
-<!-- Favicon: the files in public/ -->
-<link rel="icon" href="/favicon.ico" sizes="48x48" />
-<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<Favicon favicon={config.favicon} />
 <link rel="manifest" href="/site.webmanifest" />
 
 <!-- Fonts (driven by config/site.yml) -->

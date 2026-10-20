@@ -1,0 +1,30 @@
+---
+import { resolveImage } from '../../lib/content/image';
+
+interface Props {
+  /** The favicon from Settings → Identity, if one was uploaded. */
+  favicon?: string;
+}
+
+// An uploaded favicon serves the tab and the home screen; without one, the icons in public/. An SVG is linked as
+// uploaded: Vercel's image optimizer does not serve SVG.
+const { favicon } = Astro.props;
+const sized = async (src: string, width: number) =>
+  /\.svg(\?|$)/i.test(src) ? src : (await resolveImage(src, width)).src;
+const icon = favicon ? { tab: await sized(favicon, 64), touch: await sized(favicon, 180) } : null;
+---
+
+{
+  icon ? (
+    <>
+      <link rel="icon" href={icon.tab} />
+      <link rel="apple-touch-icon" href={icon.touch} />
+    </>
+  ) : (
+    <>
+      <link rel="icon" href="/favicon.ico" sizes="48x48" />
+      <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+      <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    </>
+  )
+}
