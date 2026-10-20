@@ -3,6 +3,7 @@ import { SESSION_COOKIE, openSession, sessionSecret } from './lib/admin/session'
 import { isAllowed } from './lib/admin/access';
 import { adminSettings } from './lib/admin/settings';
 import { cacheTagHeader } from './lib/cache-tags';
+import { isPageOn } from './lib/config';
 import { loadSiteFiles, newContext, runWithContext } from './lib/content/context';
 import { getSql, isUnreachable } from './lib/db';
 import { getMode } from './lib/mode';
@@ -24,8 +25,11 @@ function unavailable(): Response {
 
 const NO_BODY = new Set([101, 204, 205, 304]);
 
+/** Bodyless, so Astro renders 404.astro on a request and writes no file for a prerendered page. */
+const notFound = () => new Response(null, { status: 404 });
+
 /** Postgres mode, public GET/HEAD: render inside a request context, then cache on the CDN tagged with what it read. */
-async function publicPage(next: () => Promise<Response>): Promise<Response> {
+async function publicPage(pathname: string, next: () => Promise<Response>): Promise<Response> {
   let files: Map<string, string>;
   try {
     files = await loadSiteFiles(getSql());
@@ -40,7 +44,7 @@ async function publicPage(next: () => Promise<Response>): Promise<Response> {
     let body: ArrayBuffer | null;
     try {
       // A failing page query rejects next(); a failing child component errors the body stream.
-      res = await next();
+      res = isPageOn(pathname) ? await next() : notFound();
       // Child components read content while the body streams: finish rendering here so every read is in the context.
       // A null body stays null: Astro reroutes a bodyless 404 to 404.astro.
       // ponytail: the whole page is buffered in memory (no streaming, later TTFB); to stream, pass the body through and set tags via a trailing mechanism or addCacheTag before the body.
@@ -62,21 +66,22 @@ async function publicPage(next: () => Promise<Response>): Promise<Response> {
   });
 }
 
-/** Guards the admin (pages under /<adminPath>, API under /api/admin): session, same-origin writes, no caching or indexing. Postgres mode: renders public pages inside a request context and sets CDN cache headers. */
+/** Guards the admin (pages under /<adminPath>, API under /api/admin): session, same-origin writes, no caching or indexing. Public pages turned off in site.yml 404. Postgres mode: renders public pages inside a request context and sets CDN cache headers. */
 export const onRequest: MiddlewareHandler = async (ctx, next) => {
   // @astrojs/vercel 8 lets this header replace the request path, and only its edge middleware (off here) sets it. A
   // client sending it could have the CDN cache one page's HTML under another URL.
   if (ctx.request.headers.has('x-astro-path')) {
     return new Response('Bad request', { status: 400, headers: { 'Cache-Control': 'no-store' } });
   }
-  if (ctx.isPrerendered) return next();
   const { pathname } = ctx.url;
+  if (ctx.isPrerendered) return isPageOn(pathname) ? next() : notFound();
   const { adminPath, adminUsers } = adminSettings();
   const api = pathname === '/api/admin' || pathname.startsWith('/api/admin/');
   const page = pathname === `/${adminPath}` || pathname.startsWith(`/${adminPath}/`);
   if (!api && !page) {
     const cacheable = ctx.request.method === 'GET' || ctx.request.method === 'HEAD';
-    return getMode() === 'postgres' && cacheable ? publicPage(next) : next();
+    if (getMode() === 'postgres') return cacheable ? publicPage(pathname, next) : next();
+    return isPageOn(pathname) ? next() : notFound();
   }
 
   let res: Response;

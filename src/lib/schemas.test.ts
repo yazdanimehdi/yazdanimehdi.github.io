@@ -104,3 +104,10 @@ test('posts: medium.url must be a URL; empty values are dropped', () => {
   assert.equal(adminCollections.posts.safeParse({ ...base, medium: { url: 'not a url' } }).success, false);
   assert.equal(adminCollections.posts.safeParse({ ...base, medium: { url: 'javascript:alert(1)' } }).success, false);
 });
+
+test('site: pages takes on/off per built-in page and refuses an unknown page', () => {
+  const site = config('site') as Record<string, unknown>;
+  assert.equal(configSchemas.site.safeParse({ ...site, pages: { talks: false, cv: true } }).success, true);
+  assert.equal(configSchemas.site.safeParse({ ...site, pages: { talk: false } }).success, false);
+  assert.equal(configSchemas.site.safeParse({ ...site, pages: { talks: 'no' } }).success, false);
+});

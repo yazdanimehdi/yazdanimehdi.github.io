@@ -5,6 +5,7 @@ import NewsList from './NewsList.astro';
 import PostRow from './PostRow.astro';
 import HeroBackdrop from './HeroBackdrop.astro';
 import { jsonLd, socialLinks } from '../../lib/editorial';
+import { isPageOn } from '../../lib/config';
 import { imageFacts } from '../../lib/inkArt';
 import { uiStrings } from '../../lib/ui-strings';
 import type { HomeData } from './data';
@@ -235,9 +236,11 @@ const ld =
               <h2 id="home-papers" class="ed-h2">
                 {t('home.selectedPapers')}
               </h2>
-              <a href="/publications" class="ul ed-more">
-                {t('home.allPublications', { count: pubCount })} <span class="arr">→</span>
-              </a>
+              {isPageOn('/publications', config) && (
+                <a href="/publications" class="ul ed-more">
+                  {t('home.allPublications', { count: pubCount })} <span class="arr">→</span>
+                </a>
+              )}
             </div>
             <ol class="ed-papers">
               {selected.map((pub) => (

@@ -4,11 +4,13 @@ import { getMode } from './mode';
 import { NIGHT_PALETTES, type NightPalette } from './colors';
 import {
   NEWS_ART_STYLES,
+  SITE_PAGES,
   type NewsArtStyle,
   type SiteConfig,
   type HomepageSectionId,
   type HomepageSectionEntry,
   type ThemeName,
+  type SitePageId,
 } from './types';
 
 let _siteConfig: SiteConfig | null = null;
@@ -53,7 +55,16 @@ function parseSiteConfig(): SiteConfig {
     : normalizeTheme(config.theme, 'config/site.yml');
   config.editorial = { ...config.editorial, night: normalizeNight(config.editorial?.night, 'config/site.yml') };
   config.newsArt = normalizeNewsArt(config.newsArt, config.theme, 'config/site.yml');
+  // A page that is off leaves the header, the footer index and the sitemap with it.
+  if (config.nav) config.nav = config.nav.filter((n) => isPageOn(n.href, config));
   return config;
+}
+
+/** False when `path` is a built-in page that `pages` turns off, or under one (/blog/a-post when blog is off). */
+export function isPageOn(path: string, config: SiteConfig = getSiteConfig()): boolean {
+  return !Object.entries(SITE_PAGES).some(
+    ([id, href]) => config.pages?.[id as SitePageId] === false && (path === href || path.startsWith(`${href}/`)),
+  );
 }
 
 export function getSiteConfig(): SiteConfig {
@@ -89,13 +100,14 @@ const DEFAULT_HOMEPAGE_SECTIONS: HomepageSectionEntry[] = [
 
 export function getHomepageSections(): HomepageSectionId[] {
   const config = getSiteConfig();
-  if (config.homepageSections?.length) {
-    return config.homepageSections.filter((s) => s.enabled).map((s) => s.id);
-  }
-  // Backward compat: respect about.enabled when homepageSections absent
-  return DEFAULT_HOMEPAGE_SECTIONS.filter((s) => (s.id === 'about' ? config.about?.enabled !== false : s.enabled)).map(
-    (s) => s.id,
-  );
+  const ids = config.homepageSections?.length
+    ? config.homepageSections.filter((s) => s.enabled).map((s) => s.id)
+    : // Backward compat: respect about.enabled when homepageSections absent
+      DEFAULT_HOMEPAGE_SECTIONS.filter((s) => (s.id === 'about' ? config.about?.enabled !== false : s.enabled)).map(
+        (s) => s.id,
+      );
+  // News and blog items link to their pages, so the sections go when the pages are off.
+  return ids.filter((id) => (id !== 'news' && id !== 'blog') || isPageOn(`/${id}`, config));
 }
 
 export function getGridColumnCount(): number {

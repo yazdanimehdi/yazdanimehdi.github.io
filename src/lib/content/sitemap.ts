@@ -1,5 +1,5 @@
 import type { APIRoute } from 'astro';
-import { getSiteConfig } from '../config';
+import { getSiteConfig, isPageOn } from '../config';
 import { getEntries } from './index';
 
 const ENTRY_ROUTES = [
@@ -19,6 +19,7 @@ export const GET: APIRoute = async ({ site }) => {
   const paths = new Set<string>(['/']);
   for (const item of config.nav ?? []) if (item.href.startsWith('/')) paths.add(item.href);
   for (const [name, prefix] of ENTRY_ROUTES) {
+    if (!isPageOn(prefix, config)) continue;
     for (const entry of await getEntries(name)) {
       if ((entry.data as { draft?: boolean }).draft) continue;
       paths.add(`${prefix}/${entry.id}/`);

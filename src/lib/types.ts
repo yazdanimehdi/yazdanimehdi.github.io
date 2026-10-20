@@ -77,6 +77,23 @@ export type ThemeName = 'classic' | 'editorial';
 export const NEWS_ART_STYLES = ['ink', 'engraving', 'watercolor', 'geometric'] as const;
 export type NewsArtStyle = (typeof NEWS_ART_STYLES)[number];
 
+/** The built-in pages an admin can turn off (`pages: { talks: false }` in site.yml), and the URL each lives under. */
+export const SITE_PAGES = {
+  research: '/research',
+  people: '/people',
+  publications: '/publications',
+  cv: '/cv',
+  projects: '/projects',
+  news: '/news',
+  blog: '/blog',
+  talks: '/talks',
+  positions: '/positions',
+  join: '/join',
+  repositories: '/repositories',
+  contact: '/contact',
+} as const;
+export type SitePageId = keyof typeof SITE_PAGES;
+
 export type ImageShape = 'rectangular' | 'circular' | 'oval';
 
 export interface AboutConfig {
@@ -214,6 +231,8 @@ export interface SiteConfig {
   hero?: HeroConfig;
   about?: AboutConfig;
   homepageSections?: HomepageSectionEntry[];
+  /** Built-in pages turned on or off; absent means on. */
+  pages?: Partial<Record<SitePageId, boolean>>;
   imageShape?: ImageShape;
   github?: GitHubConfig;
   analytics?: AnalyticsConfig;
