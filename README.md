@@ -902,7 +902,7 @@ logo: '/images/logo.svg' # a file in public/images/
 
 It shows beside the name in the header, 28px tall at its own proportions, so a wide wordmark works. Dark line art on a transparent background is inverted in dark mode, so an ink logo stays visible.
 
-The browser-tab and home-screen icons are the files in `public/`: `favicon.ico`, `favicon.svg`, `favicon-96x96.png`, `apple-touch-icon.png` (180px, opaque), `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` and `site.webmanifest`. Replace them with your own.
+The browser-tab and home-screen icons are the files in `public/`: `favicon.ico`, `favicon.svg`, `favicon-96x96.png`, `apple-touch-icon.png` (180px, opaque), `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` and `site.webmanifest`. Replace them with your own, or upload one in the admin (Settings → Identity → Favicon, or `favicon:` in `site.yml`): a square PNG, at least 180px, on a solid background, used for the tab and the phone home screen.
 
 ### Turning Pages Off
 
