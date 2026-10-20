@@ -4,18 +4,14 @@ import ThemeToggle from '../vue/ThemeToggle.vue';
 import MobileNav from '../vue/MobileNav.vue';
 import SearchDialog from '../vue/SearchDialog.vue';
 import { getSiteConfig, getSiteName } from '../../lib/config';
-import { resolveImage } from '../../lib/content/image';
-import { imageFacts } from '../../lib/inkArt';
+import { headerLogo } from '../../lib/content/image';
 import { splitNav } from '../../lib/editorial';
 import { getSearchItems } from '../../lib/search';
 import { uiStrings } from '../../lib/ui-strings';
 
 const config = getSiteConfig();
 const siteName = getSiteName();
-// Dark line art on transparency (an ink logo) is inverted in dark mode.
-const logo = config.logo
-  ? { src: (await resolveImage(config.logo, 64)).src, ink: (await imageFacts(config.logo)).ink }
-  : null;
+const logo = config.logo ? await headerLogo(config.logo) : null;
 const searchItems = await getSearchItems();
 const t = uiStrings(config);
 // Same cap as the journal header: six links by site-mode priority, Contact pinned; the rest go to the footer.
@@ -58,9 +54,9 @@ const menuLabels = {
             <img
               src={logo.src}
               alt=""
-              width="28"
+              width={logo.width}
               height="28"
-              class:list={['size-7 shrink-0 object-contain', logo.ink && 'dark:invert']}
+              class:list={['h-7 w-auto shrink-0 object-contain', logo.ink && 'dark:invert']}
             />
           )
         }

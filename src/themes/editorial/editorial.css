@@ -235,7 +235,7 @@
   }
   /* Beats .ed-ink's width: 100% when the logo is ink art. */
   & .ed-brand .ed-brand-logo {
-    width: 28px;
+    width: auto;
     height: 28px;
     object-fit: contain;
   }
@@ -1849,8 +1849,13 @@
     /* Brand and mode toggle share the first line; the links become one row that scrolls sideways. */
     & .ed-nav {
       flex-wrap: wrap;
-      row-gap: 2px;
+      gap: 2px 12px;
       padding-block: 10px 0;
+    }
+    /* Takes what the first line leaves, so a logo wraps the name rather than pushing the toggle down. */
+    & .ed-brand {
+      flex: 1 1 0;
+      min-width: 0;
     }
     & .ed-mode,
     & .ed-nav-contact {

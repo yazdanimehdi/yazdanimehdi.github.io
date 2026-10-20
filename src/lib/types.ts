@@ -231,7 +231,7 @@ export interface SiteConfig {
   hero?: HeroConfig;
   about?: AboutConfig;
   homepageSections?: HomepageSectionEntry[];
-  /** Shown beside the name in the header and used as the favicon: a public/ path or, in Postgres mode, a Blob URL. */
+  /** Shown beside the name in the header: a public/ path or, in Postgres mode, a Blob URL. */
   logo?: string;
   /** Built-in pages turned on or off; absent means on. */
   pages?: Partial<Record<SitePageId, boolean>>;

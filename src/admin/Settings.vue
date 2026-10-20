@@ -29,7 +29,7 @@ const GROUPS: { label: string; fields: FieldDef[] }[] = [
         label: 'Logo',
         type: 'image',
         folder: 'site',
-        hint: 'Shown beside the name in the header and used as the browser-tab icon. A square image works best.',
+        hint: 'Shown beside the name in the header, 28px tall. Any shape: a wide wordmark keeps its proportions.',
       },
       text('lang', 'Language (BCP 47, e.g. en)'),
     ],

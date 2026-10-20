@@ -1,7 +1,6 @@
 ---
 import '../../styles/global.css';
 import { getSiteConfig, getSiteName } from '../../lib/config';
-import { resolveImage } from '../../lib/content/image';
 import FontStyles from './FontStyles.astro';
 
 interface Props {
@@ -31,9 +30,6 @@ const twitterUsername = twitterUrl
       return match ? (match[1].startsWith('@') ? match[1] : `@${match[1]}`) : '';
     })()
   : '';
-const logo = config.logo
-  ? { icon: (await resolveImage(config.logo, 64)).src, touch: (await resolveImage(config.logo, 180)).src }
-  : null;
 ---
 
 <meta charset="utf-8" />
@@ -43,17 +39,11 @@ const logo = config.logo
 <!-- FLoC/Topics API opt-out -->
 <meta http-equiv="Permissions-Policy" content="interest-cohort=()" />
 
-<!-- Favicon -->
-{
-  logo ? (
-    <>
-      <link rel="icon" href={logo.icon} />
-      <link rel="apple-touch-icon" href={logo.touch} />
-    </>
-  ) : (
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-  )
-}
+<!-- Favicon: the files in public/ -->
+<link rel="icon" href="/favicon.ico" sizes="48x48" />
+<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+<link rel="manifest" href="/site.webmanifest" />
 
 <!-- Fonts (driven by config/site.yml) -->
 <FontStyles />
