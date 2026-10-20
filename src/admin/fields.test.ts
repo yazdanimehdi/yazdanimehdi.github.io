@@ -86,7 +86,7 @@ test('cvEntryPreview mirrors the public CV layout (title / org / dates / points)
   });
   assert.deepEqual(cvEntryPreview({ title: 'Paper', authors: ['**Me**', 'You'], journal: 'NeurIPS', date: 2025 }), {
     title: 'Paper',
-    org: 'Me, You · NeurIPS',
+    org: '**Me**, You · NeurIPS',
     when: '2025',
     points: [],
   });

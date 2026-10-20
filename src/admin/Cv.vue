@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import {
+  computed,
+  h,
+  nextTick,
+  onBeforeUnmount,
+  onMounted,
+  ref,
+  shallowRef,
+  watch,
+  type FunctionalComponent,
+} from 'vue';
 import AdminShell from './AdminShell.vue';
 import DocBanners from './DocBanners.vue';
 import FormFields from './FormFields.vue';
@@ -16,6 +26,7 @@ import {
   type CvEntryKind,
 } from './fields';
 import { useDocument } from './useDocument';
+import { CV_FONTS, parseInline, plainText, toggleFormat, type CvFont, type InlineFormat } from '../lib/cv-inline';
 import type { CvMetadata } from '../lib/types';
 import type { AdminCtx, CommitResult, Entry } from './types';
 
@@ -234,6 +245,56 @@ function setVisible(visible: boolean) {
   else e.visible = false;
 }
 
+// ── Inline formatting (the bar above the entry fields) ──
+type TextField = HTMLInputElement | HTMLTextAreaElement;
+const isTextField = (t: EventTarget | null): t is TextField =>
+  t instanceof HTMLTextAreaElement || (t instanceof HTMLInputElement && t.type === 'text');
+/** The entry field focused last; the bar keeps acting on it while its own font select has focus. */
+const field = shallowRef<TextField | null>(null);
+const font = ref('');
+const FONTS = Object.entries(CV_FONTS) as [CvFont, (typeof CV_FONTS)[CvFont]][];
+watch([section, index], () => (field.value = null));
+function onFocusIn(e: FocusEvent) {
+  if (isTextField(e.target)) field.value = e.target;
+}
+function onFocusOut(e: FocusEvent) {
+  const to = e.relatedTarget as Node | null;
+  if (!to || !(e.currentTarget as HTMLElement).contains(to)) field.value = null;
+}
+/** Writes through the field's own input event, so the form's usual path (dirty state, validation) sees it. */
+async function applyFormat(format: InlineFormat) {
+  const el = field.value;
+  if (!el?.isConnected) return;
+  const r = toggleFormat(el.value, el.selectionStart ?? 0, el.selectionEnd ?? 0, format);
+  el.value = r.value;
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+  el.focus();
+  await nextTick();
+  el.setSelectionRange(r.start, r.end);
+}
+function applyFont() {
+  const choice = font.value;
+  font.value = '';
+  if (choice) void applyFormat({ font: choice === 'default' ? null : (choice as CvFont) });
+}
+function onFormatKey(e: KeyboardEvent) {
+  if (!(e.metaKey || e.ctrlKey) || e.altKey || !isTextField(e.target)) return;
+  const format = ({ b: 'bold', i: 'italic', k: 'link' } as const)[e.key.toLowerCase()];
+  if (!format) return;
+  e.preventDefault();
+  void applyFormat(format);
+}
+/** CV markup as the site renders it: strong, em, a font family, a link. */
+const CvInline: FunctionalComponent<{ text: string }> = ({ text }) =>
+  parseInline(text).map(({ text, bold, italic, font, href }) => {
+    let node: ReturnType<typeof h> | string = text;
+    if (italic) node = h('em', node);
+    if (bold) node = h('strong', node);
+    if (font) node = h('span', { style: { fontFamily: CV_FONTS[font].css } }, node);
+    return href ? h('a', { href, target: '_blank', rel: 'noopener' }, node) : node;
+  });
+CvInline.props = ['text'];
+
 // ── Publish ──
 async function publish() {
   const result = await doc.save(
@@ -420,7 +481,7 @@ async function generatePdf() {
         <ul class="adm-pick">
           <li v-for="(e, i) in entries" :key="i">
             <button type="button" :aria-current="index === i" @click="selectEntry(i)">
-              <span>{{ cvEntryPreview(e).title || '(untitled)' }}</span>
+              <span>{{ plainText(cvEntryPreview(e).title) || '(untitled)' }}</span>
               <span v-if="(e as any)?.visible === false" class="adm-muted">hidden</span>
             </button>
           </li>
@@ -445,8 +506,51 @@ async function generatePdf() {
         </div>
       </section>
 
-      <section aria-label="Entry" class="adm-form">
+      <section aria-label="Entry" class="adm-form" @focusin="onFocusIn" @focusout="onFocusOut" @keydown="onFormatKey">
         <template v-if="entry !== undefined && section && index !== null">
+          <div class="adm-toolbar adm-format-bar" role="toolbar" aria-label="Text formatting">
+            <button
+              type="button"
+              title="Bold (⌘B / Ctrl+B)"
+              aria-label="Bold"
+              :disabled="!field"
+              @mousedown.prevent
+              @click="applyFormat('bold')"
+            >
+              <strong>B</strong>
+            </button>
+            <button
+              type="button"
+              title="Italic (⌘I / Ctrl+I)"
+              aria-label="Italic"
+              :disabled="!field"
+              @mousedown.prevent
+              @click="applyFormat('italic')"
+            >
+              <em>I</em>
+            </button>
+            <button
+              type="button"
+              title="Link (⌘K / Ctrl+K)"
+              aria-label="Link"
+              :disabled="!field"
+              @mousedown.prevent
+              @click="applyFormat('link')"
+            >
+              Link
+            </button>
+            <select
+              v-model="font"
+              title="Font of the selected text"
+              aria-label="Font"
+              :disabled="!field"
+              @change="applyFont"
+            >
+              <option value="" disabled>Font</option>
+              <option value="default">Default</option>
+              <option v-for="[key, f] in FONTS" :key="key" :value="key">{{ f.label }}</option>
+            </select>
+          </div>
           <label v-if="kind === 'text'" class="adm-field">
             <span>Text</span>
             <textarea :value="String(entry)" rows="5" @input="setText(($event.target as HTMLTextAreaElement).value)" />
@@ -469,11 +573,12 @@ async function generatePdf() {
             />
           </template>
           <section class="adm-card" aria-label="Preview">
-            <strong>{{ entryPreview.title || '(untitled)' }}</strong>
-            <div v-if="entryPreview.org" class="adm-muted">{{ entryPreview.org }}</div>
+            <strong v-if="entryPreview.title"><CvInline :text="entryPreview.title" /></strong>
+            <strong v-else>(untitled)</strong>
+            <div v-if="entryPreview.org" class="adm-muted"><CvInline :text="entryPreview.org" /></div>
             <div v-if="entryPreview.when" class="adm-muted">{{ entryPreview.when }}</div>
             <ul v-if="entryPreview.points.length">
-              <li v-for="(point, i) in entryPreview.points" :key="i">{{ point }}</li>
+              <li v-for="(point, i) in entryPreview.points" :key="i"><CvInline :text="point" /></li>
             </ul>
           </section>
         </template>

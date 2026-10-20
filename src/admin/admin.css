@@ -790,6 +790,23 @@
   background: var(--adm-paper);
   border-color: var(--adm-rule);
 }
+.adm-toolbar button:disabled,
+.adm-toolbar select:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+/* The CV entry's formatting bar: a toolbar on its own rather than an editor's top edge. */
+.adm-format-bar {
+  align-items: center;
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+}
+.adm-format-bar select {
+  width: auto;
+  height: 30px;
+  padding-block: 0;
+  font-size: 13px;
+}
 .adm-editor .tiptap {
   min-height: 320px;
   padding: 16px 18px;
