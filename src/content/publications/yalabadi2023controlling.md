@@ -22,7 +22,7 @@ abstract: The rapid and widespread dissemination of misinformation through socia
   real social networks by considering different classes of agents with their characteristics. We proposed
   two main strategies for confronting misinformation diffusion. First, we can educate a minor class, like
   …
-image: ''
+image: ../../assets/images/publications/yalabadi2023controlling.webp
 venueShort: CSSSA
 topic: other
 ---

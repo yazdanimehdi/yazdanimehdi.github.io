@@ -25,7 +25,7 @@ abstract: As AI systems become more embedded in everyday life, the development o
   state-of-the-art contrastive learning models for tabular data. Our results demonstrate the efficacy
   of our approach in mitigating bias with minimum trade-off in accuracy and leveraging the learned fair
   representations in various downstream tasks.
-image: ''
+image: ../../assets/images/publications/tayebi2025faircontrast.webp
 venueShort: arXiv
 topic: fair
 arxiv: '2510.02017'

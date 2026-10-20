@@ -26,7 +26,7 @@ bibtex: "@inproceedings{tayebi2024learning,\n  title={Learning Fair Representati
   \ Yousefi, Niloofar and Garibay, Ozlem Ozmen},\n  booktitle={International Conference on Human-Computer\
   \ Interaction},\n  url={https://link.springer.com/chapter/10.1007/978-3-031-60611-3_8},\n  pages={105--115},\n\
   \  year={2024},\n  organization={Springer}\n}"
-image: ''
+image: ../../assets/images/publications/tayebi2024learning.webp
 venueShort: HCII
 topic: fair
 note: Oral

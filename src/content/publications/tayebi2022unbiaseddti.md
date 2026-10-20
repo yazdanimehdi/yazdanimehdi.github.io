@@ -36,7 +36,7 @@ bibtex: "@article{tayebi2022unbiaseddti,\n  title={UnbiasedDTI: Mitigating real-
   \ Niloofar and Yazdani-Jahromi, Mehdi and Kolanthai, Elayaraja and Neal, Craig J and Seal, Sudipta and\
   \ Garibay, Ozlem Ozmen},\n  journal={Molecules},\n  volume={27},\n  number={9},\n  pages={2980},\n \
   \ year={2022},\n  publisher={MDPI},\n  url={https://www.mdpi.com/1420-3049/27/9/2980}\n}"
-image: ''
+image: ../../assets/images/publications/tayebi2022unbiaseddti.webp
 venueShort: Molecules
 topic: fair
 ---

@@ -24,7 +24,7 @@ bibtex: "@inproceedings{rajabi2023through,\n  title={Through a fair looking-glas
   \ and Sukthankar, Gita},\n  booktitle={International Conference on Human-Computer Interaction},\n  pages={446--459},\n\
   \  year={2023},\n  organization={Springer},\n  url={https://link.springer.com/chapter/10.1007/978-3-031-35891-3_27}\n\
   }"
-image: ''
+image: ../../assets/images/publications/rajabi2023through.webp
 venueShort: HCII
 topic: fair
 note: Oral

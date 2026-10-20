@@ -23,7 +23,7 @@ abstract: 'The rapid emergence of global health crises, exemplified by the Coron
   via Multi-Objective Optimization (MOO) to synthesize novel, high-quality, target-specific ligands for
   SARS-CoV-2 targets. Finally, we addressed the design of next-generation prophylaxis by introducing advanced
   language models, such as\textit {Equi-mRNA}, which explicitly encode hierarchical and …'
-image: ''
+image: ../../assets/images/publications/yazdanijahromi2025advancing.webp
 venueShort: PhD Thesis
 topic: other
 ---

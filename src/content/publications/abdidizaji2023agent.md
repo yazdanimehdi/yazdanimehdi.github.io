@@ -21,7 +21,7 @@ abstract: Health issues and pandemics remain paramount concerns in the contempor
   mathematical modeling and Ordinary Differential Equations (ODE). Acknowledging the indispensable role
   of spatial features and heterogeneity in the modeling of hospital and healthcare settings, we employ
   agent-based modeling to capture new insights. By incorporating spatial considerations and …
-image: ''
+image: ../../assets/images/publications/abdidizaji2023agent.webp
 venueShort: CSSSA
 topic: other
 ---
