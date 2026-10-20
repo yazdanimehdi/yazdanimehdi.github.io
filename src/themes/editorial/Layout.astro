@@ -1,6 +1,8 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getSiteConfig, getSiteName } from '../../lib/config';
+import { resolveImage } from '../../lib/content/image';
+import { imageFacts } from '../../lib/inkArt';
 import { socialLinks, splitNav } from '../../lib/editorial';
 import { uiStrings } from '../../lib/ui-strings';
 import type { NavItem } from '../../lib/types';
@@ -20,6 +22,10 @@ interface Props {
 const { title, description, ogImage, keywords, contactFooter = false } = Astro.props;
 const config = getSiteConfig();
 const name = getSiteName();
+// Dark line art on transparency (an ink logo) is inverted in dark mode like the figures.
+const logo = config.logo
+  ? { src: (await resolveImage(config.logo, 64)).src, ink: (await imageFacts(config.logo)).ink }
+  : null;
 const email = config.socials?.email;
 const links = socialLinks(config.socials);
 // `links`: optional onward links in the home contact band (e.g. a prospective-students page).
@@ -35,7 +41,13 @@ const isActive = (href: string) => (href === '/' ? path === '/' : path === href 
   <header class="ed-header">
     <nav class="ed-wrap ed-nav" aria-label={t('nav.primary')}>
       <a href="/" class="ed-brand">
-        <span class="ed-brand-mark" aria-hidden="true"></span>
+        {
+          logo ? (
+            <img src={logo.src} alt="" width="28" height="28" class:list={['ed-brand-logo', logo.ink && 'ed-ink']} />
+          ) : (
+            <span class="ed-brand-mark" aria-hidden="true" />
+          )
+        }
         <span class="ed-brand-name" dir="auto">
           {name}
         </span>
