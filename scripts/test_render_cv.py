@@ -45,4 +45,10 @@ all_hidden = {"cv": {"name": "N", "sections": {"selected": [{"title": "T", "auth
 assert "publications" not in rc.build_rendercv_input(all_hidden, with_collection=True)["cv"]["sections"]
 with_pdf = {"cv": {"name": "N", "sections": {}}, "pdf": {"pageSize": "A4"}}
 assert "pdf" not in rc.build_rendercv_input(with_pdf), "the JS renderer's page size never reaches RenderCV"
+strip = rc.strip_site_markup
+assert strip("[**Rust** code]{.mono} and [GitHub](https://g.com/x)") == "**Rust** code and [GitHub](https://g.com/x)"
+assert strip("a**** b \\**** c") == "a b \\**** c", "empty bold goes; an escaped star stays"
+assert strip("**bold** *it* \\*") == "**bold** *it* \\*"
+fonts = {"cv": {"name": "N", "sections": {"skills": [{"label": "[Rust]{.serif}", "details": "[x]{.sans}"}]}}}
+assert rc.build_rendercv_input(fonts)["cv"]["sections"]["skills"] == [{"label": "Rust", "details": "x"}]
 print("render-cv self-check passed")
