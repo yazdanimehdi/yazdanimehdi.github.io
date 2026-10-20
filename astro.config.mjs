@@ -20,6 +20,15 @@ const cvPdfFonts =
         .filter((f) => f.endsWith('.ttf'))
         .map((f) => `./src/lib/cv-pdf/fonts/${f}`)
     : [];
+// Postgres mode also decides at request time whether the built-in news art is line art to invert in dark mode
+// (src/lib/inkArt.ts), which reads the image files.
+const newsArt =
+  mode === 'postgres'
+    ? fs
+        .readdirSync('src/assets/images/news-art', { recursive: true })
+        .filter((f) => f.endsWith('.webp'))
+        .map((f) => `./src/assets/images/news-art/${f}`)
+    : [];
 
 export default defineConfig({
   site: 'https://example.com',
@@ -30,7 +39,7 @@ export default defineConfig({
     mode === 'static'
       ? undefined
       : mode === 'postgres'
-        ? vercel({ imageService: true, includeFiles: cvPdfFonts, maxDuration: 60 })
+        ? vercel({ imageService: true, includeFiles: [...cvPdfFonts, ...newsArt], maxDuration: 60 })
         : vercel(),
   // Astro ignores Host / X-Forwarded-* unless they match allowedDomains, and then Astro.url is http://localhost: every
   // admin write fails the same-origin check. Vercel sets these headers at its edge and routes only the project's own
