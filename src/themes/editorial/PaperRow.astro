@@ -2,6 +2,8 @@
 import type { CollectionEntry } from 'astro:content';
 import { bibtexFor } from '../../lib/bibtex';
 import { getSiteConfig } from '../../lib/config';
+import { resolveImage } from '../../lib/content/image';
+import { imageFacts } from '../../lib/inkArt';
 import { isOwner, paperLink } from '../../lib/editorial';
 import { uiStrings } from '../../lib/ui-strings';
 
@@ -22,6 +24,9 @@ const list = variant === 'list';
 const t = uiStrings(getSiteConfig());
 const offSite = !!link && /^https?:\/\//.test(link);
 const venue = p.venue.includes(String(p.year)) ? p.venue : `${p.venue}, ${p.year}`;
+// The publications page shows the paper's figure beside it; the home row keeps its venue tile.
+const figure =
+  list && p.image ? { src: (await resolveImage(p.image, 320)).src, ink: (await imageFacts(p.image)).ink } : null;
 ---
 
 <li
@@ -30,6 +35,13 @@ const venue = p.venue.includes(String(p.year)) ? p.venue : `${p.venue}, ${p.year
   data-topic={list ? topic : undefined}
   data-first={list ? String(first) : undefined}
 >
+  {
+    figure && (
+      <span class="ed-paper-plate" aria-hidden="true">
+        <img src={figure.src} alt="" class:list={[figure.ink && 'ed-ink']} decoding="async" loading="lazy" />
+      </span>
+    )
+  }
   {
     !list && (
       <div class="ed-venue-tile" aria-hidden="true">
