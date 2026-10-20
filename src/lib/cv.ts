@@ -1,6 +1,7 @@
 import { readSiteFile } from './content/context';
 import yaml from 'js-yaml';
 import { loadYamlConfig, normalizeKeys } from './config';
+import { plainText } from './cv-inline';
 import type { CvConfig, CvData, CvGenericEntry, CvMetadata } from './types';
 
 type CvUpload = { enabled?: boolean; content?: string } | null | undefined;
@@ -82,6 +83,7 @@ export function isNormalEntry(e: unknown): e is CvGenericEntry {
   return typeof e === 'object' && e !== null && ('name' in e || 'startDate' in e || 'highlights' in e);
 }
 
+/** Strings keep their inline markup (`**bold**`, links, font spans); render them with parseInline (cv-inline.ts). */
 export interface CvEntryView {
   title: string;
   org?: string;
@@ -90,9 +92,12 @@ export interface CvEntryView {
 }
 
 const str = (v: unknown): string => (typeof v === 'string' || typeof v === 'number' ? String(v).trim() : '');
-/** Markdown emphasis removed, an escaped `\*` (e.g. marking equal contribution) kept as `*`. */
-const plain = (v: unknown) => str(v).replace(/\\\*/g, '\0').replace(/\*+/g, '').replace(/\0/g, '*');
-const joined = (parts: unknown[], sep: string) => parts.map(str).filter(Boolean).join(sep);
+/** Parts that show nothing (blank, or only markup such as an empty `****`) get no separator. */
+const joined = (parts: unknown[], sep: string) =>
+  parts
+    .map(str)
+    .filter((p) => plainText(p).trim())
+    .join(sep);
 
 function view(title: string, org: string, when: string, points: string[]): CvEntryView {
   return { title, ...(org ? { org } : {}), ...(when ? { when } : {}), points };
@@ -111,8 +116,8 @@ export function cvEntryView(entry: unknown): CvEntryView | null {
   if (isOneLineEntry(entry)) return view(str(e.label), str(e.details), '', []);
   if (isExperienceEntry(entry)) return view(str(e.position), joined([e.company, e.location], ', '), range, points);
   if (isPublicationEntry(entry)) {
-    const authors = (Array.isArray(e.authors) ? e.authors : []).map(plain);
-    return view(str(e.title), joined([authors.join(', '), plain(e.journal)], ' · '), str(e.date), points);
+    const authors = (Array.isArray(e.authors) ? e.authors : []).map(str);
+    return view(str(e.title), joined([authors.join(', '), e.journal], ' · '), str(e.date), points);
   }
   if (isNormalEntry(entry)) return view(str(e.name), str(e.location), range, points);
   return null;

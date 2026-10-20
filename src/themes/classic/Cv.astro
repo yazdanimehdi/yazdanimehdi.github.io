@@ -1,6 +1,7 @@
 ---
 import PageLayout from '../../layouts/PageLayout.astro';
 import PublicationEntry from '../../components/astro/PublicationEntry.astro';
+import CvText from '../../components/astro/CvText.astro';
 import type { CollectionEntry } from 'astro:content';
 import {
   formatDateRange,
@@ -25,6 +26,7 @@ interface Props {
 }
 
 const { config, cv, cvMeta, hasPdf, pdfHref, allSections, hasYamlPublications, publications } = Astro.props;
+const LINK = 'text-primary-600 underline underline-offset-2 dark:text-accent-400';
 ---
 
 <PageLayout title="CV" description={`Curriculum Vitae of ${cv.name || config.author}`}>
@@ -95,7 +97,9 @@ const { config, cv, cvMeta, hasPdf, pdfHref, allSections, hasYamlPublications, p
             </h2>
             <div class="space-y-2">
               {(entries as string[]).map((text) => (
-                <p class="text-sm text-surface-600 dark:text-dm-text">{text}</p>
+                <p class="text-sm text-surface-600 dark:text-dm-text">
+                  <CvText text={text} linkClass={LINK} />
+                </p>
               ))}
             </div>
           </section>
@@ -117,9 +121,11 @@ const { config, cv, cvMeta, hasPdf, pdfHref, allSections, hasYamlPublications, p
                     <div class="flex items-baseline justify-between">
                       <div>
                         <h3 class="text-sm font-medium text-surface-900 dark:text-dm-heading">
-                          {[edu.degree, edu.area].filter(Boolean).join(' in ')}
+                          <CvText text={[edu.degree, edu.area].filter(Boolean).join(' in ')} linkClass={LINK} />
                         </h3>
-                        <p class="text-sm text-surface-500 dark:text-dm-muted">{edu.institution}</p>
+                        <p class="text-sm text-surface-500 dark:text-dm-muted">
+                          <CvText text={edu.institution} linkClass={LINK} />
+                        </p>
                       </div>
                       <span class="ms-4 shrink-0 text-xs text-surface-400 dark:text-dm-faint">
                         {formatDateRange(edu.startDate, edu.endDate)}
@@ -128,7 +134,9 @@ const { config, cv, cvMeta, hasPdf, pdfHref, allSections, hasYamlPublications, p
                     {edu.highlights && edu.highlights.length > 0 && (
                       <ul class="mt-1 list-inside list-disc text-xs text-surface-500 dark:text-dm-muted">
                         {edu.highlights.map((h) => (
-                          <li>{h}</li>
+                          <li>
+                            <CvText text={h} linkClass={LINK} />
+                          </li>
                         ))}
                       </ul>
                     )}
@@ -152,8 +160,12 @@ const { config, cv, cvMeta, hasPdf, pdfHref, allSections, hasYamlPublications, p
                 const item = entry as { label: string; details: string };
                 return (
                   <div class="flex items-baseline gap-2 text-sm">
-                    <span class="shrink-0 font-medium text-surface-900 dark:text-dm-heading">{item.label}:</span>
-                    <span class="text-surface-600 dark:text-dm-text">{item.details}</span>
+                    <span class="shrink-0 font-medium text-surface-900 dark:text-dm-heading">
+                      <CvText text={item.label} linkClass={LINK} />:
+                    </span>
+                    <span class="text-surface-600 dark:text-dm-text">
+                      <CvText text={item.details} linkClass={LINK} />
+                    </span>
                   </div>
                 );
               })}
@@ -176,9 +188,11 @@ const { config, cv, cvMeta, hasPdf, pdfHref, allSections, hasYamlPublications, p
                   <div>
                     <div class="flex items-baseline justify-between">
                       <div>
-                        <h3 class="text-sm font-medium text-surface-900 dark:text-dm-heading">{exp.position ?? ''}</h3>
+                        <h3 class="text-sm font-medium text-surface-900 dark:text-dm-heading">
+                          <CvText text={exp.position} linkClass={LINK} />
+                        </h3>
                         <p class="text-sm text-surface-500 dark:text-dm-muted">
-                          {[exp.company, exp.location].filter(Boolean).join(', ')}
+                          <CvText text={[exp.company, exp.location].filter(Boolean).join(', ')} linkClass={LINK} />
                         </p>
                       </div>
                       <span class="ms-4 shrink-0 text-xs text-surface-400 dark:text-dm-faint">
@@ -188,7 +202,9 @@ const { config, cv, cvMeta, hasPdf, pdfHref, allSections, hasYamlPublications, p
                     {exp.highlights && exp.highlights.length > 0 && (
                       <ul class="mt-1 list-inside list-disc text-xs text-surface-500 dark:text-dm-muted">
                         {exp.highlights.map((h) => (
-                          <li>{h}</li>
+                          <li>
+                            <CvText text={h} linkClass={LINK} />
+                          </li>
                         ))}
                       </ul>
                     )}
@@ -213,21 +229,14 @@ const { config, cv, cvMeta, hasPdf, pdfHref, allSections, hasYamlPublications, p
                 const authors = (pub.authors ?? []) as string[];
                 return (
                   <div class="text-sm">
-                    <p class="font-medium text-surface-900 dark:text-dm-heading">{pub.title}</p>
+                    <p class="font-medium text-surface-900 dark:text-dm-heading">
+                      <CvText text={pub.title} linkClass={LINK} />
+                    </p>
                     <p class="text-surface-500 dark:text-dm-muted">
-                      {authors.map((author: string, i: number) => {
-                        const clean = author.replace(/\*+/g, '');
-                        const isBold = author.startsWith('**');
-                        return (
-                          <>
-                            {i > 0 && ', '}
-                            {isBold ? <strong>{clean}</strong> : <span>{clean}</span>}
-                          </>
-                        );
-                      })}
+                      <CvText text={authors.join(', ')} linkClass={LINK} />
                     </p>
                     <p class="text-surface-400 dark:text-dm-faint">
-                      {pub.journal && <span>{pub.journal}</span>}
+                      {pub.journal && <CvText text={pub.journal} linkClass={LINK} />}
                       {pub.journal && pub.date && <span> · </span>}
                       {pub.date && <span>{pub.date}</span>}
                       {pub.doi && (
@@ -271,16 +280,24 @@ const { config, cv, cvMeta, hasPdf, pdfHref, allSections, hasYamlPublications, p
                 return (
                   <div>
                     <div class="flex items-baseline justify-between">
-                      <h3 class="text-sm font-medium text-surface-900 dark:text-dm-heading">{e.name ?? ''}</h3>
+                      <h3 class="text-sm font-medium text-surface-900 dark:text-dm-heading">
+                        <CvText text={e.name} linkClass={LINK} />
+                      </h3>
                       <span class="ms-4 shrink-0 text-xs text-surface-400 dark:text-dm-faint">
                         {e.startDate ? formatDateRange(e.startDate, e.endDate) : (e.date ?? '')}
                       </span>
                     </div>
-                    {e.location && <p class="text-sm text-surface-500 dark:text-dm-muted">{e.location}</p>}
+                    {e.location && (
+                      <p class="text-sm text-surface-500 dark:text-dm-muted">
+                        <CvText text={e.location} linkClass={LINK} />
+                      </p>
+                    )}
                     {e.highlights && e.highlights.length > 0 && (
                       <ul class="mt-1 list-inside list-disc text-xs text-surface-500 dark:text-dm-muted">
                         {e.highlights.map((h) => (
-                          <li>{h}</li>
+                          <li>
+                            <CvText text={h} linkClass={LINK} />
+                          </li>
                         ))}
                       </ul>
                     )}

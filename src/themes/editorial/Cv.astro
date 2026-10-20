@@ -1,5 +1,6 @@
 ---
 import Layout from './Layout.astro';
+import CvText from '../../components/astro/CvText.astro';
 import type { CvPageData } from './data';
 import { formatMonthYear, slugify } from '../../lib/utils';
 import { getSiteConfig } from '../../lib/config';
@@ -46,19 +47,21 @@ const t = uiStrings(config);
               <div class="ed-cv-entry">
                 <div class="ed-cv-entry-top">
                   <span class="ed-cv-entry-title" dir="auto">
-                    {e.title}
+                    <CvText text={e.title} />
                   </span>
                   {e.when && <span class="ed-cv-when num">{e.when}</span>}
                 </div>
                 {e.org && (
                   <span class="ed-cv-org" dir="auto">
-                    {e.org}
+                    <CvText text={e.org} />
                   </span>
                 )}
                 {e.points.length > 0 && (
                   <ul class="ed-cv-points">
                     {e.points.map((p) => (
-                      <li dir="auto">{p}</li>
+                      <li dir="auto">
+                        <CvText text={p} />
+                      </li>
                     ))}
                   </ul>
                 )}
