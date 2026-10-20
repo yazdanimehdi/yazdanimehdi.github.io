@@ -892,6 +892,18 @@ homepageSections:
     enabled: false # hide the blog section
 ```
 
+### Turning Pages Off
+
+Turn a built-in page off in the admin (Pages → On/off) or in `site.yml`:
+
+```yaml
+pages:
+  talks: false
+  repositories: false
+```
+
+A page that is off leaves the menu, the footer and the sitemap, and its address (with everything under it, such as `/blog/a-post`) shows Not found. Its content stays. Turning off `news` or `blog` also hides that home-page section. The pages are `research`, `people`, `publications`, `cv`, `projects`, `news`, `blog`, `talks`, `positions`, `join`, `repositories` and `contact`.
+
 ---
 
 ## Content Collections
