@@ -796,6 +796,12 @@
     border: 1px solid var(--ed-rule);
     border-radius: 4px;
   }
+  /* In the home row the figure takes the venue tile's place and size. */
+  & .ed-paper-plate--home {
+    flex-basis: 140px;
+    height: 92px;
+    aspect-ratio: auto;
+  }
   & .ed-paper-plate img {
     display: block;
     width: 100%;
@@ -1898,7 +1904,8 @@
       padding-block: 56px 48px;
     }
     /* The tile would add a 92px block per paper; the meta line already names the venue and year. */
-    & .ed-venue-tile {
+    & .ed-venue-tile,
+    & .ed-paper-plate--home {
       display: none;
     }
     /* A compact plate after the actions, short enough that the first paper stays within a short scroll. */

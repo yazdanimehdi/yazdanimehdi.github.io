@@ -24,9 +24,15 @@ const list = variant === 'list';
 const t = uiStrings(getSiteConfig());
 const offSite = !!link && /^https?:\/\//.test(link);
 const venue = p.venue.includes(String(p.year)) ? p.venue : `${p.venue}, ${p.year}`;
-// The publications page shows the paper's figure beside it; the home row keeps its venue tile.
-const figure =
-  list && p.image ? { src: (await resolveImage(p.image, 320)).src, ink: (await imageFacts(p.image)).ink } : null;
+// The paper's figure (or GIF) beside it where it has one; a home row without one keeps its venue tile.
+// A remote GIF is served as uploaded: Vercel's optimizer may keep only its first frame.
+const figure = p.image
+  ? {
+      src:
+        typeof p.image === 'string' && /\.gif(\?|$)/i.test(p.image) ? p.image : (await resolveImage(p.image, 320)).src,
+      ink: (await imageFacts(p.image)).ink,
+    }
+  : null;
 ---
 
 <li
@@ -37,13 +43,13 @@ const figure =
 >
   {
     figure && (
-      <span class="ed-paper-plate" aria-hidden="true">
+      <span class:list={['ed-paper-plate', { 'ed-paper-plate--home': !list }]} aria-hidden="true">
         <img src={figure.src} alt="" class:list={[figure.ink && 'ed-ink']} decoding="async" loading="lazy" />
       </span>
     )
   }
   {
-    !list && (
+    !list && !figure && (
       <div class="ed-venue-tile" aria-hidden="true">
         <span class:list={['ed-venue-tile-short', { 'ed-venue-tile-short--long': !p.venueShort }]}>
           {p.venueShort ?? p.venue}
@@ -88,7 +94,10 @@ const figure =
         /* When the home row's tile already shows the full venue, wider screens keep this line for screen readers only. */
       }
       <span
-        class:list={['ed-venue', { 'ed-venue--tiled': !list && (!p.venueShort || p.venueShort === p.venue) }]}
+        class:list={[
+          'ed-venue',
+          { 'ed-venue--tiled': !list && !figure && (!p.venueShort || p.venueShort === p.venue) },
+        ]}
         dir="auto"
       >
         {venue}
