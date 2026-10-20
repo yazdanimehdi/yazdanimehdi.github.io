@@ -376,6 +376,13 @@ cv:
 - **Multiple themes** -- classic, modern, and more
 - **Download button** -- visitors can download your CV as PDF
 
+Any CV text can carry inline formatting: `**bold**`, `*italic*`, `[a link](https://…)` (or `mailto:`), and a font
+for part of a line with `[text]{.serif}`, `[text]{.sans}` or `[text]{.mono}`. Write `\*` for a literal asterisk, as in
+`'**Jane Smith**\*'` for equal contribution. In the admin's CV editor, select text in an entry field and use the
+formatting bar (B, I, Link, Font) or Cmd/Ctrl+B, I and K; the preview below the fields shows the result. The site and
+the built-in PDF render all of it. RenderCV renders bold, italic and links but not fonts, so a font span prints as
+plain text there.
+
 ### Research Areas
 
 A dedicated research overview page configured via YAML:
