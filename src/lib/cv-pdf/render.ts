@@ -29,6 +29,12 @@ function setUp(): void {
       italics: font('IBMPlexSans-Medium.ttf'),
       bolditalics: font('IBMPlexSans-SemiBold.ttf'),
     },
+    Mono: {
+      normal: font('IBMPlexMono-Regular.ttf'),
+      bold: font('IBMPlexMono-Regular.ttf'),
+      italics: font('IBMPlexMono-Regular.ttf'),
+      bolditalics: font('IBMPlexMono-Regular.ttf'),
+    },
   });
   pdfmake.setLocalAccessPolicy((p) => path.resolve(p).startsWith(FONTS + path.sep));
   pdfmake.setUrlAccessPolicy(() => false);
