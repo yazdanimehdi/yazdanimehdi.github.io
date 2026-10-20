@@ -315,7 +315,7 @@ export function cvEntryPreview(entry: unknown): { title: string; org: string; wh
     case 'experience':
       return { title: str(e.position), org: joined([e.company, e.location], ', '), when, points };
     case 'publication': {
-      const authors = (Array.isArray(e.authors) ? e.authors : []).map((a: unknown) => str(a).replace(/\*+/g, ''));
+      const authors = (Array.isArray(e.authors) ? e.authors : []).map(str);
       return { title: str(e.title), org: joined([authors.join(', '), e.journal], ' · '), when: str(e.date), points };
     }
     case 'oneLine':
