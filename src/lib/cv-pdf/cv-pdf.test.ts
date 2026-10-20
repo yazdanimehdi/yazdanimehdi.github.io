@@ -142,3 +142,34 @@ test('renderCvPdf: an empty CV and characters outside the fonts still render', a
   assert.equal(Buffer.from(pdf.subarray(0, 5)).toString(), '%PDF-');
   assert.equal(pageCount(pdf), 1);
 });
+
+const formatted = {
+  name: 'N',
+  sections: {
+    experience: [
+      {
+        company: 'Lab [Inc]{.mono}',
+        position: '**Lead** engineer',
+        highlights: ['Built **Rust** tools, on [GitHub](https://github.com/x/y)', '[Email](mailto:a@b.edu)'],
+      },
+    ],
+    publications: [{ title: 'Paper', authors: ['**Mehdi Yazdani-Jahromi**\\*', 'B'], journal: '****' }],
+  },
+} as unknown as CvData;
+
+test('buildCvDocument: inline markup becomes styled pdfmake text, never raw markers', () => {
+  const json = JSON.stringify(buildCvDocument(formatted, [], { author: 'N' }));
+  assert.match(json, /\{"text":"Lead","bold":true\}/);
+  assert.match(json, /\{"text":"Inc","font":"Mono"\}/);
+  assert.match(json, /\{"text":"GitHub","link":"https:\/\/github\.com\/x\/y"/);
+  assert.match(json, /\{"text":"Email","link":"mailto:a@b\.edu"/);
+  assert.match(json, /\{"text":"Mehdi Yazdani-Jahromi","bold":true\},\{"text":"\*, B"\}/);
+  assert.doesNotMatch(json, /\*\*|\]\(|\]\{/);
+});
+
+test('renderCvPdf: formatted text embeds IBM Plex Mono and link annotations', async () => {
+  const pdf = Buffer.from(await renderCvPdf(buildCvDocument(formatted, [], { author: 'N' }))).toString('latin1');
+  assert.match(pdf, /IBMPlexMono/);
+  assert.match(pdf, /\/URI \(https:\/\/github\.com\/x\/y\)/);
+  assert.match(pdf, /\/URI \(mailto:a@b\.edu\)/);
+});

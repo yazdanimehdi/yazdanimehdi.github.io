@@ -1,5 +1,6 @@
-import type { Content, ContentColumns, TDocumentDefinitions } from 'pdfmake/interfaces';
+import type { Content, ContentColumns, ContentText, TDocumentDefinitions } from 'pdfmake/interfaces';
 import { cvEntryView, cvSections, isPublicationEntry, sectionTitle, type CvEntryView } from '../cv';
+import { CV_FONTS, parseInline } from '../cv-inline';
 import { isOwner } from '../editorial';
 import type { CvData } from '../types';
 
@@ -12,6 +13,16 @@ export interface CvPublication {
 
 const MUTED = '#5c5c5c';
 
+/** CV markup as pdfmake inline text; links keep the text color with a quiet underline. */
+const inline = (s: string): ContentText['text'] =>
+  parseInline(s).map(({ text, bold, italic, font, href }) => ({
+    text,
+    ...(bold ? { bold } : {}),
+    ...(italic ? { italics: true } : {}),
+    ...(font ? { font: CV_FONTS[font].pdf } : {}),
+    ...(href ? { link: href, decoration: 'underline' as const, decorationColor: '#9a9a9a' } : {}),
+  }));
+
 const contactLine = (cv: CvData) =>
   [cv.email, cv.phone, cv.location, cv.website, ...(cv.socialNetworks ?? []).map((s) => `${s.network}: ${s.username}`)]
     .filter(Boolean)
@@ -22,13 +33,15 @@ function entry(e: CvEntryView): Content {
     stack: [
       {
         columns: [
-          { text: e.title, style: 'entryTitle', width: '*' },
+          { text: inline(e.title), style: 'entryTitle', width: '*' },
           { text: e.when ?? '', width: 'auto', alignment: 'right', color: MUTED },
         ],
         columnGap: 8,
       },
-      ...(e.org ? [{ text: e.org, color: MUTED }] : []),
-      ...(e.points.length ? [{ ul: e.points, margin: [0, 2, 0, 0] as [number, number, number, number] }] : []),
+      ...(e.org ? [{ text: inline(e.org), color: MUTED }] : []),
+      ...(e.points.length
+        ? [{ ul: e.points.map((p) => ({ text: inline(p) })), margin: [0, 2, 0, 0] as [number, number, number, number] }]
+        : []),
     ],
     margin: [0, 0, 0, 6],
     unbreakable: true,
