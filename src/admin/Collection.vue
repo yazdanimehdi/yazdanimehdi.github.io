@@ -199,8 +199,8 @@ async function remove() {
             <MarkdownEditor v-model="doc.current.body" compact :preview="doc.readonly" />
           </div>
           <AiAssist
-            v-if="name === 'announcements' && !doc.readonly"
-            collection="announcements"
+            v-if="(name === 'announcements' || name === 'publications') && !doc.readonly"
+            :collection="name"
             :doc="doc.current"
             image-key="image"
             @body="doc.current.body = $event"
