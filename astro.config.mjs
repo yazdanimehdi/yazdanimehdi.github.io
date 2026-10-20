@@ -8,6 +8,7 @@ import ffmpegPath from 'ffmpeg-static';
 import tailwindcss from '@tailwindcss/vite';
 import { markdownOptions } from './src/lib/markdown';
 import admin from './src/integrations/admin';
+import { isPageOn } from './src/lib/config';
 import { modeFromEnv } from './src/lib/mode';
 
 const mode = modeFromEnv(process.env);
@@ -50,11 +51,12 @@ export default defineConfig({
   ...(mode === 'postgres'
     ? { image: { remotePatterns: [{ protocol: 'https', hostname: '*.public.blob.vercel-storage.com' }] } }
     : {}),
-  // @astrojs/sitemap only sees prerendered pages; Postgres mode serves its own /sitemap-index.xml.
+  // @astrojs/sitemap only sees prerendered pages; Postgres mode serves its own /sitemap-index.xml. It lists routes, not
+  // written files, so pages turned off in site.yml are filtered out.
   integrations: [
     vue({ appEntrypoint: '/src/pages/_app.ts' }),
     mdx(),
-    ...(mode === 'postgres' ? [] : [sitemap()]),
+    ...(mode === 'postgres' ? [] : [sitemap({ filter: (page) => isPageOn(new URL(page).pathname) })]),
     admin(),
   ],
   markdown: markdownOptions,

@@ -1,5 +1,6 @@
 import { z } from 'astro/zod';
 import { NIGHT_PALETTES } from './colors';
+import { SITE_PAGES } from './types';
 
 /** Treat empty/whitespace-only strings as absent (CMS writes '' instead of omitting). */
 const emptyToUndefined = z
@@ -226,6 +227,10 @@ export const siteSchema = z
     nav: z.array(z.object({ label: z.string(), href: z.string() }).passthrough()).optional(),
     homepageSections: z
       .array(z.object({ id: z.enum(['hero', 'about', 'news', 'publications', 'blog']), enabled: z.boolean() }))
+      .optional(),
+    pages: z
+      .object(Object.fromEntries(Object.keys(SITE_PAGES).map((id) => [id, z.boolean().optional()])))
+      .strict()
       .optional(),
   })
   .passthrough();

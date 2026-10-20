@@ -9,7 +9,7 @@ import {
   sectionTitle,
   type CvEntryView,
 } from '../../lib/cv';
-import { getHomepageSections, getSiteConfig, getSiteName, loadYamlConfig } from '../../lib/config';
+import { getHomepageSections, getSiteConfig, getSiteName, isPageOn, loadYamlConfig } from '../../lib/config';
 import {
   boldedAuthors,
   elsewhereLabel,
@@ -94,7 +94,7 @@ export async function loadHome() {
   return {
     config,
     name: getSiteName(),
-    blocks: homeBlocks(sections, { research: areas.length > 0 }, config.siteMode),
+    blocks: homeBlocks(sections, { research: areas.length > 0 && isPageOn('/research', config) }, config.siteMode),
     showBio: sections.includes('about'),
     showNews: sections.includes('news'),
     showWriting: sections.includes('blog'),

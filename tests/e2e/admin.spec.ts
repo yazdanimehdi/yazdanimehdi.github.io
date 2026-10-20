@@ -151,10 +151,24 @@ test('cv: a stale save shows the conflict dialog and keeps the edits', async ({ 
 test('pages: reorder home sections and publish', async ({ page }) => {
   await signIn(page);
   await page.goto(`${ADMIN}/pages`);
+  await page.getByRole('tab', { name: 'Home' }).click();
   const sections = page.getByRole('group', { name: 'Home page sections' });
   await sections.getByRole('button', { name: 'Move down' }).first().click();
   await page.getByRole('button', { name: 'Publish home page' }).click();
   await expect(page.getByText(COMMITTED)).toBeVisible();
+});
+
+test('pages: turn a page off, publish, and it stays off after a reload', async ({ page }) => {
+  await signIn(page);
+  await page.goto(`${ADMIN}/pages`);
+  const talks = page.getByRole('checkbox', { name: 'Talks (/talks)' });
+  await expect(talks).toBeChecked();
+  await talks.uncheck();
+  await page.getByRole('button', { name: 'Publish pages' }).click();
+  await expect(page.getByText(COMMITTED)).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('checkbox', { name: 'Talks (/talks)' })).not.toBeChecked();
+  await expect(page.getByRole('checkbox', { name: 'Blog (/blog)' })).toBeChecked();
 });
 
 test('settings: change the site title and publish', async ({ page }) => {

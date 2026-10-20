@@ -9,6 +9,7 @@ import FeedItem from '../../components/astro/FeedItem.astro';
 import SEO from '../../components/astro/SEO.astro';
 import { homeBlocks, isOwner, normalizeAreas, paperLink, socialLinks } from '../../lib/editorial';
 import { getEntries } from '../../lib/content';
+import { isPageOn } from '../../lib/config';
 import { loadResearchConfig } from '../editorial/data';
 import { uiStrings, type UiStringId } from '../../lib/ui-strings';
 import type { CollectionEntry } from 'astro:content';
@@ -69,7 +70,7 @@ const [engageMain, ...engageMore] = engageLinks;
 // The journal's block order: research follows the papers on a personal site and leads on a lab site;
 // news and blog share one updates row. Classic keeps About as its own section, after that proof.
 const areas = normalizeAreas(loadResearchConfig().areas).slice(0, 4);
-const blocks = homeBlocks(sections, { research: areas.length > 0 }, config.siteMode);
+const blocks = homeBlocks(sections, { research: areas.length > 0 && isPageOn('/research', config) }, config.siteMode);
 const aboutAfter = Math.max(blocks.indexOf('hero'), blocks.indexOf('publications'), blocks.indexOf('research'));
 const showNews = announcementData.length > 0;
 const showBlog = posts.length + feeds.length > 0;
@@ -108,7 +109,10 @@ const metaLink =
 
         {block === 'publications' && publications.length > 0 && (
           <section class="mx-auto max-w-[930px] px-4 py-8 sm:px-6">
-            <SectionHeading title={navItem('/publications')?.label ?? t('pubs.title')} viewAllHref="/publications">
+            <SectionHeading
+              title={navItem('/publications')?.label ?? t('pubs.title')}
+              viewAllHref={isPageOn('/publications', config) ? '/publications' : undefined}
+            >
               {hasFeatured && (
                 <span
                   aria-hidden="true"
@@ -189,7 +193,7 @@ const metaLink =
                             {t('paper.code')}
                           </a>
                         )}
-                        {p.bibtex && (
+                        {p.bibtex && isPageOn('/publications', config) && (
                           <a href={`/publications#${pub.id}`} class={metaLink}>
                             {t('paper.cite')}
                           </a>

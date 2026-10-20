@@ -7,10 +7,18 @@ import FormFields from './FormFields.vue';
 import { api, report } from './api';
 import { resolveOptions, text, type FieldDef, type Option } from './fields';
 import { useDocument } from './useDocument';
+import { SITE_PAGES } from '../lib/types';
 import type { AdminCtx, CommitResult, Entry } from './types';
 
 type Config = Record<string, any>;
 defineProps<{ ctx: AdminCtx }>();
+
+const SWITCHES: FieldDef[] = Object.entries(SITE_PAGES).map(([id, href]) => ({
+  key: `pages.${id}`,
+  label: `${id === 'cv' ? 'CV' : id[0].toUpperCase() + id.slice(1)} (${href})`,
+  type: 'checkbox',
+  default: true,
+}));
 
 const HOME: FieldDef[] = [
   text('editorial.eyebrow', 'Eyebrow'),
@@ -66,7 +74,7 @@ const RESEARCH: FieldDef[] = [
   },
 ];
 
-const tab = ref<'home' | 'research'>('home');
+const tab = ref<'pages' | 'home' | 'research'>('pages');
 const home = useDocument<Config>();
 const research = useDocument<Config>();
 const publications = ref<Option[]>([]);
@@ -98,6 +106,16 @@ onMounted(() => {
         type="button"
         role="tab"
         class="adm-btn"
+        :class="{ 'adm-btn-primary': tab === 'pages' }"
+        :aria-selected="tab === 'pages'"
+        @click="tab = 'pages'"
+      >
+        On/off
+      </button>
+      <button
+        type="button"
+        role="tab"
+        class="adm-btn"
         :class="{ 'adm-btn-primary': tab === 'home' }"
         :aria-selected="tab === 'home'"
         @click="tab = 'home'"
@@ -115,6 +133,29 @@ onMounted(() => {
         Research
       </button>
     </div>
+
+    <section v-show="tab === 'pages'" class="adm-form" aria-label="Pages on the site">
+      <DocBanners
+        :draft="!!home.draft"
+        :path="'config/site.yml'"
+        :version="home.version"
+        :conflict="home.conflict"
+        :stale="home.draftStale ? home.draftChanges : null"
+        @restore="home.restore()"
+        @discard="home.discard()"
+        @reload="home.reload()"
+      />
+      <p class="adm-muted">
+        A page that is off leaves the menu, the footer and the sitemap, and its address shows Not found. Its content
+        stays, ready for when you turn it back on. Saved to config/site.yml.
+      </p>
+      <FormFields v-if="home.current" :fields="SWITCHES" :model="home.current" :errors="home.errors" />
+      <div class="adm-actions">
+        <button type="button" class="adm-btn adm-btn-primary" :disabled="home.saving" @click="publish(home, 'site')">
+          Publish pages
+        </button>
+      </div>
+    </section>
 
     <section v-show="tab === 'home'" class="adm-form" aria-label="Home page">
       <DocBanners

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeNewsArt, normalizeNight, normalizeTheme } from './config';
+import { isPageOn, normalizeNewsArt, normalizeNight, normalizeTheme } from './config';
+import type { SiteConfig } from './types';
 
 test('normalizeTheme: missing or empty means classic', () => {
   for (const value of [undefined, null, '']) assert.equal(normalizeTheme(value, 'config/site.yml'), 'classic');
@@ -37,4 +38,13 @@ test('normalizeNewsArt: missing or empty follows the theme; the four styles pass
     assert.equal(normalizeNewsArt(value, 'classic', 'config/site.yml'), value);
   }
   assert.throws(() => normalizeNewsArt('Water Color', 'editorial', 'config/site.yml'), /config\/site.yml: newsArt/);
+});
+
+test('isPageOn: a page turned off is off with everything under it; other pages and look-alike paths stay on', () => {
+  const config = { pages: { blog: false, cv: true } } as unknown as SiteConfig;
+  for (const path of ['/blog', '/blog/', '/blog/a-post', '/blog/tag/ml'])
+    assert.equal(isPageOn(path, config), false, path);
+  for (const path of ['/', '/cv', '/blogroll', '/news', '/publications'])
+    assert.equal(isPageOn(path, config), true, path);
+  assert.equal(isPageOn('/blog', {} as SiteConfig), true, 'absent means on');
 });

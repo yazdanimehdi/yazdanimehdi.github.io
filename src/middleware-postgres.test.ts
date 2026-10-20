@@ -86,6 +86,25 @@ test('a bodyless 404 keeps a null body so Astro reroutes it to 404.astro', async
   assert.equal(res.headers.get('cache-control'), 'no-store');
 });
 
+test('a page turned off in site.yml 404s bodyless and uncached without rendering; the next save turns it back on', async () => {
+  await sql`update documents set content = 'title: B
+pages:
+  talks: false' where path = 'config/site.yml'`;
+  const rendered = async () => new Response('page');
+  try {
+    for (const path of ['/talks', '/talks/']) {
+      const res = await run(path, async () => assert.fail(`${path} rendered`));
+      assert.equal(res.status, 404, path);
+      assert.equal(res.body, null, path);
+      assert.equal(res.headers.get('cache-control'), 'no-store', path);
+    }
+    assert.equal((await run('/blog', rendered)).status, 200);
+  } finally {
+    await sql`update documents set content = 'title: B' where path = 'config/site.yml'`;
+  }
+  assert.equal(await (await run('/talks', rendered)).text(), 'page');
+});
+
 test('a failed page query rejects next() → 503', async () => {
   const res = await run('/blog', async () => {
     requestContext().dbFailed = true;

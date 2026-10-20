@@ -1,11 +1,11 @@
 import rss from '@astrojs/rss';
 import type { APIContext } from 'astro';
 import { getEntries } from '../lib/content';
-import { getSiteConfig, getSiteName } from '../lib/config';
+import { getSiteConfig, getSiteName, isPageOn } from '../lib/config';
 
 export async function GET(context: APIContext) {
   const config = getSiteConfig();
-  const posts = await getEntries('posts');
+  const posts = isPageOn('/blog', config) ? await getEntries('posts') : [];
 
   return rss({
     title: getSiteName(),
