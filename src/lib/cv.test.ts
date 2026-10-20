@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { cvEntryView, cvSections, formatDateRange, resolveCvConfig, sectionTitle } from './cv';
+import { plainText } from './cv-inline';
 import type { CvConfig, CvData } from './types';
 
 const structured: CvConfig = { cv: { name: 'Structured', sections: {} } };
@@ -73,17 +74,19 @@ test('cvEntryView: each RenderCV entry shape', () => {
     cvEntryView({ title: 'Paper', authors: ['**Jane Smith**', 'Alex Chen'], journal: 'ACL', date: 2024 }),
     {
       title: 'Paper',
-      org: 'Jane Smith, Alex Chen · ACL',
+      org: '**Jane Smith**, Alex Chen · ACL',
       when: '2024',
       points: [],
     },
   );
   assert.equal(
-    cvEntryView({
-      title: 'Paper',
-      authors: ['Alex Chen\\*', '**Jane Smith**\\*'],
-      journal: 'ACL; \\* equal contribution',
-    })?.org,
+    plainText(
+      cvEntryView({
+        title: 'Paper',
+        authors: ['Alex Chen\\*', '**Jane Smith**\\*'],
+        journal: 'ACL; \\* equal contribution',
+      })?.org ?? '',
+    ),
     'Alex Chen*, Jane Smith* · ACL; * equal contribution',
   );
   assert.deepEqual(cvEntryView({ name: 'Best Paper', date: '2023', highlights: ['x', 3] }), {
