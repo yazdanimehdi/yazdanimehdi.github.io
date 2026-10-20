@@ -60,8 +60,18 @@ export async function generateAnimation(
 ): Promise<ImageOutput> {
   const key = await providerKey(store, IMAGE_PROVIDERS.higgsfield.keys);
   const model = config.image.provider === 'higgsfield' ? config.image.model : DEFAULT_MODELS.image.higgsfield;
-  const still = await higgsfieldImage(key, model, { prompt }, fetchFn);
-  const video = await higgsfieldVideo(key, config.video.model, { prompt: MOTION_PROMPT, imageUrl: still.url }, fetchFn);
+  // Both waits fit the function's 300 s with room for downloads and ffmpeg.
+  const still = await higgsfieldImage(key, model, { prompt }, fetchFn, { everyMs: 2000, timeoutMs: 60_000 });
+  const video = await higgsfieldVideo(
+    key,
+    config.video.model,
+    { prompt: MOTION_PROMPT, imageUrl: still.url },
+    fetchFn,
+    {
+      everyMs: 2000,
+      timeoutMs: 200_000,
+    },
+  );
   return { bytes: await toAnimatedWebp(video), contentType: 'image/webp' };
 }
 
