@@ -1,6 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AiError, IMAGE_PROVIDERS, TEXT_PROVIDERS, higgsfieldImage, resolveAiConfig } from './providers';
+import {
+  AiError,
+  IMAGE_PROVIDERS,
+  TEXT_PROVIDERS,
+  higgsfieldImage,
+  higgsfieldVideo,
+  resolveAiConfig,
+} from './providers';
 
 type Reply = { status?: number; body: unknown; type?: string };
 
@@ -212,6 +219,7 @@ test('higgsfield: submit with Key auth and an idempotency key, poll to completed
   const out = await higgsfieldImage('id:secret', 'higgsfield-ai/soul/standard', { prompt: 'p' }, f, fast);
   assert.deepEqual([...out.bytes], [...JPEG]);
   assert.equal(out.contentType, 'image/jpeg');
+  assert.equal(out.url, 'https://cdn.higgsfield.ai/r1.jpg');
   assert.equal(seen[0].headers.get('authorization'), 'Key id:secret');
   assert.match(seen[0].headers.get('idempotency-key') ?? '', /^[0-9a-f-]{36}$/);
   assert.deepEqual(await seen[0].json(), { prompt: 'p', aspect_ratio: '16:9', resolution: '1080p' });
@@ -253,23 +261,83 @@ test('higgsfield: gives up after the timeout', async () => {
   await rejects(higgsfieldImage('k', 'm', { prompt: 'p' }, f, { everyMs: 1, timeoutMs: 20 }), /did not finish/);
 });
 
+const MP4 = new Uint8Array([0, 0, 0, 0x18, 0x66, 0x74, 0x79, 0x70]);
+
+test('higgsfield video: image_url, 480p, 4 s, silent; poll to completed and download video.url', async () => {
+  const seen: Request[] = [];
+  const model = 'bytedance/seedance-2.5/image-to-video';
+  const f = fakeFetch(
+    {
+      [`POST ${HF}/${model}`]: { body: { status: 'queued', request_id: 'v1' } },
+      [`GET ${HF}/requests/v1/status`]: [
+        { body: { status: 'in_progress', request_id: 'v1' } },
+        { body: { status: 'completed', request_id: 'v1', video: { url: 'https://cdn.higgsfield.ai/v1.mp4' } } },
+      ],
+      'GET https://cdn.higgsfield.ai/v1.mp4': { body: MP4, type: 'video/mp4' },
+    },
+    seen,
+  );
+  const input = { prompt: 'slow drift', imageUrl: 'https://cdn.higgsfield.ai/r1.jpg' };
+  assert.deepEqual([...(await higgsfieldVideo('id:secret', model, input, f, fast))], [...MP4]);
+  assert.equal(seen[0].headers.get('authorization'), 'Key id:secret');
+  assert.match(seen[0].headers.get('idempotency-key') ?? '', /^[0-9a-f-]{36}$/);
+  assert.deepEqual(await seen[0].json(), {
+    prompt: 'slow drift',
+    image_url: 'https://cdn.higgsfield.ai/r1.jpg',
+    resolution: '480p',
+    duration: 4,
+    generate_audio: false,
+  });
+  assert.equal(seen[1].headers.get('authorization'), 'Key id:secret');
+  assert.equal(seen.filter((r) => r.url.endsWith('/status')).length, 2);
+});
+
+test('higgsfield video: failure statuses, a missing video URL and a failed download are errors', async () => {
+  const input = { prompt: 'p', imageUrl: 'https://cdn.higgsfield.ai/r.jpg' };
+  const submit = { [`POST ${HF}/m`]: { body: { status: 'queued', request_id: 'v2' } } };
+  const ending = (body: unknown, more = {}) =>
+    fakeFetch({ ...submit, [`GET ${HF}/requests/v2/status`]: { body }, ...more });
+  await rejects(
+    higgsfieldVideo('k', 'm', input, ending({ status: 'failed', error: 'GPU fault' }), fast),
+    /^Higgsfield could not generate the video: GPU fault$/,
+  );
+  await rejects(higgsfieldVideo('k', 'm', input, ending({ status: 'nsfw' }), fast), /flagged as NSFW/);
+  await rejects(higgsfieldVideo('k', 'm', input, ending({ status: 'canceled' }), fast), /canceled the request/);
+  await rejects(
+    higgsfieldVideo('k', 'm', input, ending({ status: 'completed', images: [{ url: 'https://x/a.jpg' }] }), fast),
+    /no video URL/,
+  );
+  const gone = ending(
+    { status: 'completed', video: { url: 'https://cdn.higgsfield.ai/v2.mp4' } },
+    { 'GET https://cdn.higgsfield.ai/v2.mp4': { status: 404, body: {} } },
+  );
+  await rejects(higgsfieldVideo('k', 'm', input, gone, fast), /video could not be downloaded \(404\)/);
+});
+
 test('resolveAiConfig: defaults fill the gaps; an unknown provider falls back with its default model', () => {
   assert.deepEqual(resolveAiConfig(undefined), {
     text: { provider: 'anthropic', model: 'claude-sonnet-5-5' },
     image: { provider: 'openai', model: 'gpt-image-2.5-flare' },
+    video: { model: 'bytedance/seedance-2.5/image-to-video' },
     papers: { autoPost: true, maxPostsPerRun: 3 },
   });
   assert.deepEqual(
     resolveAiConfig({
       text: { provider: 'google', model: '' },
       image: { provider: 'dall-e', model: 'x' },
+      video: { model: '  ' },
       papers: { autoPost: false, maxPostsPerRun: 0 },
     }),
     {
       text: { provider: 'google', model: 'gemini-3.8-flash' },
       image: { provider: 'openai', model: 'gpt-image-2.5-flare' },
+      video: { model: 'bytedance/seedance-2.5/image-to-video' },
       papers: { autoPost: false, maxPostsPerRun: 0 },
     },
   );
   assert.equal(resolveAiConfig({ papers: { maxPostsPerRun: -1 } }).papers.maxPostsPerRun, 3);
+  assert.equal(
+    resolveAiConfig({ video: { model: ' kling/v3/image-to-video ' } }).video.model,
+    'kling/v3/image-to-video',
+  );
 });
