@@ -1,3 +1,4 @@
+import type { ImageMetadata } from 'astro';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { isInkArt, isInkStats } from './inkArt';
@@ -16,4 +17,9 @@ test('isInkArt: the demo line art is ink; remote URLs and missing files are not'
   assert.equal(await isInkArt('https://example.com/a.png'), false);
   assert.equal(await isInkArt('/images/missing.webp'), false);
   assert.equal(await isInkArt(undefined), false);
+});
+
+test('isInkArt: a bundled image read where the build ran is found beside the function instead', async () => {
+  const built = { fsPath: '/vercel/path0/src/assets/images/news-art/ink/award.webp' } as unknown as ImageMetadata;
+  assert.equal(await isInkArt(built), true);
 });
