@@ -644,8 +644,8 @@ story in, the Writing page shows only the site's copy.
 
 ### AI assist
 
-The admin can draft and rewrite post and news bodies, generate cover images, and turn new Google Scholar papers into
-draft posts, using your own provider keys.
+The admin can draft and rewrite post and news bodies, generate cover images and publication figures, and turn new
+Google Scholar papers into draft posts, using your own provider keys.
 
 - **Keys.** Open **Scholar & AI** in the admin. In Postgres mode, paste a key and **Save**: it is stored encrypted in
   the database (with a key derived from `SESSION_SECRET`; changing that secret means entering the keys again). In git
@@ -659,6 +659,11 @@ draft posts, using your own provider keys.
   provider. **Generate image** sends the title and summary to the image provider. Paper posts send the paper's
   title, authors, venue, year, link and abstract. Results land in the editor as unsaved changes (with **Undo**);
   nothing is published until you save.
+- **Publication figures and GIFs.** In the publication editor, **Generate image** draws a journal-style figure from
+  the title and abstract. **Generate GIF** (posts, news and publications) asks Higgsfield for a still, animates it
+  with Higgsfield image-to-video, and saves a looping animated WebP. It needs the Higgsfield keys whichever image
+  provider is chosen, and takes one to three minutes. Its **Animation model** setting on the Scholar & AI screen
+  defaults to `bytedance/seedance-2.5/image-to-video`.
 - **Paper drafts.** Add the Scholar author id (the `user=` value of the profile URL) on the Scholar & AI screen.
   Postgres mode checks daily; **Check now** works in both modes. New papers become publications and, unless turned
   off, **draft** posts with a cover image, linked to the publication. The first check only records the papers already

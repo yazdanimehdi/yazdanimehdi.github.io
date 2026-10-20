@@ -6,6 +6,8 @@ text:
 image:
   provider: openai # openai | google | higgsfield
   model: ''
+# video: # Generate GIF: always Higgsfield image-to-video, whichever image provider is chosen
+#   model: '' # empty uses bytedance/seedance-2.5/image-to-video
 papers:
   autoPost: true # write a draft post for each new paper found on Google Scholar
   maxPostsPerRun: 3 # bounds one daily run's time and spend; more new papers wait for the next run
