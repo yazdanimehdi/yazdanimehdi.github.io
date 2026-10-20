@@ -45,6 +45,12 @@ const AI_FIELDS = computed<FieldDef[]>(() => {
       type: 'text',
       hint: `Empty uses ${DEFAULT_MODELS.image[effective.image.provider]}.`,
     },
+    {
+      key: 'video.model',
+      label: 'Animation model (Higgsfield)',
+      type: 'text',
+      hint: `Generate GIF animates a Higgsfield still with this image-to-video model. Empty uses ${DEFAULT_MODELS.video.higgsfield}.`,
+    },
     { key: 'papers.autoPost', label: 'Write a draft post for each new paper', type: 'checkbox', default: true },
     {
       key: 'papers.maxPostsPerRun',
@@ -200,7 +206,8 @@ onMounted(() => {
       />
       <p class="adm-muted">
         Write, Rewrite and Generate image in the post and news editors send the title, subtitle, summary, instruction
-        and body to the provider chosen here. Saved to config/ai.yml.
+        and body to the provider chosen here; for a publication, Generate image sends its title and abstract. Generate
+        GIF always uses Higgsfield. Saved to config/ai.yml.
       </p>
       <FormFields v-if="ai.current" :fields="AI_FIELDS" :model="ai.current" :errors="ai.errors" />
       <div class="adm-actions">
