@@ -14,6 +14,16 @@ import type { RunSummary } from '../lib/career/types';
 
 const BATCH = 5;
 
+/** A step failure's message without the Workflow SDK's `Step "..." failed: Error:` wrapper, short enough to show. */
+export function errorText(reason: unknown): string {
+  const raw = reason instanceof Error ? reason.message : String(reason);
+  return raw
+    .replace(/^Step "[^"]*" failed:\s*/, '')
+    .replace(/^Error:\s*/, '')
+    .trim()
+    .slice(0, 300);
+}
+
 /** Gather every enabled source in parallel, then score what's new, five at a time, up to the nightly cap. */
 export async function careerNightly(): Promise<RunSummary> {
   'use workflow';
@@ -29,6 +39,7 @@ export async function careerNightly(): Promise<RunSummary> {
   let deferred = pending.deferred;
   let scored = 0;
   let failed = 0;
+  let scoreError: string | undefined;
   // A setup problem would fail every posting the same way: score nothing and say why.
   const scoreSkipped = pending.ids.length ? await scoreReady().catch(() => 'scoring check failed') : null;
   if (scoreSkipped) deferred += pending.ids.length;
@@ -38,8 +49,10 @@ export async function careerNightly(): Promise<RunSummary> {
       const results = await Promise.allSettled(batch.map((id) => scorePosting(id)));
       for (const [j, r] of results.entries()) {
         // Rejected: the provider or the network failed. The posting stays pending and is tried again tomorrow.
-        if (r.status === 'rejected') deferred++;
-        else if (r.value === null) scored++;
+        if (r.status === 'rejected') {
+          deferred++;
+          scoreError ??= errorText(r.reason);
+        } else if (r.value === null) scored++;
         else {
           failed++;
           await markScoreFailed(batch[j], r.value);
@@ -54,6 +67,7 @@ export async function careerNightly(): Promise<RunSummary> {
     failed,
     deferred,
     ...(scoreSkipped ? { scoreSkipped } : {}),
+    ...(scoreError ? { scoreError } : {}),
   };
   await finishRun(summary);
   return summary;

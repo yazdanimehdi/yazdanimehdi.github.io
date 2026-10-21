@@ -48,6 +48,8 @@ export interface RunSummary {
   deferred: number;
   /** Why scoring was not attempted tonight (no AI key, no CV). */
   scoreSkipped?: string;
+  /** The first provider or network error of the night (at most 300 characters); set when an error deferred a posting. */
+  scoreError?: string;
 }
 
 export interface PostingSummary {

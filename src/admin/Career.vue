@@ -29,6 +29,7 @@ const threshold = ref(70);
 const filter = ref('open');
 const run = ref<RunStatus>({ runId: null, status: null, lastRun: null });
 const loading = ref(true);
+const loaded = ref(false);
 const starting = ref(false);
 let timer: ReturnType<typeof setInterval> | undefined;
 
@@ -89,6 +90,7 @@ onMounted(async () => {
   } catch (e) {
     report(e);
   }
+  loaded.value = true;
   await loadRows();
   if (isRunning(run.value.status)) watch();
 });
@@ -111,6 +113,9 @@ onBeforeUnmount(stop);
         <p v-if="run.lastRun.scoreSkipped" class="adm-err" role="status">
           Nothing was scored: {{ visible(run.lastRun.scoreSkipped) }}
         </p>
+        <p v-if="run.lastRun.scoreError" class="adm-err" role="status">
+          Scoring hit an error: {{ visible(run.lastRun.scoreError) }}. Those postings wait for the next run.
+        </p>
         <ul class="adm-rows">
           <li v-for="s in run.lastRun.sources" :key="s.id">
             <span class="adm-row-label">{{ s.id }}</span>
@@ -122,7 +127,7 @@ onBeforeUnmount(stop);
           </li>
         </ul>
       </template>
-      <p v-else class="adm-muted">No run yet. The search runs every night, or now:</p>
+      <p v-else-if="loaded" class="adm-muted">No run yet. The search runs every night, or now:</p>
       <div class="adm-actions">
         <button type="button" class="adm-btn adm-btn-primary" :disabled="running" @click="runNow">
           {{ running ? 'Running…' : 'Run now' }}
