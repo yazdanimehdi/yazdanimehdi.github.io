@@ -71,6 +71,7 @@ function publicationEntries(fronts: Entry[]): Entry[] {
  * The CV a draft starts from: config/cv.yml through the store (never the raw upload), with every paper in the
  * publications collection pooled into its first publication section (in place, under its title; appended as
  * `publications` when it has none), followed by the CV's own papers the collection lacks, so a plan can select any.
+ * A paper in both keeps the CV's fields, hidden flag included, filled in from the collection.
  */
 export async function baseCv(store: ContentStore): Promise<CvConfig> {
   const [cv, pubs] = await Promise.all([readConfig(store, 'cv'), listEntries(store, 'publications')]);
@@ -86,13 +87,16 @@ export async function baseCv(store: ContentStore): Promise<CvConfig> {
     if (papers.length && !sections.publications?.length) sections.publications = papers as never;
     return base;
   }
-  const seen = new Set(papers.map((p) => fold(String(p.title))));
+  const slot = new Map(papers.map((p, i) => [fold(String(p.title)), i]));
   const pool: unknown[] = [...papers];
+  const seen = new Set<string>();
   for (const e of own.flatMap((t) => sections[t] as unknown[])) {
     const key = isPublication(e) && fold(String((e as Entry).title));
     if (key && seen.has(key)) continue;
     if (key) seen.add(key);
-    pool.push(e);
+    const i = key ? slot.get(key) : undefined;
+    if (i !== undefined) pool[i] = { ...papers[i], ...(e as Entry) };
+    else pool.push(e);
   }
   // ponytail: one pooled section; split by type if an owner asks.
   base.cv.sections = Object.fromEntries(

@@ -606,12 +606,30 @@ async function pooledStore() {
 test('baseCv pools every collection paper into the CV’s own publication section, keeping CV-only papers once', async () => {
   const cv = await baseCv(await pooledStore());
   const titles = cv.cv.sections!.selectedPublications!.map((e) => (e as { title: string }).title);
-  assert.deepEqual(titles, ['B Title', 'A Title', 'A preprint']); // collection newest first, then CV-only
+  assert.deepEqual(titles, ['B Title', 'A title.', 'A preprint']); // collection newest first (the CV's copy wins), then CV-only
   assert.equal(cv.cv.sections!.publications, undefined, 'no second publications section');
   assert.deepEqual(
     Object.keys(cv.cv.sections),
     ['summary', 'experience', 'selectedPublications', 'skills'],
     'in place',
+  );
+});
+
+test('a pooled paper keeps the CV’s own fields, hidden flag included', async () => {
+  const store = await pooledStore();
+  const [{ content }] = await sql<{ content: string }>`select content from documents where path = 'config/cv.yml'`;
+  const own = '      - title: A title.\n        authors: [Jane Doe]\n';
+  const edit = (extra: string) =>
+    sql`update documents set content = ${content.replace(own, `${own}${extra}`)} where path = 'config/cv.yml'`;
+  await edit('        journal: NeurIPS (Spotlight)\n');
+  const paper = (await baseCv(store)).cv.sections!.selectedPublications![1] as Record<string, unknown>;
+  assert.equal(paper.journal, 'NeurIPS (Spotlight)', 'the owner’s venue, not the collection’s');
+  assert.equal(paper.date, '2023', 'what the CV lacks comes from the collection');
+  await edit('        visible: false\n');
+  const hiddenBase = await baseCv(store);
+  assert.throws(
+    () => assembleCv(hiddenBase, { sections: [{ title: 'selectedPublications', entries: [{ ref: 1 }] }] }),
+    /hidden on the CV/,
   );
 });
 
@@ -623,7 +641,7 @@ test('baseCv folds a second publication section into the pool and drops it', asy
   await sql`update documents set content = ${content.replace('design:', `${more}design:`)} where path = 'config/cv.yml'`;
   const cv = await baseCv(store);
   const titles = cv.cv.sections!.selectedPublications!.map((e) => (e as { title: string }).title);
-  assert.deepEqual(titles, ['B Title', 'A Title', 'A preprint', 'C talk']);
+  assert.deepEqual(titles, ['B Title', 'A title.', 'A preprint', 'C talk']);
   assert.equal(cv.cv.sections!.talks, undefined);
 });
 
