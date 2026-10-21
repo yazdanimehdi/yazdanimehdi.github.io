@@ -297,7 +297,7 @@ export function draftPrompt(
       'Summary: name the role this posting is for, if the CV supports it, and lead with the strongest evidence for its requirements; keep it specific, two or three sentences. Never change a past job title.',
       "Publications: keep the most relevant to this job, judged by title and abstract, most relevant first: 5 to 8 for a research role, 2 to 4 otherwise. Keep each one's authors and venue as they are.",
       'Length: at most two pages.',
-      'Each CV entry has a "ref". List the sections to keep (by their exact title) and the entries to keep (by ref) in the order to show them. Give "highlights" only for an entry that has highlights, and "text" only for an entry that is a plain string. Leave out both to keep an entry as it is.',
+      'Each CV entry has a "ref". List the sections to keep (by their exact title) and the entries to keep (by ref) in the order to show them. Give "highlights" only for an entry that has highlights, and "text" only for an entry that is a plain string. Leave them all out to keep an entry as it is.',
       'For an entry with "details" (a list such as skills), you may give "details": the same items, reordered with the ones this job asks for first, and trimmed; never add an item.',
       "Letter rules: 250-350 words, first person, addressed to the company by name. Say early why this role and company, from what the posting says. Give two or three examples from the CV mapped to the posting's top requirements; don't restate the CV. If a required item is a gap, you may name it honestly as something to grow into from related CV work; never claim it. Use only the CV and the candidate's reason for looking; invent no facts about the company beyond what the posting says.",
       abstracts?.size

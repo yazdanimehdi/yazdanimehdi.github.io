@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import AdminShell from './AdminShell.vue';
 import { api, report, toast } from './api';
-import { coverageLine, coverageState, httpUrl, visible } from './career';
+import { coverageLine, coverageState, evidenceLabel, httpUrl, visible } from './career';
 import { PostingText } from './PostingText';
 import type { AdminCtx } from './types';
 import { entryText } from '../lib/career/profile';
@@ -237,7 +237,7 @@ function coverageNote(r: Requirement): string {
       : state === 'cut'
         ? 'In your CV, not in this version; restore it in the editor below'
         : state === 'reworded'
-          ? `Supported by ${visible(r.evidence ?? '')}, in other words`
+          ? `Supported by ${evidenceLabel(visible(r.evidence ?? ''))}, in other words`
           : 'Not in your CV';
   return r.uses && r.uses > 3 ? `${base}; used ${r.uses} times; may read as stuffing` : base;
 }

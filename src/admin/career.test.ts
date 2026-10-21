@@ -1,10 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { coverageLine, coverageState, httpUrl, visible } from './career';
+import { coverageLine, coverageState, evidenceLabel, httpUrl, visible } from './career';
 
 test('visible strips format characters and turns line separators into spaces', () => {
   assert.equal(visible('a\u202eb\u200bc\u2028d\u2029e\ufefff'), 'abc d ef');
   assert.equal(visible('plain text'), 'plain text');
+});
+
+test('evidenceLabel shows a 0-based ref as a 1-based entry and leaves anything else alone', () => {
+  assert.equal(evidenceLabel('researchExperience 1'), 'researchExperience entry 2');
+  assert.equal(evidenceLabel('skills 0'), 'skills entry 1');
+  assert.equal(evidenceLabel('the Acme job'), 'the Acme job');
 });
 
 test('httpUrl accepts http(s) only', () => {

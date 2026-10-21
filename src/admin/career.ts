@@ -18,6 +18,12 @@ export function coverageState(r: Requirement): CoverageState {
   return r.inCv ? 'shown' : r.inBase ? 'cut' : r.evidence ? 'reworded' : 'gap';
 }
 
+/** The drafter's evidence ref ("researchExperience 1", 0-based) as a 1-based entry for display; anything else as is. */
+export function evidenceLabel(e: string): string {
+  const m = /^(\S+) (\d+)$/.exec(e);
+  return m ? `${m[1]} entry ${Number(m[2]) + 1}` : e;
+}
+
 export function coverageLine(reqs: Requirement[]): string {
   if (!reqs.length) return 'No requirements were listed for this posting.';
   const part = (kind: Requirement['kind']) => {
