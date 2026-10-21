@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { httpUrl, visible } from './career';
 
-test('visible strips format characters and line separators', () => {
-  assert.equal(visible('a‮b​c d e﻿f'), 'abcdef');
+test('visible strips format characters and turns line separators into spaces', () => {
+  assert.equal(visible('a\u202eb\u200bc\u2028d\u2029e\ufefff'), 'abc d ef');
   assert.equal(visible('plain text'), 'plain text');
 });
 

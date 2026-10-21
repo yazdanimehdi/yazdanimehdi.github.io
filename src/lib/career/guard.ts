@@ -97,7 +97,7 @@ function cleanText(text: string) {
   });
   return {
     text: fold(
-      Array.from(text)
+      Array.from(text.replace(/\u2028/g, '\n').replace(/\u2029/g, '\n\n'))
         .filter((c) => !INVISIBLE.has(c) && !OTHER_FORMAT.test(c))
         .join(''),
     ),

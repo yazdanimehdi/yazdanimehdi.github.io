@@ -185,3 +185,9 @@ test('unterminated openers run in linear time', () => {
 test('pathological nesting fails closed', () => {
   assert.throws(() => guardPosting('<svg>'.repeat(100000), 'html'), /nested too deeply/);
 });
+
+test('line and paragraph separators become line breaks, still counted', () => {
+  const g = guardPosting('About the Role of Science End-to-end work Next', 'text');
+  assert.equal(g.text, 'About the Role of Science\nEnd-to-end work\n\nNext');
+  assert.equal(g.flags.invisible.format, 2);
+});

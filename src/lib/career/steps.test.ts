@@ -356,7 +356,7 @@ test('invisible characters in title, company and location are stripped before st
     company: string;
     location: string;
   }>`select title, company, location from career_postings`;
-  assert.deepEqual({ ...r }, { title: 'Devevil', company: 'Acme', location: 'Bern' });
+  assert.deepEqual({ ...r }, { title: 'Devevil', company: 'Acme', location: 'Be rn' });
 });
 
 test('detail is fetched for at most 30 new postings; the rest wait for a later night', async () => {
