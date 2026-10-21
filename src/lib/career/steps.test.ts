@@ -1,3 +1,4 @@
+/* eslint-disable no-console -- the tests silence expected error logs */
 import test, { afterEach, beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -167,9 +168,55 @@ test('a source missing its key is skipped, not failed; a source off in prefs is 
   }
 });
 
+const HOUR = 60 * 60 * 1000;
+const NOW = Date.parse('2026-10-21T12:00:00Z');
+/** A fake Workflow API: the stored run has `status` and was created `age` ago; start() hands out wrun_new. */
+function fakeRuns(status: string, age: number) {
+  const calls = { cancelled: [] as string[], started: 0 };
+  const runs = {
+    get: (runId: string) => ({
+      status: Promise.resolve(status),
+      createdAt: Promise.resolve(new Date(NOW - age)),
+      cancel: async () => void calls.cancelled.push(runId),
+    }),
+    start: async () => (calls.started++, { runId: 'wrun_new' }),
+  };
+  return { runs, calls };
+}
+
 test('a second start while running returns running', async () => {
   await writeCareer(sql, { runId: 'wrun_1' }, 'test');
-  assert.deepEqual(await startNightly(sql, async () => 'running'), { running: 'wrun_1' });
-  assert.deepEqual(await startNightly(sql, async () => 'pending'), { running: 'wrun_1' });
+  for (const status of ['running', 'pending']) {
+    const { runs, calls } = fakeRuns(status, HOUR);
+    assert.deepEqual(await startNightly(sql, runs, NOW), { running: 'wrun_1' });
+    assert.deepEqual(calls, { cancelled: [], started: 0 });
+  }
   assert.equal((await readCareer(sql)).runId, 'wrun_1');
+  const { runs, calls } = fakeRuns('completed', HOUR);
+  assert.deepEqual(await startNightly(sql, runs, NOW), { runId: 'wrun_new' });
+  assert.deepEqual(calls, { cancelled: [], started: 1 });
+  assert.equal((await readCareer(sql)).runId, 'wrun_new');
+});
+
+test('a run still pending or running after 6 hours is cancelled and a new one starts', async () => {
+  for (const status of ['running', 'pending']) {
+    await writeCareer(sql, { runId: 'wrun_stuck' }, 'test');
+    const { runs, calls } = fakeRuns(status, 6 * HOUR + 1);
+    assert.deepEqual(await startNightly(sql, runs, NOW), { runId: 'wrun_new' });
+    assert.deepEqual(calls, { cancelled: ['wrun_stuck'], started: 1 });
+    assert.equal((await readCareer(sql)).runId, 'wrun_new');
+  }
+  await writeCareer(sql, { runId: 'wrun_stuck' }, 'test');
+  const { runs } = fakeRuns('running', 7 * HOUR);
+  runs.get = (id) => ({
+    ...fakeRuns('running', 7 * HOUR).runs.get(id),
+    cancel: async () => Promise.reject(new Error('no')),
+  });
+  const original = console.error;
+  console.error = () => {};
+  try {
+    assert.deepEqual(await startNightly(sql, runs, NOW), { runId: 'wrun_new' }, 'a failed cancel still restarts');
+  } finally {
+    console.error = original;
+  }
 });

@@ -74,7 +74,7 @@ test('runJobs: a failing step is recorded and the others still run; jobs.json ho
     },
     career: async () => {
       ran.push('career');
-      return { detail: 'skipped: no job search set up' };
+      return { detail: 'done' };
     },
     backup: async () => {
       ran.push('backup');
@@ -95,7 +95,7 @@ test('runJobs: a failing step is recorded and the others still run; jobs.json ho
     scheduled: { ok: true, at, detail: 'nothing due' },
     papers: { ok: true, at, detail: 'skipped: no SERPAPI_KEY' },
     github: { ok: true, at, detail: 'skipped: no GitHub username' },
-    career: { ok: true, at, detail: 'skipped: no job search set up' },
+    career: { ok: true, at, detail: 'done' },
     backup: { ok: true, at, detail: '2 file(s) changed', url: 'https://github.com/o/r/commit/c' },
   });
 });
@@ -175,7 +175,7 @@ test('cron in Postgres mode: runs every step, releases due posts, records jobs.j
         scheduled: [true, 'released now'],
         papers: [true, 'skipped: no SERPAPI_KEY'],
         github: [true, 'skipped: no GitHub username'],
-        career: [true, 'skipped: no job search set up'],
+        career: [true, 'done'],
         backup: [true, 'skipped: no GITHUB_TOKEN'],
       },
     );
@@ -325,11 +325,30 @@ test('papers step: skips cleanly without SERPAPI_KEY, and with a key but no Scho
 
 test('career runs after github and before backup; an empty search is skipped', async () => {
   assert.deepEqual(JOBS.slice(JOBS.indexOf('github')), ['github', 'career', 'backup']);
-  assert.deepEqual(await dailySteps(store()).career({}, new Date()), { detail: 'skipped: no job search set up' });
-  await writeCareer(sql, { prefs: { roles: [' '], watched: [] }, runId: 'wrun_busy' }, 'test');
-  assert.deepEqual(
-    await dailySteps(store()).career({}, new Date()),
-    { detail: 'skipped: no job search set up' },
-    'a blank role is no search',
+  let starts = 0;
+  const steps = (nightly: () => Promise<{ runId: string } | { running: string }>) =>
+    dailySteps(store(), async () => (starts++, nightly()));
+  const run = (nightly: () => Promise<{ runId: string } | { running: string }>) =>
+    steps(nightly).career({}, new Date());
+  const started = async () => ({ runId: 'wrun_1' });
+
+  const skipped = await run(started);
+  await writeCareer(sql, { prefs: { roles: [' '], watched: [] } }, 'test');
+  const blank = await run(started);
+  assert.equal(starts, 0, 'no search (a blank role is none) starts nothing');
+
+  await writeCareer(sql, { prefs: { roles: ['data scientist'] } }, 'test');
+  const ran = await run(started);
+  const busy = await run(async () => ({ running: 'wrun_1' }));
+  assert.equal(starts, 2);
+  // jobs.json is backed up to git: it must not tell whether the owner is job hunting.
+  for (const r of [skipped, blank, ran, busy]) assert.deepEqual(r, { detail: 'done' });
+
+  await assert.rejects(
+    run(async () => {
+      throw new Error('DATABASE_URL secret detail');
+    }),
+    (e: Error) => e.message === 'failed' && /secret detail/.test((e.cause as Error).message),
+    'jobs.json gets "failed"; the real error only reaches the log, as the cause',
   );
 });

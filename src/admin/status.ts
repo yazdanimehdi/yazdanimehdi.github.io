@@ -335,15 +335,14 @@ function backup(d: DashboardData): StatusRow {
   return { ...row, state: 'Backed up to GitHub', tone: 'ok', at: run.at, detail: run.detail, link: viewOn(run.url) };
 }
 
-/** The daily career step: only the owner's dashboard data carries it, so no row for anyone else. */
+/** The daily career step. Its detail is neutral on purpose (jobs.json is backed up), so the row reads only `ok`. */
 function career(d: DashboardData): StatusRow[] {
   const run = d.runs.career;
   if (!run) return [];
   const row = { key: 'career', label: 'Job search', at: run.at };
-  // Starting it only touches the database and the Workflow queue: the error as reported, retried tomorrow.
-  if (run.ok === false) return [{ ...row, state: 'Job search failed to start', tone: 'attention', detail: run.detail }];
-  if (skipped(run)) return [{ ...row, state: 'Not set up', tone: 'off', detail: run.detail }];
-  return [{ ...row, state: 'Nightly search started', tone: 'ok', detail: run.detail }];
+  if (run.ok === false)
+    return [{ ...row, state: 'Job search failed to start', tone: 'attention', detail: 'Next automatic try: tomorrow' }];
+  return [{ ...row, state: 'Checked with the daily jobs', tone: 'ok' }];
 }
 
 /** Problems first, then suggestions, runs the token can't see, jobs never seen running, the healthy rows and, last, what is not set up. */

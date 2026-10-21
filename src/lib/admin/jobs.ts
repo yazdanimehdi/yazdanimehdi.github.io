@@ -140,8 +140,8 @@ export async function releaseScheduled(store: PostgresStore, since: Date, now: D
   return due;
 }
 
-/** The daily cron's steps (Postgres mode). */
-export function dailySteps(store: PostgresStore): Steps {
+/** The daily cron's steps (Postgres mode). `nightly` starts the job search run; tests pass their own. */
+export function dailySteps(store: PostgresStore, nightly = () => startNightly(getSql())): Steps {
   return {
     feeds: async () => {
       const config = await readConfig(store, 'feeds');
@@ -167,12 +167,18 @@ export function dailySteps(store: PostgresStore): Steps {
       const r = await syncGitHubFile(store, username);
       return { detail: `${r.changed ? 'updated' : 'unchanged'} · ${r.repos} repositories` };
     },
+    // jobs.json reaches the git backup, which may be public: the detail never says whether a search is set up or ran.
+    // The real state is the owner-only career_settings (last_run, run_id).
     career: async () => {
-      const prefs = parsePrefs((await readCareer(getSql())).prefs);
-      const terms = [...prefs.roles, ...prefs.keywords].filter((t) => t.trim());
-      if (!terms.length && !prefs.watched.length) return { detail: 'skipped: no job search set up' };
-      const r = await startNightly(getSql());
-      return { detail: 'runId' in r ? `started run ${r.runId}` : 'already running' };
+      try {
+        const prefs = parsePrefs((await readCareer(getSql())).prefs);
+        const terms = [...prefs.roles, ...prefs.keywords].filter((t) => t.trim());
+        if (terms.length || prefs.watched.length) await nightly();
+      } catch (e) {
+        // runJobs logs the cause and records only the message.
+        throw new Error('failed', { cause: e });
+      }
+      return { detail: 'done' };
     },
     backup: async (_previous, now) => {
       if (!process.env.GITHUB_TOKEN) return { detail: 'skipped: no GITHUB_TOKEN' };

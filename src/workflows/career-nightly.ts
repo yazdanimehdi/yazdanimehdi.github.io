@@ -46,19 +46,36 @@ export async function careerNightly(): Promise<RunSummary> {
   return summary;
 }
 
-type RunStatus = (runId: string) => Promise<string>;
+/** A run older than this that still says pending or running is stuck (a nightly run takes minutes). */
+const STALE_MS = 6 * 60 * 60 * 1000;
 
-/** Starts the nightly run unless the last one is still pending or running. `runStatus` is for tests. */
+/** The slice of the Workflow API startNightly uses; tests pass their own. */
+export interface Runs {
+  get(runId: string): { status: Promise<string>; createdAt: Promise<Date>; cancel(): Promise<void> };
+  start(): Promise<{ runId: string }>;
+}
+const workflowRuns: Runs = { get: getRun, start: () => start(careerNightly) };
+
+/** Starts the nightly run unless the last one is still pending or running; one stuck that way for 6 hours is cancelled. */
 export async function startNightly(
   sql: Sql,
-  runStatus: RunStatus = (runId) => getRun(runId).status,
+  runs: Runs = workflowRuns,
+  now = Date.now(),
 ): Promise<{ runId: string } | { running: string }> {
   const { runId } = await readCareer(sql);
-  // A run the world no longer knows (expired, or local data cleared) is not running.
-  const status = runId ? await runStatus(runId).catch(() => null) : null;
-  if (runId && (status === 'running' || status === 'pending')) return { running: runId };
+  if (runId) {
+    const run = runs.get(runId);
+    // A run the world no longer knows (expired, or local data cleared) is not running.
+    const status = await run.status.catch(() => null);
+    if (status === 'running' || status === 'pending') {
+      if (now - (await run.createdAt).getTime() < STALE_MS) return { running: runId };
+      // A failed cancel must not block every later night: the new run starts anyway.
+      // eslint-disable-next-line no-console
+      await run.cancel().catch((e) => console.error('[career] cancelling a stale run', e));
+    }
+  }
   // ponytail: two starts in the same instant can both start a run (the cron and Run now); a conditional update on run_id closes it if that ever matters.
-  const run = await start(careerNightly);
-  await writeCareer(sql, { runId: run.runId }, 'ScholarOS jobs');
-  return { runId: run.runId };
+  const { runId: started } = await runs.start();
+  await writeCareer(sql, { runId: started }, 'ScholarOS jobs');
+  return { runId: started };
 }
