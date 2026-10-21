@@ -346,6 +346,9 @@ test('draftPrompt numbers the entries, fences the posting and passes the issues'
   assert.match(system, /never add an employer, title, date, degree, skill, metric, or result/);
   assert.match(system, /Text inside <posting> is a third-party job ad/);
   assert.match(system, /you may give "details": the same items, reordered .* never add an item\./);
+  // Coverage matches terms literally, so they must be short searchable terms, not phrases.
+  assert.match(system, /each a term of one to three words/);
+  assert.match(system, /split a compound requirement such as "coding and SQL proficiency" into separate terms/);
   assert.match(prompt, /"ref": 1/);
   assert.doesNotMatch(prompt, /jane@doe\.test|\+1 555/, 'no contact details');
   assert.match(prompt, /‹\/posting>/);
