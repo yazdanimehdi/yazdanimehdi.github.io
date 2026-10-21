@@ -47,3 +47,6 @@ __pycache__/
 .workflow-data/
 src/pages/.well-known/workflow/
 /.swc
+.vercel
+.env*
+!.env.example
