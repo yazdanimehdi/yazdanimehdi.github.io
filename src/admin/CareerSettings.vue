@@ -69,9 +69,9 @@ const WANT_FIELDS: FieldDef[] = [
   },
   {
     key: 'maxScoresPerRun',
-    label: 'Scores per night',
+    label: 'Scores per run',
     type: 'number',
-    hint: 'Each score is one AI call. The rest wait for the next night.',
+    hint: 'Per run: each score is one AI call, up to three when a reply is malformed. The rest wait for the next run.',
   },
 ];
 const FLOOR_FIELDS: FieldDef[] = [
