@@ -2,7 +2,14 @@ import type { TextInput } from '../../ai/providers';
 import type { SecretName } from '../../admin/secrets';
 import type { CareerPrefs } from '../settings';
 import type { RawPosting } from '../types';
+import { adzuna } from './adzuna';
 import { watched } from './ats';
+import { arbeitnow } from './arbeitnow';
+import { googleJobs } from './google-jobs';
+import { remoteok } from './remoteok';
+import { remotive } from './remotive';
+import { rss } from './rss';
+import { usajobs } from './usajobs';
 
 export interface SourceContext {
   prefs: CareerPrefs;
@@ -23,4 +30,13 @@ export interface Source {
 }
 
 /** Adding a source means one file plus one line here. */
-export const SOURCES: Record<string, Source> = { watched };
+export const SOURCES: Record<string, Source> = {
+  watched,
+  remotive,
+  remoteok,
+  arbeitnow,
+  adzuna,
+  usajobs,
+  'google-jobs': googleJobs,
+  rss,
+};
