@@ -22,7 +22,7 @@ const blobDeps: BlobDeps = {
   },
 };
 
-/** A local check without Blob: CAREER_PDF_DIR (never set on Vercel) writes the PDFs to that folder instead. */
+/** A local check without Blob: CAREER_PDF_DIR writes the PDFs to that folder instead (never in production). */
 const folderDeps = (dir: string): BlobDeps => ({
   put: async (pathname, body) => {
     const file = path.join(dir, `${pathname.replace(/\W+/g, '-')}-${Date.now()}.pdf`);
@@ -41,7 +41,9 @@ export function setBlobForTests(deps: BlobDeps | null): void {
 
 function deps(): BlobDeps {
   const dir = process.env.CAREER_PDF_DIR;
-  return testDeps ?? (dir && !process.env.VERCEL_ENV ? folderDeps(dir) : blobDeps);
+  // Not `!VERCEL`: `astro dev` (and so dev:postgres) sets VERCEL=1 for the admin, the one place this is for.
+  const local = dir && !process.env.VERCEL_ENV && process.env.NODE_ENV !== 'production';
+  return testDeps ?? (local ? folderDeps(dir) : blobDeps);
 }
 
 /**

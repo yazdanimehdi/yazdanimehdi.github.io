@@ -25,6 +25,7 @@ import { SOURCES, type SourceContext } from './sources';
 import { SourceError } from './sources/http';
 import {
   assembleCv,
+  baseCv,
   draftPrompt,
   FabricationError,
   parseReview,
@@ -212,8 +213,6 @@ export async function finishRun(summary: RunSummary): Promise<void> {
 
 // ---- Drafting: a tailored CV and cover letter for one posting (careerDraft) ----
 
-/** The base CV: config/cv.yml through the store, never the raw upload. */
-const baseCv = async (store: PostgresStore) => (await readConfig(store, 'cv')).data as unknown as CvConfig;
 const NO_CV = 'There is no CV to tailor: add one on the CV screen';
 const TRIES = 2;
 
@@ -269,22 +268,27 @@ export async function draftStep(
   return null;
 }
 
-/** The reviewer's verdict on the saved plan's reworded lines and the saved letter. */
-export async function reviewStep(id: number): Promise<{ ok: boolean; issues: ReviewIssue[] }> {
+/**
+ * The reviewer's verdict on what this draft wrote: the saved plan's reworded lines (unless `part` is `letter`) and the
+ * saved letter (unless `part` is `cv`). Nothing to review is ok without an AI call.
+ */
+export async function reviewStep(id: number, part: DraftPart): Promise<{ ok: boolean; issues: ReviewIssue[] }> {
   'use step';
   const store = careerStore();
   const [p, base, ai] = await Promise.all([getPosting(getSql(), id), baseCv(store), readAiConfig(store)]);
   const plan = p?.cv as TailorPlan | null;
-  const pairs = plan?.sections && base.cv?.sections ? rewordedPairs(base, plan) : [];
-  return parseReview(await generateText(store, ai, reviewPrompt(base, pairs, p?.letter ?? '')));
+  const pairs = part !== 'letter' && plan?.sections && base.cv?.sections ? rewordedPairs(base, plan) : [];
+  const letter = part === 'cv' ? '' : (p?.letter ?? '');
+  if (!pairs.length && !letter) return { ok: true, issues: [] };
+  return parseReview(await generateText(store, ai, reviewPrompt(base, pairs, letter)));
 }
 // The AI-call ceiling per draft is 6: two drafts of at most two replies each, and two reviews. No step retries them.
 draftStep.maxRetries = 0;
 reviewStep.maxRetries = 0;
 
 /**
- * Renders the saved plan in `prefs.cvStyle` (or the public style) and stores the PDF; why not, as a value. The
- * publications collection is only included when the plan keeps a publications section.
+ * Renders the saved plan in `prefs.cvStyle` (or the public style) and stores the PDF; why not, as a value. The papers
+ * the plan selected are in its sections already (baseCv), so the collection itself is never sent.
  */
 export async function renderStep(id: number): Promise<string | null> {
   'use step';
@@ -313,7 +317,7 @@ export async function renderStep(id: number): Promise<string | null> {
       ...req,
       cv,
       upload: null,
-      publications: plan.sections.some((s) => s.title === 'publications') ? req.publications : [],
+      publications: [],
       themeFiles: custom ? await readThemeFiles(store, theme) : {},
     });
   } catch (e) {
@@ -336,13 +340,10 @@ export async function finishDraft(id: number, review: { ok: boolean; issues: Rev
   const p = await getPosting(sql, id);
   const issues = review ? (review.ok ? [] : review.issues) : ((p?.draftIssues as ReviewIssue[] | null) ?? []);
   const flagged = review ? !review.ok : issues.length > 0;
-  const moved = p?.status === 'found';
-  await updatePosting(sql, id, {
-    draftState: flagged ? 'needs-review' : 'done',
-    draftIssues: flagged ? issues : null,
-    ...(moved ? { status: 'drafted' as const } : {}),
-  });
-  if (moved) await addEvent(sql, id, 'status', 'found → drafted');
+  await updatePosting(sql, id, { draftState: flagged ? 'needs-review' : 'done', draftIssues: flagged ? issues : null });
+  const moved =
+    await sql`update career_postings set status = 'drafted' where id = ${id} and status = 'found' returning id`;
+  if (moved.length) await addEvent(sql, id, 'status', 'found → drafted');
   await addEvent(sql, id, 'draft finished', flagged ? `needs review (${issues.length} issues)` : 'done');
 }
 

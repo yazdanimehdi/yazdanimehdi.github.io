@@ -1,4 +1,5 @@
 import { getRun, start } from 'workflow/api';
+import { WorkflowRunNotFoundError } from 'workflow/errors';
 import type { Sql } from '../lib/db';
 import { updatePosting } from '../lib/career/db';
 import { draftStep, failDraft, finishDraft, renderStep, reviewStep, scoreReady, startDraft } from '../lib/career/steps';
@@ -22,11 +23,11 @@ export async function careerDraft(id: number, part: DraftPart, instruction: stri
     if (part !== 'render') {
       const failed = (await scoreReady()) ?? (await draftStep(id, part, instruction, null));
       if (failed) return await failDraft(id, failed);
-      review = await reviewStep(id);
+      review = await reviewStep(id, part);
       if (!review.ok) {
         const again = await draftStep(id, part, instruction, review.issues);
         if (again) return await failDraft(id, again);
-        review = await reviewStep(id);
+        review = await reviewStep(id, part);
       }
     }
     if (part !== 'letter') {
@@ -62,13 +63,23 @@ async function finished(runId: string | null, runs: DraftRuns, now: number): Pro
   if (!runId) return true;
   if (runId.startsWith(CLAIM)) return now - Number(runId.slice(CLAIM.length)) > STALE_MS;
   const run = runs.get(runId);
-  // A run the world no longer knows (expired, or local data cleared) is not running.
-  const status = await run.status.catch(() => null);
+  let status: string;
+  try {
+    status = await run.status;
+  } catch (e) {
+    // A run the world no longer knows (expired, or local data cleared) is not running; any other error might be.
+    return WorkflowRunNotFoundError.is(e);
+  }
   if (status !== 'running' && status !== 'pending') return true;
   if (now - (await run.createdAt.catch(() => new Date(0))).getTime() < STALE_MS) return false;
-  // eslint-disable-next-line no-console
-  await run.cancel().catch((e) => console.error('[career] cancelling a stale draft', e));
-  return true;
+  try {
+    await run.cancel();
+    return true;
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('[career] cancelling a stale draft', e);
+    return false;
+  }
 }
 
 /**

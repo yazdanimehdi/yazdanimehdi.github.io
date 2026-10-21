@@ -93,8 +93,10 @@ function buildEditor() {
   editor.value = titles.map((title) => {
     const entries = (own[title] ?? []) as unknown[];
     const chosen = plan.find((s) => s.title === title)?.entries ?? [];
+    // Hidden entries stay off the CV: assembleCv refuses them.
     const refs = [...chosen.map((e) => e.ref), ...entries.keys()].filter(
-      (r, i, all) => r < entries.length && all.indexOf(r) === i,
+      (r, i, all) =>
+        r < entries.length && all.indexOf(r) === i && (entries[r] as { visible?: unknown })?.visible !== false,
     );
     return {
       title,
@@ -115,8 +117,16 @@ function buildEditor() {
   });
 }
 
-function take(res: { posting: Posting; events: JobEvent[] }) {
+interface JobView {
+  posting: Posting;
+  events: JobEvent[];
+  /** The base CV's sections, with the publications collection when the CV lists none (baseCv). */
+  cvSections: CvConfig['cv']['sections'];
+}
+
+function take(res: JobView) {
   posting.value = res.posting;
+  cvSections.value = res.cvSections;
   events.value = res.events;
   notes.value = res.posting.notes;
   letter.value = res.posting.letter ?? '';
@@ -144,7 +154,7 @@ function stop() {
 }
 async function poll() {
   try {
-    const res = await api<{ posting: Posting; events: JobEvent[] }>(`career/postings/${props.id}`);
+    const res = await api<JobView>(`career/postings/${props.id}`);
     if (res.posting.draftState !== 'running') {
       stop();
       take(res);
@@ -212,17 +222,13 @@ function downloadLetter() {
   a.href = url;
   a.download = `cover-letter-${company || 'company'}.txt`;
   a.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url));
 }
 
 onBeforeUnmount(stop);
 onMounted(async () => {
   try {
-    const [res, cv] = await Promise.all([
-      api<{ posting: Posting; events: JobEvent[] }>(`career/postings/${props.id}`),
-      api<{ data: Partial<CvConfig> }>('config/cv').catch(() => ({ data: {} as Partial<CvConfig> })),
-    ]);
-    cvSections.value = cv.data.cv?.sections ?? {};
+    const res = await api<JobView>(`career/postings/${props.id}`);
     take(res);
     if (res.posting.draftState === 'running') timer ??= setInterval(poll, 5000);
   } catch (e) {
@@ -341,43 +347,46 @@ onMounted(async () => {
         </p>
         <details>
           <summary>Edit the plan</summary>
-          <p class="adm-muted">
-            Sections and entries come from your CV. Reword highlights freely, one per line, up to the entry’s own count.
-          </p>
-          <fieldset v-for="(s, i) in editor" :key="s.title" class="adm-job-plan">
-            <legend>
-              <label><input v-model="s.on" type="checkbox" /> {{ s.title }}</label>
-            </legend>
-            <p class="adm-actions">
-              <button class="adm-btn" :disabled="i === 0" :aria-label="`Move ${s.title} up`" @click="move(i, -1)">
-                ↑
-              </button>
-              <button
-                class="adm-btn"
-                :disabled="i === editor.length - 1"
-                :aria-label="`Move ${s.title} down`"
-                @click="move(i, 1)"
-              >
-                ↓
-              </button>
+          <fieldset :disabled="drafting" class="adm-job-plan-edit">
+            <p class="adm-muted">
+              Sections and entries come from your CV. Reword highlights freely, one per line, up to the entry’s own
+              count.
             </p>
-            <template v-if="s.on">
-              <div v-for="e in s.entries" :key="e.ref">
-                <label v-if="e.text === undefined"><input v-model="e.on" type="checkbox" /> {{ e.label }}</label>
-                <label v-else class="adm-field">
-                  <span><input v-model="e.on" type="checkbox" /> Line {{ e.ref + 1 }}</span>
-                  <input v-if="e.on" v-model="e.text" maxlength="2000" />
-                </label>
-                <label v-if="e.on && e.highlights !== undefined" class="adm-field">
-                  <span>Highlights (at most {{ e.max }})</span>
-                  <textarea v-model="e.highlights" :rows="Math.max(2, e.max ?? 0)" />
-                </label>
-              </div>
-            </template>
+            <fieldset v-for="(s, i) in editor" :key="s.title" class="adm-job-plan">
+              <legend>
+                <label><input v-model="s.on" type="checkbox" /> {{ s.title }}</label>
+              </legend>
+              <p class="adm-actions">
+                <button class="adm-btn" :disabled="i === 0" :aria-label="`Move ${s.title} up`" @click="move(i, -1)">
+                  ↑
+                </button>
+                <button
+                  class="adm-btn"
+                  :disabled="i === editor.length - 1"
+                  :aria-label="`Move ${s.title} down`"
+                  @click="move(i, 1)"
+                >
+                  ↓
+                </button>
+              </p>
+              <template v-if="s.on">
+                <div v-for="e in s.entries" :key="e.ref">
+                  <label v-if="e.text === undefined"><input v-model="e.on" type="checkbox" /> {{ e.label }}</label>
+                  <label v-else class="adm-field">
+                    <span><input v-model="e.on" type="checkbox" /> Line {{ e.ref + 1 }}</span>
+                    <input v-if="e.on" v-model="e.text" maxlength="2000" />
+                  </label>
+                  <label v-if="e.on && e.highlights !== undefined" class="adm-field">
+                    <span>Highlights (at most {{ e.max }})</span>
+                    <textarea v-model="e.highlights" :rows="Math.max(2, e.max ?? 0)" />
+                  </label>
+                </div>
+              </template>
+            </fieldset>
+            <p class="adm-actions">
+              <button class="adm-btn" :disabled="drafting" @click="savePlan">Save and re-render</button>
+            </p>
           </fieldset>
-          <p class="adm-actions">
-            <button class="adm-btn" :disabled="drafting" @click="savePlan">Save and re-render</button>
-          </p>
         </details>
       </section>
 
@@ -389,6 +398,7 @@ onMounted(async () => {
             v-model="letter"
             rows="16"
             maxlength="20000"
+            :disabled="drafting"
             @blur="letter !== posting.letter && patch({ letter })"
           />
         </label>

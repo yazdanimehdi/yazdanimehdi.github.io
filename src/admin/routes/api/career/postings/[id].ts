@@ -1,12 +1,11 @@
 import { z } from 'astro/zod';
-import { readConfig } from '../../../../../lib/admin/content';
 import { HttpError, json, readBody } from '../../../../../lib/admin/http';
 import { addEvent, getPosting, listEvents, updatePosting } from '../../../../../lib/career/db';
 import { careerRoute } from '../../../../../lib/career/route';
-import { assembleCv, FabricationError } from '../../../../../lib/career/tailor';
+import { assembleCv, baseCv, FabricationError } from '../../../../../lib/career/tailor';
+import type { ContentStore } from '../../../../../lib/admin/store';
 import type { PostingStatus } from '../../../../../lib/career/types';
 import { getSql } from '../../../../../lib/db';
-import type { CvConfig } from '../../../../../lib/types';
 
 export const prerender = false;
 
@@ -57,10 +56,14 @@ async function load(idParam: string | undefined) {
   return posting;
 }
 
-export const GET = careerRoute(async (ctx) => {
-  const posting = await load(ctx.params.id);
-  return json({ posting, events: await listEvents(getSql(), posting.id) });
-});
+/** The posting, its history, and the base CV's sections (what the plan editor picks from). */
+async function view(id: string | undefined, store: ContentStore) {
+  const posting = await load(id);
+  const [events, base] = await Promise.all([listEvents(getSql(), posting.id), baseCv(store)]);
+  return json({ posting, events, cvSections: base.cv?.sections ?? {} });
+}
+
+export const GET = careerRoute(async (ctx, store) => view(ctx.params.id, store));
 
 /**
  * `{ status?, notes?, cv?, letter? }`: each change that differs from the stored value is saved and logged as an event.
@@ -72,7 +75,7 @@ export const PATCH = careerRoute(async (ctx, store) => {
   const body = Patch.parse(await readBody(ctx));
   const sql = getSql();
   if (body.cv !== undefined && JSON.stringify(body.cv) !== JSON.stringify(posting.cv)) {
-    const base = (await readConfig(store, 'cv')).data as unknown as CvConfig;
+    const base = await baseCv(store);
     if (!base.cv?.sections) throw new HttpError(400, 'There is no CV to tailor: add one on the CV screen');
     try {
       assembleCv(base, body.cv);
@@ -95,5 +98,5 @@ export const PATCH = careerRoute(async (ctx, store) => {
     await updatePosting(sql, posting.id, { notes: body.notes });
     await addEvent(sql, posting.id, 'notes edited');
   }
-  return json({ posting: await load(ctx.params.id), events: await listEvents(sql, posting.id) });
+  return view(ctx.params.id, store);
 });

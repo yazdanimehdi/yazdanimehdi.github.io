@@ -1547,3 +1547,8 @@ details.adm-editor-ask[open] > summary {
   border-radius: 6px;
   margin-block: 8px;
 }
+.adm-job-plan-edit {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
