@@ -1,5 +1,6 @@
 import { createHmac } from 'node:crypto';
 import { spawn } from 'node:child_process';
+import { parse } from 'yaml';
 import { listEntries, readConfig } from './admin/content';
 import { UpstreamError, type ContentStore } from './admin/store';
 import { PathError, THEME_NAME, configPath } from './admin/paths';
@@ -90,15 +91,30 @@ export async function cvRenderRequest(store: ContentStore, style?: CvStyle): Pro
   ]);
   const styles = parseStyles(stylesFile?.content, cv.data as unknown as CvConfig);
   const chosen = style ?? styles.styles.find((s) => s.id === styles.public)!;
-  const custom = !(BUILT_IN_THEMES as readonly string[]).includes(chosen.theme);
+  const theme = renderTheme(upload.data as CvRenderRequest['upload'], chosen);
+  const custom = !(BUILT_IN_THEMES as readonly string[]).includes(theme);
   // The theme names a folder under cv/themes: never let a client-supplied value reach the store as a path.
-  if (custom && !THEME_NAME.test(chosen.theme)) throw new PathError(`Invalid theme name: ${chosen.theme}`);
+  if (custom && !THEME_NAME.test(theme)) throw new PathError(`Invalid theme name: ${theme}`);
   return {
     cv: cv.data,
     upload: upload.data as CvRenderRequest['upload'],
     publications: pubs.map((p) => p.data),
     author: String(site.data.author ?? ''),
     style: chosen,
-    themeFiles: custom ? await readThemeFiles(store, chosen.theme) : {},
+    themeFiles: custom ? await readThemeFiles(store, theme) : {},
   };
+}
+
+/** The theme RenderCV will use: an enabled raw upload's own `design` wins over the style (`build_input`). */
+function renderTheme(upload: CvRenderRequest['upload'], style: CvStyle): string {
+  const content = upload?.enabled ? (upload.content ?? '').trim() : '';
+  let doc: unknown;
+  try {
+    doc = content ? parse(content) : null;
+  } catch {
+    return style.theme; // the renderer reports the bad YAML
+  }
+  if (!doc || typeof doc !== 'object' || !('cv' in doc) || !('design' in doc)) return style.theme;
+  const design = (doc as { design: unknown }).design as { theme?: unknown } | null;
+  return typeof design?.theme === 'string' ? design.theme : 'classic';
 }

@@ -1,6 +1,10 @@
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { stringify } from 'yaml';
 import { CvRenderError, cvRenderRequest, renderCv, type CvRenderRequest } from './cv-render';
 import { MemoryStore } from './admin/memory-store';
 import { PathError } from './admin/paths';
@@ -88,6 +92,30 @@ test('cvRenderRequest rejects a theme that is a path and reads nothing outside c
   assert.deepEqual(listed, ['src/content/publications']);
   const outside = (p: string) => p.includes('..') || !/^(config\/|src\/content\/publications|cv\/themes\/)/.test(p);
   assert.deepEqual([...reads, ...listed].filter(outside), []);
+});
+
+test("cvRenderRequest loads an enabled upload's own custom theme and validates its name", async () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'cv-render-'));
+  const write = (p: string, text: string) => {
+    mkdirSync(path.dirname(path.join(root, p)), { recursive: true });
+    writeFileSync(path.join(root, p), text);
+  };
+  write('config/cv.yml', 'cv:\n  name: N\n');
+  write('config/site.yml', 'author: N\n');
+  write('cv/themes/mine/Preamble.j2.typ', 'x');
+  const upload = (theme: string, enabled = true) =>
+    write('config/cv-upload.yml', stringify({ enabled, content: `cv:\n  name: U\ndesign:\n  theme: '${theme}'\n` }));
+  const style = { id: 'x', name: 'X', theme: 'classic', density: 'normal', design: {} } as CvStyle;
+  upload('mine');
+  assert.deepEqual((await cvRenderRequest(new MemoryStore(root), style)).themeFiles, { 'Preamble.j2.typ': 'x' });
+  upload('mine', false);
+  assert.deepEqual(
+    (await cvRenderRequest(new MemoryStore(root), style)).themeFiles,
+    {},
+    'a disabled upload is ignored',
+  );
+  upload('../../config');
+  await assert.rejects(cvRenderRequest(new MemoryStore(root), style), PathError);
 });
 
 test('renderCv maps 5xx to UpstreamError', async () => {

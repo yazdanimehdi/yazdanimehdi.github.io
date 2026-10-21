@@ -296,6 +296,11 @@ def build_input(req: dict) -> str:
     return yaml.dump(result, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
 
+def design_theme(yaml_text: str) -> str | None:
+    """The theme of built RenderCV input: the style's, or a raw upload's own (its custom theme files go there)."""
+    return ((yaml.safe_load(yaml_text) or {}).get("design") or {}).get("theme")
+
+
 def child_env() -> dict[str, str]:
     """RenderCV's whole environment: no project secrets (theme templates run unsandboxed). HOME and XDG_CACHE_HOME
     point at one stable dir under the system temp dir (the only writable place on Vercel), so a warm instance reuses

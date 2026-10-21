@@ -47,6 +47,9 @@ assert (status, headers["content-type"], out) == (200, "application/pdf", b"%PDF
 assert len(calls[0]) == 1, "no theme files, plain render"
 call({**BODY, "themeFiles": {"a.typ": "x"}})
 assert calls[1][1:] == ({"a.typ": "x"}, "classic")
+up = {"enabled": True, "content": "cv:\n  name: U\ndesign:\n  theme: mine\n"}
+call({**BODY, "upload": up, "themeFiles": {"a.typ": "x"}})
+assert calls[2][1:] == ({"a.typ": "x"}, "mine"), "an upload's own theme gets the files"
 
 
 def boom(*a):

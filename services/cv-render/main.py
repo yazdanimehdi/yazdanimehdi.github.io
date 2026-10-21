@@ -55,7 +55,7 @@ def app(environ, start_response):
     try:
         yaml_text = cvrender.build_input(req)
         pdf = (
-            cvrender.render_pdf(yaml_text, files, req["style"].get("theme"))
+            cvrender.render_pdf(yaml_text, files, cvrender.design_theme(yaml_text))
             if files
             else cvrender.render_pdf(yaml_text)
         )
