@@ -1,4 +1,7 @@
 ---
+import PatternSpotlight from './PatternSpotlight.astro';
+import { brandColors } from '../../../lib/colors';
+import { getSiteConfig } from '../../../lib/config';
 import { patternStyle } from '../../../lib/hero-patterns';
 import type { HeroPatternConfig, HeroModeConfig } from '../../../lib/types';
 
@@ -9,7 +12,12 @@ interface Props {
 }
 
 const { pattern, light, dark } = Astro.props;
-const style = patternStyle(pattern, { ink: 'var(--hero-ink)', accent: 'var(--hero-accent)' });
+// With brand colors, the brand gradient (the primary and accent palettes) is the default fill.
+const style = patternStyle(pattern, {
+  ink: 'var(--hero-ink)',
+  accent: 'var(--hero-accent)',
+  secondary: brandColors(getSiteConfig()) ? 'var(--hero-accent-2)' : undefined,
+});
 ---
 
 {/* Light mode base color */}
@@ -18,3 +26,4 @@ const style = patternStyle(pattern, { ink: 'var(--hero-ink)', accent: 'var(--her
 <div class="absolute inset-0 hidden dark:block" style={`background-color: ${dark.bgColor};`}></div>
 {/* Pattern overlay */}
 <div class:list={['hero-pattern absolute inset-0', { 'hero-pattern--full': pattern.fade === false }]} {style}></div>
+{pattern.interactive && <PatternSpotlight {style} />}

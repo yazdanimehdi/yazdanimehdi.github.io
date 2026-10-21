@@ -3,6 +3,9 @@
  * hero.type in the journal's terms: a hairline pattern at a whisper, an image or video under a paper wash, or
  * nothing. Animation presets are classic-only; the journal draws them as the configured pattern instead.
  */
+import PatternSpotlight from '../../components/astro/hero/PatternSpotlight.astro';
+import { brandColors } from '../../lib/colors';
+import { getSiteConfig } from '../../lib/config';
 import { patternStyle } from '../../lib/hero-patterns';
 import type { HeroConfig } from '../../lib/types';
 
@@ -12,7 +15,12 @@ interface Props {
 
 const { hero } = Astro.props;
 const type = hero?.type === 'animation' ? 'pattern' : (hero?.type ?? 'none');
-const patternCss = patternStyle(hero?.pattern, { ink: 'var(--ed-ink)', accent: 'var(--ed-accent)' });
+// With brand colors, --ed-brand-2 (lib/colors.ts editorialAccentCss) makes the brand gradient the default fill.
+const patternCss = patternStyle(hero?.pattern, {
+  ink: 'var(--ed-ink)',
+  accent: 'var(--ed-accent)',
+  secondary: brandColors(getSiteConfig()) ? 'var(--ed-brand-2)' : undefined,
+});
 const fade = hero?.pattern?.fade !== false;
 const light = hero?.light?.bgImage?.trim();
 const dark = hero?.dark?.bgImage?.trim() || light;
@@ -31,6 +39,7 @@ const imageStyle =
     />
   )
 }
+{type === 'pattern' && hero?.pattern?.interactive && <PatternSpotlight style={patternCss} class="ed-backdrop" />}
 {type === 'image' && imageStyle && <div class="ed-backdrop ed-backdrop--image" style={imageStyle} aria-hidden="true" />}
 {
   type === 'video' && video && (

@@ -494,11 +494,12 @@ hero:
   type: 'pattern'
   pattern:
     name: 'circuit'
-    color: 'accent' # empty: the text color; 'accent': the theme accent; or any CSS color (#7c3aed)
+    color: 'accent' # empty: the brand gradient, or the text color; 'accent' / 'secondary'; or any CSS color
     color2: '#14b8a6' # optional: a second color runs the lines in a gradient
     angle: 135 # the gradient's direction in degrees
     strength: 'medium' # subtle | medium | strong
     fade: true # false: full strength across the hero instead of fading toward the text
+    interactive: true # the pattern lights up around the cursor (mouse and trackpad; touch keeps it still)
 ```
 
 Empty and `accent` follow light and dark mode; a fixed color stays the same in both, so a saturated one usually wants
@@ -826,7 +827,20 @@ imageShape: 'circular' # "rectangular" | "circular" | "oval"
 
 ### Colors & Typography
 
-Customize the visual identity with hex colors and Google Fonts:
+The quickest way to brand the site: two hex colors (Settings → Theme & colors → Brand, or `site.yml`):
+
+```yaml
+brand:
+  primary: '#7c3aed'
+  secondary: '#14b8a6'
+```
+
+The site derives the rest: the accent for links, buttons and tiles in light and dark mode (darkened or lifted only
+as far as 4.5:1 contrast needs), its hover, border and selection shades, the classic theme's palettes, and the hero
+pattern's gradient (primary to secondary, unless the pattern has its own color). Brand colors replace `colors`
+below; leave `brand` out to set each color yourself.
+
+Or customize the visual identity color by color, with Google Fonts:
 
 ```yaml
 colors:

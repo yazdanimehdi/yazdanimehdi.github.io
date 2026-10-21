@@ -1,0 +1,36 @@
+---
+interface Props {
+  /** The pattern's custom properties (lib/hero-patterns.ts patternStyle), so the spotlight draws the same lines. */
+  style: string;
+  class?: string;
+}
+
+const { style, class: className } = Astro.props;
+---
+
+<div class:list={['hero-spotlight', className]} {style} data-hero-spotlight aria-hidden="true"></div>
+
+<script>
+  // hero.pattern.interactive: the pattern lights up around the cursor. Pointers that hover only; touch keeps the
+  // still pattern. Positions are relative to the spotlight, written once a frame.
+  if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    for (const spot of document.querySelectorAll<HTMLElement>('[data-hero-spotlight]')) {
+      const area = spot.parentElement;
+      if (!area) continue;
+      let frame = 0;
+      area.addEventListener('pointermove', (event) => {
+        cancelAnimationFrame(frame);
+        frame = requestAnimationFrame(() => {
+          const box = spot.getBoundingClientRect();
+          spot.style.setProperty('--hero-mx', `${event.clientX - box.left}px`);
+          spot.style.setProperty('--hero-my', `${event.clientY - box.top}px`);
+          spot.classList.add('is-on');
+        });
+      });
+      area.addEventListener('pointerleave', () => {
+        cancelAnimationFrame(frame);
+        spot.classList.remove('is-on');
+      });
+    }
+  }
+</script>

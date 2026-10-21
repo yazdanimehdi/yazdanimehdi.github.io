@@ -53,7 +53,10 @@ export interface HeroVideoConfig {
 
 export interface HeroPatternConfig {
   name: HeroPatternName;
-  /** The lines' color: empty for the theme's text color, 'accent' for its accent, or any CSS color. */
+  /**
+   * The lines' color: 'accent' or 'secondary' for the theme's (brand) colors, or any CSS color. Empty: the brand
+   * gradient when brand colors are set, otherwise the theme's text color.
+   */
   color?: string;
   /** Set: the lines run in a gradient from `color` to this one. */
   color2?: string;
@@ -62,6 +65,8 @@ export interface HeroPatternConfig {
   strength?: HeroPatternStrength;
   /** False: full strength across the hero instead of fading toward the text. */
   fade?: boolean;
+  /** The pattern lights up around the cursor (devices with a pointer that hovers). */
+  interactive?: boolean;
 }
 
 export interface HeroAnimationConfig {
@@ -245,6 +250,8 @@ export interface SiteConfig {
   logo?: string;
   /** The browser-tab and home-screen icon, same sources as `logo`. Absent: the icons in public/. */
   favicon?: string;
+  /** Two hexes that color the whole site (lib/colors.ts brandColors): set, they stand in for `colors`. */
+  brand?: { primary?: string; secondary?: string };
   /** Built-in pages turned on or off; absent means on. */
   pages?: Partial<Record<SitePageId, boolean>>;
   imageShape?: ImageShape;

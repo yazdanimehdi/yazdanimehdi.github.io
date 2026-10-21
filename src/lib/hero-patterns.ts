@@ -99,19 +99,39 @@ export function patternMask(name: string | undefined): string {
 // A hex, a named color, or rgb()/hsl()/oklch() with plain numbers: never anything that could leave the declaration.
 const COLOR = /^(#[0-9a-f]{3,8}|[a-z]+|(rgb|rgba|hsl|hsla|oklch|oklab)\([\d.,%\s/+-]+\))$/i;
 
-/** A configured color as CSS: '' → the theme's ink, 'accent' → its accent, anything unsafe → ink. */
-export function patternColor(value: string | undefined, theme: { ink: string; accent: string }): string {
+/**
+ * A theme's colors for patterns, as CSS: its text (ink), its accent, and with brand colors set, the brand
+ * secondary, which also makes the brand gradient the default fill.
+ */
+export interface PatternTheme {
+  ink: string;
+  accent: string;
+  secondary?: string;
+}
+
+/** A configured color as CSS: '' → ink, 'accent' / 'secondary' → the theme's, anything unsafe → ink. */
+export function patternColor(value: string | undefined, theme: PatternTheme): string {
   const v = value?.trim() ?? '';
   if (!v || !COLOR.test(v)) return theme.ink;
-  return v.toLowerCase() === 'accent' ? theme.accent : v;
+  const word = v.toLowerCase();
+  if (word === 'accent') return theme.accent;
+  if (word === 'secondary') return theme.secondary ?? theme.accent;
+  return v;
 }
 
 /** The custom properties a hero pattern element reads: its mask, its fill (a color or gradient) and its strength. */
-export function patternStyle(p: HeroPatternConfig | undefined, theme: { ink: string; accent: string }): string {
-  const from = patternColor(p?.color, theme);
-  const fill = p?.color2?.trim()
-    ? `linear-gradient(${Number.isFinite(Number(p.angle)) ? Number(p.angle) : 135}deg, ${from}, ${patternColor(p.color2, theme)})`
-    : from;
+export function patternStyle(p: HeroPatternConfig | undefined, theme: PatternTheme): string {
+  const angle = Number.isFinite(Number(p?.angle)) && p?.angle !== undefined ? Number(p.angle) : 135;
+  const color = p?.color?.trim();
+  const color2 = p?.color2?.trim();
+  const from = patternColor(color, theme);
+  // Nothing chosen and brand colors set: the brand gradient, accent to secondary.
+  const fill =
+    !color && !color2 && theme.secondary
+      ? `linear-gradient(${angle}deg, ${theme.accent}, ${theme.secondary})`
+      : color2
+        ? `linear-gradient(${angle}deg, ${from}, ${patternColor(color2, theme)})`
+        : from;
   const opacity = HERO_PATTERN_STRENGTH[p?.strength as HeroPatternStrength] ?? HERO_PATTERN_STRENGTH.subtle;
   return `--hero-pattern: ${patternMask(p?.name)}; --hero-pattern-fill: ${fill}; --hero-pattern-opacity: ${opacity};`;
 }

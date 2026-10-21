@@ -44,3 +44,14 @@ test('patternStyle: a solid fill, a gradient with its angle, and the strength', 
   assert.match(gradient, /--hero-pattern-opacity: 0\.24;/);
   assert.match(patternStyle({ name: 'dots', color2: 'teal' }, theme), /linear-gradient\(135deg, var\(--ink\), teal\)/);
 });
+
+test('patternStyle: with brand colors, nothing chosen draws the brand gradient; a chosen color still wins', () => {
+  const brand = { ...theme, secondary: 'var(--brand-2)' };
+  assert.match(
+    patternStyle({ name: 'dots', angle: 0 }, brand),
+    /--hero-pattern-fill: linear-gradient\(0deg, var\(--accent\), var\(--brand-2\)\);/,
+  );
+  assert.match(patternStyle({ name: 'dots', color: 'secondary' }, brand), /--hero-pattern-fill: var\(--brand-2\);/);
+  assert.match(patternStyle({ name: 'dots', color: 'secondary' }, theme), /--hero-pattern-fill: var\(--accent\);/);
+  assert.match(patternStyle({ name: 'dots', color: '#123456' }, brand), /--hero-pattern-fill: #123456;/);
+});

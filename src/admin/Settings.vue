@@ -47,8 +47,20 @@ const GROUPS: { label: string; fields: FieldDef[] }[] = [
     fields: [
       select('theme', 'Theme', ['classic', 'editorial']),
       select('defaultTheme', 'Light or dark by default (classic)', ['light', 'dark', 'system']),
-      { key: 'colors.light.primary', label: 'Accent color', type: 'color' },
-      { key: 'colors.dark.primary', label: 'Accent color in dark mode', type: 'color' },
+      {
+        key: 'brand.primary',
+        label: 'Brand primary',
+        type: 'color',
+        hint: 'Set your brand colors and the site does the rest: the accent for links, buttons and tiles in light and dark mode (adjusted only as far as needed to stay readable), its hover and selection shades, and the hero pattern’s gradient. Brand colors replace the two accent colors below; leave them empty to use those instead.',
+      },
+      {
+        key: 'brand.secondary',
+        label: 'Brand secondary',
+        type: 'color',
+        hint: 'The gradient’s second color, and the classic theme’s highlight color. Empty: the primary alone.',
+      },
+      { key: 'colors.light.primary', label: 'Accent color (without brand colors)', type: 'color' },
+      { key: 'colors.dark.primary', label: 'Accent color in dark mode (without brand colors)', type: 'color' },
       {
         key: 'editorial.night',
         label: 'Night palette (journal, dark mode)',
@@ -111,7 +123,7 @@ const GROUPS: { label: string; fields: FieldDef[] }[] = [
         key: 'hero.pattern.color',
         label: 'Pattern color',
         type: 'color',
-        hint: 'Empty: the text color, in light and dark mode. Type accent for the theme accent, or pick any color.',
+        hint: 'Empty: the brand gradient when brand colors are set, otherwise the text color; both follow light and dark mode. Type accent or secondary for one brand color, or pick any color.',
       },
       {
         key: 'hero.pattern.color2',
@@ -129,6 +141,12 @@ const GROUPS: { label: string; fields: FieldDef[] }[] = [
         label: 'Fade the pattern toward the text',
         type: 'checkbox',
         default: true,
+      },
+      {
+        key: 'hero.pattern.interactive',
+        label: 'Light up the pattern around the cursor',
+        type: 'checkbox',
+        hint: 'On computers with a mouse or trackpad; phones and tablets keep the still pattern.',
       },
       { key: 'hero.light.bgColor', label: 'Background color', type: 'color' },
       { key: 'hero.light.bgImage', label: 'Background image', type: 'image', folder: 'site' },
