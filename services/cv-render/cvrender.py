@@ -6,8 +6,10 @@ Used by scripts/render-cv.py (GitHub Actions) and by the private Python service 
 
 import copy
 import json
+import os
 import re
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 
@@ -294,6 +296,22 @@ def build_input(req: dict) -> str:
     return yaml.dump(result, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
 
+def child_env() -> dict[str, str]:
+    """RenderCV's whole environment: no project secrets (theme templates run unsandboxed). HOME and XDG_CACHE_HOME
+    point at one stable dir under the system temp dir (the only writable place on Vercel), so a warm instance reuses
+    Typst's package cache (RenderCV's library downloads @preview/fontawesome on first use)."""
+    cache = Path(tempfile.gettempdir()) / "cv-render-cache"
+    cache.mkdir(exist_ok=True)
+    return {
+        "PATH": os.environ.get("PATH", os.defpath),
+        "PYTHONPATH": os.pathsep.join(p for p in sys.path if p),
+        "HOME": str(cache),
+        "XDG_CACHE_HOME": str(cache),
+        "LANG": "C.UTF-8",
+        "LC_ALL": "C.UTF-8",
+    }
+
+
 def render_pdf(yaml_text: str, theme_files: dict[str, str] | None = None, theme: str | None = None) -> bytes:
     """Run RenderCV on `yaml_text` and return the PDF. Custom theme files are written under `<tmp>/<theme>/`."""
     if theme_files and not theme:
@@ -316,14 +334,18 @@ def render_pdf(yaml_text: str, theme_files: dict[str, str] | None = None, theme:
         try:
             result = subprocess.run(
                 # Not --quiet (it hides the validation table) nor --dont-generate-typst (it implicitly disables the PDF).
-                ["rendercv", "render", "cv.yaml", "--dont-generate-markdown", "--dont-generate-html", "--dont-generate-png"],
+                [sys.executable, "-m", "rendercv", "render", "cv.yaml",
+                 "--dont-generate-markdown", "--dont-generate-html", "--dont-generate-png"],
                 capture_output=True,
                 text=True,
                 cwd=tmp,
                 timeout=120,
+                env=child_env(),
             )
         except subprocess.TimeoutExpired as e:
             raise RenderError("RenderCV timed out after 120 seconds") from e
+        except OSError as e:
+            raise RenderError(f"Could not start RenderCV: {e}") from e
         if result.returncode != 0:
             raise RenderError(result.stderr or result.stdout)
 

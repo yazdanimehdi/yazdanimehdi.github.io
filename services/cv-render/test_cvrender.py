@@ -77,6 +77,32 @@ for bad in ["../x.j2.typ", "/abs.typ", "a//b.typ", "a/../b.typ"]:
 assert fails(lambda: cr.render_pdf("cv: {}", {"a.typ": "x"})), "theme_files need a theme"
 assert fails(lambda: cr.render_pdf("cv: {}", {"a.typ": "x"}, "../x")), "theme must be [a-z0-9]+"
 assert fails(lambda: cr.render_pdf("cv: {}", {"a.typ": "x"}, "My_Theme")), "theme must be [a-z0-9]+"
+# The child runs this interpreter's rendercv module with a minimal env: no secrets, a writable cache under the temp dir.
+import os  # noqa: E402
+import sys  # noqa: E402
+import tempfile  # noqa: E402
+
+seen = {}
+real_run = cr.subprocess.run
+
+
+def spy(cmd, **kw):
+    seen.update(cmd=cmd, env=kw.get("env"))
+    raise FileNotFoundError("no python")
+
+
+os.environ["SESSION_SECRET"] = "leak-me"
+cr.subprocess.run = spy
+try:
+    assert fails(lambda: cr.render_pdf("cv: {}")), "a spawn failure is a RenderError"
+finally:
+    cr.subprocess.run = real_run
+    del os.environ["SESSION_SECRET"]
+assert seen["cmd"][:4] == [sys.executable, "-m", "rendercv", "render"], seen["cmd"]
+env = seen["env"]
+assert env is not None and "SESSION_SECRET" not in env, env
+assert set(env) == {"PATH", "PYTHONPATH", "HOME", "XDG_CACHE_HOME", "LANG", "LC_ALL"}, env
+assert env["XDG_CACHE_HOME"].startswith(tempfile.gettempdir()), env
 before = json.dumps(cr.PRESETS, sort_keys=True)
 cr.resolve_design(style)["page"]["top_margin"] = "changed"
 assert json.dumps(cr.PRESETS, sort_keys=True) == before, "resolve_design must not share dicts with PRESETS"
