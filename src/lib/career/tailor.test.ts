@@ -19,8 +19,10 @@ import { getPosting, listEvents, updatePosting, upsertPostings, writeCareer } fr
 import { setBlobForTests } from './files';
 import {
   assembleCv,
+  baseCv,
   draftPrompt,
   FabricationError,
+  paperAbstracts,
   parseReview,
   parseTailorPlan,
   reviewPrompt,
@@ -405,6 +407,62 @@ test('a tailored CV can select papers from the collection, and only those are re
   assert.deepEqual((req.cv as CvConfig).cv.sections.publications, [
     { title: 'Old paper', authors: ['Jane Doe'], journal: 'ACL', date: '2020' },
   ]);
+});
+
+/** The CV lists "A title." and a CV-only "A preprint"; the collection has "A Title" (2023, with an abstract) and "B Title" (2024). */
+async function pooledStore() {
+  const cvYml = CV_YML.replace(
+    '    skills:\n',
+    `    selectedPublications:
+      - title: A title.
+        authors: [Jane Doe]
+      - title: A preprint
+        authors: [Jane Doe]
+    skills:\n`,
+  );
+  const paper = (title: string, year: number, abstract = '') =>
+    `---\ntitle: ${title}\nauthors: [Jane Doe]\nvenue: ACL\nyear: ${year}\n${abstract && `abstract: ${abstract}\n`}---\n`;
+  await sql`update documents set content = ${cvYml} where path = 'config/cv.yml'`;
+  await sql`insert into documents (path, content) values
+    ('src/content/publications/a.md', ${paper('A Title', 2023, `Graph neural networks for ${'x'.repeat(500)}`)}),
+    ('src/content/publications/b.md', ${paper('B Title', 2024)})`;
+  return new PostgresStore(sql);
+}
+
+test('baseCv pools every collection paper into the CV’s own publication section, keeping CV-only papers once', async () => {
+  const cv = await baseCv(await pooledStore());
+  const titles = cv.cv.sections!.selectedPublications!.map((e) => (e as { title: string }).title);
+  assert.deepEqual(titles, ['B Title', 'A Title', 'A preprint']); // collection newest first, then CV-only
+  assert.equal(cv.cv.sections!.publications, undefined, 'no second publications section');
+  assert.deepEqual(
+    Object.keys(cv.cv.sections),
+    ['summary', 'experience', 'selectedPublications', 'skills'],
+    'in place',
+  );
+});
+
+test('baseCv folds a second publication section into the pool and drops it', async () => {
+  const store = await pooledStore();
+  const [{ content }] = await sql<{ content: string }>`select content from documents where path = 'config/cv.yml'`;
+  const more =
+    '    talks:\n      - title: A Preprint\n        authors: [Jane Doe]\n      - title: C talk\n        authors: [Jane Doe]\n';
+  await sql`update documents set content = ${content.replace('design:', `${more}design:`)} where path = 'config/cv.yml'`;
+  const cv = await baseCv(store);
+  const titles = cv.cv.sections!.selectedPublications!.map((e) => (e as { title: string }).title);
+  assert.deepEqual(titles, ['B Title', 'A Title', 'A preprint', 'C talk']);
+  assert.equal(cv.cv.sections!.talks, undefined);
+});
+
+test('draftPrompt shows abstracts for papers, and the assembled CV never carries them', async () => {
+  const store = await pooledStore();
+  const abstracts = await paperAbstracts(store);
+  assert.deepEqual([...abstracts.keys()], ['a title'], 'papers without an abstract are absent');
+  assert.equal(abstracts.get('a title')!.length, 400, 'trimmed to 400 characters');
+  const p = { company: 'Acme', title: 'Dev', location: null, description: 'x', flags: { warn: false } };
+  const prompt = draftPrompt(await baseCv(store), p as never, { whyLooking: '' }, '', undefined, abstracts).prompt;
+  assert.match(prompt, /"abstract": "Graph neural networks for/);
+  const cv = assembleCv(await baseCv(store), { sections: [{ title: 'selectedPublications', entries: [{ ref: 1 }] }] });
+  assert.equal(JSON.stringify(cv).includes('abstract'), false);
 });
 
 test('the theme files are the chosen style’s, not an enabled upload’s', async () => {

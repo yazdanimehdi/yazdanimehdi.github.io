@@ -29,6 +29,7 @@ import {
   baseCv,
   draftPrompt,
   FabricationError,
+  paperAbstracts,
   parseReview,
   parseTailorPlan,
   reviewPrompt,
@@ -240,15 +241,16 @@ export async function draftStep(
   'use step';
   const sql = getSql();
   const store = careerStore();
-  const [p, base, career, ai] = await Promise.all([
+  const [p, base, abstracts, career, ai] = await Promise.all([
     getPosting(sql, id),
     baseCv(store),
+    paperAbstracts(store),
     readCareer(sql),
     readAiConfig(store),
   ]);
   if (!p) return 'The posting no longer exists';
   if (!base.cv?.sections) return NO_CV;
-  const prompt = draftPrompt(base, p, parseAnswers(career.answers), instruction, issues ?? undefined);
+  const prompt = draftPrompt(base, p, parseAnswers(career.answers), instruction, issues ?? undefined, abstracts);
   let plan: TailorPlan | null = null;
   let rejected = '';
   for (let attempt = 1; !plan; attempt++) {

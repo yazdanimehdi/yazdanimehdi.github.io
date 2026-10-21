@@ -2,6 +2,7 @@ import { listEntries, readConfig } from '../admin/content';
 import type { ContentStore } from '../admin/store';
 import type { TextInput } from '../ai/providers';
 import type { CvConfig } from '../types';
+import { fold } from './match';
 import { jsonObject, posting, UNTRUSTED } from './prompts';
 import type { ApplicationAnswers } from './settings';
 import type { Posting } from './types';
@@ -51,19 +52,49 @@ function publicationEntries(fronts: Entry[]): Entry[] {
 }
 
 /**
- * The CV a draft starts from: config/cv.yml through the store (never the raw upload). When it lists no publications
- * of its own, the publications collection is its `publications` section, as the renderer would add it, so a plan can
- * select papers.
+ * The CV a draft starts from: config/cv.yml through the store (never the raw upload), with every paper in the
+ * publications collection pooled into its first publication section (in place, under its title; appended as
+ * `publications` when it has none), followed by the CV's own papers the collection lacks, so a plan can select any.
  */
 export async function baseCv(store: ContentStore): Promise<CvConfig> {
   const [cv, pubs] = await Promise.all([readConfig(store, 'cv'), listEntries(store, 'publications')]);
   const base = cv.data as unknown as CvConfig;
   const sections = base.cv?.sections;
   if (!sections) return base;
-  const own = Object.values(sections).some((e) => Array.isArray(e) && e.length && isPublication(e[0]));
-  const papers = own ? [] : publicationEntries(pubs.map((p) => p.data));
-  if (papers.length && !sections.publications?.length) sections.publications = papers as never;
+  const papers = publicationEntries(pubs.map((p) => p.data));
+  const own = Object.keys(sections).filter((t) => {
+    const e = sections[t];
+    return Array.isArray(e) && e.length && isPublication(e[0]);
+  });
+  if (!own.length) {
+    if (papers.length && !sections.publications?.length) sections.publications = papers as never;
+    return base;
+  }
+  const seen = new Set(papers.map((p) => fold(String(p.title))));
+  const pool: unknown[] = [...papers];
+  for (const e of own.flatMap((t) => sections[t] as unknown[])) {
+    const key = isPublication(e) && fold(String((e as Entry).title));
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
+    pool.push(e);
+  }
+  // ponytail: one pooled section; split by type if an owner asks.
+  base.cv.sections = Object.fromEntries(
+    Object.entries(sections).flatMap(([t, e]): [string, unknown][] =>
+      t === own[0] ? [[t, pool]] : own.includes(t) ? [] : [[t, e]],
+    ),
+  ) as CvConfig['cv']['sections'];
   return base;
+}
+
+/** `fold(title)` → the collection paper's abstract (at most 400 characters), for the drafter's prompt only. */
+export async function paperAbstracts(store: ContentStore): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  for (const { data } of await listEntries(store, 'publications')) {
+    const abstract = typeof data.abstract === 'string' ? data.abstract.trim().slice(0, 400) : '';
+    if (data.title && abstract) out.set(fold(String(data.title)), abstract);
+  }
+  return out;
 }
 
 const ownHighlights = (e: unknown) =>
@@ -131,15 +162,22 @@ export function rewordedPairs(
   return out;
 }
 
-/** The CV's sections with each entry numbered by its `ref` (its index); no contact details, no hidden entries. */
-const numbered = (cv: CvConfig) =>
+/**
+ * The CV's sections with each entry numbered by its `ref` (its index); no contact details, no hidden entries. A paper
+ * whose folded title is in `abstracts` shows its abstract (here only, never in the CV).
+ */
+const numbered = (cv: CvConfig, abstracts?: Map<string, string>) =>
   JSON.stringify(
     {
       name: cv.cv.name,
       sections: Object.fromEntries(
         Object.entries(cv.cv.sections ?? {}).map(([title, entries]) => [
           title,
-          (entries ?? []).flatMap((entry, ref) => (hidden(entry) ? [] : [{ ref, entry }])),
+          (entries ?? []).flatMap((entry, ref) => {
+            if (hidden(entry)) return [];
+            const abstract = isPublication(entry) && abstracts?.get(fold(String((entry as Entry).title)));
+            return [{ ref, entry: abstract ? { ...(entry as Entry), abstract } : entry }];
+          }),
         ]),
       ),
     },
@@ -154,6 +192,7 @@ export function draftPrompt(
   prefs: Pick<ApplicationAnswers, 'whyLooking'>,
   instruction?: string,
   issues?: ReviewIssue[],
+  abstracts?: Map<string, string>,
 ): TextInput {
   const cap = (v: string | null) => (v ?? '').slice(0, 200);
   const header = `Title: ${cap(p.title)}\nCompany: ${cap(p.company)}\nLocation: ${cap(p.location)}\n\n`;
@@ -167,7 +206,7 @@ export function draftPrompt(
       'Reply with one JSON object only: {"sections":[{"title":string,"entries":[{"ref":number,"highlights"?:[string],"text"?:string}]}],"letter":string}.',
     ].join('\n'),
     prompt: [
-      `Candidate CV:\n${numbered(cv)}`,
+      `Candidate CV:\n${numbered(cv, abstracts)}`,
       `Why the candidate is looking:\n${prefs.whyLooking.trim() || '(not given)'}`,
       instruction?.trim() ? `The candidate asks: ${instruction.trim().slice(0, 500)}` : '',
       issues?.length
