@@ -1,4 +1,5 @@
 import type { RawPosting } from '../types';
+import { detectAts, type AtsKind } from './detect';
 import { ashby } from './ashby';
 import { greenhouse } from './greenhouse';
 import { SourceError, type FetchInit } from './http';
@@ -11,33 +12,7 @@ import { workable } from './workable';
 export const ATS_MAX_BYTES = 25 * 1024 * 1024;
 
 const BOARDS = { greenhouse, lever, ashby, workable, smartrecruiters };
-export type AtsKind = keyof typeof BOARDS;
-
-const HOSTS: Record<string, AtsKind> = {
-  'boards.greenhouse.io': 'greenhouse',
-  'job-boards.greenhouse.io': 'greenhouse',
-  'jobs.lever.co': 'lever',
-  'jobs.ashbyhq.com': 'ashby',
-  'apply.workable.com': 'workable',
-  'jobs.smartrecruiters.com': 'smartrecruiters',
-  'careers.smartrecruiters.com': 'smartrecruiters',
-};
-
-/** The board behind a careers URL: its kind and the first path segment as token. */
-export function detectAts(url: string): { kind: AtsKind; token: string } | null {
-  let u: URL;
-  try {
-    u = new URL(url);
-  } catch {
-    return null;
-  }
-  const host = u.hostname.toLowerCase();
-  const kind = Object.hasOwn(HOSTS, host) ? HOSTS[host] : undefined;
-  const token = u.pathname.split('/')[1];
-  // apply.workable.com/j/<shortcode> is one job, not an account.
-  if (!kind || !token || (kind === 'workable' && token === 'j')) return null;
-  return { kind, token };
-}
+export { detectAts, type AtsKind };
 
 export const atsPostings = (kind: AtsKind, token: string, init?: FetchInit): Promise<RawPosting[]> =>
   BOARDS[kind](token, { maxBytes: ATS_MAX_BYTES, ...init });

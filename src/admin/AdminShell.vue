@@ -36,6 +36,7 @@ const GROUPS = computed(() => [
       ['pages', 'Pages'],
       ['media', 'Media'],
       ['ai', 'Scholar & AI'],
+      ...(props.ctx.isOwner && props.ctx.mode === 'postgres' ? [['career', 'Job search']] : []),
       ['editor', 'Site editor'],
       ...(props.ctx.mode === 'postgres' ? [['users', 'Users']] : []),
       ['settings', 'Settings'],
