@@ -28,6 +28,7 @@
       "content-backup": false
     }
   },
+  "rewrites": [{ "source": "/(.*)", "destination": { "service": "web" } }],
   "headers": [
     {
       "source": "/(.*)",

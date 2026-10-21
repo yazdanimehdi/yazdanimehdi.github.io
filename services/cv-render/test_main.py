@@ -34,6 +34,10 @@ assert call(None, raw=b"not json")[0] == 400
 assert call([1])[0] == 400, "body must be an object"
 assert call({**BODY, "style": "x"})[0] == 400
 assert call({**BODY, "themeFiles": {"a": 1}})[0] == 400
+assert call(BODY, key="é\udcff")[0] == 401, "non-ASCII key is a 401, not a crash"
+assert call({k: v for k, v in BODY.items() if k != "cv"})[0] == 400, "missing cv"
+assert call({**BODY, "cv": "x"})[0] == 400
+assert call({**BODY, "upload": "x"})[0] == 400
 
 calls = []
 real = cr.render_pdf

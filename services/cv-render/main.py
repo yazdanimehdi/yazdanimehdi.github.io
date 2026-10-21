@@ -24,7 +24,8 @@ def authorized(environ) -> bool:
     if not secret:
         return False
     want = hmac.new(secret.encode(), b"cv-render", hashlib.sha256).hexdigest()
-    return hmac.compare_digest(environ.get("HTTP_X_CV_RENDER_KEY", ""), want)
+    got = environ.get("HTTP_X_CV_RENDER_KEY", "")
+    return hmac.compare_digest(got.encode("utf-8", "surrogateescape"), want.encode())
 
 
 def app(environ, start_response):
@@ -46,6 +47,8 @@ def app(environ, start_response):
     if (
         not isinstance(req, dict)
         or not isinstance(req.get("style"), dict)
+        or not isinstance(req.get("cv"), dict)
+        or not isinstance(req.get("upload"), (dict, type(None)))
         or not (files is None or (isinstance(files, dict) and all(isinstance(v, str) for v in files.values())))
     ):
         return reply(start_response, "400 Bad Request", {"error": "invalid request"})
