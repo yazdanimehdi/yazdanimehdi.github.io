@@ -78,7 +78,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          for f in public/cv.pdf src/data/cv.json src/data/cv-people.json config/cv.yml config/cv-upload.yml; do
+          for f in public/cv.pdf src/data/cv.json src/data/cv-people.json config/cv.yml config/cv-upload.yml config/cv-styles.yml; do
             [ -f "$f" ] && git add "$f"
           done
           [ -d "public/cv" ] && git add public/cv/

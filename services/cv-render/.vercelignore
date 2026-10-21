@@ -1,0 +1,5 @@
+# Not needed at runtime (cvrender.py reads presets.json; main.py is the entrypoint).
+test_*.py
+fixtures/
+export_schema.py
+design-schema.json
