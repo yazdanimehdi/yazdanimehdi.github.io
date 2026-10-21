@@ -180,11 +180,10 @@ export function guardPosting(input: string, format: 'html' | 'text'): { text: st
   }
   const { text, invisible, flagged } = cleanText(raw);
   const hidden = cleanText(hiddenText).text;
-  // Hidden content is removed, so it is context (hiddenBlocks, hiddenUrls), not a warning: only visible text is scanned.
 
   const seen = new Set<string>();
   const instructionLines: string[] = [];
-  for (const line of text.split('\n')) {
+  for (const line of [...text.split('\n'), ...hidden.split('\n')]) {
     const s = line.trim();
     if (!s || seen.has(s)) continue;
     const m = INSTRUCTION_PATTERNS.map((p) => p.exec(s)).find(Boolean);
@@ -196,7 +195,9 @@ export function guardPosting(input: string, format: 'html' | 'text'): { text: st
 
   const visibleUrls = new Set(text.match(URL_RE));
   const hiddenUrls = [...new Set(hidden.match(URL_RE) ?? [])].filter((u) => !visibleUrls.has(u));
-  const mixedScript = [...new Set((text.match(WORD) ?? []).filter((w) => LATIN.test(w) && CONFUSABLE.test(w)))];
+  const mixedScript = [
+    ...new Set((`${text}\n${hidden}`.match(WORD) ?? []).filter((w) => LATIN.test(w) && CONFUSABLE.test(w))),
+  ];
 
   return {
     text,
