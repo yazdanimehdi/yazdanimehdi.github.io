@@ -1,22 +1,37 @@
 ---
 import Layout from './Layout.astro';
+import RepoMeta from './RepoMeta.astro';
 import { getSiteConfig } from '../../lib/config';
 import { uiStrings } from '../../lib/ui-strings';
 import './projects.css';
 
-/** A github-readme-stats card in its light and dark variants. */
+/** A github-readme-stats card in its light and dark variants: the fallback until a GitHub snapshot exists. */
 interface Shot {
   light: string;
   dark: string;
   alt: string;
 }
 
+interface Repo {
+  name: string;
+  href: string;
+  description?: string;
+  language?: string;
+  stars?: number;
+  forks?: number;
+  topics: string[];
+  updated?: string;
+  updatedIso?: string;
+}
+
 interface Props {
   personal: boolean;
   username: string;
   stats: Shot[];
-  trophies?: Shot;
-  repos: { name: string; href: string; description?: string }[];
+  glance?: { stars: number; forks: number; repos: number; followers: number; since: number };
+  languages: { name: string; share: number }[];
+  recent: Repo[];
+  repos: Repo[];
   members: {
     id: string;
     name: string;
@@ -27,9 +42,21 @@ interface Props {
   }[];
 }
 
-const { personal, username, stats, trophies, repos, members } = Astro.props;
-const t = uiStrings(getSiteConfig());
+const { personal, username, stats, glance, languages, recent, repos, members } = Astro.props;
+const config = getSiteConfig();
+const t = uiStrings(config);
 const description = t(personal ? 'repos.descriptionPersonal' : 'repos.descriptionLab');
+const n = (v: number) => v.toLocaleString(config.lang || 'en');
+const facts = glance
+  ? [
+      [n(glance.stars), t('repos.stars')],
+      [n(glance.forks), t('repos.forks')],
+      [n(glance.repos), t('repos.repositories')],
+      [n(glance.followers), t('repos.followers')],
+      [String(glance.since), t('repos.since')],
+    ]
+  : [];
+const percent = (share: number) => Math.max(1, Math.round(share * 100));
 ---
 
 <Layout title={t('repos.title')} description={description}>
@@ -38,6 +65,24 @@ const description = t(personal ? 'repos.descriptionPersonal' : 'repos.descriptio
       <h1 class="ed-h1">{t('repos.title')}</h1>
       <p class="ed-intro">{description}</p>
     </div>
+
+    {
+      facts.length > 0 && (
+        <section class="ed-pj-group" aria-labelledby="rp-glance">
+          <h2 id="rp-glance" class="ed-label ed-pj-group-head">
+            {t('repos.glance')}
+          </h2>
+          <div class="ed-stats ed-pj-glance">
+            {facts.map(([num, label]) => (
+              <div class="ed-stat">
+                <span class="ed-stat-num num">{num}</span>
+                <span class="ed-stat-label">{label}</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )
+    }
 
     {
       repos.length > 0 && (
@@ -58,6 +103,7 @@ const description = t(personal ? 'repos.descriptionPersonal' : 'repos.descriptio
                         {r.description}
                       </span>
                     )}
+                    <RepoMeta repo={r} />
                   </span>
                   <span class="arr" aria-hidden="true">
                     ↗
@@ -68,6 +114,60 @@ const description = t(personal ? 'repos.descriptionPersonal' : 'repos.descriptio
             ))}
           </ul>
         </section>
+      )
+    }
+
+    {
+      (languages.length > 0 || recent.length > 0) && (
+        <div class="ed-pj-split">
+          {languages.length > 0 && (
+            <section class="ed-pj-group" aria-labelledby="rp-langs">
+              <h2 id="rp-langs" class="ed-label ed-pj-group-head">
+                {t('repos.languages')}
+              </h2>
+              <p class="ed-meta">{t('repos.languagesNote')}</p>
+              <ul class="ed-pj-langs">
+                {languages.map((l) => (
+                  <li class="ed-pj-lang">
+                    <span class="ed-pj-lang-name">{l.name}</span>
+                    <span class="ed-pj-lang-bar" aria-hidden="true">
+                      <span style={`inline-size: ${percent(l.share)}%`} />
+                    </span>
+                    <span class="ed-pj-lang-pct num">{percent(l.share)}%</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          {recent.length > 0 && (
+            <section class="ed-pj-group" aria-labelledby="rp-recent">
+              <h2 id="rp-recent" class="ed-label ed-pj-group-head">
+                {t('repos.recent')}
+              </h2>
+              <ul class="ed-pj-repos">
+                {recent.map((r) => (
+                  <li>
+                    <a href={r.href} class="row ed-pj-repo ed-pj-repo--compact" rel="noopener noreferrer">
+                      <span class="ed-pj-repo-text">
+                        <span class="ed-pj-repo-name">{r.name}</span>
+                        {r.description && (
+                          <span class="ed-pj-repo-desc" dir="auto">
+                            {r.description}
+                          </span>
+                        )}
+                        <RepoMeta repo={{ ...r, topics: [] }} />
+                      </span>
+                      <span class="arr" aria-hidden="true">
+                        ↗
+                      </span>
+                      <span class="ed-sr-only">{t('link.external')}</span>
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
       )
     }
 
@@ -84,20 +184,6 @@ const description = t(personal ? 'repos.descriptionPersonal' : 'repos.descriptio
                 <img class="ed-pj-shot-dark" src={s.dark} alt={s.alt} loading="lazy" decoding="async" />
               </div>
             ))}
-          </div>
-        </section>
-      )
-    }
-
-    {
-      trophies && (
-        <section class="ed-pj-group" aria-labelledby="rp-trophies">
-          <h2 id="rp-trophies" class="ed-label ed-pj-group-head">
-            {t('repos.trophies')}
-          </h2>
-          <div class="ed-pj-shot ed-pj-shot--wide">
-            <img class="ed-pj-shot-light" src={trophies.light} alt={trophies.alt} loading="lazy" decoding="async" />
-            <img class="ed-pj-shot-dark" src={trophies.dark} alt={trophies.alt} loading="lazy" decoding="async" />
           </div>
         </section>
       )
@@ -139,7 +225,7 @@ const description = t(personal ? 'repos.descriptionPersonal' : 'repos.descriptio
     }
 
     {
-      repos.length === 0 && stats.length === 0 && !trophies && members.length === 0 && (
+      repos.length === 0 && stats.length === 0 && !glance && languages.length === 0 && members.length === 0 && (
         <p class="ed-pj-empty">{t('repos.empty')}</p>
       )
     }

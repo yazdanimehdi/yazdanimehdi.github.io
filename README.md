@@ -438,11 +438,15 @@ Recruit new team members with dedicated position listings:
 
 Showcase your lab's open-source work:
 
-- **GitHub stats card** -- contribution streak, language breakdown
-- **Profile trophies** -- GitHub achievement badges
-- **Pinned repos** -- highlight your most important repositories
+- **At a glance** -- total stars, forks, repositories, followers and the year you joined (`trophies: true`)
+- **Pinned repos** -- your chosen repositories with description, language, stars, forks, topics and last update
+- **Languages and recent activity** -- the main language of each repository, and the five last pushed (`stats: true`)
 - **Team activity** -- show GitHub profiles of all team members
-- **Self-hosted support** -- use your own github-readme-stats instance
+- **Self-hosted support** -- use your own github-readme-stats instance for the team cards
+
+The journal theme reads these from a snapshot, `src/data/github.json`: the daily job refreshes it in Postgres mode
+(or **Run daily jobs** on the admin Dashboard), and `pnpm sync:github` writes it otherwise. Until the first snapshot,
+the page shows the github-readme-stats cards. `GITHUB_TOKEN`, when set, raises GitHub's API rate limit.
 
 ### Global Search
 
@@ -1089,7 +1093,7 @@ ScholarOS/
 | `/talks` | Talks and presentations timeline |
 | `/positions` | Open positions with application status |
 | `/positions/[id]` | Position detail with application form |
-| `/repositories` | GitHub stats, trophies, and pinned repos |
+| `/repositories` | GitHub totals, pinned repos, languages and recent activity |
 | `/cv` | CV page with PDF download |
 | `/contact` | Contact form |
 | `/join` | Lab recruitment page |

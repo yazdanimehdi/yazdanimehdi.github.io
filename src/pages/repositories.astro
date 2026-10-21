@@ -3,7 +3,9 @@ import ClassicRepositories from '../themes/classic/Repositories.astro';
 import EditorialRepositories from '../themes/editorial/Repositories.astro';
 import { getSiteConfig, getTheme, isPersonalMode } from '../lib/config';
 import { getEntries } from '../lib/content';
-import { getRoleName, extractGitHubUsername } from '../lib/utils';
+import { readSiteFile } from '../lib/content/context';
+import { GITHUB_JSON, parseSnapshot, summarize, type GitHubRepo } from '../lib/github';
+import { getRoleName, extractGitHubUsername, formatShortDate } from '../lib/utils';
 
 const config = getSiteConfig();
 const personal = isPersonalMode();
@@ -42,22 +44,42 @@ const members = (await getEntries('people'))
   }))
   .filter((m) => m.githubUsername !== null);
 
-// Journal theme: the same cards as light/dark image pairs; a pinned repo takes its description from the project
-// whose repoUrl points at it.
+// Journal theme: GitHub's own numbers from the daily snapshot (src/data/github.json), drawn in the site's type. Without
+// a snapshot yet, the stats fall back to the card images. A pinned repo takes its description from the project whose
+// repoUrl points at it, then from GitHub.
 const shot = (url: (theme: string) => string, alt: string) => ({ light: url(lightTheme), dark: url(darkTheme), alt });
 const editorial = getTheme() === 'editorial';
 const projects = editorial ? await getEntries('projects') : [];
+const snapshot = editorial ? parseSnapshot(readSiteFile(GITHUB_JSON), username) : null;
+const pinned = showPinnedRepos !== false ? (pinnedRepos ?? []) : [];
+const summary = snapshot ? summarize(snapshot, pinned) : null;
+const describe = (r: GitHubRepo) => ({
+  name: r.name,
+  href: r.url,
+  description: r.description ?? undefined,
+  language: r.language ?? undefined,
+  stars: r.stars,
+  forks: r.forks,
+  topics: r.topics,
+  updated: formatShortDate(r.pushedAt, config.lang),
+  updatedIso: r.pushedAt,
+});
 const journal = {
   personal,
   username,
-  stats: stats
-    ? [shot((t) => statsUrl(username, t), 'GitHub Stats'), shot((t) => langsUrl(username, t), 'Top Languages')]
-    : [],
-  trophies: trophies ? shot(trophyUrl, 'GitHub Trophies') : undefined,
-  repos: (showPinnedRepos !== false ? (pinnedRepos ?? []) : []).map((repo) => {
+  stats:
+    stats && !summary
+      ? [shot((t) => statsUrl(username, t), 'GitHub Stats'), shot((t) => langsUrl(username, t), 'Top Languages')]
+      : [],
+  glance: trophies && summary ? summary.totals : undefined,
+  languages: stats && summary ? summary.languages : [],
+  recent: stats && summary ? summary.recent.map(describe) : [],
+  repos: pinned.map((repo) => {
     const href = `https://github.com/${username}/${repo}`;
     const project = projects.find((p) => p.data.repoUrl?.replace(/\/+$/, '').toLowerCase() === href.toLowerCase());
-    return { name: repo, href, description: project?.data.excerpt };
+    const live = summary?.pinned.find((r) => r.name.toLowerCase() === repo.toLowerCase());
+    const base = live ? describe(live) : { name: repo, href, topics: [] as string[] };
+    return { ...base, description: project?.data.excerpt ?? (live?.description || undefined) };
   }),
   members: personal
     ? []

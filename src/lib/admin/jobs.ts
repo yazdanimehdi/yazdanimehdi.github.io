@@ -1,19 +1,20 @@
 import { getSql } from '../db';
 import { feedSources, syncFeeds, type FeedsConfig } from '../feeds';
-import type { FeedItem } from '../types';
+import type { FeedItem, SiteConfig } from '../types';
 import { becameDue } from '../utils';
 import { BACKUP_BRANCH, backupToGit } from './backup';
 import { listEntries, readConfig } from './content';
 import { GitHubStore, githubConfig } from './github-store';
 import { HttpError, commitChanges } from './http';
 import { papersDeps, papersSummary, syncPapers } from './papers';
+import { GITHUB_JSON, fetchGitHub, snapshotJson } from '../github';
 import { FEEDS_JSON, JOBS_JSON } from './paths';
 import type { PostgresStore } from './postgres-store';
 import type { CommitResult, ContentStore } from './store';
 
-// Scheduled first: it is cheap and time-sensitive, while feeds can take 15 s per source. Papers before the backup, so
-// it includes the new drafts.
-export const JOBS = ['scheduled', 'feeds', 'papers', 'backup'] as const;
+// Scheduled first: it is cheap and time-sensitive, while feeds can take 15 s per source. Papers and GitHub before the
+// backup, so it includes what they wrote.
+export const JOBS = ['scheduled', 'feeds', 'papers', 'github', 'backup'] as const;
 export type JobName = (typeof JOBS)[number];
 export interface StepResult {
   ok: boolean;
@@ -107,6 +108,20 @@ export async function syncFeedsFile(store: ContentStore): Promise<{
   return { changed: true, ...summary, commit };
 }
 
+/** The daily job: snapshot the GitHub profile into src/data/github.json when it changed (the Repositories page). */
+export async function syncGitHubFile(
+  store: ContentStore,
+  username: string,
+): Promise<{ changed: boolean; repos: number }> {
+  const [snapshot, current] = await Promise.all([fetchGitHub(username), store.read(GITHUB_JSON)]);
+  const content = snapshotJson(snapshot);
+  if (current?.content === content) return { changed: false, repos: snapshot.repos.length };
+  await commitChanges(store, [{ path: GITHUB_JSON, content }], 'Sync GitHub profile', {
+    [GITHUB_JSON]: current?.version ?? null,
+  });
+  return { changed: true, repos: snapshot.repos.length };
+}
+
 /** The release window starts at the last successful run; after a failed one, a week back (purging twice is harmless). */
 export function releaseSince(previous: StepResult | undefined, now: Date): Date {
   if (previous?.ok) return new Date(previous.at);
@@ -142,6 +157,12 @@ export function dailySteps(store: PostgresStore): Steps {
       const deps = await papersDeps(store);
       if (!deps) return { detail: 'skipped: no SERPAPI_KEY' };
       return { detail: papersSummary(await syncPapers(store, deps, now)) };
+    },
+    github: async () => {
+      const username = ((await readConfig(store, 'site')).data.github as SiteConfig['github'])?.username;
+      if (!username) return { detail: 'skipped: no GitHub username' };
+      const r = await syncGitHubFile(store, username);
+      return { detail: `${r.changed ? 'updated' : 'unchanged'} · ${r.repos} repositories` };
     },
     backup: async (_previous, now) => {
       if (!process.env.GITHUB_TOKEN) return { detail: 'skipped: no GITHUB_TOKEN' };
