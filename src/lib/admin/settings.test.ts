@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { canPublish, isAdminUser, loadAdminSettings } from './settings';
+import { canPublish, isAdminUser, isOwner, loadAdminSettings } from './settings';
 
 function fixture(site: string, cms: string): string {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'admin-settings-'));
@@ -21,6 +21,7 @@ test('loadAdminSettings reads site.yml and cms.yml', () => {
   assert.deepEqual(loadAdminSettings(root), {
     adminPath: 'manage',
     adminUsers: ['alice'],
+    owner: 'alice',
     publishers: ['@bob'],
     mediaFolder: 'src/assets/images',
     publicFolder: '/src/assets/images',
@@ -72,4 +73,17 @@ test('canPublish: unset means every admin; GitHub logins and password: accounts 
   assert.ok(!canPublish(password('janesmith'), { publishers }), 'a password account named like a GitHub publisher');
   assert.ok(!canPublish(github('priya'), { publishers }), 'a GitHub login named like a password publisher');
   assert.ok(!canPublish(github('password:priya'), { publishers }));
+});
+
+test('owner defaults to the first adminUsers entry; password:<user> names a password account', () => {
+  const gh = (login: string) => ({ login, provider: 'github' as const });
+  const pw = (login: string) => ({ login, provider: 'password' as const });
+  assert.ok(isOwner(gh('jane'), { owner: 'jane' }));
+  assert.ok(!isOwner(pw('jane'), { owner: 'jane' }));
+  assert.ok(isOwner(pw('jane'), { owner: 'password:jane' }));
+  assert.ok(!isOwner(gh('jane'), { owner: '' }));
+  assert.ok(!isOwner(pw('jane'), { owner: '' }));
+  const root = fixture('adminUsers: [a, b]\n', '');
+  assert.equal(loadAdminSettings(root).owner, 'a');
+  assert.equal(loadAdminSettings(fixture('adminUsers: [a, b]\nowner: b\n', '')).owner, 'b');
 });

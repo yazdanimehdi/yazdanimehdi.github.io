@@ -11,6 +11,7 @@ test('migrate creates the tables once; a second run applies nothing', async () =
     '002_admin_users.sql',
     '003_secrets.sql',
     '004_login_attempts_ip.sql',
+    '005_career.sql',
   ]);
   assert.deepEqual(await migrate(sql), []);
   await sql`insert into documents (path, content) values ('config/site.yml', 'title: A')`;
@@ -22,7 +23,18 @@ test('migrate creates the tables once; a second run applies nothing', async () =
   }>`select table_name as name from information_schema.tables where table_schema = 'public' order by 1`;
   assert.deepEqual(
     tables.map((t) => t.name),
-    ['admin_users', 'documents', 'login_attempts', 'media', 'revisions', 'schema_migrations', 'secrets'],
+    [
+      'admin_users',
+      'career_events',
+      'career_postings',
+      'career_settings',
+      'documents',
+      'login_attempts',
+      'media',
+      'revisions',
+      'schema_migrations',
+      'secrets',
+    ],
   );
 });
 

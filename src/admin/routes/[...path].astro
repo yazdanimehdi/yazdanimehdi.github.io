@@ -22,7 +22,7 @@ import type { SiteConfig } from '../../lib/types';
 import { readConfig } from '../../lib/admin/content';
 import { getStore } from '../../lib/admin/get-store';
 import { authorOf } from '../../lib/admin/http';
-import { adminSettings, canPublish } from '../../lib/admin/settings';
+import { adminSettings, canPublish, isOwner } from '../../lib/admin/settings';
 import '../../themes/editorial/editorial.css';
 import '../admin.css';
 
@@ -78,6 +78,7 @@ const ctx = {
   user: user ?? null,
   mode,
   canPublish: !!user && canPublish(user, adminSettings()),
+  isOwner: !!user && isOwner(user, adminSettings()),
   mediumToken: !!process.env.MEDIUM_TOKEN,
   siteUrl,
 };
