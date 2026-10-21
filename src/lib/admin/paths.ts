@@ -24,7 +24,7 @@ export const SITE_MEDIA = { dir: 'public/images', url: '/images' };
 export class PathError extends Error {}
 
 const SLUG = /^[a-z0-9-]{1,80}$/;
-const SEGMENT = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
+export const SEGMENT = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 const IMAGE = /\.(png|jpe?g|webp|gif|avif|svg|ico)$/i;
 
 export function assertSlug(slug: unknown): string {
@@ -46,7 +46,7 @@ export function assertConfigFile(file: unknown): ConfigFile {
 
 /** Custom RenderCV themes: `cv/themes/<name>/<template files>`. */
 export const THEMES_DIR = 'cv/themes';
-const THEME_NAME = /^[a-z0-9]+$/;
+export const THEME_NAME = /^[a-z0-9]+$/;
 const THEME_FILE = /\.typ$/;
 
 export function isThemePath(path: string): boolean {

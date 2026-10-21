@@ -1,5 +1,5 @@
 import { parse } from 'yaml';
-import { PathError, THEMES_DIR } from './admin/paths';
+import { PathError, SEGMENT, THEMES_DIR, THEME_NAME } from './admin/paths';
 import type { ContentStore } from './admin/store';
 import type { CvConfig, CvStyle, CvStylesConfig, Density } from './types';
 
@@ -19,8 +19,6 @@ export const BUILT_IN_THEMES = [
 
 const DENSITIES: Density[] = ['compact', 'normal', 'airy'];
 const STYLE_ID = /^[a-z0-9-]{1,40}$/;
-const THEME_NAME = /^[a-z0-9]+$/;
-const FILE_SEGMENT = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/;
 const MAX_FILES = 40;
 const MAX_BYTES = 512 * 1024;
 const PAGE_SIZES: Record<string, string> = { LETTER: 'us-letter', A4: 'a4' };
@@ -51,6 +49,7 @@ export function parseStyles(text: string | undefined, cv: CvConfig): CvStylesCon
     return defaultStyles(cv);
   }
   const list: unknown[] = isMap(raw) && Array.isArray(raw.styles) ? raw.styles : [];
+  const seen = new Set<string>();
   const styles = list.filter(
     (s): s is CvStyle =>
       isMap(s) &&
@@ -59,7 +58,9 @@ export function parseStyles(text: string | undefined, cv: CvConfig): CvStylesCon
       DENSITIES.includes(s.density as Density) &&
       isMap(s.design) &&
       typeof s.name === 'string' &&
-      typeof s.theme === 'string',
+      typeof s.theme === 'string' &&
+      !seen.has(s.id) &&
+      !!seen.add(s.id),
   );
   if (!styles.length) return defaultStyles(cv);
   const pub = (raw as Record<string, unknown>).public;
@@ -74,7 +75,7 @@ export function assertThemeFiles(name: string, files: Record<string, string>): v
   if (entries.length > MAX_FILES) throw new PathError(`A theme has at most ${MAX_FILES} files`);
   let bytes = 0;
   for (const [rel, text] of entries) {
-    if (!rel.endsWith('.typ') || !rel.split('/').every((s) => FILE_SEGMENT.test(s)) || rel.includes('..')) {
+    if (!rel.endsWith('.typ') || !rel.split('/').every((s) => SEGMENT.test(s))) {
       throw new PathError(`Invalid theme file: ${rel}`);
     }
     bytes += Buffer.byteLength(text);

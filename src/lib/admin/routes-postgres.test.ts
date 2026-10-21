@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { migrate } from '../db-migrate';
 import { pgliteSql } from '../pglite-sql';
 import type { Sql } from '../db';
+import { adminSettings } from './settings';
 import { setStoreForTests } from './get-store';
 import { MemoryStore } from './memory-store';
 import { PostgresStore } from './postgres-store';
@@ -172,4 +173,25 @@ test('an unreachable database answers 503 JSON', async () => {
   const res = await call(listCollection, { params: { name: 'posts' } });
   assert.equal(res.status, 503);
   assert.match((await res.json()).error, /unreachable/);
+});
+
+test('history: restoring a theme file needs a publisher; a normal path still restores', async () => {
+  const theme = 'cv/themes/mine/Header.j2.typ';
+  const store = new PostgresStore(
+    sql,
+    { name: 'Jane', email: 'j@x' },
+    { purge: async () => {}, put: async () => ({ url: '' }), del: async () => {} },
+  );
+  await store.commit([{ path: theme, content: 'x' }], 'Add theme', { [theme]: null });
+  const [rev] = (await (await call(history, { query: `?path=${theme}` })).json()) as { id: string }[];
+  adminSettings().publishers = ['priya'];
+  try {
+    const denied = await call(restore, { method: 'POST', params: { id: rev.id }, body: { version: '1' } });
+    assert.equal(denied.status, 403);
+    adminSettings().publishers = ['jane'];
+    const ok = await call(restore, { method: 'POST', params: { id: rev.id }, body: { version: '1' } });
+    assert.equal(ok.status, 200);
+  } finally {
+    adminSettings().publishers = [];
+  }
 });

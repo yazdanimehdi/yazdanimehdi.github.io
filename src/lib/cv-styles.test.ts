@@ -26,6 +26,11 @@ test('parseStyles repairs public', () => {
     ['a'],
   );
   assert.equal(tiny.public, 'a');
+  const dup = parseStyles(`styles:\n${style('a')}\n${style('a', 'airy')}\n`, cv);
+  assert.deepStrictEqual(
+    dup.styles.map((s) => s.density),
+    ['normal'],
+  );
 });
 
 test('assertThemeFiles rejects', () => {
