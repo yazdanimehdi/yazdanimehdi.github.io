@@ -2,7 +2,7 @@ import { generateText, readAiConfig } from '../../../../lib/admin/ai';
 import { listEntries } from '../../../../lib/admin/content';
 import { HttpError, json } from '../../../../lib/admin/http';
 import { careerRoute } from '../../../../lib/career/route';
-import { cvTextOf, readCv } from '../../../../lib/career/steps';
+import { cvTextOf, readCv } from '../../../../lib/career/cv-text';
 import { contactAnswers, cvLocations, parseSuggestion, suggestPrompt } from '../../../../lib/career/suggest';
 
 export const prerender = false;

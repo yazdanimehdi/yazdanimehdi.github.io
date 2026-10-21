@@ -4,21 +4,19 @@ import { generateText, readAiConfig } from '../admin/ai';
 import { readConfig } from '../admin/content';
 import { getStore } from '../admin/get-store';
 import { postgresOnly } from '../admin/http';
-import type { PostgresStore } from '../admin/postgres-store';
 import { getSecret, missingKey } from '../admin/secrets';
 import { TEXT_PROVIDERS } from '../ai/providers';
-import { resolveCvConfig } from '../cv';
 import { configPath, PathError, THEME_NAME } from '../admin/paths';
 import { CvRenderError, cvRenderRequest, renderCv } from '../cv-render';
 import { BUILT_IN_THEMES, parseStyles, readThemeFiles } from '../cv-styles';
 import { getSql } from '../db';
-import type { CvConfig } from '../types';
 import { addEvent, getPosting, readCareer, updatePosting, upsertPostings, writeCareer } from './db';
+import { cvTextOf } from './cv-text';
 import { pdfPages, putCareerPdf } from './files';
 import { answersPrompt, type FormAnswer, greenhouseQuestions, parseFormAnswers, splitQuestions } from './answers';
 import { guardPosting } from './guard';
 import { hardGate, postingKey, tidyPosting } from './match';
-import { cvText, prefsText } from './profile';
+import { prefsText } from './profile';
 import { parseScore, scorePrompt, totalScore, type ScoreDetail } from './score';
 import { parseAnswers, parsePrefs } from './settings';
 import { SOURCES, type SourceContext } from './sources';
@@ -147,18 +145,6 @@ export async function pendingScores(limit: number): Promise<{ ids: number[]; def
     limit ${limit}`;
   const ids = rows.map((r) => Number(r.id));
   return { ids, deferred: rows.length ? Number(rows[0].total) - ids.length : 0 };
-}
-
-/** The CV read through the store as cv-render does (an enabled upload wins); `cv` is missing when there is none. */
-export async function readCv(store: PostgresStore): Promise<CvConfig> {
-  const [cv, upload] = await Promise.all([readConfig(store, 'cv'), readConfig(store, 'cv-upload')]);
-  return resolveCvConfig(upload.data as { enabled?: boolean; content?: string }, () => cv.data as unknown as CvConfig);
-}
-
-/** The CV as prompt text; '' when there is none. */
-export async function cvTextOf(store: PostgresStore): Promise<string> {
-  const resolved = await readCv(store);
-  return resolved?.cv ? cvText(resolved).trim() : '';
 }
 
 /** Why the AI can't work on postings (no key for the configured text provider, or no CV), or null when ready. */
