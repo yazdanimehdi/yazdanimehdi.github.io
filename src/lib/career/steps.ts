@@ -9,9 +9,13 @@ import type { PostgresStore } from '../admin/postgres-store';
 import { getSecret, missingKey } from '../admin/secrets';
 import { TEXT_PROVIDERS } from '../ai/providers';
 import { resolveCvConfig } from '../cv';
+import { configPath } from '../admin/paths';
+import { CvRenderError, cvRenderRequest, renderCv } from '../cv-render';
+import { parseStyles } from '../cv-styles';
 import { getSql } from '../db';
 import type { CvConfig } from '../types';
-import { getPosting, readCareer, updatePosting, upsertPostings, writeCareer } from './db';
+import { addEvent, getPosting, readCareer, updatePosting, upsertPostings, writeCareer } from './db';
+import { putCareerPdf } from './files';
 import { guardPosting } from './guard';
 import { hardGate, postingKey } from './match';
 import { cvText, prefsText } from './profile';
@@ -19,6 +23,18 @@ import { parseScore, scorePrompt, totalScore, type ScoreDetail } from './score';
 import { parseAnswers, parsePrefs } from './settings';
 import { SOURCES, type SourceContext } from './sources';
 import { SourceError } from './sources/http';
+import {
+  assembleCv,
+  draftPrompt,
+  FabricationError,
+  parseReview,
+  parseTailorPlan,
+  reviewPrompt,
+  rewordedPairs,
+  type DraftPart,
+  type ReviewIssue,
+  type TailorPlan,
+} from './tailor';
 import type { RunSummary } from './types';
 
 /** The same bot author as the daily cron; these steps only read content. */
@@ -192,4 +208,133 @@ export async function markScoreFailed(id: number, error: string): Promise<void> 
 export async function finishRun(summary: RunSummary): Promise<void> {
   'use step';
   await writeCareer(getSql(), { lastRun: summary }, BOT.name);
+}
+
+// ---- Drafting: a tailored CV and cover letter for one posting (careerDraft) ----
+
+/** The base CV: config/cv.yml through the store, never the raw upload. */
+const baseCv = async (store: PostgresStore) => (await readConfig(store, 'cv')).data as unknown as CvConfig;
+const NO_CV = 'There is no CV to tailor: add one on the CV screen';
+const TRIES = 2;
+
+export async function startDraft(id: number, part: DraftPart): Promise<void> {
+  'use step';
+  const sql = getSql();
+  await updatePosting(sql, id, { draftState: 'running' });
+  await addEvent(sql, id, 'draft started', part);
+}
+
+/**
+ * Drafts the plan and letter and saves the part asked for (`letter` keeps the current CV, `cv` the current letter).
+ * A reply that isn't the plan, or a plan that reaches past the CV, is asked again once with the reason; a second
+ * failure's reason is returned (as a value: a thrown error reaches the workflow without its class). Provider and
+ * network errors throw.
+ */
+export async function draftStep(
+  id: number,
+  part: DraftPart,
+  instruction: string,
+  issues: ReviewIssue[] | null,
+): Promise<string | null> {
+  'use step';
+  const sql = getSql();
+  const store = careerStore();
+  const [p, base, career, ai] = await Promise.all([
+    getPosting(sql, id),
+    baseCv(store),
+    readCareer(sql),
+    readAiConfig(store),
+  ]);
+  if (!p) return 'The posting no longer exists';
+  if (!base.cv?.sections) return NO_CV;
+  const prompt = draftPrompt(base, p, parseAnswers(career.answers), instruction, issues ?? undefined);
+  let plan: TailorPlan | null = null;
+  let rejected = '';
+  for (let attempt = 1; !plan; attempt++) {
+    const again = `\n\nYour last reply was rejected: ${rejected}. Reply again with the corrected JSON.`;
+    const text = await generateText(store, ai, rejected ? { ...prompt, prompt: prompt.prompt + again } : prompt);
+    try {
+      plan = parseTailorPlan(text);
+      if (part !== 'letter') assembleCv(base, plan);
+    } catch (e) {
+      plan = null;
+      rejected = (e as Error).message;
+      if (attempt === TRIES) return rejected;
+    }
+  }
+  await updatePosting(sql, id, {
+    ...(part === 'letter' ? {} : { cv: { sections: plan.sections } }),
+    ...(part === 'cv' ? {} : { letter: plan.letter }),
+  });
+  return null;
+}
+
+/** The reviewer's verdict on the saved plan's reworded lines and the saved letter. */
+export async function reviewStep(id: number): Promise<{ ok: boolean; issues: ReviewIssue[] }> {
+  'use step';
+  const store = careerStore();
+  const [p, base, ai] = await Promise.all([getPosting(getSql(), id), baseCv(store), readAiConfig(store)]);
+  const plan = p?.cv as TailorPlan | null;
+  const pairs = plan?.sections && base.cv?.sections ? rewordedPairs(base, plan) : [];
+  return parseReview(await generateText(store, ai, reviewPrompt(base, pairs, p?.letter ?? '')));
+}
+// The AI-call ceiling per draft is 6: two drafts of at most two replies each, and two reviews. No step retries them.
+draftStep.maxRetries = 0;
+reviewStep.maxRetries = 0;
+
+/** Renders the saved plan in `prefs.cvStyle` (or the public style) and stores the PDF; why not, as a value. */
+export async function renderStep(id: number): Promise<string | null> {
+  'use step';
+  const sql = getSql();
+  const store = careerStore();
+  const [p, base, career, styles] = await Promise.all([
+    getPosting(sql, id),
+    baseCv(store),
+    readCareer(sql),
+    store.read(configPath('cv-styles')),
+  ]);
+  const plan = p?.cv as TailorPlan | null;
+  if (!plan?.sections) return 'There is no tailored CV to render yet';
+  if (!base.cv?.sections) return NO_CV;
+  let pdf: Uint8Array;
+  try {
+    const cv = assembleCv(base, plan);
+    const wanted = parsePrefs(career.prefs).cvStyle;
+    const style = parseStyles(styles?.content, base).styles.find((s) => s.id === wanted);
+    pdf = await renderCv({ ...(await cvRenderRequest(store, style)), cv, upload: null });
+  } catch (e) {
+    if (e instanceof FabricationError) return `The CV changed since this plan: ${e.message}`;
+    if (e instanceof CvRenderError) return e.message;
+    throw e;
+  }
+  await putCareerPdf(id, pdf);
+  return null;
+}
+renderStep.maxRetries = 1;
+
+/**
+ * `needs-review` with the issues when the last review still found some, else `done`; `found` moves to `drafted`. With
+ * no review (a re-render of the owner's edits) the earlier issues stand: only a review clears them.
+ */
+export async function finishDraft(id: number, review: { ok: boolean; issues: ReviewIssue[] } | null): Promise<void> {
+  'use step';
+  const sql = getSql();
+  const p = await getPosting(sql, id);
+  const issues = review ? (review.ok ? [] : review.issues) : ((p?.draftIssues as ReviewIssue[] | null) ?? []);
+  const flagged = review ? !review.ok : issues.length > 0;
+  const moved = p?.status === 'found';
+  await updatePosting(sql, id, {
+    draftState: flagged ? 'needs-review' : 'done',
+    draftIssues: flagged ? issues : null,
+    ...(moved ? { status: 'drafted' as const } : {}),
+  });
+  if (moved) await addEvent(sql, id, 'status', 'found → drafted');
+  await addEvent(sql, id, 'draft finished', flagged ? `needs review (${issues.length} issues)` : 'done');
+}
+
+export async function failDraft(id: number, message: string): Promise<void> {
+  'use step';
+  const sql = getSql();
+  await updatePosting(sql, id, { draftState: 'failed' });
+  await addEvent(sql, id, 'draft failed', message.slice(0, 500));
 }

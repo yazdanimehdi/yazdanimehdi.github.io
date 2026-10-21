@@ -11,7 +11,7 @@ const joined = (keys: string[], e: Entry, sep: string) =>
     .join(sep);
 
 /** One line for an entry plus its highlights; an entry of an unknown shape becomes its JSON. */
-function entryText(entry: unknown): string {
+export function entryText(entry: unknown): string {
   if (typeof entry === 'string') return entry.trim();
   if (!entry || typeof entry !== 'object') return JSON.stringify(entry);
   const e = entry as Entry;

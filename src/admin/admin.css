@@ -1537,3 +1537,13 @@ details.adm-editor-ask[open] > summary {
   flex: 1;
   min-width: 0;
 }
+.adm-job-pdf {
+  width: 100%;
+  height: 70vh;
+  border: 1px solid var(--adm-rule);
+}
+.adm-job-plan {
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+  margin-block: 8px;
+}
