@@ -197,7 +197,7 @@ export const cvSchema = z
     cv: z
       .object({
         name: z.string().min(1),
-        sections: z.record(z.array(cvEntrySchema)).optional(),
+        sections: z.record(z.string(), z.array(cvEntrySchema)).optional(),
       })
       .passthrough(),
     /** The JS PDF renderer's paper size (Postgres mode); RenderCV ignores it. */
