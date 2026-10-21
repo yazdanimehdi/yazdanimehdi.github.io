@@ -22,6 +22,8 @@ export const adzuna: Source = {
   needs: ['ADZUNA_APP_ID', 'ADZUNA_APP_KEY'],
   defaultOn: false,
   async search(ctx) {
+    // An empty query would be an unbounded (or paid) search for nothing.
+    if (!queryOf(ctx.prefs).trim()) return [];
     const id = await requireSecret(ctx, 'ADZUNA_APP_ID');
     const key = await requireSecret(ctx, 'ADZUNA_APP_KEY');
     const country = encodeURIComponent((ctx.prefs.sources.adzuna?.options?.country || 'us').toLowerCase());

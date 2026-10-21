@@ -201,3 +201,12 @@ test('SUGGESTED_FEEDS are well-formed http(s) URLs', () => {
   assert.ok(SUGGESTED_FEEDS.length > 0);
   for (const f of SUGGESTED_FEEDS) assert.ok(f.label && new URL(f.url).protocol === 'https:');
 });
+
+test('google-jobs with no roles or keywords makes no request', async () => {
+  const calls = serve({});
+  const empty = { roles: [], keywords: [] };
+  assert.deepEqual(await SOURCES['google-jobs'].search(ctx(empty, { SERPAPI_KEY: 'k' })), []);
+  assert.deepEqual(await SOURCES.adzuna.search(ctx(empty, { ADZUNA_APP_ID: 'i', ADZUNA_APP_KEY: 'k' })), []);
+  assert.deepEqual(await SOURCES.usajobs.search(ctx(empty, { USAJOBS_API_KEY: 'k' })), []);
+  assert.equal(calls.length, 0);
+});

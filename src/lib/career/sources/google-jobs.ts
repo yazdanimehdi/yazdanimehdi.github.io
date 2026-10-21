@@ -29,6 +29,8 @@ export const googleJobs: Source = {
   needs: ['SERPAPI_KEY'],
   defaultOn: true,
   async search(ctx) {
+    // An empty query would be an unbounded (or paid) search for nothing.
+    if (!queryOf(ctx.prefs).trim()) return [];
     const key = await requireSecret(ctx, 'SERPAPI_KEY');
     const seen = new Map<string, RawPosting>();
     for (const location of locationsOf(ctx.prefs)) {

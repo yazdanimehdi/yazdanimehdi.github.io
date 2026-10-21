@@ -27,6 +27,8 @@ export const usajobs: Source = {
   needs: ['USAJOBS_API_KEY'],
   defaultOn: false,
   async search(ctx) {
+    // An empty query would be an unbounded (or paid) search for nothing.
+    if (!queryOf(ctx.prefs).trim()) return [];
     const key = await requireSecret(ctx, 'USAJOBS_API_KEY');
     const email = ctx.prefs.sources.usajobs?.options?.email?.trim();
     if (!email) throw new SourceError('USAJobs needs a contact email in its source options');
