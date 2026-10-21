@@ -1,6 +1,7 @@
 import type { APIContext, APIRoute } from 'astro';
 import { ZodError } from 'astro/zod';
 import { AiError } from '../ai/providers';
+import { CvRenderError } from '../cv-render';
 import { ImportError } from './cv-import';
 import { getStore } from './get-store';
 import { MediaError } from './media';
@@ -44,6 +45,7 @@ function errorResponse(e: unknown): Response {
   if (e instanceof MediaError) return json({ error: e.message }, e.status);
   if (e instanceof ImportError) return json({ error: e.message, details: e.details }, 422);
   if (e instanceof UpstreamError) return json({ error: e.message }, e.status);
+  if (e instanceof CvRenderError) return json({ error: e.message }, 422);
   if (e instanceof AiError) return json({ error: e.message }, 502);
   // eslint-disable-next-line no-console
   console.error(e);

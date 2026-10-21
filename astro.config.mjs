@@ -13,15 +13,6 @@ import { modeFromEnv } from './src/lib/mode';
 
 const mode = modeFromEnv(process.env);
 
-// Postgres mode renders the CV PDF in the function, which reads these from process.cwd() at runtime. Listed only in
-// that mode, so a fork without the fonts directory still builds statically or in git mode.
-const cvPdfFonts =
-  mode === 'postgres'
-    ? fs
-        .readdirSync('src/lib/cv-pdf/fonts')
-        .filter((f) => f.endsWith('.ttf'))
-        .map((f) => `./src/lib/cv-pdf/fonts/${f}`)
-    : [];
 // Postgres mode also decides at request time whether the built-in news art is line art to invert in dark mode
 // (src/lib/inkArt.ts), which reads the image files.
 const newsArt =
@@ -42,7 +33,7 @@ export default defineConfig({
     mode === 'static'
       ? undefined
       : mode === 'postgres'
-        ? vercel({ imageService: true, includeFiles: [...cvPdfFonts, ...newsArt, ffmpegPath], maxDuration: 300 })
+        ? vercel({ imageService: true, includeFiles: [...newsArt, ffmpegPath], maxDuration: 300 })
         : vercel({ includeFiles: [ffmpegPath], maxDuration: 300 }),
   // Astro ignores Host / X-Forwarded-* unless they match allowedDomains, and then Astro.url is http://localhost: every
   // admin write fails the same-origin check. Vercel sets these headers at its edge and routes only the project's own

@@ -3,6 +3,7 @@ import { HttpError, json, route } from '../../../../lib/admin/http';
 import { CV_JSON } from '../../../../lib/admin/paths';
 import { PostgresStore } from '../../../../lib/admin/postgres-store';
 import { ConflictError, UpstreamError } from '../../../../lib/admin/store';
+import { CvRenderError } from '../../../../lib/cv-render';
 import { generateCvPdf, readCvMeta } from '../../../../lib/cv-pdf/generate';
 
 export const prerender = false;
@@ -16,7 +17,7 @@ export const POST = route(async (_ctx, store) => {
       const { meta, purgeFailed } = await generateCvPdf(store);
       return json({ pdf: meta, ...(purgeFailed ? { warning: 'cache-purge-failed', tags: purgeFailed } : {}) });
     } catch (e) {
-      if (e instanceof UpstreamError || e instanceof ConflictError) throw e;
+      if (e instanceof UpstreamError || e instanceof ConflictError || e instanceof CvRenderError) throw e;
       throw new HttpError(502, `PDF generation failed: ${e instanceof Error ? e.message : String(e)}`);
     }
   }
