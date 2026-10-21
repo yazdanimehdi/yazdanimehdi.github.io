@@ -28,7 +28,8 @@ function entryText(entry: unknown): string {
   const when = [text(e.startDate), text(e.endDate)].filter(Boolean).join(' to ') || text(e.date);
   const line = [head, authors, joined(['journal', 'location'], e, ', '), when].filter(Boolean).join(' | ');
   const highlights = Array.isArray(e.highlights) ? e.highlights.map(text).filter(Boolean) : [];
-  return [line, ...highlights.map((h) => `  - ${h}`)].join('\n');
+  const summary = text(e.summary);
+  return [line, ...(summary ? [`  ${summary}`] : []), ...highlights.map((h) => `  - ${h}`)].join('\n');
 }
 
 /** The CV as plain compact text: identity first (no email or phone), then every non-empty section. */
