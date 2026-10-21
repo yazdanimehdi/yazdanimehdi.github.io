@@ -62,4 +62,20 @@ try:
     raise SystemExit("bad design value should fail")
 except cr.RenderError as e:
     assert "top_margin" in str(e), e
+
+def fails(fn):
+    try:
+        fn()
+    except cr.RenderError:
+        return True
+    return False
+
+
+assert fails(lambda: cr.build_input({**req, "upload": {"enabled": True, "content": "cv: [unclosed"}})), "bad upload YAML"
+for bad in ["../x.j2.typ", "/abs.typ", "a//b.typ", "a/../b.typ"]:
+    assert fails(lambda: cr.render_pdf("cv: {}", {bad: "x"}, "mine")), bad
+assert fails(lambda: cr.render_pdf("cv: {}", {"a.typ": "x"})), "theme_files need a theme"
+before = json.dumps(cr.PRESETS, sort_keys=True)
+cr.resolve_design(style)["page"]["top_margin"] = "changed"
+assert json.dumps(cr.PRESETS, sort_keys=True) == before, "resolve_design must not share dicts with PRESETS"
 print("cvrender self-check passed")

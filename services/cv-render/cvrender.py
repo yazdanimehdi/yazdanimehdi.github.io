@@ -4,6 +4,7 @@ Shared CV renderer: site CV data plus a style become RenderCV input, and RenderC
 Used by scripts/render-cv.py (GitHub Actions) and by the private Python service (api/).
 """
 
+import copy
 import json
 import re
 import subprocess
@@ -240,9 +241,9 @@ def default_styles(cv_config: dict) -> dict:
 
 
 def deep_merge(base: dict, over: dict) -> dict:
-    out = dict(base)
+    out = copy.deepcopy(base)
     for key, value in over.items():
-        out[key] = deep_merge(out[key], value) if isinstance(value, dict) and isinstance(out.get(key), dict) else value
+        out[key] = deep_merge(out[key], value) if isinstance(value, dict) and isinstance(out.get(key), dict) else copy.deepcopy(value)
     return out
 
 
@@ -275,7 +276,10 @@ def build_input(req: dict) -> str:
     """The final RenderCV YAML for a request: cv, upload, publications, author and style (see the service's API)."""
     style, upload, author = req["style"], req.get("upload"), req.get("author") or ""
     content = ((upload or {}).get("content") or "").strip() if (upload or {}).get("enabled") else ""
-    parsed = yaml.safe_load(strip_site_markup(content)) if content else None
+    try:
+        parsed = yaml.safe_load(strip_site_markup(content)) if content else None
+    except yaml.YAMLError as e:
+        raise RenderError(f"The uploaded CV is not valid YAML: {e}") from e
     if isinstance(parsed, dict) and "cv" in parsed:
         # A raw upload keeps its own design; otherwise the style's applies.
         result = parsed
@@ -291,6 +295,13 @@ def build_input(req: dict) -> str:
 
 def render_pdf(yaml_text: str, theme_files: dict[str, str] | None = None, theme: str | None = None) -> bytes:
     """Run RenderCV on `yaml_text` and return the PDF. Custom theme files are written under `<tmp>/<theme>/`."""
+    if theme_files and not theme:
+        raise RenderError("theme is required with theme_files")
+    for rel in theme_files or {}:
+        if rel.startswith("/") or any(part in ("", "..") for part in rel.split("/")):
+            raise RenderError(f"Invalid theme file path: {rel!r}")
+    if theme and not re.fullmatch(r"[a-z0-9]+", theme):
+        raise RenderError(f"Invalid theme name: {theme!r}")
     with tempfile.TemporaryDirectory() as tmp:
         root = Path(tmp)
         (root / "cv.yaml").write_text(yaml_text, encoding="utf-8")
@@ -299,14 +310,17 @@ def render_pdf(yaml_text: str, theme_files: dict[str, str] | None = None, theme:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text, encoding="utf-8")
 
-        result = subprocess.run(
-            # Not --quiet (it hides the validation table) nor --dont-generate-typst (it implicitly disables the PDF).
-            ["rendercv", "render", "cv.yaml", "--dont-generate-markdown", "--dont-generate-html", "--dont-generate-png"],
-            capture_output=True,
-            text=True,
-            cwd=tmp,
-            timeout=120,
-        )
+        try:
+            result = subprocess.run(
+                # Not --quiet (it hides the validation table) nor --dont-generate-typst (it implicitly disables the PDF).
+                ["rendercv", "render", "cv.yaml", "--dont-generate-markdown", "--dont-generate-html", "--dont-generate-png"],
+                capture_output=True,
+                text=True,
+                cwd=tmp,
+                timeout=120,
+            )
+        except subprocess.TimeoutExpired as e:
+            raise RenderError("RenderCV timed out after 120 seconds") from e
         if result.returncode != 0:
             raise RenderError(result.stderr or result.stdout)
 
