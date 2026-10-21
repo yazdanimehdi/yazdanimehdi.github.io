@@ -143,8 +143,21 @@ const skills = { label: 'Programming Languages', details: 'Python, Dart, JavaScr
 test('details may reorder and trim a skills line', () => {
   const plan = { sections: [{ title: 'skills', entries: [{ ref: 0, details: 'SQL, python' }] }] };
   const cv = assembleCv(base({ skills: [skills] }), plan);
-  assert.equal((cv.cv.sections.skills![0] as typeof skills).details, 'SQL, python');
+  assert.equal((cv.cv.sections.skills![0] as typeof skills).details, 'SQL, Python', 'the CV’s spelling');
   assert.deepEqual(rewordedPairs(base({ skills: [skills] }), plan), [], 'code already proves details adds nothing');
+  const js = assembleCv(base({ skills: [skills] }), {
+    sections: [{ title: 'skills', entries: [{ ref: 0, details: 'javascript' }] }],
+  });
+  assert.equal((js.cv.sections.skills![0] as typeof skills).details, 'JavaScript');
+  const spaced = { label: 'x', details: ' Python, SQL ' };
+  const trimmed = assembleCv(base({ skills: [spaced] }), {
+    sections: [{ title: 'skills', entries: [{ ref: 0, details: 'SQL, Python ' }] }],
+  });
+  assert.equal(
+    (trimmed.cv.sections.skills![0] as typeof skills).details,
+    'SQL, Python',
+    'stray end spaces are ignored',
+  );
 });
 test('details may not add, repeat or empty a skills line', () => {
   for (const details of ['SQL, Rust', 'SQL, SQL', ' , '])

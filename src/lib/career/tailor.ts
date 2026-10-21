@@ -98,13 +98,20 @@ export async function paperAbstracts(store: ContentStore): Promise<Map<string, s
   return out;
 }
 
-const items = (s: string) => s.split(/\s*[,;]\s*/).filter(Boolean);
+const items = (s: string) =>
+  s
+    .trim()
+    .split(/\s*[,;]\s*/)
+    .filter(Boolean);
 
-/** `details` as a subset of the entry's own items, in the plan's order; throws for an item it doesn't have. */
+/**
+ * `details` as a subset of the entry's own items, in the plan's order and the CV's spelling; throws for an item the
+ * entry doesn't have.
+ */
 function trimDetails(at: string, had: unknown, details: string): string {
   if (typeof had !== 'string') throw new FabricationError(`${at} has no details`);
   if (details === had) return had; // unchanged, even when the CV's own line is empty or repeats an item
-  const own = new Set(items(had).map((i) => i.toLowerCase()));
+  const own = new Map(items(had).map((i) => [i.toLowerCase(), i]));
   const picked = items(details);
   if (!picked.length) throw new FabricationError(`${at} has no details left`);
   const seen = new Set<string>();
@@ -114,7 +121,7 @@ function trimDetails(at: string, had: unknown, details: string): string {
     if (seen.has(key)) throw new FabricationError(`${at} repeats "${item}"`);
     seen.add(key);
   }
-  return picked.join(', ');
+  return [...seen].map((key) => own.get(key)).join(', ');
 }
 
 const ownHighlights = (e: unknown) =>
