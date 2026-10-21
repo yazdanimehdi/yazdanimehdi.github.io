@@ -1,6 +1,6 @@
 import { readConfig } from '../../../../lib/admin/content';
 import { json, route } from '../../../../lib/admin/http';
-import { THEMES_DIR, configPath } from '../../../../lib/admin/paths';
+import { THEMES_DIR, THEME_NAME, configPath } from '../../../../lib/admin/paths';
 import { BUILT_IN_THEMES, parseStyles } from '../../../../lib/cv-styles';
 import type { CvConfig } from '../../../../lib/types';
 
@@ -16,7 +16,12 @@ export const GET = route(async (_ctx, store) => {
     store.read(configPath('cv-styles')),
     store.list(THEMES_DIR),
   ]);
-  const themes = [...new Set(themeFiles.map((f) => f.path.slice(THEMES_DIR.length + 1).split('/')[0]))];
+  // Only folders (a path below the name) with a valid theme name; anything else under cv/themes is not a theme.
+  const names = themeFiles.flatMap(({ path }) => {
+    const [name, ...rest] = path.slice(THEMES_DIR.length + 1).split('/');
+    return rest.length && THEME_NAME.test(name) ? [name] : [];
+  });
+  const themes = [...new Set(names)];
   return json({
     data: parseStyles(file?.content, cv.data as unknown as CvConfig),
     version: file?.version ?? null,

@@ -64,13 +64,18 @@ function viaCli(body: string): Promise<Uint8Array> {
   });
 }
 
-/** PDF bytes for a CV and style: the render service when CV_RENDER_URL is set, else the local CLI (astro dev only). */
+/**
+ * PDF bytes for a CV and style: the render service when CV_RENDER_URL is set, else the local CLI. A deployed function
+ * (VERCEL_ENV production or preview) never spawns Python; `astro dev` sets VERCEL=1 for the admin but no VERCEL_ENV.
+ */
 export async function renderCv(req: CvRenderRequest): Promise<Uint8Array> {
   if (override) return override(req);
   const body = JSON.stringify(req);
   const url = process.env.CV_RENDER_URL;
   if (url) return viaService(url, body);
-  if (process.env.VERCEL) throw new UpstreamError('CV renderer not configured');
+  if (['production', 'preview'].includes(process.env.VERCEL_ENV ?? '')) {
+    throw new UpstreamError('CV renderer not configured');
+  }
   return viaCli(body);
 }
 

@@ -18,11 +18,15 @@ const req = {
 const realFetch = globalThis.fetch;
 const realSecret = process.env.SESSION_SECRET;
 const realUrl = process.env.CV_RENDER_URL;
+const realVercel = process.env.VERCEL;
+const realVercelEnv = process.env.VERCEL_ENV;
 afterEach(() => {
   globalThis.fetch = realFetch;
   for (const [k, v] of [
     ['CV_RENDER_URL', realUrl],
     ['SESSION_SECRET', realSecret],
+    ['VERCEL', realVercel],
+    ['VERCEL_ENV', realVercelEnv],
   ] as const) {
     if (v === undefined) delete process.env[k];
     else process.env[k] = v;
@@ -46,6 +50,18 @@ test('renderCv posts to the binding with the key', async () => {
   assert.match(seen.url!, /\/render$/);
   assert.equal(seen.key, createHmac('sha256', 's3cret').update('cv-render').digest('hex'));
   assert.equal(new TextDecoder().decode(bytes), '%PDF-1');
+});
+
+test('renderCv without a binding: a deployed function refuses, astro dev (VERCEL=1, no VERCEL_ENV) runs the CLI', async () => {
+  delete process.env.CV_RENDER_URL;
+  process.env.VERCEL = '1';
+  for (const env of ['production', 'preview']) {
+    process.env.VERCEL_ENV = env;
+    await assert.rejects(renderCv(req), (e) => e instanceof UpstreamError && /not configured/.test(e.message));
+  }
+  delete process.env.VERCEL_ENV;
+  // The CLI refuses this empty CV (exit 2), or python3 is missing: either way it was the CLI that ran.
+  await assert.rejects(renderCv(req), (e) => e instanceof Error && !/not configured/.test(e.message));
 });
 
 test('renderCv maps 422 to CvRenderError', async () => {

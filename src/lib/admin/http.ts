@@ -5,7 +5,7 @@ import { CvRenderError } from '../cv-render';
 import { ImportError } from './cv-import';
 import { getStore } from './get-store';
 import { MediaError } from './media';
-import { PathError, assertAllowed } from './paths';
+import { PathError, assertAllowed, isThemeFolderEntry } from './paths';
 import { PostgresStore } from './postgres-store';
 import type { SessionUser } from './session';
 import { affectsCvPdf, generateCvPdf } from '../cv-pdf/generate';
@@ -80,7 +80,7 @@ export async function readBody<T>(ctx: APIContext): Promise<T> {
   return body as T;
 }
 
-/** Checks every path against the allowlist, commits once, regenerates the CV PDF when a Postgres-mode save changes it, and returns the new version of each file. */
+/** Checks every path against the allowlist (deleting anything inside a theme folder is also allowed), commits once, regenerates the CV PDF when a Postgres-mode save changes it, and returns the new version of each file. */
 export async function commitChanges(
   store: ContentStore,
   changes: Change[],
@@ -90,7 +90,7 @@ export async function commitChanges(
   if (new Set(changes.map((c) => c.path)).size !== changes.length) {
     throw new HttpError(400, 'The same file appears twice in one save');
   }
-  for (const c of changes) assertAllowed(c.path);
+  for (const c of changes) if (!(c.content === null && isThemeFolderEntry(c.path))) assertAllowed(c.path);
   const result = await store.commit(changes, message, base);
   if (!(store instanceof PostgresStore) || !affectsCvPdf(changes.map((c) => c.path))) return result;
   try {

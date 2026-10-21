@@ -165,6 +165,31 @@ test('cv styles: create, set public, persists', async ({ page }) => {
   await expect(page.getByLabel('Top margin', { exact: true })).toHaveValue('1cm');
 });
 
+test('cv styles: switching styles renders the new one and never offers the old PDF', async ({ page }) => {
+  // A stub renderer: the test is about which style the panel shows, not RenderCV. Compact's render waits for `release`.
+  let release = () => {};
+  const held = new Promise<void>((r) => (release = r));
+  const rendered: string[] = [];
+  await page.route('**/api/admin/cv/preview', async (route) => {
+    const id = JSON.parse(route.request().postData() ?? '{}').style.id;
+    if (id === 'compact') await held;
+    rendered.push(id);
+    await route.fulfill({ contentType: 'application/pdf', body: `%PDF-1.4 ${id}` }).catch(() => {});
+  });
+  await signIn(page);
+  await page.goto(`${ADMIN}/cv-styles`);
+  const list = page.getByRole('region', { name: 'My styles' });
+  page.once('dialog', (d) => d.accept('Switch test'));
+  await page.getByRole('button', { name: 'Use Harvard as a new style' }).click();
+  const download = page.getByRole('link', { name: 'Download PDF' });
+  await expect(download).toHaveAttribute('download', 'switch-test.pdf');
+  await list.getByRole('button', { name: /^Compact/ }).click();
+  await expect(download).toHaveCount(0);
+  release();
+  await expect(download).toHaveAttribute('download', 'compact.pdf');
+  expect(rendered.at(-1)).toBe('compact');
+});
+
 test('pages: reorder home sections and publish', async ({ page }) => {
   await signIn(page);
   await page.goto(`${ADMIN}/pages`);

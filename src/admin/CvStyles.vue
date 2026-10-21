@@ -173,19 +173,27 @@ function editYaml(text: string) {
   }
 }
 
-// ── Live preview: RenderCV renders the unsaved style; a failed render keeps the last good PDF ──
-const pdfUrl = ref('');
+// ── Live preview: RenderCV renders the unsaved style; a failed render keeps that style's last good PDF ──
+/** The last PDF and the style it shows: another style's PDF is never shown (or downloaded) as this one's. */
+const pdf = ref<{ url: string; styleId: string } | null>(null);
+const pdfUrl = computed(() => (pdf.value?.styleId === selectedId.value ? pdf.value.url : ''));
 const renderError = ref('');
 const rendering = ref(false);
 let timer: number | undefined;
 let inFlight: AbortController | null = null;
+let previewedId = '';
+/** Edits wait 800 ms for the next keystroke; switching styles renders at once. Either way older requests stop now. */
 function preview() {
+  const switched = selectedId.value !== previewedId;
+  previewedId = selectedId.value;
+  if (switched) renderError.value = '';
   clearTimeout(timer);
-  timer = window.setTimeout(render, 800);
+  inFlight?.abort();
+  timer = window.setTimeout(render, switched ? 0 : 800);
 }
 async function render() {
   if (!style.value) return;
-  inFlight?.abort();
+  const styleId = style.value.id;
   const ctrl = (inFlight = new AbortController());
   rendering.value = true;
   try {
@@ -201,8 +209,8 @@ async function render() {
       return;
     }
     const url = URL.createObjectURL(await res.blob());
-    if (pdfUrl.value) URL.revokeObjectURL(pdfUrl.value);
-    pdfUrl.value = url;
+    if (pdf.value) URL.revokeObjectURL(pdf.value.url);
+    pdf.value = { url, styleId };
     renderError.value = '';
   } catch (e) {
     if ((e as Error).name !== 'AbortError') renderError.value = (e as Error).message;
@@ -217,7 +225,7 @@ watch(() => JSON.stringify(style.value ?? null), preview);
 onBeforeUnmount(() => {
   clearTimeout(timer);
   inFlight?.abort();
-  if (pdfUrl.value) URL.revokeObjectURL(pdfUrl.value);
+  if (pdf.value) URL.revokeObjectURL(pdf.value.url);
 });
 </script>
 

@@ -55,6 +55,16 @@ export function isThemePath(path: string): boolean {
   return THEME_NAME.test(name) && rel.length > 0 && THEME_FILE.test(path) && rel.every((s) => SEGMENT.test(s));
 }
 
+/**
+ * Any file inside a custom theme's folder, stray ones (`.DS_Store`, a README) included: replacing or deleting a theme
+ * may delete them, though `isThemePath` never lets anyone write them.
+ */
+export function isThemeFolderEntry(path: string): boolean {
+  if (!path.startsWith(`${THEMES_DIR}/`)) return false;
+  const [name, ...rel] = path.slice(THEMES_DIR.length + 1).split('/');
+  return THEME_NAME.test(name) && rel.length > 0 && rel.every((s) => s !== '' && s !== '.' && s !== '..');
+}
+
 export const collectionDir = (name: CollectionName) => `src/content/${name}`;
 export const collectionPath = (name: CollectionName, slug: string, ext: 'md' | 'mdx' = 'md') =>
   `${collectionDir(name)}/${assertSlug(slug)}.${ext}`;

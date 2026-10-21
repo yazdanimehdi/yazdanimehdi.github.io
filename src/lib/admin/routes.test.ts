@@ -485,6 +485,32 @@ test('cv/themes: PUT replaces the folder in one commit; the styles list shows it
   assert.ok(styles.builtIn.includes('classic'));
 });
 
+test('cv/themes: stray non-template files in the folder never block a replace or a delete', async () => {
+  const strays = ['cv/themes/mine/.DS_Store', 'cv/themes/mine/notes/README.md'];
+  await store.commit(
+    [...strays, 'cv/themes/mine/Header.j2.typ'].map((path) => ({ path, content: 'x' })),
+    'out of band',
+    {},
+  );
+  const put = await call(putTheme, { method: 'PUT', params: { name: 'mine' }, body: { files: THEME } });
+  assert.equal(put.status, 200);
+  assert.deepEqual(
+    (await store.list('cv/themes/mine')).map((f) => f.path),
+    ['cv/themes/mine/Header.j2.typ', 'cv/themes/mine/components/entry.typ'],
+  );
+  assert.equal(store.log.length, 2);
+
+  await store.commit([{ path: strays[0], content: 'x' }], 'again', {});
+  assert.equal((await call(deleteTheme, { method: 'DELETE', params: { name: 'mine' } })).status, 200);
+  assert.deepEqual(await store.list('cv/themes/mine'), []);
+  assert.equal(store.log.length, 4);
+  // Strays are deletable, never writable.
+  assert.equal(
+    (await call(putTheme, { method: 'PUT', params: { name: 'mine' }, body: { files: { '.DS_Store': 'x' } } })).status,
+    400,
+  );
+});
+
 test('cv/themes: DELETE refuses while a style uses the theme', async () => {
   await call(putTheme, { method: 'PUT', params: { name: 'mine' }, body: { files: THEME } });
   const styles = (theme: string) =>
@@ -512,4 +538,12 @@ test('cv/styles: the stored styles (or the defaults) with the file version', asy
   const file = await store.read('config/cv-styles.yml');
   assert.equal(res.version, file?.version ?? null);
   assert.ok(res.data.styles.some((s: { id: string }) => s.id === res.data.public));
+
+  const files = ['cv/themes/README.md', 'cv/themes/My-Theme/a.typ', 'cv/themes/good/a.typ'];
+  await store.commit(
+    files.map((path) => ({ path, content: 'x' })),
+    'out of band',
+    {},
+  );
+  assert.deepEqual((await (await call(getStyles)).json()).themes, ['good']);
 });
