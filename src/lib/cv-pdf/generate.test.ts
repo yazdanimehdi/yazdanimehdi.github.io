@@ -2,6 +2,7 @@
 import test, { beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { parse } from 'yaml';
 import { migrate } from '../db-migrate';
 import { pgliteSql } from '../pglite-sql';
 import type { Sql } from '../db';
@@ -14,9 +15,12 @@ import { GET as getConfig, PUT as putConfig } from '../../admin/routes/api/confi
 import { PUT as putEntry } from '../../admin/routes/api/collections/[name]/[slug]';
 import { GET as pdfStatus, POST as generatePdf } from '../../admin/routes/api/cv/pdf';
 import { generateCvPdf } from './generate';
+import { CvRenderError, setRendererForTests, type CvRenderRequest } from '../cv-render';
 
 const user = { login: 'jane', name: 'Jane', avatar: '' };
 const BLOB = 'https://b.public.blob.vercel-storage.com/';
+const STYLES =
+  'public: public\nstyles:\n  - {id: public, name: Public, theme: classic, density: compact, design: {}}\n';
 const SEED = [
   'config/cv.yml',
   'config/cv-upload.yml',
@@ -51,6 +55,8 @@ beforeEach(async () => {
   await migrate(sql);
   for (const path of SEED)
     await sql`insert into documents (path, content) values (${path}, ${fs.readFileSync(path, 'utf8')})`;
+  await sql`insert into documents (path, content) values ('config/cv-styles.yml', ${STYLES})`;
+  setRendererForTests(async () => new TextEncoder().encode(`%PDF-1.7 ${Math.random()}`));
   [blobs, deleted, purged, putFails, purgeFails] = [new Map(), [], [], false, () => false];
   store = new PostgresStore(sql, { name: 'Jane', email: 'j@x' }, deps());
   setStoreForTests((author) => new PostgresStore(sql, author, deps()));
@@ -204,11 +210,14 @@ test('a failed purge of cv.json is reported as the save’s warning', async () =
 });
 
 test('if cv.json can’t be saved after the upload, the new PDF is deleted — never one the site already links to', async () => {
+  let text = 'one';
+  setRendererForTests(async () => new TextEncoder().encode(`%PDF-1.7 ${text}`));
   const first = (await generateCvPdf(store, new Date('2026-10-07T00:00:00Z'))).meta;
   const failing = new PostgresStore(sql, { name: 'Jane', email: 'j@x' }, deps());
   failing.commit = async () => {
     throw new Error('db down');
   };
+  text = 'two';
   await assert.rejects(
     quiet(() => generateCvPdf(failing, new Date('2026-10-08T00:00:00Z'))),
     /db down/,
@@ -216,6 +225,7 @@ test('if cv.json can’t be saved after the upload, the new PDF is deleted — n
   assert.equal(deleted.length, 1, 'the just-uploaded PDF');
   assert.notEqual(deleted[0], first.pdfPath);
   deleted.length = 0;
+  text = 'one';
   await assert.rejects(
     quiet(() => generateCvPdf(failing, new Date('2026-10-07T00:00:00Z'))),
     /db down/,
@@ -230,4 +240,26 @@ test('cv/pdf: a concurrent save answers 409, not 502', async () => {
   };
   setStoreForTests(() => racing);
   assert.equal((await quiet(() => call(generatePdf, { method: 'POST' }))).status, 409);
+});
+
+test('generate keeps the last PDF when the renderer fails', async () => {
+  const old = '{"lastGenerated":null,"pdfPath":"/cv.pdf","pdfSize":0}';
+  await sql`insert into documents (path, content) values (${CV_JSON}, ${old})`;
+  setRendererForTests(async () => {
+    throw new CvRenderError('bad margin');
+  });
+  await assert.rejects(generateCvPdf(store), /bad margin/);
+  assert.equal((await store.read(CV_JSON))!.content, old);
+  assert.equal(blobs.size, 0);
+});
+
+test('generate renders the public style', async () => {
+  let seen: CvRenderRequest | undefined;
+  setRendererForTests(async (req) => {
+    seen = req;
+    return new TextEncoder().encode('%PDF-1.7');
+  });
+  await generateCvPdf(store);
+  assert.equal(seen!.style.id, 'public');
+  assert.equal(seen!.author, parse((await store.read('config/site.yml'))!.content).author);
 });

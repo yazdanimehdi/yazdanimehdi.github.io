@@ -24,111 +24,109 @@ const figures = await Promise.all(areas.map((a) => imageFacts(a.figure)));
 >
   <div class="ed-wrap ed-main ed-main--flush">
     <div class="ed-research-intro">
-      <h1 class="ed-h1" dir="auto">{headline || t('home.research')}</h1>
-      <p class="ed-lede" dir="auto">{intro}</p>
+      <h1 class="ed-h1" dir="auto">
+        {headline || t('home.research')}
+      </h1>
+      <p class="ed-lede" dir="auto">
+        {intro}
+      </p>
     </div>
 
-    {
-      (areas.length > 0 || software.length > 0) && (
-        <nav class="ed-toc" aria-label={t('research.toc')}>
-          <span class="ed-toc-label">{t('research.toc')}</span>
-          {areas.map((a) => (
-            <a href={`#${a.id}`} class="ul" dir="auto">
-              <bdi>{a.numeral}</bdi> {a.title}
+    {(areas.length > 0 || software.length > 0) && (
+      <nav class="ed-toc" aria-label={t('research.toc')}>
+        <span class="ed-toc-label">{t('research.toc')}</span>
+        {areas.map((a) => (
+          <a href={`#${a.id}`} class="ul" dir="auto">
+            <bdi>{a.numeral}</bdi> {a.title}
+          </a>
+        ))}
+        {software.length > 0 && (
+          <a href="#software" class="ul">
+            {t('research.software')}
+          </a>
+        )}
+      </nav>
+    )}
+
+    {areas.map((a, i) => (
+      <section id={a.id} class="ed-area" aria-labelledby={`${a.id}-title`}>
+        <div class="ed-area-text">
+          <span class="ed-area-num" aria-hidden="true">
+            <bdi>{a.numeral}</bdi>
+          </span>
+          <h2 id={`${a.id}-title`} dir="auto">
+            {a.title}
+          </h2>
+          <div class="ed-md" set:html={a.bodyHtml} />
+          {a.result && (
+            <p class="ed-result">
+              <b>{t('research.result')}</b> <span dir="auto">{a.result}</span>
+            </p>
+          )}
+          {a.papers.length > 0 && (
+            <div class="ed-related">
+              <span class="ed-label">{t('research.papers')}</span>
+              {a.papers.map((p) => (
+                <a href={`/publications#${p.id}`} class="row">
+                  <span dir="auto">
+                    {shortTitle(p.data.title)}{' '}
+                    <span class="ed-related-venue">
+                      · {p.data.venueShort ? `${p.data.venueShort} ${p.data.year}` : p.data.venue}
+                    </span>
+                  </span>
+                  <span class="arr" aria-hidden="true">
+                    →
+                  </span>
+                </a>
+              ))}
+            </div>
+          )}
+        </div>
+        {a.figure && (
+          <figure class="ed-area-fig">
+            <div class="ed-figure-box">
+              <img
+                src={a.figure}
+                alt={a.caption || a.title}
+                width={figures[i].width}
+                height={figures[i].height}
+                class:list={[figures[i].ink && 'ed-ink']}
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+            {a.caption && (
+              <figcaption class="ed-figcaption">
+                <b>{t('figure.label', { n: figureNumbers[i] })}</b> <span dir="auto">{a.caption}</span>
+              </figcaption>
+            )}
+          </figure>
+        )}
+      </section>
+    ))}
+
+    {software.length > 0 && (
+      <section id="software" class="ed-software" aria-labelledby="software-title">
+        <Eyebrow as="h2" id="software-title">
+          {t('research.software')}
+        </Eyebrow>
+        <div class="ed-software-grid">
+          {software.map((s) => (
+            <a href={s.href} class="row ed-software-card">
+              <span class="ed-software-name">
+                {s.name}
+                {s.href && <Arrow external />}
+              </span>
+              {s.description && (
+                <span class="ed-software-desc" dir="auto">
+                  {s.description}
+                </span>
+              )}
+              {s.tech && <span class="ed-software-tech">{s.tech}</span>}
             </a>
           ))}
-          {software.length > 0 && (
-            <a href="#software" class="ul">
-              {t('research.software')}
-            </a>
-          )}
-        </nav>
-      )
-    }
-
-    {
-      areas.map((a, i) => (
-        <section id={a.id} class="ed-area" aria-labelledby={`${a.id}-title`}>
-          <div class="ed-area-text">
-            <span class="ed-area-num" aria-hidden="true">
-              <bdi>{a.numeral}</bdi>
-            </span>
-            <h2 id={`${a.id}-title`} dir="auto">
-              {a.title}
-            </h2>
-            <div class="ed-md" set:html={a.bodyHtml} />
-            {a.result && (
-              <p class="ed-result">
-                <b>{t('research.result')}</b> <span dir="auto">{a.result}</span>
-              </p>
-            )}
-            {a.papers.length > 0 && (
-              <div class="ed-related">
-                <span class="ed-label">{t('research.papers')}</span>
-                {a.papers.map((p) => (
-                  <a href={`/publications#${p.id}`} class="row">
-                    <span dir="auto">
-                      {shortTitle(p.data.title)}{' '}
-                      <span class="ed-related-venue">
-                        · {p.data.venueShort ? `${p.data.venueShort} ${p.data.year}` : p.data.venue}
-                      </span>
-                    </span>
-                    <span class="arr" aria-hidden="true">
-                      →
-                    </span>
-                  </a>
-                ))}
-              </div>
-            )}
-          </div>
-          {a.figure && (
-            <figure class="ed-area-fig">
-              <div class="ed-figure-box">
-                <img
-                  src={a.figure}
-                  alt={a.caption || a.title}
-                  width={figures[i].width}
-                  height={figures[i].height}
-                  class:list={[figures[i].ink && 'ed-ink']}
-                  loading="lazy"
-                  decoding="async"
-                />
-              </div>
-              {a.caption && (
-                <figcaption class="ed-figcaption">
-                  <b>{t('figure.label', { n: figureNumbers[i] })}</b> <span dir="auto">{a.caption}</span>
-                </figcaption>
-              )}
-            </figure>
-          )}
-        </section>
-      ))
-    }
-
-    {
-      software.length > 0 && (
-        <section id="software" class="ed-software" aria-labelledby="software-title">
-          <Eyebrow as="h2" id="software-title">
-            {t('research.software')}
-          </Eyebrow>
-          <div class="ed-software-grid">
-            {software.map((s) => (
-              <a href={s.href} class="row ed-software-card">
-                <span class="ed-software-name">
-                  {s.name}
-                  {s.href && <Arrow external />}
-                </span>
-                {s.description && (
-                  <span class="ed-software-desc" dir="auto">
-                    {s.description}
-                  </span>
-                )}
-                {s.tech && <span class="ed-software-tech">{s.tech}</span>}
-              </a>
-            ))}
-          </div>
-        </section>
-      )
-    }
+        </div>
+      </section>
+    )}
   </div>
 </Layout>

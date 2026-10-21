@@ -7,6 +7,8 @@ export interface AdminCtx {
   mode: 'static' | 'git' | 'postgres';
   /** May publish from the Site editor (site.yml `publishers`; every admin when that is empty). */
   canPublish: boolean;
+  /** The job-search owner (site.yml `owner`); everyone else never sees those screens. */
+  isOwner: boolean;
   /** MEDIUM_TOKEN is set: "Also publish to Medium" posts through the API. */
   mediumToken?: boolean;
   /** siteUrl from config/site.yml (post editor only): the public post URL handed to Medium's import tool. */

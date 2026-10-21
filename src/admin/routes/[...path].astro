@@ -1,7 +1,11 @@
 ---
 import Ai from '../Ai.vue';
+import Career from '../Career.vue';
+import CareerJob from '../CareerJob.vue';
+import CareerSettings from '../CareerSettings.vue';
 import Collection from '../Collection.vue';
 import Cv from '../Cv.vue';
+import CvStyles from '../CvStyles.vue';
 import Editor from '../Editor.vue';
 import Dashboard from '../Dashboard.vue';
 import Login from '../Login.vue';
@@ -21,11 +25,9 @@ import type { SiteConfig } from '../../lib/types';
 import { readConfig } from '../../lib/admin/content';
 import { getStore } from '../../lib/admin/get-store';
 import { authorOf } from '../../lib/admin/http';
-import { adminSettings, canPublish } from '../../lib/admin/settings';
+import { adminSettings, canPublish, isOwner } from '../../lib/admin/settings';
 import '../../themes/editorial/editorial.css';
 import '../admin.css';
-
-export const prerender = false;
 
 const { adminPath, siteName } = adminSettings();
 const [screen = '', arg = ''] = (Astro.params.path ?? '').split('/');
@@ -37,16 +39,27 @@ const SCREENS = new Set([
   'publications',
   'content',
   'cv',
+  'cv-styles',
   'pages',
   'settings',
   'users',
   'ai',
   'editor',
+  'career',
 ]);
 const CONTENT = ['announcements', 'people', 'projects', 'talks', 'positions'];
 if (!SCREENS.has(screen)) return new Response('Not found', { status: 404 });
 if (screen === 'content' && !CONTENT.includes(arg)) return new Response('Not found', { status: 404 });
 if (screen === 'users' && getMode() !== 'postgres') return new Response('Not found', { status: 404 });
+if (
+  screen === 'career' &&
+  (getMode() !== 'postgres' ||
+    !Astro.locals.user ||
+    !isOwner(Astro.locals.user, adminSettings()) ||
+    (arg && arg !== 'settings' && !/^\d+$/.test(arg)))
+)
+  return new Response('Not found', { status: 404 });
+if (screen === 'cv-styles' && getMode() === 'static') return new Response('Not found', { status: 404 });
 
 // The post editor's "Import to Medium" needs the public site URL. Read from the store like the medium API route, so
 // it is current in both modes (git: GitHub; Postgres: the database, where site.yml lives); unreadable → the editor
@@ -77,6 +90,7 @@ const ctx = {
   user: user ?? null,
   mode,
   canPublish: !!user && canPublish(user, adminSettings()),
+  isOwner: !!user && isOwner(user, adminSettings()),
   mediumToken: !!process.env.MEDIUM_TOKEN,
   siteUrl,
 };
@@ -106,25 +120,27 @@ if (screen === 'login' && error === 'denied') Astro.response.status = 403;
     />
   </head>
   <body class="adm">
-    {
-      screen === 'login' && (
-        <Login
-          client:only="vue"
-          adminPath={adminPath}
-          siteName={siteName}
-          password={mode === 'postgres'}
-          github={githubLogin}
-          error={loginError}
-        />
-      )
-    }
+    {screen === 'login' && (
+      <Login
+        client:only="vue"
+        adminPath={adminPath}
+        siteName={siteName}
+        password={mode === 'postgres'}
+        github={githubLogin}
+        error={loginError}
+      />
+    )}
     {screen === 'media' && <Media client:only="vue" ctx={ctx} />}
     {screen === 'pages' && <Pages client:only="vue" ctx={ctx} />}
     {screen === 'settings' && <Settings client:only="vue" ctx={ctx} />}
     {screen === 'ai' && <Ai client:only="vue" ctx={ctx} />}
     {screen === 'editor' && <Editor client:only="vue" ctx={ctx} />}
     {screen === 'users' && <Users client:only="vue" ctx={ctx} />}
+    {screen === 'career' && !arg && <Career client:only="vue" ctx={ctx} />}
+    {screen === 'career' && arg === 'settings' && <CareerSettings client:only="vue" ctx={ctx} />}
+    {screen === 'career' && /^\d+$/.test(arg) && <CareerJob client:only="vue" ctx={ctx} id={arg} />}
     {screen === 'cv' && <Cv client:only="vue" ctx={ctx} />}
+    {screen === 'cv-styles' && <CvStyles client:only="vue" ctx={ctx} />}
     {screen === '' && <Dashboard client:only="vue" ctx={ctx} />}
     {screen === 'posts' && !arg && <Posts client:only="vue" ctx={ctx} />}
     {screen === 'posts' && arg && <PostEditor client:only="vue" ctx={ctx} slug={arg} />}

@@ -31,34 +31,26 @@ const circular = isCircularShape();
       circular ? 'h-[140px] w-[140px]' : 'h-[170px] w-[140px]',
     ]}
   >
-    {
-      photo ? (
-        <Image src={photo} alt={name} width={140} height={170} class="h-full w-full object-cover" />
-      ) : (
-        <div class="flex h-full w-full items-center justify-center font-serif text-2xl font-light text-surface-400 dark:text-dm-faint">
-          {name
-            .split(' ')
-            .map((n) => n[0])
-            .join('')}
-        </div>
-      )
-    }
+    {photo ? (
+      <Image src={photo} alt={name} width={140} height={170} class="h-full w-full object-cover" />
+    ) : (
+      <div class="flex h-full w-full items-center justify-center font-serif text-2xl font-light text-surface-400 dark:text-dm-faint">
+        {name
+          .split(' ')
+          .map((n) => n[0])
+          .join('')}
+      </div>
+    )}
   </div>
 
   <!-- Name & title -->
-  <h3
-    class="text-sm font-medium text-surface-900 transition-colors group-hover:text-primary-600 dark:text-dm-heading dark:group-hover:text-accent-400"
-  >
+  <h3 class="text-sm font-medium text-surface-900 transition-colors group-hover:text-primary-600 dark:text-dm-heading dark:group-hover:text-accent-400">
     {name}
   </h3>
-  <p class="mt-0.5 text-xs text-surface-500 dark:text-dm-muted">
-    {displayTitle}
-  </p>
-  {
-    showDate && startDate && (
-      <p class="mt-0.5 text-xs text-surface-400 dark:text-dm-faint">
-        {startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-      </p>
-    )
-  }
+  <p class="mt-0.5 text-xs text-surface-500 dark:text-dm-muted">{displayTitle}</p>
+  {showDate && startDate && (
+    <p class="mt-0.5 text-xs text-surface-400 dark:text-dm-faint">
+      {startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+    </p>
+  )}
 </a>

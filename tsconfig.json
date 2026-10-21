@@ -9,6 +9,7 @@
       "@lib/*": ["src/lib/*"],
       "@content/*": ["src/content/*"],
       "@config/*": ["config/*"]
-    }
+    },
+    "plugins": [{ "name": "workflow" }]
   }
 }

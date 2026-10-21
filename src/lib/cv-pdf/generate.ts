@@ -1,11 +1,8 @@
 import { createHash } from 'node:crypto';
-import { listEntries, readConfig } from '../admin/content';
 import { CV_JSON } from '../admin/paths';
 import type { PostgresStore } from '../admin/postgres-store';
-import { resolveCvConfig } from '../cv';
-import type { CvConfig, CvMetadata } from '../types';
-import { buildCvDocument, type CvPublication } from './definition';
-import { renderCvPdf } from './render';
+import { cvRenderRequest, renderCv } from '../cv-render';
+import type { CvMetadata } from '../types';
 
 /** Saves that change what the CV PDF shows (site.yml too: the author is bold in it). */
 export const affectsCvPdf = (paths: string[]) =>
@@ -13,6 +10,8 @@ export const affectsCvPdf = (paths: string[]) =>
     (p) =>
       p === 'config/cv.yml' ||
       p === 'config/cv-upload.yml' ||
+      p === 'config/cv-styles.yml' ||
+      p.startsWith('cv/themes/') ||
       p === 'config/site.yml' ||
       p.startsWith('src/content/publications/'),
   );
@@ -28,7 +27,7 @@ export function readCvMeta(content: string | undefined): CvMetadata | null {
 }
 
 /**
- * Postgres mode: renders the stored CV (the raw upload when enabled, as the CV page does), uploads it to Blob as
+ * Postgres mode: renders the stored CV with the public style through RenderCV, uploads it to Blob as
  * cv/cv-<hash>.pdf, records it in src/data/cv.json (which purges the CV page), then deletes the previous PDF.
  * `purgeFailed` carries the tags of the cv.json save whose cache purge failed. A failed cv.json save removes the PDF
  * this run uploaded, never one that already existed under the same name.
@@ -37,24 +36,7 @@ export async function generateCvPdf(
   store: PostgresStore,
   now = new Date(),
 ): Promise<{ meta: CvMetadata; purgeFailed?: string[] }> {
-  const [cv, rawCv, site, pubs, current] = await Promise.all([
-    readConfig(store, 'cv'),
-    readConfig(store, 'cv-upload'),
-    readConfig(store, 'site'),
-    listEntries(store, 'publications'),
-    store.read(CV_JSON),
-  ]);
-  const structured = cv.data as unknown as CvConfig;
-  const config = resolveCvConfig(rawCv.data as { enabled?: boolean; content?: string }, () => structured);
-  if (!config?.cv?.name) throw new Error('config/cv.yml has no cv.name');
-  const definition = buildCvDocument(
-    config.cv,
-    pubs.map((p) => ({ id: p.slug, data: p.data as CvPublication['data'] })),
-    { author: String(site.data.author ?? '') },
-    { pageSize: structured.pdf?.pageSize },
-  );
-  definition.info = { ...definition.info, creationDate: now };
-  const bytes = await renderCvPdf(definition);
+  const [bytes, current] = await Promise.all([cvRenderRequest(store).then(renderCv), store.read(CV_JSON)]);
   const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 8);
   const upload = await store.putMedia(
     'site',

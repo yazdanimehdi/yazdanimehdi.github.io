@@ -1,6 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PathError, assertAllowed, assertCollection, assertConfigFile, assertSlug, collectionPath } from './paths';
+import {
+  PathError,
+  assertAllowed,
+  assertCollection,
+  assertConfigFile,
+  assertSlug,
+  collectionPath,
+  isThemeFolderEntry,
+} from './paths';
 import { adminSettings } from './settings';
 
 const media = adminSettings().mediaFolder;
@@ -65,4 +73,11 @@ test('assertAllowed accepts exactly the admin-writable paths', () => {
     'public/index.html',
   ];
   for (const p of bad) assert.throws(() => assertAllowed(p), PathError, p);
+});
+
+test('isThemeFolderEntry: anything inside a valid theme folder, nothing that climbs out', () => {
+  for (const p of ['cv/themes/mine/.DS_Store', 'cv/themes/mine/notes/README.md', 'cv/themes/mine/a.j2.typ'])
+    assert.ok(isThemeFolderEntry(p), p);
+  const bad = ['cv/themes/mine', 'cv/themes/README.md', 'cv/themes/My-Theme/a.typ', 'cv/themes/mine/../x', 'cv/x'];
+  for (const p of bad) assert.ok(!isThemeFolderEntry(p), p);
 });

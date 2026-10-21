@@ -1,4 +1,5 @@
 /* eslint-disable no-console -- the tests silence expected error logs */
+import { nonOwnerUser, ownerUser } from '../career/test-owner';
 import test, { after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { migrate } from '../db-migrate';
@@ -8,7 +9,9 @@ import { setStoreForTests } from './get-store';
 import { MemoryStore } from './memory-store';
 import { PostgresStore } from './postgres-store';
 import { JOBS_JSON } from './paths';
-import { dailySteps, parseJobs, releaseScheduled, releaseSince, runJobs, type Steps } from './jobs';
+import { JOBS, dailySteps, parseJobs, releaseScheduled, releaseSince, runJobs, type Steps } from './jobs';
+import { writeCareer } from '../career/db';
+import { setRunsForTests } from '../../workflows/career-nightly';
 import { GET as cron } from '../../admin/routes/api/cron/daily';
 import { POST as runNow } from '../../admin/routes/api/jobs/run';
 
@@ -71,6 +74,10 @@ test('runJobs: a failing step is recorded and the others still run; jobs.json ho
       ran.push('github');
       return { detail: 'skipped: no GitHub username' };
     },
+    career: async () => {
+      ran.push('career');
+      return { detail: 'done' };
+    },
     backup: async () => {
       ran.push('backup');
       return { detail: '2 file(s) changed', url: 'https://github.com/o/r/commit/c' };
@@ -83,13 +90,14 @@ test('runJobs: a failing step is recorded and the others still run; jobs.json ho
   } finally {
     console.error = original;
   }
-  assert.deepEqual(ran, ['scheduled', 'feeds', 'papers', 'github', 'backup']);
+  assert.deepEqual(ran, ['scheduled', 'feeds', 'papers', 'github', 'career', 'backup']);
   const at = '2026-10-07T03:00:00.000Z';
   assert.deepEqual(await jobs(), {
     feeds: { ok: false, at, detail: 'feed down' },
     scheduled: { ok: true, at, detail: 'nothing due' },
     papers: { ok: true, at, detail: 'skipped: no SERPAPI_KEY' },
     github: { ok: true, at, detail: 'skipped: no GitHub username' },
+    career: { ok: true, at, detail: 'done' },
     backup: { ok: true, at, detail: '2 file(s) changed', url: 'https://github.com/o/r/commit/c' },
   });
 });
@@ -169,6 +177,7 @@ test('cron in Postgres mode: runs every step, releases due posts, records jobs.j
         scheduled: [true, 'released now'],
         papers: [true, 'skipped: no SERPAPI_KEY'],
         github: [true, 'skipped: no GitHub username'],
+        career: [true, 'done'],
         backup: [true, 'skipped: no GITHUB_TOKEN'],
       },
     );
@@ -192,7 +201,7 @@ test('Run now: Postgres only; runs the same jobs as the signed-in user', async (
     await sql`insert into documents (path, content) values ('config/feeds.yml', ${'feeds: []\n'})`;
     const res = await call();
     assert.equal(res.status, 200);
-    assert.deepEqual(Object.keys(await res.json()), ['scheduled', 'feeds', 'papers', 'github', 'backup']);
+    assert.deepEqual(Object.keys(await res.json()), ['scheduled', 'feeds', 'papers', 'github', 'career', 'backup']);
     setStoreForTests(() => new MemoryStore());
     assert.equal((await call()).status, 404);
   } finally {
@@ -312,6 +321,72 @@ test('papers step: skips cleanly without SERPAPI_KEY, and with a key but no Scho
       detail: 'skipped: no Scholar author id in config/scholar.yml',
     });
   } finally {
+    restore();
+  }
+});
+
+test('career runs after github and before backup; an empty search is skipped', async () => {
+  assert.deepEqual(JOBS.slice(JOBS.indexOf('github')), ['github', 'career', 'backup']);
+  let starts = 0;
+  const steps = (nightly: () => Promise<{ runId: string } | { running: string }>) =>
+    dailySteps(store(), async () => (starts++, nightly()));
+  const run = (nightly: () => Promise<{ runId: string } | { running: string }>) =>
+    steps(nightly).career({}, new Date());
+  const started = async () => ({ runId: 'wrun_1' });
+
+  const skipped = await run(started);
+  await writeCareer(sql, { prefs: { roles: [' '], watched: [] } }, 'test');
+  const blank = await run(started);
+  assert.equal(starts, 0, 'no search (a blank role is none) starts nothing');
+
+  await writeCareer(sql, { prefs: { roles: ['data scientist'] } }, 'test');
+  const ran = await run(started);
+  const busy = await run(async () => ({ running: 'wrun_1' }));
+  assert.equal(starts, 2);
+  await writeCareer(sql, { prefs: { feeds: ['https://jobs.test/feed.xml'] } }, 'test');
+  await run(started);
+  assert.equal(starts, 3, 'feeds alone are a search');
+  // Every admin reads jobs.json: it must not tell whether the owner is job hunting.
+  for (const r of [skipped, blank, ran, busy]) assert.deepEqual(r, { detail: 'done' });
+
+  await assert.rejects(
+    run(async () => {
+      throw new Error('DATABASE_URL secret detail');
+    }),
+    (e: Error) => e.message === 'failed' && /secret detail/.test((e.cause as Error).message),
+    'jobs.json gets "failed"; the real error only reaches the log, as the cause',
+  );
+});
+
+test('Run now starts the job search for the owner only', async () => {
+  const restore = env({ GITHUB_TOKEN: undefined, SERPAPI_KEY: undefined });
+  let starts = 0;
+  setRunsForTests({
+    get: () => ({
+      status: Promise.resolve('completed'),
+      createdAt: Promise.resolve(new Date()),
+      cancel: async () => {},
+    }),
+    start: async () => (starts++, { runId: 'wrun_owner' }),
+  });
+  const call = (user: ReturnType<typeof ownerUser>) =>
+    runNow({
+      request: new Request('https://site.test/api/admin/jobs/run', { method: 'POST' }),
+      url: new URL('https://site.test/api/admin/jobs/run'),
+      params: {},
+      locals: { user },
+    } as never);
+  try {
+    await sql`insert into documents (path, content) values ('config/feeds.yml', ${'feeds: []\n'})`;
+    await writeCareer(sql, { prefs: { roles: ['data scientist'] } }, 'test');
+    const other = await (await call(nonOwnerUser())).json();
+    assert.equal(starts, 0, "another admin's Run now never starts the owner's search");
+    assert.deepEqual(other.career.detail, 'done');
+    const owner = await (await call(ownerUser())).json();
+    assert.equal(starts, 1);
+    assert.deepEqual(owner.career.detail, 'done');
+  } finally {
+    setRunsForTests(null);
     restore();
   }
 });

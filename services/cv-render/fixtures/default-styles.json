@@ -1,0 +1,72 @@
+[
+  {
+    "input": { "cv": { "name": "N" } },
+    "expected": {
+      "public": "compact",
+      "styles": [{ "id": "compact", "name": "Compact", "theme": "classic", "density": "compact", "design": {} }]
+    }
+  },
+  {
+    "input": { "cv": { "name": "N" }, "design": { "theme": "harvard" }, "pdf": { "pageSize": "A4" } },
+    "expected": {
+      "public": "compact",
+      "styles": [
+        {
+          "id": "compact",
+          "name": "Compact",
+          "theme": "harvard",
+          "density": "compact",
+          "design": { "page": { "size": "a4" } }
+        }
+      ]
+    }
+  },
+  {
+    "input": { "cv": { "name": "N" }, "pdf": { "pageSize": "LETTER" } },
+    "expected": {
+      "public": "compact",
+      "styles": [
+        {
+          "id": "compact",
+          "name": "Compact",
+          "theme": "classic",
+          "density": "compact",
+          "design": { "page": { "size": "us-letter" } }
+        }
+      ]
+    }
+  },
+  {
+    "input": { "cv": { "name": "N" }, "design": { "theme": "sb2nov", "page": { "top_margin": "1in" } } },
+    "expected": {
+      "public": "my-style",
+      "styles": [
+        {
+          "id": "my-style",
+          "name": "My style",
+          "theme": "sb2nov",
+          "density": "normal",
+          "design": { "page": { "top_margin": "1in" } }
+        }
+      ]
+    }
+  },
+  {
+    "input": {
+      "cv": { "name": "N" },
+      "design": { "theme": "sb2nov", "page": { "topMargin": "1in" }, "textAlignment": "left" }
+    },
+    "expected": {
+      "public": "my-style",
+      "styles": [
+        {
+          "id": "my-style",
+          "name": "My style",
+          "theme": "sb2nov",
+          "density": "normal",
+          "design": { "page": { "top_margin": "1in" }, "text_alignment": "left" }
+        }
+      ]
+    }
+  }
+]

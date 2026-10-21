@@ -70,10 +70,8 @@ const feeds = sections.includes('blog')
 const editorialHome = getTheme() === 'editorial' ? await loadHome() : null;
 ---
 
-{
-  editorialHome ? (
-    <EditorialHome {...editorialHome} />
-  ) : (
-    <ClassicHome {config} {personal} {siteName} {sections} {announcementData} {publications} {posts} {feeds} />
-  )
-}
+{editorialHome ? (
+  <EditorialHome {...editorialHome} />
+) : (
+  <ClassicHome {config} {personal} {siteName} {sections} {announcementData} {publications} {posts} {feeds} />
+)}

@@ -7,4 +7,6 @@ interface Props {
 const { as: Tag = 'span', id } = Astro.props;
 ---
 
-<Tag class="ed-eyebrow" id={id}><slot /></Tag>
+<Tag class="ed-eyebrow" id={id}>
+  <slot />
+</Tag>

@@ -1,0 +1,30 @@
+{
+  "search_metadata": { "status": "Success" },
+  "jobs_results": [
+    {
+      "title": "Research Software Engineer",
+      "company_name": "Example Labs",
+      "location": "Boston, MA",
+      "via": "via LinkedIn",
+      "description": "We are looking for a research software engineer to build pipelines.\n\nYou will work with scientists ...",
+      "job_highlights": [{ "title": "Qualifications", "items": ["PhD or MSc", "Python"] }],
+      "apply_options": [{ "title": "LinkedIn", "link": "https://www.linkedin.com/jobs/view/1234567890" }],
+      "share_link": "https://www.google.com/search?q=research+software+engineer&ibp=htl;jobs#fpstate=tldetail&htidocid=abc",
+      "extensions": ["3 days ago", "Full-time"],
+      "detected_extensions": { "posted_at": "3 days ago", "schedule_type": "Full-time" },
+      "job_id": "eyJqb2JfdGl0bGUiOiJSZXNlYXJjaCBTb2Z0d2FyZSBFbmdpbmVlciJ9"
+    },
+    {
+      "title": "Data Scientist",
+      "company_name": "Sample Analytics",
+      "location": "Anywhere",
+      "via": "via Indeed",
+      "description": "Apply machine learning to ...",
+      "apply_options": [{ "title": "Indeed", "link": "https://www.indeed.com/viewjob?jk=abcdef" }],
+      "extensions": ["Work from home", "Contractor"],
+      "detected_extensions": { "work_from_home": true, "schedule_type": "Contractor" },
+      "job_id": "eyJqb2JfdGl0bGUiOiJEYXRhIFNjaWVudGlzdCJ9"
+    }
+  ],
+  "serpapi_pagination": { "next_page_token": "TOKEN2" }
+}

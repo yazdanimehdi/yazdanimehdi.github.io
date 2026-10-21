@@ -22,15 +22,13 @@ const { title, description, ogImage, keywords, fullWidth = false } = Astro.props
     <Header />
   </div>
   <main id="main-content" class="flex-1">
-    {
-      fullWidth ? (
+    {fullWidth ? (
+      <slot />
+    ) : (
+      <div class="mx-auto max-w-[930px] px-4 py-8 sm:px-6">
         <slot />
-      ) : (
-        <div class="mx-auto max-w-[930px] px-4 py-8 sm:px-6">
-          <slot />
-        </div>
-      )
-    }
+      </div>
+    )}
   </main>
   <Footer />
 </BaseLayout>

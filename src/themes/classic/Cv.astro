@@ -36,22 +36,18 @@ const LINK = 'text-primary-600 underline underline-offset-2 dark:text-accent-400
         {cv.name || config.author}
       </h1>
       {cv.location && <p class="text-sm text-surface-500 dark:text-dm-muted">{cv.location}</p>}
-      {
-        (config.department || config.university) && (
-          <p class="text-sm text-surface-500 dark:text-dm-muted">
-            {[config.department, config.university].filter(Boolean).join(', ')}
-          </p>
-        )
-      }
+      {(config.department || config.university) && (
+        <p class="text-sm text-surface-500 dark:text-dm-muted">
+          {[config.department, config.university].filter(Boolean).join(', ')}
+        </p>
+      )}
       <div class="mt-1 flex flex-wrap gap-3 text-xs text-surface-500 dark:text-dm-muted">
         {cv.email && <span>{cv.email}</span>}
-        {
-          cv.website && (
-            <a href={cv.website} class="text-primary-600 hover:underline dark:text-accent-400">
-              {cv.website}
-            </a>
-          )
-        }
+        {cv.website && (
+          <a href={cv.website} class="text-primary-600 hover:underline dark:text-accent-400">
+            {cv.website}
+          </a>
+        )}
       </div>
     </div>
     <a
@@ -62,285 +58,277 @@ const LINK = 'text-primary-600 underline underline-offset-2 dark:text-accent-400
           ? 'text-primary-600 hover:bg-surface-50 dark:text-accent-400 dark:hover:bg-[#161b22]'
           : 'pointer-events-none cursor-not-allowed text-surface-400 dark:text-dm-faint',
       ]}
-      {...hasPdf ? { download: 'cv.pdf' } : {}}
+      {...(hasPdf ? { download: 'cv.pdf' } : {})}
     >
-      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"
-        ><path
-          d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-        ></path></svg
-      >
+      <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+        <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+      </svg>
       Download PDF
     </a>
   </div>
 
-  {
-    cvMeta?.lastGenerated && (
-      <p class="mb-6 text-xs text-surface-400 dark:text-dm-faint">
-        PDF last generated:{' '}
-        {new Date(cvMeta.lastGenerated).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-      </p>
-    )
-  }
+  {cvMeta?.lastGenerated && (
+    <p class="mb-6 text-xs text-surface-400 dark:text-dm-faint">
+      PDF last generated:{' '}
+      {new Date(cvMeta.lastGenerated).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+    </p>
+  )}
 
   <!-- All sections in YAML order -->
-  {
-    allSections.map(([key, entries]) => {
-      const title = sectionTitle(key);
-      const first = entries[0];
+  {allSections.map(([key, entries]) => {
+    const title = sectionTitle(key);
+    const first = entries[0];
 
-      // String entries (summary, academic services, etc.)
-      if (typeof first === 'string') {
-        return (
-          <section class="mb-8">
-            <h2 class="mb-3 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading">
-              {title}
-            </h2>
-            <div class="space-y-2">
-              {(entries as string[]).map((text) => (
-                <p class="text-sm text-surface-600 dark:text-dm-text">
-                  <CvText text={text} linkClass={LINK} />
-                </p>
-              ))}
-            </div>
-          </section>
-        );
-      }
+    // String entries (summary, academic services, etc.)
+    if (typeof first === 'string') {
+      return (
+        <section class="mb-8">
+          <h2 class="mb-3 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading">
+            {title}
+          </h2>
+          <div class="space-y-2">
+            {(entries as string[]).map((text) => (
+              <p class="text-sm text-surface-600 dark:text-dm-text">
+                <CvText text={text} linkClass={LINK} />
+              </p>
+            ))}
+          </div>
+        </section>
+      );
+    }
 
-      // Education entries (institution, area, degree)
-      if (isEducationEntry(first)) {
-        return (
-          <section class="mb-8">
-            <h2 class="mb-3 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading">
-              {title}
-            </h2>
-            <div class="space-y-3">
-              {entries.map((entry) => {
-                const edu = entry as CvGenericEntry;
-                return (
-                  <div>
-                    <div class="flex items-baseline justify-between">
-                      <div>
-                        <h3 class="text-sm font-medium text-surface-900 dark:text-dm-heading">
-                          <CvText text={[edu.degree, edu.area].filter(Boolean).join(' in ')} linkClass={LINK} />
-                        </h3>
-                        <p class="text-sm text-surface-500 dark:text-dm-muted">
-                          <CvText text={edu.institution} linkClass={LINK} />
-                        </p>
-                      </div>
-                      <span class="ms-4 shrink-0 text-xs text-surface-400 dark:text-dm-faint">
-                        {formatDateRange(edu.startDate, edu.endDate)}
-                      </span>
-                    </div>
-                    {edu.highlights && edu.highlights.length > 0 && (
-                      <ul class="mt-1 list-inside list-disc text-xs text-surface-500 dark:text-dm-muted">
-                        {edu.highlights.map((h) => (
-                          <li>
-                            <CvText text={h} linkClass={LINK} />
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        );
-      }
-
-      // One-line entries (label + details — skills, etc.)
-      if (isOneLineEntry(first)) {
-        return (
-          <section class="mb-8">
-            <h2 class="mb-3 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading">
-              {title}
-            </h2>
-            <div class="space-y-2">
-              {entries.map((entry) => {
-                const item = entry as { label: string; details: string };
-                return (
-                  <div class="flex items-baseline gap-2 text-sm">
-                    <span class="shrink-0 font-medium text-surface-900 dark:text-dm-heading">
-                      <CvText text={item.label} linkClass={LINK} />:
-                    </span>
-                    <span class="text-surface-600 dark:text-dm-text">
-                      <CvText text={item.details} linkClass={LINK} />
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        );
-      }
-
-      // Experience-like entries (company, position)
-      if (isExperienceEntry(first)) {
-        return (
-          <section class="mb-8">
-            <h2 class="mb-3 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading">
-              {title}
-            </h2>
-            <div class="space-y-3">
-              {entries.map((entry) => {
-                const exp = entry as CvGenericEntry;
-                return (
-                  <div>
-                    <div class="flex items-baseline justify-between">
-                      <div>
-                        <h3 class="text-sm font-medium text-surface-900 dark:text-dm-heading">
-                          <CvText text={exp.position} linkClass={LINK} />
-                        </h3>
-                        <p class="text-sm text-surface-500 dark:text-dm-muted">
-                          <CvText text={[exp.company, exp.location].filter(Boolean).join(', ')} linkClass={LINK} />
-                        </p>
-                      </div>
-                      <span class="ms-4 shrink-0 text-xs text-surface-400 dark:text-dm-faint">
-                        {formatDateRange(exp.startDate, exp.endDate)}
-                      </span>
-                    </div>
-                    {exp.highlights && exp.highlights.length > 0 && (
-                      <ul class="mt-1 list-inside list-disc text-xs text-surface-500 dark:text-dm-muted">
-                        {exp.highlights.map((h) => (
-                          <li>
-                            <CvText text={h} linkClass={LINK} />
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        );
-      }
-
-      // Publication-like entries (title, authors)
-      if (isPublicationEntry(first)) {
-        return (
-          <section class="mb-8">
-            <h2 class="mb-3 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading">
-              {title}
-            </h2>
-            <div class="space-y-3">
-              {entries.map((entry) => {
-                const pub = entry as CvGenericEntry;
-                const authors = (pub.authors ?? []) as string[];
-                return (
-                  <div class="text-sm">
-                    <p class="font-medium text-surface-900 dark:text-dm-heading">
-                      <CvText text={pub.title} linkClass={LINK} />
-                    </p>
-                    <p class="text-surface-500 dark:text-dm-muted">
-                      <CvText text={authors.join(', ')} linkClass={LINK} />
-                    </p>
-                    <p class="text-surface-400 dark:text-dm-faint">
-                      {pub.journal && <CvText text={pub.journal} linkClass={LINK} />}
-                      {pub.journal && pub.date && <span> · </span>}
-                      {pub.date && <span>{pub.date}</span>}
-                      {pub.doi && (
-                        <>
-                          <span> · </span>
-                          <a
-                            href={`https://doi.org/${pub.doi}`}
-                            class="text-primary-600 underline underline-offset-2 dark:text-accent-400"
-                          >
-                            DOI
-                          </a>
-                        </>
-                      )}
-                      {pub.url && (
-                        <>
-                          <span> · </span>
-                          <a href={pub.url} class="text-primary-600 underline underline-offset-2 dark:text-accent-400">
-                            Link
-                          </a>
-                        </>
-                      )}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          </section>
-        );
-      }
-
-      // Normal entries (name, date, highlights — awards, projects, certificates, references)
-      if (isNormalEntry(first)) {
-        return (
-          <section class="mb-8">
-            <h2 class="mb-3 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading">
-              {title}
-            </h2>
-            <div class="space-y-3">
-              {entries.map((entry) => {
-                const e = entry as CvGenericEntry;
-                return (
-                  <div>
-                    <div class="flex items-baseline justify-between">
+    // Education entries (institution, area, degree)
+    if (isEducationEntry(first)) {
+      return (
+        <section class="mb-8">
+          <h2 class="mb-3 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading">
+            {title}
+          </h2>
+          <div class="space-y-3">
+            {entries.map((entry) => {
+              const edu = entry as CvGenericEntry;
+              return (
+                <div>
+                  <div class="flex items-baseline justify-between">
+                    <div>
                       <h3 class="text-sm font-medium text-surface-900 dark:text-dm-heading">
-                        <CvText text={e.name} linkClass={LINK} />
+                        <CvText text={[edu.degree, edu.area].filter(Boolean).join(' in ')} linkClass={LINK} />
                       </h3>
-                      <span class="ms-4 shrink-0 text-xs text-surface-400 dark:text-dm-faint">
-                        {e.startDate ? formatDateRange(e.startDate, e.endDate) : (e.date ?? '')}
-                      </span>
-                    </div>
-                    {e.location && (
                       <p class="text-sm text-surface-500 dark:text-dm-muted">
-                        <CvText text={e.location} linkClass={LINK} />
+                        <CvText text={edu.institution} linkClass={LINK} />
                       </p>
-                    )}
-                    {e.highlights && e.highlights.length > 0 && (
-                      <ul class="mt-1 list-inside list-disc text-xs text-surface-500 dark:text-dm-muted">
-                        {e.highlights.map((h) => (
-                          <li>
-                            <CvText text={h} linkClass={LINK} />
-                          </li>
-                        ))}
-                      </ul>
-                    )}
+                    </div>
+                    <span class="ms-4 shrink-0 text-xs text-surface-400 dark:text-dm-faint">
+                      {formatDateRange(edu.startDate, edu.endDate)}
+                    </span>
                   </div>
-                );
-              })}
-            </div>
-          </section>
-        );
-      }
+                  {edu.highlights && edu.highlights.length > 0 && (
+                    <ul class="mt-1 list-inside list-disc text-xs text-surface-500 dark:text-dm-muted">
+                      {edu.highlights.map((h) => (
+                        <li>
+                          <CvText text={h} linkClass={LINK} />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      );
+    }
 
-      return null;
-    })
-  }
+    // One-line entries (label + details — skills, etc.)
+    if (isOneLineEntry(first)) {
+      return (
+        <section class="mb-8">
+          <h2 class="mb-3 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading">
+            {title}
+          </h2>
+          <div class="space-y-2">
+            {entries.map((entry) => {
+              const item = entry as { label: string; details: string };
+              return (
+                <div class="flex items-baseline gap-2 text-sm">
+                  <span class="shrink-0 font-medium text-surface-900 dark:text-dm-heading">
+                    <CvText text={item.label} linkClass={LINK} />:
+                  </span>
+                  <span class="text-surface-600 dark:text-dm-text">
+                    <CvText text={item.details} linkClass={LINK} />
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      );
+    }
+
+    // Experience-like entries (company, position)
+    if (isExperienceEntry(first)) {
+      return (
+        <section class="mb-8">
+          <h2 class="mb-3 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading">
+            {title}
+          </h2>
+          <div class="space-y-3">
+            {entries.map((entry) => {
+              const exp = entry as CvGenericEntry;
+              return (
+                <div>
+                  <div class="flex items-baseline justify-between">
+                    <div>
+                      <h3 class="text-sm font-medium text-surface-900 dark:text-dm-heading">
+                        <CvText text={exp.position} linkClass={LINK} />
+                      </h3>
+                      <p class="text-sm text-surface-500 dark:text-dm-muted">
+                        <CvText text={[exp.company, exp.location].filter(Boolean).join(', ')} linkClass={LINK} />
+                      </p>
+                    </div>
+                    <span class="ms-4 shrink-0 text-xs text-surface-400 dark:text-dm-faint">
+                      {formatDateRange(exp.startDate, exp.endDate)}
+                    </span>
+                  </div>
+                  {exp.highlights && exp.highlights.length > 0 && (
+                    <ul class="mt-1 list-inside list-disc text-xs text-surface-500 dark:text-dm-muted">
+                      {exp.highlights.map((h) => (
+                        <li>
+                          <CvText text={h} linkClass={LINK} />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      );
+    }
+
+    // Publication-like entries (title, authors)
+    if (isPublicationEntry(first)) {
+      return (
+        <section class="mb-8">
+          <h2 class="mb-3 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading">
+            {title}
+          </h2>
+          <div class="space-y-3">
+            {entries.map((entry) => {
+              const pub = entry as CvGenericEntry;
+              const authors = (pub.authors ?? []) as string[];
+              return (
+                <div class="text-sm">
+                  <p class="font-medium text-surface-900 dark:text-dm-heading">
+                    <CvText text={pub.title} linkClass={LINK} />
+                  </p>
+                  <p class="text-surface-500 dark:text-dm-muted">
+                    <CvText text={authors.join(', ')} linkClass={LINK} />
+                  </p>
+                  <p class="text-surface-400 dark:text-dm-faint">
+                    {pub.journal && <CvText text={pub.journal} linkClass={LINK} />}
+                    {pub.journal && pub.date && <span> · </span>}
+                    {pub.date && <span>{pub.date}</span>}
+                    {pub.doi && (
+                      <>
+                        <span> · </span>
+                        <a
+                          href={`https://doi.org/${pub.doi}`}
+                          class="text-primary-600 underline underline-offset-2 dark:text-accent-400"
+                        >
+                          DOI
+                        </a>
+                      </>
+                    )}
+                    {pub.url && (
+                      <>
+                        <span> · </span>
+                        <a href={pub.url} class="text-primary-600 underline underline-offset-2 dark:text-accent-400">
+                          Link
+                        </a>
+                      </>
+                    )}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      );
+    }
+
+    // Normal entries (name, date, highlights — awards, projects, certificates, references)
+    if (isNormalEntry(first)) {
+      return (
+        <section class="mb-8">
+          <h2 class="mb-3 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading">
+            {title}
+          </h2>
+          <div class="space-y-3">
+            {entries.map((entry) => {
+              const e = entry as CvGenericEntry;
+              return (
+                <div>
+                  <div class="flex items-baseline justify-between">
+                    <h3 class="text-sm font-medium text-surface-900 dark:text-dm-heading">
+                      <CvText text={e.name} linkClass={LINK} />
+                    </h3>
+                    <span class="ms-4 shrink-0 text-xs text-surface-400 dark:text-dm-faint">
+                      {e.startDate ? formatDateRange(e.startDate, e.endDate) : (e.date ?? '')}
+                    </span>
+                  </div>
+                  {e.location && (
+                    <p class="text-sm text-surface-500 dark:text-dm-muted">
+                      <CvText text={e.location} linkClass={LINK} />
+                    </p>
+                  )}
+                  {e.highlights && e.highlights.length > 0 && (
+                    <ul class="mt-1 list-inside list-disc text-xs text-surface-500 dark:text-dm-muted">
+                      {e.highlights.map((h) => (
+                        <li>
+                          <CvText text={h} linkClass={LINK} />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      );
+    }
+
+    return null;
+  })}
 
   <!-- Content collection publications fallback (only when no publication sections in YAML) -->
-  {
-    !hasYamlPublications && publications.length > 0 && (
-      <section class="mb-8">
-        <h2 class="mb-3 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading">
-          Selected Publications
-          <a
-            href="/publications"
-            class="float-end font-sans text-xs text-primary-600 hover:underline dark:text-accent-400"
-          >
-            View all &rarr;
-          </a>
-        </h2>
-        <div class="space-y-3">
-          {publications.slice(0, 5).map((pub) => (
-            <PublicationEntry
-              title={pub.data.title}
-              authors={pub.data.authors}
-              venue={pub.data.venue}
-              year={pub.data.year}
-              doi={pub.data.doi}
-              url={pub.data.url}
-              type={pub.data.type}
-              highlightAuthors={[config.author]}
-            />
-          ))}
-        </div>
-      </section>
-    )
-  }
+  {!hasYamlPublications && publications.length > 0 && (
+    <section class="mb-8">
+      <h2 class="mb-3 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading">
+        Selected Publications
+        <a
+          href="/publications"
+          class="float-end font-sans text-xs text-primary-600 hover:underline dark:text-accent-400"
+        >
+          View all &rarr;
+        </a>
+      </h2>
+      <div class="space-y-3">
+        {publications.slice(0, 5).map((pub) => (
+          <PublicationEntry
+            title={pub.data.title}
+            authors={pub.data.authors}
+            venue={pub.data.venue}
+            year={pub.data.year}
+            doi={pub.data.doi}
+            url={pub.data.url}
+            type={pub.data.type}
+            highlightAuthors={[config.author]}
+          />
+        ))}
+      </div>
+    </section>
+  )}
 </PageLayout>

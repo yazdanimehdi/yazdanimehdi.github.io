@@ -7,6 +7,8 @@ import type { SessionUser } from './session';
 export interface AdminSettings {
   adminPath: string;
   adminUsers: string[];
+  /** The one admin who sees the job search (site.yml `owner`, else the first adminUsers entry, else ''). */
+  owner: string;
   /** Who may publish from the Site editor (site.yml `publishers`); empty means every admin. */
   publishers: string[];
   /** Repo folder for collection images (cms.yml `media_folder`), e.g. src/assets/images */
@@ -32,9 +34,11 @@ export function loadAdminSettings(root = process.cwd()): AdminSettings {
   if (mediaFolder.split('/').some((s) => s === '' || s === '.' || s === '..')) {
     throw new Error('config/cms.yml media_folder must be a relative folder inside the repo');
   }
+  const adminUsers = Array.isArray(site.adminUsers) ? site.adminUsers.map(String) : [];
   return {
     adminPath: trimSlashes(String(site.adminPath || 'admin')),
-    adminUsers: Array.isArray(site.adminUsers) ? site.adminUsers.map(String) : [],
+    adminUsers,
+    owner: String(site.owner || adminUsers[0] || ''),
     publishers: Array.isArray(site.publishers) ? site.publishers.map(String) : [],
     mediaFolder,
     publicFolder: `/${trimSlashes(String(cms.public_folder ?? mediaFolder))}`,
@@ -79,4 +83,12 @@ export function canPublish(
   return publishers.some(
     (e) => PASSWORD.test(e.trim()) && e.trim().slice('password:'.length).trim().toLowerCase() === wanted,
   );
+}
+
+/** The job-search owner, matched like a single-entry `publishers`; no owner means nobody. */
+export function isOwner(
+  user: Pick<SessionUser, 'login' | 'provider'>,
+  { owner }: Pick<AdminSettings, 'owner'>,
+): boolean {
+  return !!owner && canPublish(user, { publishers: [owner] });
 }

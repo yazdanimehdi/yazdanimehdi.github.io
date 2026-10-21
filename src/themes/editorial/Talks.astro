@@ -32,45 +32,43 @@ for (const talk of talks) groups.set(yearOf(talk), [...(groups.get(yearOf(talk))
 
     {talks.length === 0 && <p class="ed-tl-empty">{t('talks.empty')}</p>}
 
-    {
-      [...groups].map(([year, items]) => (
-        <section class="ed-year ed-tl-year" aria-labelledby={`talks-${year || 'Undated'}`}>
-          <h2 id={`talks-${year || 'Undated'}`} class="num">
-            {year || t('talks.undated')}
-          </h2>
-          <ol class="ed-tl-list">
-            {items.map((talk) => (
-              <li class="row ed-tl-row">
-                <span class="ed-tl-date num" dir="auto">
-                  {talk.data.date}
+    {[...groups].map(([year, items]) => (
+      <section class="ed-year ed-tl-year" aria-labelledby={`talks-${year || 'Undated'}`}>
+        <h2 id={`talks-${year || 'Undated'}`} class="num">
+          {year || t('talks.undated')}
+        </h2>
+        <ol class="ed-tl-list">
+          {items.map((talk) => (
+            <li class="row ed-tl-row">
+              <span class="ed-tl-date num" dir="auto">
+                {talk.data.date}
+              </span>
+              <div class="ed-tl-body">
+                <h3 class="ed-tl-title" dir="auto">
+                  {talk.data.title}
+                </h3>
+                <span class="ed-tl-venue" dir="auto">
+                  {talk.data.event}
+                  {talk.data.location && <> · {talk.data.location}</>}
                 </span>
-                <div class="ed-tl-body">
-                  <h3 class="ed-tl-title" dir="auto">
-                    {talk.data.title}
-                  </h3>
-                  <span class="ed-tl-venue" dir="auto">
-                    {talk.data.event}
-                    {talk.data.location && <> · {talk.data.location}</>}
-                  </span>
-                  <div class="ed-tl-meta">
-                    <span class="ed-note">{talk.data.type}</span>
-                    {talk.data.slidesUrl && (
-                      <a href={talk.data.slidesUrl} class="ul">
-                        {t('talks.slides')}
-                      </a>
-                    )}
-                    {talk.data.videoUrl && (
-                      <a href={talk.data.videoUrl} class="ul">
-                        {t('talks.video')}
-                      </a>
-                    )}
-                  </div>
+                <div class="ed-tl-meta">
+                  <span class="ed-note">{talk.data.type}</span>
+                  {talk.data.slidesUrl && (
+                    <a href={talk.data.slidesUrl} class="ul">
+                      {t('talks.slides')}
+                    </a>
+                  )}
+                  {talk.data.videoUrl && (
+                    <a href={talk.data.videoUrl} class="ul">
+                      {t('talks.video')}
+                    </a>
+                  )}
                 </div>
-              </li>
-            ))}
-          </ol>
-        </section>
-      ))
-    }
+              </div>
+            </li>
+          ))}
+        </ol>
+      </section>
+    ))}
   </div>
 </Layout>

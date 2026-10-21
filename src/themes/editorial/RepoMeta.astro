@@ -22,31 +22,27 @@ const n = (v: number) => v.toLocaleString(config.lang || 'en');
 const known = r.language || r.stars || r.forks || r.updated;
 ---
 
-{
-  known && (
-    <span class="ed-pj-repo-meta">
-      {r.language && <span>{r.language}</span>}
-      {!!r.stars && (
-        <span class="num">
-          <span aria-hidden="true">★ {n(r.stars)}</span>
-          <span class="ed-sr-only">
-            {r.stars === 1 ? t('repos.starOne') : t('repos.starCount', { count: n(r.stars) })}
-          </span>
+{known && (
+  <span class="ed-pj-repo-meta">
+    {r.language && <span>{r.language}</span>}
+    {!!r.stars && (
+      <span class="num">
+        <span aria-hidden="true">★ {n(r.stars)}</span>
+        <span class="ed-sr-only">
+          {r.stars === 1 ? t('repos.starOne') : t('repos.starCount', { count: n(r.stars) })}
         </span>
-      )}
-      {!!r.forks && (
-        <span class="num">{r.forks === 1 ? t('repos.forkOne') : t('repos.forkCount', { count: n(r.forks) })}</span>
-      )}
-      {r.updated && <time datetime={r.updatedIso}>{t('repos.updated', { date: r.updated })}</time>}
-    </span>
-  )
-}
-{
-  r.topics.length > 0 && (
-    <span class="ed-pj-topics">
-      {r.topics.slice(0, 6).map((topic) => (
-        <span class="ed-pj-topic">{topic}</span>
-      ))}
-    </span>
-  )
-}
+      </span>
+    )}
+    {!!r.forks && (
+      <span class="num">{r.forks === 1 ? t('repos.forkOne') : t('repos.forkCount', { count: n(r.forks) })}</span>
+    )}
+    {r.updated && <time datetime={r.updatedIso}>{t('repos.updated', { date: r.updated })}</time>}
+  </span>
+)}
+{r.topics.length > 0 && (
+  <span class="ed-pj-topics">
+    {r.topics.slice(0, 6).map((topic) => (
+      <span class="ed-pj-topic">{topic}</span>
+    ))}
+  </span>
+)}

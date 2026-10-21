@@ -5,7 +5,7 @@ import { GitHubStore, type WorkflowRun } from '../../../lib/admin/github-store';
 import { json, route } from '../../../lib/admin/http';
 import { parseJobs } from '../../../lib/admin/jobs';
 import type { ContentStore } from '../../../lib/admin/store';
-import { adminSettings, canPublish } from '../../../lib/admin/settings';
+import { adminSettings, canPublish, isOwner } from '../../../lib/admin/settings';
 import { CV_JSON, FEEDS_JSON, JOBS_JSON, SCHOLAR_JSON, collectionDir, configPath } from '../../../lib/admin/paths';
 import { readCvMeta } from '../../../lib/cv-pdf/generate';
 import { feedSources, type FeedsConfig } from '../../../lib/feeds';
@@ -118,6 +118,8 @@ export const GET = route(async (_ctx, store, user) => {
   const items = jsonField(feedsJson?.content, 'length');
   const authors = Array.isArray(scholar.data.authors) ? scholar.data.authors : [];
   const lastRun = jsonField(scholarJson?.content, 'lastRun');
+  // Job search is the owner's alone: nobody else learns it exists.
+  const { career, ...daily } = jobs ? parseJobs(jobs.content) : {};
   const data: DashboardData = {
     mode,
     posts,
@@ -135,7 +137,7 @@ export const GET = route(async (_ctx, store, user) => {
     },
     news: { count: news.length, latest: newestDate(news) },
     people,
-    runs: jobs ? parseJobs(jobs.content) : runs.runs,
+    runs: jobs ? { ...daily, ...(career && isOwner(user, adminSettings()) ? { career } : {}) } : runs.runs,
     hiddenRuns: runs.hiddenRuns,
     lastCommit: head,
     review,

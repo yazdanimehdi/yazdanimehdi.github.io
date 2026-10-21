@@ -47,53 +47,45 @@ const { project, teamMembers, ogImage } = Astro.props;
 
     <!-- Links -->
     <div class="mb-6 flex flex-wrap items-center gap-3 text-sm">
-      {
-        project.data.url && (
-          <a
-            href={project.data.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-primary-600 hover:underline dark:text-accent-400"
-          >
-            Website
-          </a>
-        )
-      }
-      {
-        project.data.repoUrl && (
-          <a
-            href={project.data.repoUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-primary-600 hover:underline dark:text-accent-400"
-          >
-            Source Code
-          </a>
-        )
-      }
-      {
-        project.data.paperUrl && (
-          <a
-            href={project.data.paperUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-primary-600 hover:underline dark:text-accent-400"
-          >
-            Paper
-          </a>
-        )
-      }
+      {project.data.url && (
+        <a
+          href={project.data.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-primary-600 hover:underline dark:text-accent-400"
+        >
+          Website
+        </a>
+      )}
+      {project.data.repoUrl && (
+        <a
+          href={project.data.repoUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-primary-600 hover:underline dark:text-accent-400"
+        >
+          Source Code
+        </a>
+      )}
+      {project.data.paperUrl && (
+        <a
+          href={project.data.paperUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-primary-600 hover:underline dark:text-accent-400"
+        >
+          Paper
+        </a>
+      )}
     </div>
 
-    {
-      project.data.tags && project.data.tags.length > 0 && (
-        <div class="mb-6 flex flex-wrap gap-2">
-          {project.data.tags.map((tag) => (
-            <TagBadge tag={tag} />
-          ))}
-        </div>
-      )
-    }
+    {project.data.tags && project.data.tags.length > 0 && (
+      <div class="mb-6 flex flex-wrap gap-2">
+        {project.data.tags.map((tag) => (
+          <TagBadge tag={tag} />
+        ))}
+      </div>
+    )}
 
     <!-- Content -->
     <div class="prose mb-8">
@@ -102,31 +94,29 @@ const { project, teamMembers, ogImage } = Astro.props;
     <ProseEnhancements />
 
     <!-- Team -->
-    {
-      teamMembers.length > 0 && (
-        <section class="border-t border-surface-200 pt-6 dark:border-dm-border">
-          <h2 class="mb-3 font-serif text-lg font-normal text-surface-900 dark:text-dm-heading">Team</h2>
-          <div class="flex flex-wrap gap-3">
-            {teamMembers.map((member) => (
-              <a
-                href={`/people/${member.id}`}
-                class="flex items-center gap-2 rounded border border-surface-200 px-3 py-2 text-sm transition-colors hover:border-primary-300 dark:border-dm-border dark:hover:border-accent-500"
-              >
-                <div class="flex h-7 w-7 items-center justify-center rounded-full bg-surface-100 text-xs font-medium text-surface-600 dark:bg-dm-alt dark:text-dm-muted">
-                  {member.data.name
-                    .split(' ')
-                    .map((n) => n[0])
-                    .join('')}
-                </div>
-                <div>
-                  <span class="text-surface-900 dark:text-dm-heading">{member.data.name}</span>
-                  <span class="ms-1 text-surface-400 dark:text-dm-faint">{getRoleName(member.data.role)}</span>
-                </div>
-              </a>
-            ))}
-          </div>
-        </section>
-      )
-    }
+    {teamMembers.length > 0 && (
+      <section class="border-t border-surface-200 pt-6 dark:border-dm-border">
+        <h2 class="mb-3 font-serif text-lg font-normal text-surface-900 dark:text-dm-heading">Team</h2>
+        <div class="flex flex-wrap gap-3">
+          {teamMembers.map((member) => (
+            <a
+              href={`/people/${member.id}`}
+              class="flex items-center gap-2 rounded border border-surface-200 px-3 py-2 text-sm transition-colors hover:border-primary-300 dark:border-dm-border dark:hover:border-accent-500"
+            >
+              <div class="flex h-7 w-7 items-center justify-center rounded-full bg-surface-100 text-xs font-medium text-surface-600 dark:bg-dm-alt dark:text-dm-muted">
+                {member.data.name
+                  .split(' ')
+                  .map((n) => n[0])
+                  .join('')}
+              </div>
+              <div>
+                <span class="text-surface-900 dark:text-dm-heading">{member.data.name}</span>
+                <span class="ms-1 text-surface-400 dark:text-dm-faint">{getRoleName(member.data.role)}</span>
+              </div>
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
   </div>
 </PageLayout>

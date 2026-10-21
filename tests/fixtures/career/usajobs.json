@@ -1,0 +1,42 @@
+{
+  "LanguageCode": "EN",
+  "SearchParameters": { "Keyword": "data scientist" },
+  "SearchResult": {
+    "SearchResultCount": 2,
+    "SearchResultCountAll": 2,
+    "SearchResultItems": [
+      {
+        "MatchedObjectId": "812345600",
+        "MatchedObjectDescriptor": {
+          "PositionID": "24-ABC-1234",
+          "PositionTitle": "Data Scientist",
+          "PositionURI": "https://www.usajobs.gov/job/812345600",
+          "ApplyURI": ["https://www.usajobs.gov/job/812345600?apply=1"],
+          "PositionLocationDisplay": "Washington, District of Columbia",
+          "OrganizationName": "Example Bureau",
+          "DepartmentName": "Department of Examples",
+          "QualificationSummary": "You must be a U.S. citizen and have one year of specialized experience ...",
+          "PositionRemuneration": [{ "MinimumRange": "103690", "MaximumRange": "134795", "RateIntervalCode": "PA", "Description": "Per Year" }],
+          "PublicationStartDate": "2026-10-15",
+          "UserArea": { "Details": { "JobSummary": "This position analyzes survey data to ...", "MajorDuties": ["Builds statistical models", "Writes reports"] } }
+        }
+      },
+      {
+        "MatchedObjectId": "812345601",
+        "MatchedObjectDescriptor": {
+          "PositionID": "24-XYZ-5678",
+          "PositionTitle": "Statistician",
+          "PositionURI": "https://www.usajobs.gov/job/812345601",
+          "ApplyURI": ["https://www.usajobs.gov/job/812345601?apply=1"],
+          "PositionLocationDisplay": "Multiple Locations",
+          "OrganizationName": "Sample Agency",
+          "DepartmentName": "Department of Samples",
+          "QualificationSummary": "Applicants must have a degree in statistics ...",
+          "PositionRemuneration": [{ "MinimumRange": "45", "MaximumRange": "60", "RateIntervalCode": "PH", "Description": "Per Hour" }],
+          "PublicationStartDate": "2026-10-16",
+          "UserArea": { "Details": { "JobSummary": "Provides statistical consulting ..." } }
+        }
+      }
+    ]
+  }
+}

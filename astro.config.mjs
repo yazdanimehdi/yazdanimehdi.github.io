@@ -6,6 +6,7 @@ import sitemap from '@astrojs/sitemap';
 import vercel from '@astrojs/vercel';
 import ffmpegPath from 'ffmpeg-static';
 import tailwindcss from '@tailwindcss/vite';
+import { workflow } from 'workflow/astro';
 import { markdownOptions } from './src/lib/markdown';
 import admin from './src/integrations/admin';
 import { isPageOn } from './src/lib/config';
@@ -13,15 +14,9 @@ import { modeFromEnv } from './src/lib/mode';
 
 const mode = modeFromEnv(process.env);
 
-// Postgres mode renders the CV PDF in the function, which reads these from process.cwd() at runtime. Listed only in
-// that mode, so a fork without the fonts directory still builds statically or in git mode.
-const cvPdfFonts =
-  mode === 'postgres'
-    ? fs
-        .readdirSync('src/lib/cv-pdf/fonts')
-        .filter((f) => f.endsWith('.ttf'))
-        .map((f) => `./src/lib/cv-pdf/fonts/${f}`)
-    : [];
+// workflow() (Postgres mode) regenerates these server routes on every build; no other build may see a stale copy.
+fs.rmSync('src/pages/.well-known/workflow', { recursive: true, force: true });
+
 // Postgres mode also decides at request time whether the built-in news art is line art to invert in dark mode
 // (src/lib/inkArt.ts), which reads the image files.
 const newsArt =
@@ -42,7 +37,7 @@ export default defineConfig({
     mode === 'static'
       ? undefined
       : mode === 'postgres'
-        ? vercel({ imageService: true, includeFiles: [...cvPdfFonts, ...newsArt, ffmpegPath], maxDuration: 300 })
+        ? vercel({ imageService: true, includeFiles: [...newsArt, ffmpegPath], maxDuration: 300 })
         : vercel({ includeFiles: [ffmpegPath], maxDuration: 300 }),
   // Astro ignores Host / X-Forwarded-* unless they match allowedDomains, and then Astro.url is http://localhost: every
   // admin write fails the same-origin check. Vercel sets these headers at its edge and routes only the project's own
@@ -58,6 +53,8 @@ export default defineConfig({
     mdx(),
     ...(mode === 'postgres' ? [] : [sitemap({ filter: (page) => isPageOn(new URL(page).pathname) })]),
     admin(),
+    // Durable background jobs (src/workflows) only run in Postgres mode.
+    ...(mode === 'postgres' ? [workflow()] : []),
   ],
   markdown: markdownOptions,
   vite: {

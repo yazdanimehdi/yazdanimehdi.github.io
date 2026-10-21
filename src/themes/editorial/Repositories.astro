@@ -66,174 +66,164 @@ const percent = (share: number) => Math.max(1, Math.round(share * 100));
       <p class="ed-intro">{description}</p>
     </div>
 
-    {
-      facts.length > 0 && (
-        <section class="ed-pj-group" aria-labelledby="rp-glance">
-          <h2 id="rp-glance" class="ed-label ed-pj-group-head">
-            {t('repos.glance')}
-          </h2>
-          <div class="ed-stats ed-pj-glance">
-            {facts.map(([num, label]) => (
-              <div class="ed-stat">
-                <span class="ed-stat-num num">{num}</span>
-                <span class="ed-stat-label">{label}</span>
-              </div>
-            ))}
-          </div>
-        </section>
-      )
-    }
-
-    {
-      repos.length > 0 && (
-        <section class="ed-pj-group" aria-labelledby="rp-pinned">
-          <h2 id="rp-pinned" class="ed-label ed-pj-group-head">
-            {t('repos.pinned')}
-          </h2>
-          <ul class="ed-pj-repos">
-            {repos.map((r) => (
-              <li>
-                <a href={r.href} class="row ed-pj-repo" rel="noopener noreferrer">
-                  <span class="ed-pj-repo-text">
-                    <span class="ed-pj-repo-name">
-                      {username}/{r.name}
-                    </span>
-                    {r.description && (
-                      <span class="ed-pj-repo-desc" dir="auto">
-                        {r.description}
-                      </span>
-                    )}
-                    <RepoMeta repo={r} />
-                  </span>
-                  <span class="arr" aria-hidden="true">
-                    ↗
-                  </span>
-                  <span class="ed-sr-only">{t('link.external')}</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )
-    }
-
-    {
-      (languages.length > 0 || recent.length > 0) && (
-        <div class="ed-pj-split">
-          {languages.length > 0 && (
-            <section class="ed-pj-group" aria-labelledby="rp-langs">
-              <h2 id="rp-langs" class="ed-label ed-pj-group-head">
-                {t('repos.languages')}
-              </h2>
-              <p class="ed-meta">{t('repos.languagesNote')}</p>
-              <ul class="ed-pj-langs">
-                {languages.map((l) => (
-                  <li class="ed-pj-lang">
-                    <span class="ed-pj-lang-name">{l.name}</span>
-                    <span class="ed-pj-lang-bar" aria-hidden="true">
-                      <span style={`inline-size: ${percent(l.share)}%`} />
-                    </span>
-                    <span class="ed-pj-lang-pct num">{percent(l.share)}%</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-          {recent.length > 0 && (
-            <section class="ed-pj-group" aria-labelledby="rp-recent">
-              <h2 id="rp-recent" class="ed-label ed-pj-group-head">
-                {t('repos.recent')}
-              </h2>
-              <ul class="ed-pj-repos">
-                {recent.map((r) => (
-                  <li>
-                    <a href={r.href} class="row ed-pj-repo ed-pj-repo--compact" rel="noopener noreferrer">
-                      <span class="ed-pj-repo-text">
-                        <span class="ed-pj-repo-name">{r.name}</span>
-                        {r.description && (
-                          <span class="ed-pj-repo-desc" dir="auto">
-                            {r.description}
-                          </span>
-                        )}
-                        <RepoMeta repo={{ ...r, topics: [] }} />
-                      </span>
-                      <span class="arr" aria-hidden="true">
-                        ↗
-                      </span>
-                      <span class="ed-sr-only">{t('link.external')}</span>
-                    </a>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
+    {facts.length > 0 && (
+      <section class="ed-pj-group" aria-labelledby="rp-glance">
+        <h2 id="rp-glance" class="ed-label ed-pj-group-head">
+          {t('repos.glance')}
+        </h2>
+        <div class="ed-stats ed-pj-glance">
+          {facts.map(([num, label]) => (
+            <div class="ed-stat">
+              <span class="ed-stat-num num">{num}</span>
+              <span class="ed-stat-label">{label}</span>
+            </div>
+          ))}
         </div>
-      )
-    }
+      </section>
+    )}
 
-    {
-      stats.length > 0 && (
-        <section class="ed-pj-group" aria-labelledby="rp-stats">
-          <h2 id="rp-stats" class="ed-label ed-pj-group-head">
-            {t('repos.activity')}
-          </h2>
-          <div class="ed-pj-shots">
-            {stats.map((s) => (
-              <div class="ed-pj-shot">
-                <img class="ed-pj-shot-light" src={s.light} alt={s.alt} loading="lazy" decoding="async" />
-                <img class="ed-pj-shot-dark" src={s.dark} alt={s.alt} loading="lazy" decoding="async" />
-              </div>
-            ))}
-          </div>
-        </section>
-      )
-    }
-
-    {
-      members.length > 0 && (
-        <section class="ed-pj-group" aria-labelledby="rp-members">
-          <h2 id="rp-members" class="ed-label ed-pj-group-head">
-            {t('repos.members')}
-          </h2>
-          <ul class="ed-pj-members">
-            {members.map((m) => (
-              <li>
-                <p class="ed-pj-member">
-                  <a href={`/people/${m.id}`} class="ed-pj-member-name" dir="auto">
-                    {m.name}
-                  </a>
-                  <span class="ed-pj-role" dir="auto">
-                    {m.caption}
+    {repos.length > 0 && (
+      <section class="ed-pj-group" aria-labelledby="rp-pinned">
+        <h2 id="rp-pinned" class="ed-label ed-pj-group-head">
+          {t('repos.pinned')}
+        </h2>
+        <ul class="ed-pj-repos">
+          {repos.map((r) => (
+            <li>
+              <a href={r.href} class="row ed-pj-repo" rel="noopener noreferrer">
+                <span class="ed-pj-repo-text">
+                  <span class="ed-pj-repo-name">
+                    {username}/{r.name}
                   </span>
-                  <a href={m.githubUrl} class="ul ed-pj-mono" rel="noopener noreferrer">
-                    @{m.githubUsername}
-                  </a>
-                </p>
-                <div class="ed-pj-shots">
-                  {m.stats.map((s) => (
-                    <div class="ed-pj-shot">
-                      <img class="ed-pj-shot-light" src={s.light} alt={s.alt} loading="lazy" decoding="async" />
-                      <img class="ed-pj-shot-dark" src={s.dark} alt={s.alt} loading="lazy" decoding="async" />
-                    </div>
-                  ))}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )
-    }
+                  {r.description && (
+                    <span class="ed-pj-repo-desc" dir="auto">
+                      {r.description}
+                    </span>
+                  )}
+                  <RepoMeta repo={r} />
+                </span>
+                <span class="arr" aria-hidden="true">
+                  ↗
+                </span>
+                <span class="ed-sr-only">{t('link.external')}</span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
 
-    {
-      repos.length === 0 && stats.length === 0 && !glance && languages.length === 0 && members.length === 0 && (
-        <p class="ed-pj-empty">{t('repos.empty')}</p>
-      )
-    }
+    {(languages.length > 0 || recent.length > 0) && (
+      <div class="ed-pj-split">
+        {languages.length > 0 && (
+          <section class="ed-pj-group" aria-labelledby="rp-langs">
+            <h2 id="rp-langs" class="ed-label ed-pj-group-head">
+              {t('repos.languages')}
+            </h2>
+            <p class="ed-meta">{t('repos.languagesNote')}</p>
+            <ul class="ed-pj-langs">
+              {languages.map((l) => (
+                <li class="ed-pj-lang">
+                  <span class="ed-pj-lang-name">{l.name}</span>
+                  <span class="ed-pj-lang-bar" aria-hidden="true">
+                    <span style={`inline-size: ${percent(l.share)}%`} />
+                  </span>
+                  <span class="ed-pj-lang-pct num">{percent(l.share)}%</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        {recent.length > 0 && (
+          <section class="ed-pj-group" aria-labelledby="rp-recent">
+            <h2 id="rp-recent" class="ed-label ed-pj-group-head">
+              {t('repos.recent')}
+            </h2>
+            <ul class="ed-pj-repos">
+              {recent.map((r) => (
+                <li>
+                  <a href={r.href} class="row ed-pj-repo ed-pj-repo--compact" rel="noopener noreferrer">
+                    <span class="ed-pj-repo-text">
+                      <span class="ed-pj-repo-name">{r.name}</span>
+                      {r.description && (
+                        <span class="ed-pj-repo-desc" dir="auto">
+                          {r.description}
+                        </span>
+                      )}
+                      <RepoMeta repo={{ ...r, topics: [] }} />
+                    </span>
+                    <span class="arr" aria-hidden="true">
+                      ↗
+                    </span>
+                    <span class="ed-sr-only">{t('link.external')}</span>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+      </div>
+    )}
+
+    {stats.length > 0 && (
+      <section class="ed-pj-group" aria-labelledby="rp-stats">
+        <h2 id="rp-stats" class="ed-label ed-pj-group-head">
+          {t('repos.activity')}
+        </h2>
+        <div class="ed-pj-shots">
+          {stats.map((s) => (
+            <div class="ed-pj-shot">
+              <img class="ed-pj-shot-light" src={s.light} alt={s.alt} loading="lazy" decoding="async" />
+              <img class="ed-pj-shot-dark" src={s.dark} alt={s.alt} loading="lazy" decoding="async" />
+            </div>
+          ))}
+        </div>
+      </section>
+    )}
+
+    {members.length > 0 && (
+      <section class="ed-pj-group" aria-labelledby="rp-members">
+        <h2 id="rp-members" class="ed-label ed-pj-group-head">
+          {t('repos.members')}
+        </h2>
+        <ul class="ed-pj-members">
+          {members.map((m) => (
+            <li>
+              <p class="ed-pj-member">
+                <a href={`/people/${m.id}`} class="ed-pj-member-name" dir="auto">
+                  {m.name}
+                </a>
+                <span class="ed-pj-role" dir="auto">
+                  {m.caption}
+                </span>
+                <a href={m.githubUrl} class="ul ed-pj-mono" rel="noopener noreferrer">
+                  @{m.githubUsername}
+                </a>
+              </p>
+              <div class="ed-pj-shots">
+                {m.stats.map((s) => (
+                  <div class="ed-pj-shot">
+                    <img class="ed-pj-shot-light" src={s.light} alt={s.alt} loading="lazy" decoding="async" />
+                    <img class="ed-pj-shot-dark" src={s.dark} alt={s.alt} loading="lazy" decoding="async" />
+                  </div>
+                ))}
+              </div>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+
+    {repos.length === 0 && stats.length === 0 && !glance && languages.length === 0 && members.length === 0 && (
+      <p class="ed-pj-empty">{t('repos.empty')}</p>
+    )}
 
     <p class="ed-pj-text">
       <a href={`https://github.com/${username}`} class="ul" rel="noopener noreferrer">
-        {t('repos.profile')}
-        <span class="arr" aria-hidden="true">↗</span>
+        {t('repos.profile')}{' '}
+        <span class="arr" aria-hidden="true">
+          ↗
+        </span>
         <span class="ed-sr-only">{t('link.external')}</span>
       </a>
     </p>

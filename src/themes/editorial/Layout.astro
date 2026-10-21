@@ -37,41 +37,35 @@ const isActive = (href: string) => (href === '/' ? path === '/' : path === href 
   <header class="ed-header">
     <nav class="ed-wrap ed-nav" aria-label={t('nav.primary')}>
       <a href="/" class="ed-brand">
-        {
-          logo ? (
-            <img
-              src={logo.src}
-              alt=""
-              width={logo.width}
-              height="28"
-              class:list={['ed-brand-logo', logo.ink && 'ed-ink']}
-            />
-          ) : (
-            <span class="ed-brand-mark" aria-hidden="true" />
-          )
-        }
+        {logo ? (
+          <img
+            src={logo.src}
+            alt=""
+            width={logo.width}
+            height="28"
+            class:list={['ed-brand-logo', logo.ink && 'ed-ink']}
+          />
+        ) : (
+          <span class="ed-brand-mark" aria-hidden="true" />
+        )}
         <span class="ed-brand-name" dir="auto">
           {name}
         </span>
       </a>
       <div class="ed-navlinks">
-        {
-          nav.primary.map((item) => (
-            <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
-              {item.label}
-            </a>
-          ))
-        }
+        {nav.primary.map((item) => (
+          <a href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
+            {item.label}
+          </a>
+        ))}
       </div>
-      {
-        nav.contact && (
-          <span class="ed-nav-contact">
-            <a href={nav.contact.href} aria-current={isActive(nav.contact.href) ? 'page' : undefined}>
-              {nav.contact.label}
-            </a>
-          </span>
-        )
-      }
+      {nav.contact && (
+        <span class="ed-nav-contact">
+          <a href={nav.contact.href} aria-current={isActive(nav.contact.href) ? 'page' : undefined}>
+            {nav.contact.label}
+          </a>
+        </span>
+      )}
       <ModeToggle />
     </nav>
   </header>
@@ -90,66 +84,63 @@ const isActive = (href: string) => (href === '/' ? path === '/' : path === href 
       new ResizeObserver(fade).observe(row);
     })();
   </script>
-
   <main id="main-content" class="ed-grow">
     <slot />
   </main>
 
-  {
-    contactFooter ? (
-      <footer class="ed-contact">
-        <div class="ed-wrap ed-contact-inner">
-          <div class="ed-contact-top">
-            <div class="ed-contact-copy">
-              <h2 dir="auto">{contact?.heading || t('contact.heading')}</h2>
-              {contact?.text && <p dir="auto">{contact.text}</p>}
-              {contact?.links?.length ? (
-                <p class="ed-contact-onward">
-                  {contact.links.map((l) => (
-                    <a class="ul" href={l.href}>
-                      {l.label} <span class="arr">→</span>
-                    </a>
-                  ))}
-                </p>
-              ) : null}
-            </div>
-            {email && (
-              <a class="ed-btn-light" href={`mailto:${email}`}>
-                {email}
-              </a>
-            )}
-          </div>
-          <div class="ed-contact-bottom">
-            <span>
-              © <span class="num">{year}</span> <bdi>{name}</bdi>
-            </span>
-            {nav.more.length > 0 && <FooterNav items={nav.more} label={t('nav.more')} {isActive} />}
-            {links.length > 0 && (
-              <span class="ed-contact-links">
-                {links.map((l) => (
+  {contactFooter ? (
+    <footer class="ed-contact">
+      <div class="ed-wrap ed-contact-inner">
+        <div class="ed-contact-top">
+          <div class="ed-contact-copy">
+            <h2 dir="auto">{contact?.heading || t('contact.heading')}</h2>
+            {contact?.text && <p dir="auto">{contact.text}</p>}
+            {contact?.links?.length ? (
+              <p class="ed-contact-onward">
+                {contact.links.map((l) => (
                   <a class="ul" href={l.href}>
-                    {l.label}
+                    {l.label} <span class="arr">→</span>
                   </a>
                 ))}
-              </span>
-            )}
+              </p>
+            ) : null}
           </div>
-        </div>
-      </footer>
-    ) : (
-      <footer class="ed-footer">
-        <div class="ed-wrap ed-footer-inner">
-          <span>
-            © <span class="num">{year}</span> <bdi>{name}</bdi>
-          </span>
-          {nav.more.length > 0 && <FooterNav items={nav.more} label={t('nav.more')} {isActive} />}
           {email && (
-            <a class="ul" href={`mailto:${email}`}>
+            <a class="ed-btn-light" href={`mailto:${email}`}>
               {email}
             </a>
           )}
         </div>
-      </footer>
-    )
-  }
+        <div class="ed-contact-bottom">
+          <span>
+            © <span class="num">{year}</span> <bdi>{name}</bdi>
+          </span>
+          {nav.more.length > 0 && <FooterNav items={nav.more} label={t('nav.more')} {isActive} />}
+          {links.length > 0 && (
+            <span class="ed-contact-links">
+              {links.map((l) => (
+                <a class="ul" href={l.href}>
+                  {l.label}
+                </a>
+              ))}
+            </span>
+          )}
+        </div>
+      </div>
+    </footer>
+  ) : (
+    <footer class="ed-footer">
+      <div class="ed-wrap ed-footer-inner">
+        <span>
+          © <span class="num">{year}</span> <bdi>{name}</bdi>
+        </span>
+        {nav.more.length > 0 && <FooterNav items={nav.more} label={t('nav.more')} {isActive} />}
+        {email && (
+          <a class="ul" href={`mailto:${email}`}>
+            {email}
+          </a>
+        )}
+      </div>
+    </footer>
+  )}
 </BaseLayout>

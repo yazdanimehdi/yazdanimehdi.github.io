@@ -24,22 +24,18 @@ const { id, title, date, excerpt, tags } = Astro.props;
       {title}
     </a>
   </h3>
-  {
-    excerpt && (
-      <p dir="auto" class="mt-1 line-clamp-2 text-xs text-surface-500 dark:text-dm-muted">
-        {excerpt}
-      </p>
-    )
-  }
+  {excerpt && (
+    <p dir="auto" class="mt-1 line-clamp-2 text-xs text-surface-500 dark:text-dm-muted">
+      {excerpt}
+    </p>
+  )}
   <div class="mt-1 flex items-center gap-2 text-xs text-surface-500 dark:text-dm-muted">
     <time datetime={date.toISOString()}>{formatNewsDate(date, 'day', getSiteConfig().lang)}</time>
-    {
-      tags && tags.length > 0 && (
-        <>
-          <span aria-hidden="true">&middot;</span>
-          <span>{tags[0]}</span>
-        </>
-      )
-    }
+    {tags && tags.length > 0 && (
+      <>
+        <span aria-hidden="true">&middot;</span>
+        <span>{tags[0]}</span>
+      </>
+    )}
   </div>
 </article>

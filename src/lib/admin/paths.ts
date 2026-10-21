@@ -10,7 +10,7 @@ export const COLLECTIONS = [
   'positions',
 ] as const;
 export type CollectionName = (typeof COLLECTIONS)[number];
-export const CONFIG_FILES = ['site', 'research', 'feeds', 'cv', 'cv-upload', 'ai', 'scholar'] as const;
+export const CONFIG_FILES = ['site', 'research', 'feeds', 'cv', 'cv-upload', 'cv-styles', 'ai', 'scholar'] as const;
 export type ConfigFile = (typeof CONFIG_FILES)[number];
 export const FEEDS_JSON = 'src/data/feeds.json';
 /** Last daily-jobs results (Postgres mode): admin-only, never rendered. */
@@ -24,7 +24,7 @@ export const SITE_MEDIA = { dir: 'public/images', url: '/images' };
 export class PathError extends Error {}
 
 const SLUG = /^[a-z0-9-]{1,80}$/;
-const SEGMENT = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
+export const SEGMENT = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
 const IMAGE = /\.(png|jpe?g|webp|gif|avif|svg|ico)$/i;
 
 export function assertSlug(slug: unknown): string {
@@ -42,6 +42,27 @@ export function assertCollection(name: unknown): CollectionName {
 export function assertConfigFile(file: unknown): ConfigFile {
   if (!CONFIG_FILES.includes(file as ConfigFile)) throw new PathError(`Unknown config file "${String(file)}"`);
   return file as ConfigFile;
+}
+
+/** Custom RenderCV themes: `cv/themes/<name>/<template files>`. */
+export const THEMES_DIR = 'cv/themes';
+export const THEME_NAME = /^[a-z0-9]+$/;
+const THEME_FILE = /\.typ$/;
+
+export function isThemePath(path: string): boolean {
+  if (!path.startsWith(`${THEMES_DIR}/`)) return false;
+  const [name, ...rel] = path.slice(THEMES_DIR.length + 1).split('/');
+  return THEME_NAME.test(name) && rel.length > 0 && THEME_FILE.test(path) && rel.every((s) => SEGMENT.test(s));
+}
+
+/**
+ * Any file inside a custom theme's folder, stray ones (`.DS_Store`, a README) included: replacing or deleting a theme
+ * may delete them, though `isThemePath` never lets anyone write them.
+ */
+export function isThemeFolderEntry(path: string): boolean {
+  if (!path.startsWith(`${THEMES_DIR}/`)) return false;
+  const [name, ...rel] = path.slice(THEMES_DIR.length + 1).split('/');
+  return THEME_NAME.test(name) && rel.length > 0 && rel.every((s) => s !== '' && s !== '.' && s !== '..');
 }
 
 export const collectionDir = (name: CollectionName) => `src/content/${name}`;
@@ -77,6 +98,7 @@ export function assertAllowed(path: string): void {
     path === FEEDS_JSON ||
     path === JOBS_JSON ||
     path === SCHOLAR_JSON ||
+    isThemePath(path) ||
     isMediaPath(path)
   )
     return;

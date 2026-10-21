@@ -26,59 +26,57 @@ const tabs = [
     </div>
 
     <div class="ed-filterbar" data-blog-filters>
-      {
-        hasBoth ? (
-          <div class="ed-tabs" role="group" aria-label={t('blog.filterLabel')}>
-            {tabs.map((tab) => (
-              <button
-                type="button"
-                class="ed-tab"
-                data-filter={tab.id}
-                aria-pressed={tab.id === 'all' ? 'true' : 'false'}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <span />
-        )
-      }
-      <a href="/feed.xml" class="ul ed-feedlink">{t('blog.rss')}</a>
+      {hasBoth ? (
+        <div class="ed-tabs" role="group" aria-label={t('blog.filterLabel')}>
+          {tabs.map((tab) => (
+            <button
+              type="button"
+              class="ed-tab"
+              data-filter={tab.id}
+              aria-pressed={tab.id === 'all' ? 'true' : 'false'}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <span />
+      )}
+      <a href="/feed.xml" class="ul ed-feedlink">
+        {t('blog.rss')}
+      </a>
     </div>
 
     {items.length === 0 && <p class="ed-intro">{t('blog.empty')}</p>}
 
     <ol class="ed-entries">
-      {
-        items.map((item) => {
-          const external = item.kind === 'external';
-          const date = formatNewsDate(item.date, 'month', config.lang);
-          return (
-            <li class="ed-entry" data-kind={item.kind}>
-              <div class="ed-entry-tile" aria-hidden="true">
-                <span class="ed-entry-tag">{external ? item.source : (item.tag ?? t('blog.post'))}</span>
-                <span class="ed-entry-date num">{date}</span>
-              </div>
-              <div class="ed-entry-body">
-                <a href={item.href} class="ed-entry-title" rel={external ? 'noopener' : undefined} dir="auto">
-                  {item.title}
-                </a>
-                {item.excerpt && (
-                  <p class="ed-entry-excerpt" dir="auto">
-                    {item.excerpt}
-                  </p>
-                )}
-                <span class="ed-entry-meta">
-                  {external
-                    ? `${date} · ${t('blog.publishedOn', { source: item.source ?? '' })}`
-                    : [date, t('post.minutes', { n: item.minutes ?? 0 }), item.tag].filter(Boolean).join(' · ')}
-                </span>
-              </div>
-            </li>
-          );
-        })
-      }
+      {items.map((item) => {
+        const external = item.kind === 'external';
+        const date = formatNewsDate(item.date, 'month', config.lang);
+        return (
+          <li class="ed-entry" data-kind={item.kind}>
+            <div class="ed-entry-tile" aria-hidden="true">
+              <span class="ed-entry-tag">{external ? item.source : (item.tag ?? t('blog.post'))}</span>
+              <span class="ed-entry-date num">{date}</span>
+            </div>
+            <div class="ed-entry-body">
+              <a href={item.href} class="ed-entry-title" rel={external ? 'noopener' : undefined} dir="auto">
+                {item.title}
+              </a>
+              {item.excerpt && (
+                <p class="ed-entry-excerpt" dir="auto">
+                  {item.excerpt}
+                </p>
+              )}
+              <span class="ed-entry-meta">
+                {external
+                  ? `${date} · ${t('blog.publishedOn', { source: item.source ?? '' })}`
+                  : [date, t('post.minutes', { n: item.minutes ?? 0 }), item.tag].filter(Boolean).join(' · ')}
+              </span>
+            </div>
+          </li>
+        );
+      })}
     </ol>
   </div>
 </Layout>

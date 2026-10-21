@@ -17,19 +17,17 @@ const pdfHref = cvMeta?.pdfPath ?? '#';
 const editorialCv = getTheme() === 'editorial' ? await loadCvPage() : null;
 ---
 
-{
-  editorialCv ? (
-    <EditorialCv {...editorialCv} />
-  ) : (
-    <ClassicCv
-      {config}
-      {cv}
-      {cvMeta}
-      {hasPdf}
-      {pdfHref}
-      {allSections}
-      hasYamlPublications={hasYamlPublications(allSections)}
-      {publications}
-    />
-  )
-}
+{editorialCv ? (
+  <EditorialCv {...editorialCv} />
+) : (
+  <ClassicCv
+    {config}
+    {cv}
+    {cvMeta}
+    {hasPdf}
+    {pdfHref}
+    {allSections}
+    hasYamlPublications={hasYamlPublications(allSections)}
+    {publications}
+  />
+)}

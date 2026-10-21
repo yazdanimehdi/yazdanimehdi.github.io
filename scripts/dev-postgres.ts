@@ -32,7 +32,7 @@ try {
 }
 const child = spawn(
   process.execPath,
-  [path.join(ROOT, 'node_modules/astro/astro.js'), 'dev', ...process.argv.slice(2)],
+  [path.join(ROOT, 'node_modules/astro/bin/astro.mjs'), 'dev', ...process.argv.slice(2)],
   {
     cwd: ROOT,
     env,

@@ -237,6 +237,18 @@ test('postgres adds the backup row; a skipped job reads as not set up, not as a 
   assert.equal(row(d, 'backup').state, 'No backup yet');
 });
 
+test('the job search row shows only when the daily career step reported (owner, Postgres); it reads no detail', () => {
+  assert.equal(row(base({ mode: 'postgres' }), 'career'), undefined);
+  const at = '2026-10-18T03:00:00Z';
+  const done = base({ mode: 'postgres', runs: { career: { ok: true, at, detail: 'done' } } });
+  assert.equal(row(done, 'career').tone, 'ok');
+  assert.equal(row(done, 'career').label, 'Job search');
+  assert.equal(row(done, 'career').detail, undefined);
+  const failed = base({ mode: 'postgres', runs: { career: { ok: false, at, detail: 'failed' } } });
+  assert.equal(row(failed, 'career').tone, 'attention');
+  assert.equal(row(failed, 'career').state, 'Job search failed to start');
+});
+
 test('scheduled posts with no release run: fine in git mode, unknown only where the job runner should have run it', () => {
   const posts = [post('soon', { date: '2026-10-20' })];
   const git = base({ posts });

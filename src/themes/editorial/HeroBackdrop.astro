@@ -30,24 +30,20 @@ const imageStyle =
   type === 'image' && light ? `--ed-hero-img: url('${light}'); --ed-hero-img-dark: url('${dark}');` : undefined;
 ---
 
-{
-  type === 'pattern' && (
-    <div
-      class:list={['ed-backdrop ed-backdrop--pattern', { 'ed-backdrop--full': !fade }]}
-      style={patternCss}
-      aria-hidden="true"
-    />
-  )
-}
+{type === 'pattern' && (
+  <div
+    class:list={['ed-backdrop ed-backdrop--pattern', { 'ed-backdrop--full': !fade }]}
+    style={patternCss}
+    aria-hidden="true"
+  />
+)}
 {type === 'pattern' && hero?.pattern?.interactive && <PatternSpotlight style={patternCss} class="ed-backdrop" />}
 {type === 'image' && imageStyle && <div class="ed-backdrop ed-backdrop--image" style={imageStyle} aria-hidden="true" />}
-{
-  type === 'video' && video && (
-    <div class="ed-backdrop ed-backdrop--video" aria-hidden="true">
-      <video data-hero-video muted loop playsinline preload="none" poster={poster} src={video} />
-    </div>
-  )
-}
+{type === 'video' && video && (
+  <div class="ed-backdrop ed-backdrop--video" aria-hidden="true">
+    <video data-hero-video muted loop playsinline preload="none" poster={poster} src={video} />
+  </div>
+)}
 
 <script>
   // Autoplay only when motion is welcome; otherwise the poster stays.

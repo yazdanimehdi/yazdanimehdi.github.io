@@ -17,7 +17,7 @@ export interface DocumentEntry {
 /** Database documents → entries shaped like getCollection's. A bad document is logged and skipped, never fatal. */
 export function parseDocuments(name: DocumentCollection, docs: { path: string; content: string }[]): DocumentEntry[] {
   if (name === 'feeds') return docs.flatMap((d) => parseFeeds(d.path, d.content));
-  const schema = documentSchemas[name] as z.ZodTypeAny;
+  const schema = documentSchemas[name] as z.ZodType<Record<string, unknown>>;
   return docs.flatMap(({ path, content }) => {
     const id = /\/([^/]+)\.mdx?$/.exec(path)?.[1];
     if (!id) return [];

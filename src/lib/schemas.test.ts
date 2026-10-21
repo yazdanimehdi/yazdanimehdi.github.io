@@ -23,6 +23,7 @@ test('admin collection schemas take image paths as plain strings', () => {
 
 test('every config file in the repo passes its admin schema', () => {
   for (const [file, schema] of Object.entries(configSchemas)) {
+    if (file === 'cv-styles' && !fs.existsSync(`config/${file}.yml`)) continue; // cv-styles.yml is optional: defaults apply
     const result = schema.safeParse(config(file));
     assert.ok(result.success, `${file}: ${JSON.stringify(result.error?.issues)}`);
   }

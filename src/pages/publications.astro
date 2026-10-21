@@ -39,10 +39,8 @@ const pubData = await Promise.all(
 const editorialPublications = getTheme() === 'editorial' ? await loadPublications() : null;
 ---
 
-{
-  editorialPublications ? (
-    <EditorialPublications {...editorialPublications} />
-  ) : (
-    <ClassicPublications {config} {personal} {pubData} />
-  )
-}
+{editorialPublications ? (
+  <EditorialPublications {...editorialPublications} />
+) : (
+  <ClassicPublications {config} {personal} {pubData} />
+)}

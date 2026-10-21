@@ -39,9 +39,7 @@ const menuLabels = {
 };
 ---
 
-<header
-  class="w-full border-b border-surface-200 bg-white/95 backdrop-blur-sm max-md:sticky max-md:top-0 max-md:z-40 dark:border-dm-border dark:bg-dm/95"
->
+<header class="w-full border-b border-surface-200 bg-white/95 backdrop-blur-sm max-md:sticky max-md:top-0 max-md:z-40 dark:border-dm-border dark:bg-dm/95">
   <div class="mx-auto max-w-[930px] px-4 sm:px-6">
     <div class="flex min-h-16 items-center justify-between gap-4">
       <a
@@ -49,17 +47,15 @@ const menuLabels = {
         class="flex min-w-0 items-center gap-2 py-2 text-base leading-tight font-medium break-words text-surface-900 transition-colors hover:text-primary-600 md:me-2 md:shrink-0 md:whitespace-nowrap dark:text-dm-heading dark:hover:text-accent-400"
         aria-current={Astro.url.pathname === '/' ? 'page' : undefined}
       >
-        {
-          logo && (
-            <img
-              src={logo.src}
-              alt=""
-              width={logo.width}
-              height="28"
-              class:list={['h-7 w-auto shrink-0 object-contain', logo.ink && 'dark:invert']}
-            />
-          )
-        }
+        {logo && (
+          <img
+            src={logo.src}
+            alt=""
+            width={logo.width}
+            height="28"
+            class:list={['h-7 w-auto shrink-0 object-contain', logo.ink && 'dark:invert']}
+          />
+        )}
         <span class="min-w-0">{siteName}</span>
       </a>
 

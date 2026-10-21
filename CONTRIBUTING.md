@@ -47,7 +47,7 @@ New to the project? Look for issues labeled [`good first issue`](https://github.
 
 ### Prerequisites
 
-- [Node.js 22+](https://nodejs.org/)
+- [Node.js 22.22+](https://nodejs.org/)
 - [pnpm](https://pnpm.io/) (install with `npm install -g pnpm`)
 - [Git](https://git-scm.com/)
 

@@ -157,6 +157,7 @@ labName: ''
 university: ''
 department: ''
 siteUrl: 'https://yazdanimehdi.com'
+logo: '/images/logo.svg' # beside the name in the header; tab icons are the favicon files in public/
 
 # Navigation items
 nav:
@@ -223,6 +224,8 @@ adminPath: 'admin'
 
 adminUsers:
   - 'yazdanimehdi'
+# Who sees the job search (Postgres mode): a GitHub username, or 'password:<username>'. Default: the first adminUsers entry.
+owner: 'password:myjahromi'
 
 # Who can publish from the Site editor: GitHub usernames like adminUsers, or 'password:<username>' for a password
 # account (Postgres mode). Other admins can still ask for changes, which wait for a publisher. Empty: every admin.

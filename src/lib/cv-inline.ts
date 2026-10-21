@@ -1,7 +1,7 @@
 /**
  * Inline formatting inside CV strings: the Markdown subset RenderCV understands (`**bold**`, `*italic*`,
  * `[text](https://…)`, `\*` for a literal asterisk) plus Pandoc-style font spans, `[text]{.mono}`.
- * Every renderer (site, admin preview, pdfmake) reads `parseInline`; the YAML keeps plain strings.
+ * Every renderer (site, admin preview) reads `parseInline`; the YAML keeps plain strings.
  */
 
 export type CvFont = 'serif' | 'sans' | 'mono';

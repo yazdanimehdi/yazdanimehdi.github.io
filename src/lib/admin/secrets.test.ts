@@ -10,6 +10,8 @@ import { backupToGit } from './backup';
 import { getSecret, listSecrets, openSecret, sealSecret, setSecret } from './secrets';
 import type { Change } from './store';
 import { GET as listKeys, PUT as putKey } from '../../admin/routes/api/ai/keys';
+import { GET as careerKeys } from '../../admin/routes/api/career/keys';
+import { ownerUser } from '../career/test-owner';
 
 const A = 'a'.repeat(32);
 const KEY = 'sk-live-0123456789abcd';
@@ -132,4 +134,24 @@ test('the git backup never sees stored keys, sealed or not', async () => {
   );
   const text = JSON.stringify(written);
   assert.ok(!text.includes(KEY) && !text.includes(sealed));
+});
+
+test('career keys are listed only by the career route', async () => {
+  await setSecret(sql, 'ADZUNA_APP_KEY', KEY, 'jane');
+  const names = async (handler: (ctx: never) => Response | Promise<Response>) =>
+    ((await (await call(handler)).json()) as { name: string }[]).map((s) => s.name);
+  assert.ok(!(await names(listKeys)).includes('ADZUNA_APP_KEY'));
+  assert.ok((await names(listKeys)).includes('SERPAPI_KEY'));
+  assert.equal((await call(putKey, { name: 'ADZUNA_APP_KEY', value: KEY })).status, 400);
+
+  const asOwner = await careerKeys({
+    request: new Request('https://site.test/api/admin/career/keys'),
+    url: new URL('https://site.test/api/admin/career/keys'),
+    params: {},
+    locals: { user: ownerUser() },
+  } as never);
+  const listed = await asOwner.text();
+  assert.ok(listed.includes('ADZUNA_APP_KEY') && listed.includes('SERPAPI_KEY'));
+  assert.ok(!listed.includes('OPENAI_API_KEY') && !listed.includes(KEY.slice(0, -4)), listed);
+  assert.equal((await call(careerKeys)).status, 404);
 });

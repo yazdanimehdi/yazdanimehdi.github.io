@@ -28,16 +28,21 @@ const inquiries = t('positions.inquiries').split(/(\{email\})/);
 
 <Layout title={title} description={excerpt}>
   <article class="ed-article">
-    <a href="/positions" class="ed-back"><span class="arr" aria-hidden="true">←</span> {label}</a>
+    <a href="/positions" class="ed-back">
+      <span class="arr" aria-hidden="true">
+        ←
+      </span>{' '}
+      {label}
+    </a>
     <header class="ed-article-head">
-      <h1 class="ed-article-title" dir="auto">{title}</h1>
-      {
-        excerpt && (
-          <p class="ed-subtitle" dir="auto">
-            {excerpt}
-          </p>
-        )
-      }
+      <h1 class="ed-article-title" dir="auto">
+        {title}
+      </h1>
+      {excerpt && (
+        <p class="ed-subtitle" dir="auto">
+          {excerpt}
+        </p>
+      )}
     </header>
 
     <dl class="ed-tl-facts">
@@ -49,107 +54,99 @@ const inquiries = t('positions.inquiries').split(/(\{email\})/);
         <dt>{t('positions.status')}</dt>
         <dd>{t(isOpen ? 'positions.open' : 'positions.closed')}</dd>
       </div>
-      {
-        deadline && (
-          <div>
-            <dt>{t('positions.deadline')}</dt>
-            <dd class="num">
-              <time datetime={deadline.toISOString()}>{formatNewsDate(deadline, 'day', config.lang)}</time>
-            </dd>
-          </div>
-        )
-      }
-      {
-        tags && tags.length > 0 && (
-          <div>
-            <dt>{t('positions.topics')}</dt>
-            <dd dir="auto">{tags.join(' · ')}</dd>
-          </div>
-        )
-      }
-      {
-        isOpen && (web3formsKey || mailto) && (
-          <div>
-            <dt>{t('positions.howToApply')}</dt>
-            <dd>
-              {web3formsKey ? (
-                <a href="#apply" class="ul">
-                  {t('positions.useForm')}
-                </a>
-              ) : (
-                <a href={mailto} class="ul">
-                  {contactEmail}
-                </a>
-              )}
-            </dd>
-          </div>
-        )
-      }
+      {deadline && (
+        <div>
+          <dt>{t('positions.deadline')}</dt>
+          <dd class="num">
+            <time datetime={deadline.toISOString()}>{formatNewsDate(deadline, 'day', config.lang)}</time>
+          </dd>
+        </div>
+      )}
+      {tags && tags.length > 0 && (
+        <div>
+          <dt>{t('positions.topics')}</dt>
+          <dd dir="auto">{tags.join(' · ')}</dd>
+        </div>
+      )}
+      {isOpen && (web3formsKey || mailto) && (
+        <div>
+          <dt>{t('positions.howToApply')}</dt>
+          <dd>
+            {web3formsKey ? (
+              <a href="#apply" class="ul">
+                {t('positions.useForm')}
+              </a>
+            ) : (
+              <a href={mailto} class="ul">
+                {contactEmail}
+              </a>
+            )}
+          </dd>
+        </div>
+      )}
     </dl>
 
-    <div class="ed-prose" dir="auto"><EntryBody entry={position} /></div>
+    <div class="ed-prose" dir="auto">
+      <EntryBody entry={position} />
+    </div>
 
-    {
-      isOpen && (
-        <section id="apply" class="ed-tl-apply" aria-labelledby="apply-title">
-          <h2 id="apply-title">{t('positions.applyTitle')}</h2>
-          {web3formsKey ? (
-            <div class="ed-tl-form">
-              <ApplicationForm
-                client:visible
-                positionTitle={title}
-                contactEmail={contactEmail}
-                accessKey={web3formsKey}
-              />
-            </div>
-          ) : (
+    {isOpen && (
+      <section id="apply" class="ed-tl-apply" aria-labelledby="apply-title">
+        <h2 id="apply-title">{t('positions.applyTitle')}</h2>
+        {web3formsKey ? (
+          <div class="ed-tl-form">
+            <ApplicationForm
+              client:visible
+              positionTitle={title}
+              contactEmail={contactEmail}
+              accessKey={web3formsKey}
+            />
+          </div>
+        ) : (
+          <>
+            <p>
+              {applyByEmail.map((part) =>
+                part !== '{email}' ? (
+                  part
+                ) : mailto ? (
+                  <a href={mailto} class="ul">
+                    {contactEmail}
+                  </a>
+                ) : (
+                  t('positions.us')
+                ),
+              )}
+            </p>
+            {mailto && (
+              <a href={mailto} class="ed-btn">
+                {t('positions.emailButton')}
+              </a>
+            )}
+          </>
+        )}
+      </section>
+    )}
+
+    {!isOpen && (
+      <section class="ed-tl-apply">
+        <p>
+          {t('positions.closedText')}
+          {mailto && (
             <>
-              <p>
-                {applyByEmail.map((part) =>
-                  part !== '{email}' ? (
-                    part
-                  ) : mailto ? (
-                    <a href={mailto} class="ul">
-                      {contactEmail}
-                    </a>
-                  ) : (
-                    t('positions.us')
-                  ),
-                )}
-              </p>
-              {mailto && (
-                <a href={mailto} class="ed-btn">
-                  {t('positions.emailButton')}
-                </a>
+              {' '}
+              {inquiries.map((part) =>
+                part === '{email}' ? (
+                  <a href={mailto} class="ul">
+                    {contactEmail}
+                  </a>
+                ) : (
+                  part
+                ),
               )}
             </>
           )}
-        </section>
-      )
-    }
-
-    {
-      !isOpen && (
-        <section class="ed-tl-apply">
-          <p>
-            {t('positions.closedText')}
-            {mailto && (
-              <>
-                {' '}
-                {inquiries.map((part) =>
-                  part === '{email}' ? (
-                    <a href={mailto} class="ul">
-                      {contactEmail}
-                    </a>
-                  ) : (
-                    part
-                  ),
-                )}
-              </>
-            )}
-          </p>
-        </section>
-      )
-    }
+        </p>
+      </section>
+    )}
   </article>
 </Layout>

@@ -1,0 +1,409 @@
+{
+  "postings": {
+    "offset": 0,
+    "limit": 100,
+    "totalFound": 2,
+    "content": [
+      {
+        "id": "744000156764558",
+        "name": "QC Manager - TSD",
+        "uuid": "2aed7804-57d9-407e-90d6-7fb73b1646c8",
+        "jobAdId": "54772d50-7b11-450d-8495-2ed942f1b0d6",
+        "defaultJobAd": true,
+        "refNumber": "REF31884K",
+        "company": {
+          "identifier": "Ubisoft2",
+          "name": "Ubisoft"
+        },
+        "releasedDate": "2026-10-21T10:16:40.904Z",
+        "location": {
+          "city": "Pune",
+          "region": "MH",
+          "country": "in",
+          "remote": false,
+          "hybrid": false,
+          "latitude": "18.5246091",
+          "longitude": "73.8786239",
+          "fullLocation": "Pune, MH, India"
+        },
+        "industry": {
+          "id": "entertainment",
+          "label": "Entertainment"
+        },
+        "department": {
+          "id": "13847731",
+          "label": "Ubisoft"
+        },
+        "function": {
+          "id": "information_technology",
+          "label": "Information Technology"
+        },
+        "typeOfEmployment": {
+          "id": "permanent",
+          "label": "Full-time"
+        },
+        "experienceLevel": {
+          "id": "associate",
+          "label": "Associate"
+        },
+        "customField": [
+          {
+            "fieldId": "56c253c2e4b0cabf01d19d37",
+            "fieldLabel": "Organizational Unit",
+            "valueId": "dab915b3-de09-4b87-a685-51027b27af42",
+            "valueLabel": "Pune Test studio"
+          },
+          {
+            "fieldId": "56c2539de4b0cabf01d19d36",
+            "fieldLabel": "Recruitment Programs",
+            "valueId": "cb9660da-dde8-48ec-ba09-d33d9bb77edc",
+            "valueLabel": "N/A"
+          },
+          {
+            "fieldId": "5bb3995c6d8bc56bc081b87d",
+            "fieldLabel": "Contract",
+            "valueId": "b5a86fc0-2681-4b3c-98b6-b73a4be23ef1",
+            "valueLabel": "Permanent"
+          },
+          {
+            "fieldId": "68e4ce369c52964c7125078a",
+            "fieldLabel": "Job Family",
+            "valueId": "5efa8624-8cd0-46d1-aaf5-1e8f973e3259",
+            "valueLabel": "Game Quality & Player Satisfaction"
+          },
+          {
+            "fieldId": "56d1aa7ae4b0a07f777a4ef4",
+            "fieldLabel": "Brands",
+            "valueId": "default",
+            "valueLabel": "Ubisoft"
+          },
+          {
+            "fieldId": "6904811aa8fa2db78e2ee2ed",
+            "fieldLabel": "Job  Function",
+            "valueId": "a095c089-8eb4-465b-9770-2bba63eee59f",
+            "valueLabel": "Quality Cross Functional Management"
+          },
+          {
+            "fieldId": "691ca2ee342dfb96e5364508",
+            "fieldLabel": "Reference Job",
+            "valueId": "4aaa1ff9-6cf5-44c1-b7bc-f38cfb82aceb",
+            "valueLabel": "Quality Project Manager"
+          },
+          {
+            "fieldId": "6a158e3c77b1f5657b57af9d",
+            "fieldLabel": "Management Unit L0&1 (New)",
+            "valueId": "f0bd3708-c5ff-47b1-9104-b83a1b4071d2",
+            "valueLabel": "UBISOFT"
+          },
+          {
+            "fieldId": "58b7e4d0e4b09a6d37a0cd8b",
+            "fieldLabel": "Department",
+            "valueId": "13847731",
+            "valueLabel": "Ubisoft"
+          },
+          {
+            "fieldId": "COUNTRY",
+            "fieldLabel": "Country/Region",
+            "valueId": "in",
+            "valueLabel": "India"
+          },
+          {
+            "fieldId": "6904797c56f594d5ed50988d",
+            "fieldLabel": "Work flexibility",
+            "valueId": "ccb10278-8410-4710-b0e7-698fc2195139",
+            "valueLabel": "Office-based"
+          },
+          {
+            "fieldId": "5def94650389ad3cc4be9d17",
+            "fieldLabel": "OU sub location (select when applicable)",
+            "valueId": "ac8ae7ad-70a6-491d-b848-4625c10b9609",
+            "valueLabel": "N/A"
+          }
+        ],
+        "visibility": "PUBLIC",
+        "ref": "https://api.smartrecruiters.com/v1/companies/Ubisoft2/postings/744000156764558",
+        "language": {
+          "code": "en",
+          "label": "English",
+          "labelNative": "English (US)"
+        }
+      },
+      {
+        "id": "744000156722629",
+        "name": ".Net Full-Stack Developer",
+        "uuid": "f2641b5a-5850-4b12-9d74-e35c9addaa8f",
+        "jobAdId": "c12dc9dc-3873-4e3b-9764-905f1231ee00",
+        "defaultJobAd": false,
+        "refNumber": "REF32080Y",
+        "company": {
+          "identifier": "Ubisoft2",
+          "name": "Ubisoft"
+        },
+        "releasedDate": "2026-10-21T07:03:06.033Z",
+        "location": {
+          "city": "Bucharest",
+          "region": "Bucharest",
+          "country": "ro",
+          "remote": false,
+          "hybrid": false,
+          "latitude": "44.4267674",
+          "longitude": "26.1025384",
+          "fullLocation": "Bucharest, Bucharest, Romania"
+        },
+        "industry": {
+          "id": "computer_games",
+          "label": "Computer Games"
+        },
+        "department": {
+          "id": "13847731",
+          "label": "Ubisoft"
+        },
+        "function": {
+          "id": "information_technology",
+          "label": "Information Technology"
+        },
+        "typeOfEmployment": {
+          "id": "permanent",
+          "label": "Full-time"
+        },
+        "experienceLevel": {
+          "id": "mid_senior_level",
+          "label": "Mid-Senior Level"
+        },
+        "customField": [
+          {
+            "fieldId": "56c253c2e4b0cabf01d19d37",
+            "fieldLabel": "Organizational Unit",
+            "valueId": "721c58b3-5e0f-4dca-baba-1c5580c3f39b",
+            "valueLabel": "Ubisoft IT"
+          },
+          {
+            "fieldId": "5bb3995c6d8bc56bc081b87d",
+            "fieldLabel": "Contract",
+            "valueId": "b5a86fc0-2681-4b3c-98b6-b73a4be23ef1",
+            "valueLabel": "Permanent"
+          },
+          {
+            "fieldId": "68e4ce369c52964c7125078a",
+            "fieldLabel": "Job Family",
+            "valueId": "43fccb43-cd89-4548-ab8b-24ab8e79edec",
+            "valueLabel": "Software Development"
+          },
+          {
+            "fieldId": "56d1aa7ae4b0a07f777a4ef4",
+            "fieldLabel": "Brands",
+            "valueId": "default",
+            "valueLabel": "Ubisoft"
+          },
+          {
+            "fieldId": "6904811aa8fa2db78e2ee2ed",
+            "fieldLabel": "Job  Function",
+            "valueId": "00698f79-7c89-487d-96db-9b54fd7e350a",
+            "valueLabel": "Software Development Online"
+          },
+          {
+            "fieldId": "691ca2ee342dfb96e5364508",
+            "fieldLabel": "Reference Job",
+            "valueId": "fb698978-f4ae-489f-a035-42088e571f26",
+            "valueLabel": "Software Developer Online Full stack"
+          },
+          {
+            "fieldId": "6a158e3c77b1f5657b57af9d",
+            "fieldLabel": "Management Unit L0&1 (New)",
+            "valueId": "d0730a17-c5b4-4334-8ff0-cc555e31b54d",
+            "valueLabel": "IT & I3D"
+          },
+          {
+            "fieldId": "58b7e4d0e4b09a6d37a0cd8b",
+            "fieldLabel": "Department",
+            "valueId": "13847731",
+            "valueLabel": "Ubisoft"
+          },
+          {
+            "fieldId": "COUNTRY",
+            "fieldLabel": "Country/Region",
+            "valueId": "ro",
+            "valueLabel": "Romania"
+          },
+          {
+            "fieldId": "5937f94ee4b0e8ba74f2a99c",
+            "fieldLabel": "Management Unit L2 (New)",
+            "valueId": "f4b5ad82-6ecd-4cd2-a65d-a2bfd36178db",
+            "valueLabel": "IT"
+          },
+          {
+            "fieldId": "6904797c56f594d5ed50988d",
+            "fieldLabel": "Work flexibility",
+            "valueId": "ccb10278-8410-4710-b0e7-698fc2195139",
+            "valueLabel": "Office-based"
+          },
+          {
+            "fieldId": "5def94650389ad3cc4be9d17",
+            "fieldLabel": "OU sub location (select when applicable)",
+            "valueId": "ca20a399-bb63-491c-9d12-ee438870465d",
+            "valueLabel": "Romania"
+          }
+        ],
+        "visibility": "PUBLIC",
+        "ref": "https://api.smartrecruiters.com/v1/companies/Ubisoft2/postings/744000156722629",
+        "language": {
+          "code": "en",
+          "label": "English",
+          "labelNative": "English (US)"
+        }
+      }
+    ]
+  },
+  "detail": {
+    "id": "744000156764558",
+    "name": "QC Manager - TSD",
+    "uuid": "2aed7804-57d9-407e-90d6-7fb73b1646c8",
+    "jobId": "97fd9323-d5e7-4e32-aa13-d0be5f79c9e1",
+    "jobAdId": "54772d50-7b11-450d-8495-2ed942f1b0d6",
+    "defaultJobAd": true,
+    "refNumber": "REF31884K",
+    "company": {
+      "name": "Ubisoft",
+      "identifier": "Ubisoft2"
+    },
+    "location": {
+      "city": "Pune",
+      "region": "MH",
+      "country": "in",
+      "remote": false,
+      "hybrid": false,
+      "latitude": "18.5246091",
+      "longitude": "73.8786239",
+      "fullLocation": "Pune, MH, India"
+    },
+    "customField": [
+      {
+        "fieldId": "56c253c2e4b0cabf01d19d37",
+        "fieldLabel": "Organizational Unit",
+        "valueId": "dab915b3-de09-4b87-a685-51027b27af42",
+        "valueLabel": "Pune Test studio"
+      },
+      {
+        "fieldId": "58b7e4d0e4b09a6d37a0cd8b",
+        "fieldLabel": "Department",
+        "valueId": "13847731",
+        "valueLabel": "Ubisoft"
+      },
+      {
+        "fieldId": "56c2539de4b0cabf01d19d36",
+        "fieldLabel": "Recruitment Programs",
+        "valueId": "cb9660da-dde8-48ec-ba09-d33d9bb77edc",
+        "valueLabel": "N/A"
+      },
+      {
+        "fieldId": "5bb3995c6d8bc56bc081b87d",
+        "fieldLabel": "Contract",
+        "valueId": "b5a86fc0-2681-4b3c-98b6-b73a4be23ef1",
+        "valueLabel": "Permanent"
+      },
+      {
+        "fieldId": "COUNTRY",
+        "fieldLabel": "Country/Region",
+        "valueId": "in",
+        "valueLabel": "India"
+      },
+      {
+        "fieldId": "6904797c56f594d5ed50988d",
+        "fieldLabel": "Work flexibility",
+        "valueId": "ccb10278-8410-4710-b0e7-698fc2195139",
+        "valueLabel": "Office-based"
+      },
+      {
+        "fieldId": "68e4ce369c52964c7125078a",
+        "fieldLabel": "Job Family",
+        "valueId": "5efa8624-8cd0-46d1-aaf5-1e8f973e3259",
+        "valueLabel": "Game Quality & Player Satisfaction"
+      },
+      {
+        "fieldId": "56d1aa7ae4b0a07f777a4ef4",
+        "fieldLabel": "Brands",
+        "valueId": "default",
+        "valueLabel": "Ubisoft"
+      },
+      {
+        "fieldId": "6904811aa8fa2db78e2ee2ed",
+        "fieldLabel": "Job  Function",
+        "valueId": "a095c089-8eb4-465b-9770-2bba63eee59f",
+        "valueLabel": "Quality Cross Functional Management"
+      },
+      {
+        "fieldId": "691ca2ee342dfb96e5364508",
+        "fieldLabel": "Reference Job",
+        "valueId": "4aaa1ff9-6cf5-44c1-b7bc-f38cfb82aceb",
+        "valueLabel": "Quality Project Manager"
+      },
+      {
+        "fieldId": "6a158e3c77b1f5657b57af9d",
+        "fieldLabel": "Management Unit L0&1 (New)",
+        "valueId": "f0bd3708-c5ff-47b1-9104-b83a1b4071d2",
+        "valueLabel": "UBISOFT"
+      },
+      {
+        "fieldId": "5def94650389ad3cc4be9d17",
+        "fieldLabel": "OU sub location (select when applicable)",
+        "valueId": "ac8ae7ad-70a6-491d-b848-4625c10b9609",
+        "valueLabel": "N/A"
+      }
+    ],
+    "releasedDate": "2026-10-21T10:16:40.904Z",
+    "creator": {
+      "name": "",
+      "avatarUrl": ""
+    },
+    "postingUrl": "https://jobs.smartrecruiters.com/Ubisoft2/744000156764558-qc-manager-tsd",
+    "applyUrl": "https://jobs.smartrecruiters.com/Ubisoft2/744000156764558-qc-manager-tsd?oga=true",
+    "referralUrl": "https://jobs.smartrecruiters.com/external-referrals/company/Ubisoft2/publication/2aed7804-57d9-407e-90d6-7fb73b1646c8?dcr_ci=Ubisoft2",
+    "jobAd": {
+      "sections": {
+        "companyDescription": {
+          "title": "Company Description",
+          "text": "<p>Ubisoft is a global leader in gaming with teams across the world creating original and memorable gaming experiences, from Assassin’s Creed, Rainbow Six to Just Dance and more. We believe diverse perspectives help both players and teams thrive. If you’re passionate about innovation and pushing entertainment boundaries, join our journey and help us create the unknown!</p><p>&#xa0;</p>"
+        },
+        "jobDescription": {
+          "title": "Job Description",
+          "text": "<p><strong>Job Purpose :&#xa0;</strong>The TSD Manager leads Specialized Testing across all platforms (HD, Mobile, and future platforms), owning end-to-end quality compliance, governance, and delivery. The role ensures scalable, reliable testing across domains such as Compliance, Live QA, Telemetry, Mobile compliance and compatibility, while building organizational capability and aligning testing strategy with business objectives.</p><p><strong>IMPACT:</strong></p><p>1. Ensure end-to-end quality compliance across platforms, reducing certification risks and production delays.<br>\n2. Act as single point of accountability for Specialized Testing quality outcomes across portfolio.<br>\n3. Enable cross-studio and WWQC collaboration for optimal resource utilization and predictable delivery.<br>\n4. Establish governance frameworks, benchmarks, and quality standards across testing functions.<br>\n5. Drive early risk identification and mitigation, preventing late-stage issues and rework.<br>\n6. Build a future-ready testing organization through capability development and team engagement.<br>\n7. Break silos across HD and Mobile testing, enabling scalable processes and efficiencies.</p><p><strong>INNOVATION:</strong></p><p>1. Align Specialized Testing strategy with long-term business and growth objectives.<br>\n2. Drive data-led decision-making and automation adoption improving predictability and coverage.<br>\n3. Enable cross-functional collaboration (Functionality, Automation, Production, HQ) improving delivery outcomes.<br>\n4. Lead global efficiency initiatives across sites with WWQC alignment.<br>\n5. Drive change management across evolving platforms, tools, and business needs.<br>\n6. Build organizational capability through performance management, engagement, and DEI initiatives.</p><p><strong>KNOWLEDGE:</strong></p><p><strong>CORE COMPETENCIES:</strong><br>\n• Strong understanding of QC domain including specialized testing areas (Compliance, Live QA, Telemetry, Mobile compliance and compatibility).<br>\n• Program-level thinking across multiple projects, releases, and testing streams.<br>\n• Ability to align testing strategy with business and delivery priorities.<br>\n&#xa0;</p><p><strong>TECHNICAL / FUNCTIONAL COMPETENCIES:</strong><br>\n• Deep experience in specialized testing processes across platforms.<br>\n• Data analysis and reporting for decision-making and stakeholder visibility.<br>\n• Risk identification, mitigation planning, and resource forecasting.<br>\n• Workflow and process design across distributed/global teams.</p><p><strong>LEADERSHIP COMPETENCIES:</strong><br>\n• Team leadership, capability building, and engagement management.<br>\n• Stakeholder management across production, HQ, and cross-site teams.<br>\n• Driving alignment between local teams and global strategy.<br>\n• Change leadership across platforms and business transformation.<br>\n&#xa0;</p><p><strong>BEHAVIORAL COMPETENCIES:</strong><br>\n• Strong ownership and accountability for organizational outcomes.<br>\n• Executive communication and stakeholder influence.<br>\n• Strategic thinking combined with operational execution.<br>\n• Ability to manage complexity across multiple teams and geographies.</p>"
+        },
+        "qualifications": {
+          "title": "Qualifications",
+          "text": "<p>1. 8+ years of QC/Engineering experience, preferably in QCPM or Senior QC Lead roles.<br>\n2. Minimum 2 years of team management experience.<br>\n3. Bachelor's/Master's in Engineering; MBA is a plus.</p>"
+        },
+        "additionalInformation": {
+          "title": "Additional Information",
+          "text": "<p>&#xa0;</p><p>&#xa0;</p>"
+        }
+      }
+    },
+    "active": true,
+    "visibility": "PUBLIC",
+    "industry": {
+      "id": "entertainment",
+      "label": "Entertainment"
+    },
+    "function": {
+      "id": "information_technology",
+      "label": "Information Technology"
+    },
+    "department": {
+      "id": 13847731,
+      "label": "Ubisoft"
+    },
+    "experienceLevel": {
+      "id": "associate",
+      "label": "Associate"
+    },
+    "typeOfEmployment": {
+      "id": "permanent",
+      "label": "Full-time"
+    },
+    "language": {
+      "code": "en",
+      "label": "English",
+      "labelNative": "English (US)"
+    }
+  }
+}

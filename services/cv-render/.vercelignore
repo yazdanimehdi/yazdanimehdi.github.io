@@ -1,0 +1,4 @@
+# Not needed at runtime (cvrender.py reads presets.json; main.py is the entrypoint). design-schema.json and fixtures/
+# stay: the site's admin and tests import them, and this file must never be able to break the web build.
+test_*.py
+export_schema.py

@@ -11,17 +11,15 @@ const { text = '', linkClass = 'ul' } = Astro.props;
 const spans = parseInline(typeof text === 'string' || typeof text === 'number' ? String(text) : '');
 ---
 
-{
-  spans.map(({ text, bold, italic, font, href }) => {
-    const plain = italic ? <em>{text}</em> : text;
-    const strong = bold ? <strong>{plain}</strong> : plain;
-    const styled = font ? <span style={`font-family: ${CV_FONTS[font].css}`}>{strong}</span> : strong;
-    return href ? (
-      <a href={href} class={linkClass} rel="noopener">
-        {styled}
-      </a>
-    ) : (
-      styled
-    );
-  })
-}
+{spans.map(({ text, bold, italic, font, href }) => {
+  const plain = italic ? <em>{text}</em> : text;
+  const strong = bold ? <strong>{plain}</strong> : plain;
+  const styled = font ? <span style={`font-family: ${CV_FONTS[font].css}`}>{strong}</span> : strong;
+  return href ? (
+    <a href={href} class={linkClass} rel="noopener">
+      {styled}
+    </a>
+  ) : (
+    styled
+  );
+})}

@@ -27,6 +27,20 @@ jobs:
       - name: Unit tests
         run: pnpm test
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: services/cv-render/requirements.txt
+
+      - name: CV renderer self-checks (RenderCV)
+        run: |
+          pip install -r services/cv-render/requirements.txt
+          python3 services/cv-render/test_cvrender.py
+          python3 services/cv-render/test_main.py
+          python3 scripts/test_render_cv.py
+
       - name: Static build (no adapter output; Sveltia admin present)
         run: |
           pnpm build
@@ -53,7 +67,6 @@ jobs:
           rm -rf .vercel/output
           pnpm build
           test -d .vercel/output/functions
-          test -f .vercel/output/functions/_render.func/src/lib/cv-pdf/fonts/SourceSerif4-Regular.ttf
           test ! -e .vercel/output/static/index.html
           test ! -e .vercel/output/static/blog/index.html
 

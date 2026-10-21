@@ -40,7 +40,9 @@ const colorCSS = generateColorOverrides(config) + (theme === 'editorial' ? edito
     <DarkModeScript />
   </head>
   <body class="flex min-h-screen flex-col">
-    <a href="#main-content" class="skip-link">{uiStrings(config)('a11y.skip')}</a>
+    <a href="#main-content" class="skip-link">
+      {uiStrings(config)('a11y.skip')}
+    </a>
     <slot />
     <Analytics />
     {config.cookieConsent && <CookieConsent />}

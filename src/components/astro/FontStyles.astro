@@ -135,6 +135,8 @@ if (hasSizeOverrides) {
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link rel="preload" as="style" href={googleFontsUrl} />
 <link href={googleFontsUrl} rel="stylesheet" media="print" onload="this.media='all'" />
-<noscript><link href={googleFontsUrl} rel="stylesheet" /></noscript>
+<noscript>
+  <link href={googleFontsUrl} rel="stylesheet" />
+</noscript>
 
 {cssOverrides && <style set:html={cssOverrides} />}

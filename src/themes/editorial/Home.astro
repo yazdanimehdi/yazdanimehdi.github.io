@@ -96,196 +96,194 @@ const ld =
 <Layout title={lab ? config.title : name} contactFooter>
   <script type="application/ld+json" set:html={jsonLd(ld)} />
   {!blocks.includes('hero') && <h1 class="ed-sr-only">{name}</h1>}
-  {
-    blocks.map((block) => {
-      if (block === 'hero') {
-        return (
-          <section class="ed-hero-band">
-            <HeroBackdrop hero={config.hero} />
-            <div class="ed-wrap ed-hero">
-              <div class="ed-hero-text">
-                <h1 class="ed-hero-name" dir="auto">
-                  {name}
-                </h1>
-                {(role || affils.length > 0) && (
-                  <div class="ed-role">
-                    {role && <p dir="auto">{role}</p>}
-                    {affils.length > 0 && (
-                      <ul class="ed-affil" aria-label={t('home.affiliations')}>
-                        {affils.map((a) => (
-                          <li>
-                            <span dir="auto">{a}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
-                )}
-                {ed.tagline && (
-                  <p class="ed-tagline" dir="auto">
-                    {ed.tagline}
-                  </p>
-                )}
-                {showBio && bioHtml && <div class="ed-bio" dir="auto" set:html={bioHtml} />}
-                {(profiles.length > 0 || email) && (
-                  <ul class="ed-profiles" aria-label={t('home.profiles')}>
-                    {email && (
-                      <li>
-                        <a href={`mailto:${email}`} class="ed-email" dir="ltr">
-                          {email}
-                        </a>
-                      </li>
-                    )}
-                    {profiles.map((l) => (
-                      <li>
-                        <a href={l.href} class="ul" rel="noopener noreferrer">
-                          <bdi>{l.label}</bdi>
-                          <span class="arr" aria-hidden="true">
-                            ↗
-                          </span>
-                          <span class="ed-sr-only">{t('link.external')}</span>
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {actions.length > 0 && (
-                  <div class="ed-actions">
-                    {actions.map((a, i) =>
-                      i === 0 ? (
-                        <a href={a.href} class="ed-btn">
-                          {a.label}
-                        </a>
-                      ) : (
-                        <a href={a.href} class="ul ed-more">
-                          {a.label} <span class="arr">→</span>
-                        </a>
-                      ),
-                    )}
-                  </div>
-                )}
-              </div>
-              {/* Without a caption the figure is a portrait: on phones it leads the hero at full size. */}
-              {ed.figure?.image && (
-                <figure class:list={['ed-figure', { 'ed-figure--portrait': !ed.figure.caption?.trim() }]}>
-                  <div class="ed-figure-box">
-                    <img
-                      src={ed.figure.image}
-                      alt={ed.figure.alt ?? ''}
-                      width={figure?.width}
-                      height={figure?.height}
-                      class:list={[figure?.ink && 'ed-ink']}
-                      fetchpriority="high"
-                      decoding="async"
-                    />
-                  </div>
-                  {ed.figure.caption && (
-                    <figcaption class="ed-figcaption">
-                      <b>
-                        <bdi>{t('figure.label', { n: 1 })}</bdi>
-                      </b>{' '}
-                      <span dir="auto">{ed.figure.caption}</span>
-                    </figcaption>
+  {blocks.map((block) => {
+    if (block === 'hero') {
+      return (
+        <section class="ed-hero-band">
+          <HeroBackdrop hero={config.hero} />
+          <div class="ed-wrap ed-hero">
+            <div class="ed-hero-text">
+              <h1 class="ed-hero-name" dir="auto">
+                {name}
+              </h1>
+              {(role || affils.length > 0) && (
+                <div class="ed-role">
+                  {role && <p dir="auto">{role}</p>}
+                  {affils.length > 0 && (
+                    <ul class="ed-affil" aria-label={t('home.affiliations')}>
+                      {affils.map((a) => (
+                        <li>
+                          <span dir="auto">{a}</span>
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                </figure>
-              )}
-            </div>
-          </section>
-        );
-      }
-
-      if (block === 'research') {
-        return (
-          <section class="ed-wrap ed-home-section" aria-labelledby="home-research">
-            <div class="ed-section-head">
-              <h2 id="home-research" class="ed-h2">
-                {t('home.research')}
-              </h2>
-              <a href="/research" class="ul ed-more">
-                {t('home.researchOverview')} <span class="arr">→</span>
-              </a>
-            </div>
-            {/* The tagline already says what this person studies; the full lede stays on /research. */}
-            {researchHeadline && !ed.tagline && (
-              <p class="ed-lede ed-home-lede" dir="auto">
-                {researchHeadline}
-              </p>
-            )}
-            <ol class="ed-topics">
-              {areas.map((a) => (
-                <li class="row ed-topic">
-                  <span class="ed-topic-num" aria-hidden="true">
-                    <bdi>{a.numeral}</bdi>
-                  </span>
-                  <div class="ed-topic-body">
-                    <h3 class="ed-topic-title" dir="auto">
-                      <a href={`/research#${a.id}`}>{a.title}</a>
-                    </h3>
-                    <p dir="auto">{a.description}</p>
-                  </div>
-                </li>
-              ))}
-            </ol>
-          </section>
-        );
-      }
-
-      if (block === 'publications' && selected.length > 0) {
-        return (
-          <section class="ed-wrap ed-home-section ed-home-section--papers" aria-labelledby="home-papers">
-            <div class="ed-section-head">
-              <h2 id="home-papers" class="ed-h2">
-                {t('home.selectedPapers')}
-              </h2>
-              {isPageOn('/publications', config) && (
-                <a href="/publications" class="ul ed-more">
-                  {t('home.allPublications', { count: pubCount })} <span class="arr">→</span>
-                </a>
-              )}
-            </div>
-            <ol class="ed-papers">
-              {selected.map((pub) => (
-                <PaperRow pub={pub} {owners} />
-              ))}
-            </ol>
-          </section>
-        );
-      }
-
-      if (block === 'updates' && hasUpdates) {
-        return (
-          <section class="ed-wrap ed-split" aria-label={t('home.updates')}>
-            {showNews && news.length > 0 && (
-              <div>
-                <div class="ed-split-head">
-                  <h2 class="ed-split-title">{newsLabel}</h2>
-                  <a href="/news" class="ul ed-more">
-                    {t('home.allNews')} <span class="arr">→</span>
-                  </a>
                 </div>
-                <NewsList items={news} />
-              </div>
-            )}
-            {showWriting && writing.length > 0 && (
-              <div>
-                <div class="ed-split-head">
-                  <h2 class="ed-split-title">{blogLabel}</h2>
-                  <a href="/blog" class="ul ed-more">
-                    {t('home.allPosts')} <span class="arr">→</span>
-                  </a>
-                </div>
-                <ul class="ed-posts">
-                  {writing.map((item) => (
-                    <PostRow item={item} />
+              )}
+              {ed.tagline && (
+                <p class="ed-tagline" dir="auto">
+                  {ed.tagline}
+                </p>
+              )}
+              {showBio && bioHtml && <div class="ed-bio" dir="auto" set:html={bioHtml} />}
+              {(profiles.length > 0 || email) && (
+                <ul class="ed-profiles" aria-label={t('home.profiles')}>
+                  {email && (
+                    <li>
+                      <a href={`mailto:${email}`} class="ed-email" dir="ltr">
+                        {email}
+                      </a>
+                    </li>
+                  )}
+                  {profiles.map((l) => (
+                    <li>
+                      <a href={l.href} class="ul" rel="noopener noreferrer">
+                        <bdi>{l.label}</bdi>{' '}
+                        <span class="arr" aria-hidden="true">
+                          ↗
+                        </span>
+                        <span class="ed-sr-only">{t('link.external')}</span>
+                      </a>
+                    </li>
                   ))}
                 </ul>
-              </div>
+              )}
+              {actions.length > 0 && (
+                <div class="ed-actions">
+                  {actions.map((a, i) =>
+                    i === 0 ? (
+                      <a href={a.href} class="ed-btn">
+                        {a.label}
+                      </a>
+                    ) : (
+                      <a href={a.href} class="ul ed-more">
+                        {a.label} <span class="arr">→</span>
+                      </a>
+                    ),
+                  )}
+                </div>
+              )}
+            </div>
+            {/* Without a caption the figure is a portrait: on phones it leads the hero at full size. */}
+            {ed.figure?.image && (
+              <figure class:list={['ed-figure', { 'ed-figure--portrait': !ed.figure.caption?.trim() }]}>
+                <div class="ed-figure-box">
+                  <img
+                    src={ed.figure.image}
+                    alt={ed.figure.alt ?? ''}
+                    width={figure?.width}
+                    height={figure?.height}
+                    class:list={[figure?.ink && 'ed-ink']}
+                    fetchpriority="high"
+                    decoding="async"
+                  />
+                </div>
+                {ed.figure.caption && (
+                  <figcaption class="ed-figcaption">
+                    <b>
+                      <bdi>{t('figure.label', { n: 1 })}</bdi>
+                    </b>{' '}
+                    <span dir="auto">{ed.figure.caption}</span>
+                  </figcaption>
+                )}
+              </figure>
             )}
-          </section>
-        );
-      }
+          </div>
+        </section>
+      );
+    }
 
-      return null;
-    })
-  }
+    if (block === 'research') {
+      return (
+        <section class="ed-wrap ed-home-section" aria-labelledby="home-research">
+          <div class="ed-section-head">
+            <h2 id="home-research" class="ed-h2">
+              {t('home.research')}
+            </h2>
+            <a href="/research" class="ul ed-more">
+              {t('home.researchOverview')} <span class="arr">→</span>
+            </a>
+          </div>
+          {/* The tagline already says what this person studies; the full lede stays on /research. */}
+          {researchHeadline && !ed.tagline && (
+            <p class="ed-lede ed-home-lede" dir="auto">
+              {researchHeadline}
+            </p>
+          )}
+          <ol class="ed-topics">
+            {areas.map((a) => (
+              <li class="row ed-topic">
+                <span class="ed-topic-num" aria-hidden="true">
+                  <bdi>{a.numeral}</bdi>
+                </span>
+                <div class="ed-topic-body">
+                  <h3 class="ed-topic-title" dir="auto">
+                    <a href={`/research#${a.id}`}>{a.title}</a>
+                  </h3>
+                  <p dir="auto">{a.description}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
+        </section>
+      );
+    }
+
+    if (block === 'publications' && selected.length > 0) {
+      return (
+        <section class="ed-wrap ed-home-section ed-home-section--papers" aria-labelledby="home-papers">
+          <div class="ed-section-head">
+            <h2 id="home-papers" class="ed-h2">
+              {t('home.selectedPapers')}
+            </h2>
+            {isPageOn('/publications', config) && (
+              <a href="/publications" class="ul ed-more">
+                {t('home.allPublications', { count: pubCount })} <span class="arr">→</span>
+              </a>
+            )}
+          </div>
+          <ol class="ed-papers">
+            {selected.map((pub) => (
+              <PaperRow pub={pub} {owners} />
+            ))}
+          </ol>
+        </section>
+      );
+    }
+
+    if (block === 'updates' && hasUpdates) {
+      return (
+        <section class="ed-wrap ed-split" aria-label={t('home.updates')}>
+          {showNews && news.length > 0 && (
+            <div>
+              <div class="ed-split-head">
+                <h2 class="ed-split-title">{newsLabel}</h2>
+                <a href="/news" class="ul ed-more">
+                  {t('home.allNews')} <span class="arr">→</span>
+                </a>
+              </div>
+              <NewsList items={news} />
+            </div>
+          )}
+          {showWriting && writing.length > 0 && (
+            <div>
+              <div class="ed-split-head">
+                <h2 class="ed-split-title">{blogLabel}</h2>
+                <a href="/blog" class="ul ed-more">
+                  {t('home.allPosts')} <span class="arr">→</span>
+                </a>
+              </div>
+              <ul class="ed-posts">
+                {writing.map((item) => (
+                  <PostRow item={item} />
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+      );
+    }
+
+    return null;
+  })}
 </Layout>

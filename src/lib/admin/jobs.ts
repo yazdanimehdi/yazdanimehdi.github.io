@@ -1,7 +1,10 @@
+import { readCareer } from '../career/db';
+import { parsePrefs } from '../career/settings';
 import { getSql } from '../db';
 import { feedSources, syncFeeds, type FeedsConfig } from '../feeds';
 import type { FeedItem, SiteConfig } from '../types';
 import { becameDue } from '../utils';
+import { startNightly } from '../../workflows/career-nightly';
 import { BACKUP_BRANCH, backupToGit } from './backup';
 import { listEntries, readConfig } from './content';
 import { GitHubStore, githubConfig } from './github-store';
@@ -13,8 +16,8 @@ import type { PostgresStore } from './postgres-store';
 import type { CommitResult, ContentStore } from './store';
 
 // Scheduled first: it is cheap and time-sensitive, while feeds can take 15 s per source. Papers and GitHub before the
-// backup, so it includes what they wrote.
-export const JOBS = ['scheduled', 'feeds', 'papers', 'github', 'backup'] as const;
+// backup, so it includes what they wrote. Career only starts the job search workflow, which writes nothing backed up.
+export const JOBS = ['scheduled', 'feeds', 'papers', 'github', 'career', 'backup'] as const;
 export type JobName = (typeof JOBS)[number];
 export interface StepResult {
   ok: boolean;
@@ -137,8 +140,8 @@ export async function releaseScheduled(store: PostgresStore, since: Date, now: D
   return due;
 }
 
-/** The daily cron's steps (Postgres mode). */
-export function dailySteps(store: PostgresStore): Steps {
+/** The daily cron's steps (Postgres mode). `nightly` starts the job search run; tests pass their own. */
+export function dailySteps(store: PostgresStore, nightly = () => startNightly(getSql())): Steps {
   return {
     feeds: async () => {
       const config = await readConfig(store, 'feeds');
@@ -163,6 +166,19 @@ export function dailySteps(store: PostgresStore): Steps {
       if (!username) return { detail: 'skipped: no GitHub username' };
       const r = await syncGitHubFile(store, username);
       return { detail: `${r.changed ? 'updated' : 'unchanged'} · ${r.repos} repositories` };
+    },
+    // Every admin sees jobs.json (the dashboard, db:export): the detail never says whether a search is set up or ran.
+    // The real state is the owner-only career_settings (last_run, run_id).
+    career: async () => {
+      try {
+        const prefs = parsePrefs((await readCareer(getSql())).prefs);
+        const terms = [...prefs.roles, ...prefs.keywords].filter((t) => t.trim());
+        if (terms.length || prefs.watched.length || prefs.feeds.length) await nightly();
+      } catch (e) {
+        // runJobs logs the cause and records only the message.
+        throw new Error('failed', { cause: e });
+      }
+      return { detail: 'done' };
     },
     backup: async (_previous, now) => {
       if (!process.env.GITHUB_TOKEN) return { detail: 'skipped: no GITHUB_TOKEN' };

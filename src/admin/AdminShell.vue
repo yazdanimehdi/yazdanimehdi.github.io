@@ -22,6 +22,7 @@ const GROUPS = computed(() => [
       ['content/people', 'People'],
       ['publications', 'Publications'],
       ['cv', 'CV'],
+      ...(props.ctx.mode === 'static' ? [] : [['cv-styles', 'CV styles']]),
     ],
     more: [
       ['content/projects', 'Projects'],
@@ -35,6 +36,7 @@ const GROUPS = computed(() => [
       ['pages', 'Pages'],
       ['media', 'Media'],
       ['ai', 'Scholar & AI'],
+      ...(props.ctx.isOwner && props.ctx.mode === 'postgres' ? [['career', 'Job search']] : []),
       ['editor', 'Site editor'],
       ...(props.ctx.mode === 'postgres' ? [['users', 'Users']] : []),
       ['settings', 'Settings'],

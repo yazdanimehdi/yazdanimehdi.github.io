@@ -33,10 +33,8 @@ if (project.data.team) {
 }
 ---
 
-{
-  getTheme() === 'editorial' ? (
-    <EditorialProject {project} team={teamMembers} {ogImage} />
-  ) : (
-    <ClassicProject {project} {teamMembers} {ogImage} />
-  )
-}
+{getTheme() === 'editorial' ? (
+  <EditorialProject {project} team={teamMembers} {ogImage} />
+) : (
+  <ClassicProject {project} {teamMembers} {ogImage} />
+)}

@@ -46,56 +46,46 @@ const darkBg = hero.dark?.bgColor ?? '#0d1117';
 >
   {/* Background layer */}
   <div class="absolute inset-0 z-0">
-    {
-      hero.type === 'none' && (
-        <>
-          <div class="absolute inset-0 dark:hidden" style={`background-color: ${lightBg};`} />
-          <div class="absolute inset-0 hidden dark:block" style={`background-color: ${darkBg};`} />
-        </>
-      )
-    }
+    {hero.type === 'none' && (
+      <>
+        <div class="absolute inset-0 dark:hidden" style={`background-color: ${lightBg};`} />
+        <div class="absolute inset-0 hidden dark:block" style={`background-color: ${darkBg};`} />
+      </>
+    )}
 
     {hero.type === 'image' && <HeroBgImage light={hero.light} dark={hero.dark} />}
 
     {hero.type === 'video' && hero.video && <HeroBgVideo video={hero.video} />}
 
-    {
-      hero.type === 'pattern' && hero.pattern && (
-        <HeroBgPattern pattern={hero.pattern} light={hero.light} dark={hero.dark} />
-      )
-    }
+    {hero.type === 'pattern' && hero.pattern && (
+      <HeroBgPattern pattern={hero.pattern} light={hero.light} dark={hero.dark} />
+    )}
 
-    {
-      hero.type === 'animation' && hero.animation && (
-        <HeroBgAnimation
-          client:only="vue"
-          preset={hero.animation.preset}
-          customScript={hero.animation.customScript || undefined}
-          lightBgColor={lightBg}
-          darkBgColor={darkBg}
-        />
-      )
-    }
+    {hero.type === 'animation' && hero.animation && (
+      <HeroBgAnimation
+        client:only="vue"
+        preset={hero.animation.preset}
+        customScript={hero.animation.customScript || undefined}
+        lightBgColor={lightBg}
+        darkBgColor={darkBg}
+      />
+    )}
   </div>
 
   {/* Foreground content */}
-  <div
-    class="relative z-10 mx-auto flex max-w-[930px] flex-col gap-6 px-4 py-12 sm:px-6 sm:py-16 md:flex-row md:items-center md:gap-10"
-  >
-    {
-      portrait && (
-        <img
-          src={portrait.src}
-          alt={portrait.alt}
-          width="176"
-          height="176"
-          class:list={['h-32 w-32 shrink-0 object-cover sm:h-44 sm:w-44 md:order-last', getImageShapeClass()]}
-          loading="eager"
-          fetchpriority="high"
-          decoding="async"
-        />
-      )
-    }
+  <div class="relative z-10 mx-auto flex max-w-[930px] flex-col gap-6 px-4 py-12 sm:px-6 sm:py-16 md:flex-row md:items-center md:gap-10">
+    {portrait && (
+      <img
+        src={portrait.src}
+        alt={portrait.alt}
+        width="176"
+        height="176"
+        class:list={['h-32 w-32 shrink-0 object-cover sm:h-44 sm:w-44 md:order-last', getImageShapeClass()]}
+        loading="eager"
+        fetchpriority="high"
+        decoding="async"
+      />
+    )}
     {/* Without a portrait the actions take the end column on md+, so the hero's second half carries them. */}
     <div
       class:list={[
@@ -109,65 +99,57 @@ const darkBg = hero.dark?.bgColor ?? '#0d1117';
       >
         {title}
       </h1>
-      {
-        role && (
-          <p dir="auto" class="mt-3 text-base font-medium text-surface-700 dark:text-dm-text">
-            {role}
-          </p>
-        )
-      }
-      {
-        focus && (
-          <p dir="auto" class="mt-4 max-w-2xl text-base leading-relaxed text-surface-600 sm:text-lg dark:text-dm-muted">
-            {focus}
-          </p>
-        )
-      }
-      {
-        profiles.length > 0 && (
-          <ul aria-label={t('home.profiles')} class="mt-2 flex flex-wrap gap-x-5 text-sm">
-            {profiles.map((l) => (
-              <li>
-                <a
-                  href={l.href}
-                  rel="noopener noreferrer"
-                  class="inline-flex min-h-11 items-center text-primary-600 underline-offset-2 hover:underline dark:text-accent-400"
-                >
-                  <bdi>{l.label}</bdi>
-                  <span class="sr-only">{` ${t('link.external')}`}</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        )
-      }
-      {
-        (primary || secondary.length > 0) && (
-          <div
-            class:list={[
-              'mt-6 flex flex-wrap gap-3',
-              !portrait && 'md:col-start-2 md:row-span-4 md:row-start-1 md:mt-0 md:flex-col md:items-stretch',
-            ]}
-          >
-            {primary && (
-              <a
-                href={primary.href}
-                class="inline-flex min-h-11 items-center justify-center rounded bg-primary-600 px-4 text-sm font-medium text-white transition-colors hover:bg-primary-700 dark:bg-accent-600 dark:text-dm dark:hover:bg-accent-500"
-              >
-                {primary.text}
-              </a>
-            )}
-            {secondary.map((l) => (
+      {role && (
+        <p dir="auto" class="mt-3 text-base font-medium text-surface-700 dark:text-dm-text">
+          {role}
+        </p>
+      )}
+      {focus && (
+        <p dir="auto" class="mt-4 max-w-2xl text-base leading-relaxed text-surface-600 sm:text-lg dark:text-dm-muted">
+          {focus}
+        </p>
+      )}
+      {profiles.length > 0 && (
+        <ul aria-label={t('home.profiles')} class="mt-2 flex flex-wrap gap-x-5 text-sm">
+          {profiles.map((l) => (
+            <li>
               <a
                 href={l.href}
-                class="inline-flex min-h-11 items-center justify-center rounded border border-surface-300 px-4 text-sm font-medium text-surface-700 transition-colors hover:border-surface-400 hover:text-surface-900 dark:border-dm-border-alt dark:text-dm-text dark:hover:border-[#8b949e] dark:hover:text-white"
+                rel="noopener noreferrer"
+                class="inline-flex min-h-11 items-center text-primary-600 underline-offset-2 hover:underline dark:text-accent-400"
               >
-                {l.text}
+                <bdi>{l.label}</bdi>
+                <span class="sr-only">{` ${t('link.external')}`}</span>
               </a>
-            ))}
-          </div>
-        )
-      }
+            </li>
+          ))}
+        </ul>
+      )}
+      {(primary || secondary.length > 0) && (
+        <div
+          class:list={[
+            'mt-6 flex flex-wrap gap-3',
+            !portrait && 'md:col-start-2 md:row-span-4 md:row-start-1 md:mt-0 md:flex-col md:items-stretch',
+          ]}
+        >
+          {primary && (
+            <a
+              href={primary.href}
+              class="inline-flex min-h-11 items-center justify-center rounded bg-primary-600 px-4 text-sm font-medium text-white transition-colors hover:bg-primary-700 dark:bg-accent-600 dark:text-dm dark:hover:bg-accent-500"
+            >
+              {primary.text}
+            </a>
+          )}
+          {secondary.map((l) => (
+            <a
+              href={l.href}
+              class="inline-flex min-h-11 items-center justify-center rounded border border-surface-300 px-4 text-sm font-medium text-surface-700 transition-colors hover:border-surface-400 hover:text-surface-900 dark:border-dm-border-alt dark:text-dm-text dark:hover:border-[#8b949e] dark:hover:text-white"
+            >
+              {l.text}
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   </div>
 </section>

@@ -29,10 +29,8 @@ const researchDescription = researchConfig.description || '';
 const editorialResearch = getTheme() === 'editorial' ? await loadResearch() : null;
 ---
 
-{
-  editorialResearch ? (
-    <EditorialResearch {...editorialResearch} />
-  ) : (
-    <ClassicResearch {personal} {projects} {publications} {researchAreas} {researchDescription} />
-  )
-}
+{editorialResearch ? (
+  <EditorialResearch {...editorialResearch} />
+) : (
+  <ClassicResearch {personal} {projects} {publications} {researchAreas} {researchDescription} />
+)}

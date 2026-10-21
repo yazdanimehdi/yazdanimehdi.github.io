@@ -9,7 +9,7 @@
   <br>
   Designed for researchers, professors, and labs who want their public presence to stay current by default.
   <br>
-  Built with <strong>Astro 5</strong>, <strong>Vue 3</strong>, and <strong>Tailwind CSS v4</strong>.
+  Built with <strong>Astro 7</strong>, <strong>Vue 3</strong>, and <strong>Tailwind CSS v4</strong>.
   <br><br>
   <a href="https://github.com/yazdanimehdi/ScholarOS/stargazers">
     <img src="https://img.shields.io/github/stars/yazdanimehdi/ScholarOS?style=social" alt="GitHub Stars">
@@ -238,7 +238,7 @@ If you prefer working locally, want to customize components, or need to run auto
 
 #### Prerequisites
 
-- [Node.js 22+](https://nodejs.org/)
+- [Node.js 22.22+](https://nodejs.org/)
 - [pnpm](https://pnpm.io/)
 
 #### Setup
@@ -372,16 +372,16 @@ cv:
         details: 'Python, TypeScript, C++'
 ```
 
-- **PDF generation** -- automated PDF rendering via GitHub Actions using RenderCV
-- **Multiple themes** -- classic, modern, and more
+- **PDF generation** -- RenderCV renders the PDF in every mode (GitHub Actions, or the admin on Vercel)
+- **Styles** -- nine built-in themes, three densities and your own themes (see [CV styles](#cv-styles))
 - **Download button** -- visitors can download your CV as PDF
 
 Any CV text can carry inline formatting: `**bold**`, `*italic*`, `[a link](https://…)` (or `mailto:`), and a font
 for part of a line with `[text]{.serif}`, `[text]{.sans}` or `[text]{.mono}`. Write `\*` for a literal asterisk, as in
 `'**Jane Smith**\*'` for equal contribution. In the admin's CV editor, select text in an entry field and use the
-formatting bar (B, I, Link, Font) or Cmd/Ctrl+B, I and K; the preview below the fields shows the result. The site and
-the built-in PDF render all of it. RenderCV renders bold, italic and links but not fonts, so a font span prints as
-plain text there.
+formatting bar (B, I, Link, Font) or Cmd/Ctrl+B, I and K; the preview below the fields shows the result. The site
+renders all of it; the PDF renders bold, italic and links. Font spans are website-only: RenderCV has no fonts to
+switch to, so they print as plain text in the PDF.
 
 ### Research Areas
 
@@ -612,7 +612,7 @@ content to the `content-backup` branch.
    leaves documents that exist only in the database).
 3. The dashboard's Site status now has a **Backup copy** row and **Run daily jobs**.
 
-Notes: MDX posts are shown with a notice (MDX needs a build). The CV PDF is rendered on Vercel (see _CV PDF in Postgres mode_).
+Notes: MDX posts are shown with a notice (MDX needs a build). The CV PDF is rendered on Vercel (see [CV styles](#cv-styles)).
 Editing `adminUsers` takes effect after a redeploy. The feeds, Google Scholar and SEO workflows
 (`sync-feeds.yml`, `sync-scholar.yml`, `generate-seo.yml`) commit to git and have no effect on a Postgres-mode site;
 the daily job syncs feeds, and **Check now** syncs them at once.
@@ -752,11 +752,41 @@ commits it so the site redeploys.
   and the publish routes answer 403. Publishers see "Site changes waiting for review" on the Dashboard's Next up,
   read from a tag on the sandbox (one lookup that never wakes it), so it shows while the session is paused too.
 
-### CV PDF in Postgres mode
+### CV styles
 
-The CV PDF is rendered on Vercel whenever you publish the CV or a publication (and with **Generate PDF**), stored in
-Vercel Blob, and linked from the CV page. It uses fixed fonts (Source Serif 4 and IBM Plex Sans) and its own layout,
-so it looks different from the RenderCV PDF that git mode builds on GitHub Actions. Paper size:
+RenderCV renders the CV PDF everywhere: on GitHub Actions in git mode and on static hosting, and on Vercel (both
+admin modes) in a private Python service deployed beside Astro. A style is a RenderCV theme (`classic`, `sb2nov`,
+`engineeringresumes`, `moderncv`, `engineeringclassic`, `harvard`, `ink`, `opal` or `ember`), a density (`compact`,
+`normal` or `airy`) and optional `design` overrides in RenderCV's own keys. Styles live in `config/cv-styles.yml`, and
+`public` names the one used for the public PDF. Without the file you get one style built from your `cv.yml`: "My
+style" at `normal` density when its `design` has overrides beyond the theme, otherwise a compact style in its theme.
+
+```yaml
+# config/cv-styles.yml
+public: compact
+styles:
+  - id: compact
+    name: Compact
+    theme: classic
+    density: compact
+    design: {}
+```
+
+On Vercel, **CV → Styles** in the admin edits the list with a live preview; the preview and **Generate PDF** render
+through the service. A design RenderCV rejects (a bad margin, say) shows its error and leaves the public PDF alone. A
+raw YAML upload that carries its own `design` keeps it. When the GitHub Action folds such an upload into `cv.yml` and
+disables it, it also saves that design as the public style "Uploaded design" (`uploaded-design`) in
+`config/cv-styles.yml`, creating the file if needed. On Sveltia the same file is under **CV (Styles)**, without
+the preview.
+
+Custom themes are RenderCV theme folders under `cv/themes/<name>/` (`*.j2.typ` and `*.typ` files, names `a-z0-9`, at
+most 40 files and 512 KB). Upload them in **CV → Styles**; only publishers can upload or delete a theme, because a
+theme template is code that runs in the renderer. Per-person lab CVs (`cv/*.yml`) keep their own `design` and are
+rendered on GitHub Actions only.
+
+To render locally run `pip install -r scripts/requirements.txt`. `astro dev` previews through
+`services/cv-render/cli.py` and needs `pip install -r services/cv-render/requirements.txt`. The paper size is
+`pdf.pageSize` in `cv.yml`, used for the default style when there is no `cv-styles.yml` (otherwise set `design.page.size`):
 
 ```yaml
 # config/cv.yml
@@ -764,7 +794,52 @@ pdf:
   pageSize: A4 # or LETTER (default)
 ```
 
-Per-person lab CVs (`cv/*.yml`) are rendered in git mode only.
+### Job search (Postgres mode)
+
+A private job search inside the admin. Each night it gathers postings from the sources you turn on, scores them against your CV and preferences, and lists the best matches. On a posting, **Draft CV and letter** (later **Regenerate both**) writes a tailored CV (rendered to PDF in one of your [CV styles](#cv-styles)), a cover letter and, for Greenhouse forms, proposed answers. Nothing is ever submitted for you.
+
+**Owner only, Postgres mode only.** Only the owner sees the screens, the data and the source keys. The owner is the `owner` entry in `config/site.yml`; when that is empty, it is the first `adminUsers` entry. An entry is a GitHub login or `password:<username>`, matched like `publishers`. Anyone else gets a 404, so they cannot tell the feature exists. In static and git mode every job-search screen and route answers 404 and the nav link is hidden (CV styles keep working in all modes).
+
+**Sources.** Turn them on under **Job search → Settings → Sources**. A source that needs a key you have not saved reports `skipped: no <KEY>`; that is not a failure. Keys live in the `secrets` table, never in content or the git backup.
+
+| Source                                 | Key                                   | On by default | Notes                                                                                                                                                                                                                 |
+| -------------------------------------- | ------------------------------------- | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Watched companies (`watched`)          | none                                  | yes           | Greenhouse, Lever, Ashby, Workable and SmartRecruiters boards from your watched list. Every open role is kept, not only those matching your roles or keywords                                                         |
+| Company careers pages (`careers-page`) | none                                  | yes           | Watched URLs that are not a known board. Up to one AI call per URL on every run, to read the page                                                                                                                     |
+| Remotive (`remotive`)                  | none                                  | yes           |                                                                                                                                                                                                                       |
+| Remote OK (`remoteok`)                 | none                                  | yes           |                                                                                                                                                                                                                       |
+| Arbeitnow (`arbeitnow`)                | none                                  | yes           |                                                                                                                                                                                                                       |
+| Google Jobs (`google-jobs`)            | `SERPAPI_KEY`                         | yes           | Up to 6 SerpAPI credits a run (2 pages × up to 3 locations), from the same `SERPAPI_KEY` as the Scholar sync. Nightly that is about 180 a month, enough to use up a free plan the papers sync also needs              |
+| RSS feeds (`rss`)                      | none                                  | yes           | Feeds you add, every item kept (not filtered by your roles or keywords). `SUGGESTED_FEEDS` currently lists only the two HigherEdJobs feeds that were confirmed (Chemistry; Geology, Earth Sciences, and Oceanography) |
+| Adzuna (`adzuna`)                      | `ADZUNA_APP_ID`, `ADZUNA_APP_KEY`     | no            |                                                                                                                                                                                                                       |
+| USAJobs (`usajobs`)                    | `USAJOBS_API_KEY`                     | no            |                                                                                                                                                                                                                       |
+| LinkedIn guest search (`linkedin`)     | none (`SERPAPI_KEY` for the fallback) | no            | See the note below. The fallback uses up to 3 SerpAPI credits a run (1 page × up to 3 locations)                                                                                                                      |
+
+**LinkedIn.** LinkedIn's terms forbid automated access and its `robots.txt` disallows everything, so this is the one source that does not check `robots.txt`; turning it on is your call, for personal use. It reads only the public guest search (2 pages per location, the honest ScholarOS User-Agent, no cookies), never your account, and stops at the first refusal. LinkedIn often blocks server IPs like Vercel's; when it refuses or finds nothing and `SERPAPI_KEY` is set, the source falls back to the Google Jobs results LinkedIn lists. Guest-search postings carry no description, so they are scored on title, company and location.
+
+**The nightly run.** The daily cron (03:00 UTC) starts it once preferences have a role, keyword, watched company or feed; **Run now** starts it any time, and a run that is still going is not started twice. It is a [Vercel Workflow](https://vercel.com/docs/workflows), so each run shows in the Workflow dashboard. It gathers every enabled source in parallel, fetches the detail of new postings that came without a description (at most 30 per source), then scores the new postings five at a time. Each run scores at most `maxScoresPerRun` postings (default 100), and each **Run now** is a run of its own; the rest wait for the next run and are counted as `deferred`. Scoring a posting takes one AI call, and up to three when the model's reply is not the JSON asked for. Company careers pages add up to one AI call per watched URL on every run, and that list has no cap. A provider or network error also leaves a posting deferred. A reply the model cannot get right after three tries marks that posting `failed`. If the AI key or the CV is missing, nothing is scored and the run says why (`scoreSkipped`). Posting text is untrusted: it is guarded before any AI call or storage, wrapped as data in every prompt, never rendered as HTML, and capped at 20,000 characters.
+
+**Drafts do not fabricate.** The AI may only select, reorder, condense and reword what is in your CV and Application answers. The tailored CV is assembled from that CV by `assembleCv`, so a claim that is not in it cannot enter, and a second AI pass (the reviewer) checks the result against the CV. If the reviewer finds issues, the draft is revised once; one that still has issues is saved as `needs-review` with the issues listed. A draft makes at most 6 AI calls (7 with Greenhouse answers). Form answers come from your CV and Application answers; EEO questions follow your setting and decline by default; a fact that is not there is left empty as a hand-off for you to fill in, never guessed. Answers are proposals only.
+
+**Suggested settings.** When preferences have no roles, keywords, fields, watched companies or feeds, **Job search → Settings** fills its empty fields from your site: one AI call reads the CV and up to 40 papers from the publications collection (title, topic and the first 200 characters of the abstract) and suggests roles, keywords, seniority, fields and languages, at most 8 of each. Locations are only ever the CV's own contact location, copied in code and filled in only when Locations is empty, since a posting outside your locations that isn't remote is filtered out (the AI isn't asked: past places on the CV would filter out jobs you want). Phone, address and links (your social networks and website) are copied from the CV in code, with no AI, into empty answers only. **Suggest from my site** asks again any time and replaces those five preference lists; it never replaces Locations you have set. Nothing is saved until you press Save; a banner says the form holds suggestions until then.
+
+**The requirements panel.** A drafted CV lists the posting's key requirements, required ones first, and how the tailored CV covers each: shown (in this version), cut (in your CV but not in this version; restore it in the plan editor), worded differently (supported by a named CV entry in other words), or a gap (not in your CV). Whether a term appears in the tailored CV or in your CV is checked in code; whether a missing term is worded differently or a gap rests on the CV entry the model cites as evidence. A term used more than three times is flagged as possible keyword stuffing.
+
+**Papers by relevance.** A draft can choose from every paper in the publications collection, pooled with the CV's own publication section, not only the papers the CV lists. The drafter picks the most relevant to the posting by title and abstract (5 to 8 for a research role, 2 to 4 otherwise). Abstracts are only for judging relevance; they are never quoted in the CV or the letter.
+
+**Where the data lives.** Preferences, Application answers, postings and events are in the Postgres tables `career_settings`, `career_postings` and `career_events` (migration `005_career.sql`), not in `documents`, so they never reach the git backup or the generic config API. The daily jobs record only a neutral `done` for this step. Tailored PDFs go to Vercel Blob under `career/` with a random suffix and no row in the media library. They are public URLs that cannot be guessed, but anyone with the link can open the PDF.
+
+**Previews share production data.** A Vercel preview uses the same database and Blob store as production. Deploying one applies the migration to the live database, and a run on it writes real postings and spends your real AI and SerpAPI credits.
+
+#### Checking it on a preview
+
+Do this once, as the owner, after a preview deploys:
+
+1. Sign in on the preview's `/admin`. In the browser console run `const { runId } = await (await fetch('/api/admin/career/run', { method: 'POST' })).json();`, then poll `GET /api/admin/career/run` until the status is `completed`. This confirms Workflow runs on the preview.
+2. Save test preferences (one role, a few sources, a low `maxScoresPerRun`), click **Run now**, and wait for `completed`. Note the run id.
+3. Open one job and click **Draft CV and letter**. The PDF should render.
+4. Find the run in the Vercel Workflow dashboard.
+5. Clean up with `delete from career_postings; update career_settings set last_run = null, run_id = null;` in the Neon SQL editor, delete the `career/` files in the Vercel Blob browser (the test run's tailored PDFs, which are public URLs), then clear the test preferences.
 
 ### Cookie Consent (GDPR)
 
@@ -1069,10 +1144,13 @@ ScholarOS/
 ├── config/ # All configuration (YAML)
 │ ├── site.yml # Main site config
 │ ├── cv.yml # CV / resume data
+│ ├── cv-styles.yml # CV PDF styles (optional)
 │ ├── research.yml # Research areas
 │ ├── feeds.yml # External RSS feed sources
 │ ├── scholar.yml # Google Scholar sync config
 │ └── cms.yml # CMS panel config
+├── cv/themes/ # Custom CV themes (optional)
+├── services/cv-render/ # Private RenderCV service (Vercel Services) and shared renderer
 ├── public/ # Static assets (served as-is)
 ├── scripts/ # Automation scripts
 │ ├── migrate-al-folio.ts # al-folio migration
@@ -1216,7 +1294,7 @@ pnpm migrate:al-folio
 
 | Technology                                 | Purpose                                         |
 | ------------------------------------------ | ----------------------------------------------- |
-| [Astro 5](https://astro.build)             | Static site generator with island architecture  |
+| [Astro 7](https://astro.build)             | Static site generator with island architecture  |
 | [Vue 3](https://vuejs.org)                 | Interactive components (search, filters, forms) |
 | [Tailwind CSS v4](https://tailwindcss.com) | Utility-first styling with CSS variables        |
 | [MDX](https://mdxjs.com)                   | Enhanced Markdown with component support        |

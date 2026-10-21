@@ -148,6 +148,48 @@ test('cv: a stale save shows the conflict dialog and keeps the edits', async ({ 
   await expect(page.getByRole('button', { name: 'Restore edits' })).toBeVisible();
 });
 
+test('cv styles: create, set public, persists', async ({ page }) => {
+  await signIn(page);
+  await page.goto(`${ADMIN}/cv-styles`);
+  const list = page.getByRole('region', { name: 'My styles' });
+  await list.getByRole('button', { name: /^Compact/ }).click();
+  page.once('dialog', (d) => d.accept('Tight'));
+  await page.getByRole('button', { name: 'Duplicate' }).click();
+  await expect(list.getByRole('button', { name: 'Tight', exact: true })).toHaveAttribute('aria-current', 'true');
+  await page.getByLabel('Top margin', { exact: true }).fill('1cm');
+  await page.getByRole('button', { name: 'Set as public download' }).click();
+  await page.getByRole('button', { name: 'Publish styles' }).click();
+  await expect(page.getByText(COMMITTED)).toBeVisible();
+  await page.reload();
+  await expect(list.getByRole('button', { name: /^Tight/ })).toContainText('Public');
+  await expect(page.getByLabel('Top margin', { exact: true })).toHaveValue('1cm');
+});
+
+test('cv styles: switching styles renders the new one and never offers the old PDF', async ({ page }) => {
+  // A stub renderer: the test is about which style the panel shows, not RenderCV. Compact's render waits for `release`.
+  let release = () => {};
+  const held = new Promise<void>((r) => (release = r));
+  const rendered: string[] = [];
+  await page.route('**/api/admin/cv/preview', async (route) => {
+    const id = JSON.parse(route.request().postData() ?? '{}').style.id;
+    if (id === 'compact') await held;
+    rendered.push(id);
+    await route.fulfill({ contentType: 'application/pdf', body: `%PDF-1.4 ${id}` }).catch(() => {});
+  });
+  await signIn(page);
+  await page.goto(`${ADMIN}/cv-styles`);
+  const list = page.getByRole('region', { name: 'My styles' });
+  page.once('dialog', (d) => d.accept('Switch test'));
+  await page.getByRole('button', { name: 'Use Harvard as a new style' }).click();
+  const download = page.getByRole('link', { name: 'Download PDF' });
+  await expect(download).toHaveAttribute('download', 'switch-test.pdf');
+  await list.getByRole('button', { name: /^Compact/ }).click();
+  await expect(download).toHaveCount(0);
+  release();
+  await expect(download).toHaveAttribute('download', 'compact.pdf');
+  expect(rendered.at(-1)).toBe('compact');
+});
+
 test('pages: reorder home sections and publish', async ({ page }) => {
   await signIn(page);
   await page.goto(`${ADMIN}/pages`);

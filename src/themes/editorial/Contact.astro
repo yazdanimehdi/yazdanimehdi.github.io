@@ -26,26 +26,30 @@ const byEmail = t(personal ? 'contact.byEmailPersonal' : 'contact.byEmailLab').s
 <Layout title={t('contact.title')} description={t(personal ? 'contact.descriptionPersonal' : 'contact.descriptionLab')}>
   <div class="ed-wrap ed-main">
     <div class="ed-stack">
-      <h1 class="ed-h1" dir="auto">{config.editorial?.contact?.heading || t('contact.heading')}</h1>
-      <p class="ed-intro" dir="auto">{intro}</p>
+      <h1 class="ed-h1" dir="auto">
+        {config.editorial?.contact?.heading || t('contact.heading')}
+      </h1>
+      <p class="ed-intro" dir="auto">
+        {intro}
+      </p>
     </div>
 
     <div class="ed-pj-contact">
       <section class="ed-pj-contact-main" aria-labelledby="ct-message">
-        <h2 id="ct-message" class="ed-label ed-pj-group-head">{t('contact.sendMessage')}</h2>
-        {
-          web3formsKey ? (
-            <div class="ed-pj-form">
-              <ContactForm client:visible accessKey={web3formsKey} />
-            </div>
-          ) : email ? (
-            <p class="ed-pj-text">
-              {byEmail.map((part) => (part === '{email}' ? <ObfuscatedEmail email={email} class="ul" /> : part))}
-            </p>
-          ) : (
-            <p class="ed-pj-empty">{t('contact.empty')}</p>
-          )
-        }
+        <h2 id="ct-message" class="ed-label ed-pj-group-head">
+          {t('contact.sendMessage')}
+        </h2>
+        {web3formsKey ? (
+          <div class="ed-pj-form">
+            <ContactForm client:visible accessKey={web3formsKey} />
+          </div>
+        ) : email ? (
+          <p class="ed-pj-text">
+            {byEmail.map((part) => (part === '{email}' ? <ObfuscatedEmail email={email} class="ul" /> : part))}
+          </p>
+        ) : (
+          <p class="ed-pj-empty">{t('contact.empty')}</p>
+        )}
       </section>
 
       <section class="ed-pj-contact-info" aria-labelledby="ct-info">
@@ -57,45 +61,39 @@ const byEmail = t(personal ? 'contact.byEmailPersonal' : 'contact.byEmailLab').s
             <dt>{t(personal ? 'contact.namePersonal' : 'contact.nameLab')}</dt>
             <dd dir="auto">{siteName}</dd>
           </div>
-          {
-            affiliation.length > 0 && (
-              <div>
-                <dt>{t('contact.affiliation')}</dt>
-                <dd dir="auto">
-                  {affiliation.map((a, i) => (
-                    <>
-                      {i > 0 && <br />}
-                      {a}
-                    </>
-                  ))}
-                </dd>
-              </div>
-            )
-          }
-          {
-            email && (
-              <div>
-                <dt>{t('contact.email')}</dt>
-                <dd>
-                  <ObfuscatedEmail email={email} class="ul" />
-                </dd>
-              </div>
-            )
-          }
-          {
-            profiles.length > 0 && (
-              <div>
-                <dt>{t('contact.elsewhere')}</dt>
-                <dd class="ed-pj-links">
-                  {profiles.map((l) => (
-                    <a href={l.href} class="ul" rel="noopener noreferrer">
-                      {l.label}
-                    </a>
-                  ))}
-                </dd>
-              </div>
-            )
-          }
+          {affiliation.length > 0 && (
+            <div>
+              <dt>{t('contact.affiliation')}</dt>
+              <dd dir="auto">
+                {affiliation.map((a, i) => (
+                  <>
+                    {i > 0 && <br />}
+                    {a}
+                  </>
+                ))}
+              </dd>
+            </div>
+          )}
+          {email && (
+            <div>
+              <dt>{t('contact.email')}</dt>
+              <dd>
+                <ObfuscatedEmail email={email} class="ul" />
+              </dd>
+            </div>
+          )}
+          {profiles.length > 0 && (
+            <div>
+              <dt>{t('contact.elsewhere')}</dt>
+              <dd class="ed-pj-links">
+                {profiles.map((l) => (
+                  <a href={l.href} class="ul" rel="noopener noreferrer">
+                    {l.label}
+                  </a>
+                ))}
+              </dd>
+            </div>
+          )}
         </dl>
       </section>
     </div>

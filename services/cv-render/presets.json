@@ -1,0 +1,26 @@
+{
+  "compact": {
+    "page": {
+      "top_margin": "1.2cm",
+      "bottom_margin": "1.2cm",
+      "left_margin": "1.4cm",
+      "right_margin": "1.4cm",
+      "show_top_note": false
+    },
+    "typography": {
+      "line_spacing": "0.45em",
+      "font_size": { "body": "9.5pt", "name": "22pt", "headline": "9.5pt", "connections": "9pt" }
+    },
+    "header": { "space_below_name": "0.3cm", "space_below_headline": "0.3cm", "space_below_connections": "0.35cm" },
+    "section_titles": { "space_above": "0.35cm", "space_below": "0.15cm" },
+    "sections": { "space_between_regular_entries": "0.6em", "space_between_text_based_entries": "0.15em" }
+  },
+  "normal": {},
+  "airy": {
+    "page": { "top_margin": "2cm", "bottom_margin": "2cm", "left_margin": "2cm", "right_margin": "2cm" },
+    "typography": { "line_spacing": "0.75em" },
+    "header": { "space_below_name": "0.9cm", "space_below_headline": "0.9cm", "space_below_connections": "0.9cm" },
+    "section_titles": { "space_above": "0.7cm", "space_below": "0.4cm" },
+    "sections": { "space_between_regular_entries": "1.6em" }
+  }
+}

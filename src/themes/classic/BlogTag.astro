@@ -27,17 +27,15 @@ const { tag, posts } = Astro.props;
 
   <h2 class="sr-only">Posts</h2>
   <div class="divide-y divide-surface-100 dark:divide-dm-border">
-    {
-      posts.map((post) => (
-        <PostCard
-          id={post.id}
-          title={post.data.title}
-          date={post.data.date}
-          excerpt={post.data.excerpt}
-          tags={post.data.tags}
-          author={post.data.author}
-        />
-      ))
-    }
+    {posts.map((post) => (
+      <PostCard
+        id={post.id}
+        title={post.data.title}
+        date={post.data.date}
+        excerpt={post.data.excerpt}
+        tags={post.data.tags}
+        author={post.data.author}
+      />
+    ))}
   </div>
 </PageLayout>
