@@ -2,7 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import AdminShell from './AdminShell.vue';
 import { api, report, toast } from './api';
-import { groupFeed, isRunning, type RunStatus } from './career';
+import { groupFeed, visible, isRunning, type RunStatus } from './career';
 import type { AdminCtx } from './types';
 import type { CareerPrefs } from '../lib/career/settings';
 import type { PostingStatus, PostingSummary } from '../lib/career/types';
@@ -173,7 +173,7 @@ onBeforeUnmount(stop);
               <a :href="`${base}/career/${r.id}`">{{ r.title }}</a>
               <span class="adm-row-detail">
                 {{ r.company }}<template v-if="where(r)"> · {{ where(r) }}</template>
-                <template v-if="gate && r.gate"> · {{ r.gate }}</template>
+                <template v-if="gate && r.gate"> · {{ visible(r.gate) }}</template>
               </span>
             </span>
             <span v-if="r.flagged" title="The ad contained hidden or instruction-like text" aria-label="Flagged"

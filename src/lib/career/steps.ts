@@ -1,5 +1,6 @@
 // The nightly run's steps. Each takes and returns ids and plain JSON (the workflow log stores both) and reads
 // keys, prefs and the CV itself.
+import { visible } from './text';
 import { generateText, readAiConfig } from '../admin/ai';
 import { readConfig } from '../admin/content';
 import { getStore } from '../admin/get-store';
@@ -71,7 +72,13 @@ export async function gatherSource(id: string): Promise<{ id: string; found: num
       siteUrl: typeof site.data.siteUrl === 'string' ? site.data.siteUrl : '',
       ai: async (input) => generateText(store, await readAiConfig(store), input),
     };
-    const raws = await source.search(ctx);
+    // Bidi and zero-width characters in a title would reorder the admin UI, and would split one posting into two keys.
+    const raws = (await source.search(ctx)).map((r) => ({
+      ...r,
+      title: visible(r.title),
+      company: visible(r.company),
+      ...(r.location === undefined ? {} : { location: visible(r.location) }),
+    }));
     found = raws.length;
     const keyed = raws.map((raw) => ({ raw, key: postingKey(raw) }));
     const known = new Set(

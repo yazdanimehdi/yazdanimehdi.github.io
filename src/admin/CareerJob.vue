@@ -2,7 +2,7 @@
 import { computed, onMounted, ref } from 'vue';
 import AdminShell from './AdminShell.vue';
 import { api, report } from './api';
-import { httpUrl } from './career';
+import { httpUrl, visible } from './career';
 import { PostingText } from './PostingText';
 import type { AdminCtx } from './types';
 import type { ScoreDetail } from '../lib/career/score';
@@ -52,9 +52,16 @@ function take(res: { posting: Posting; events: JobEvent[] }) {
 async function patch(body: { status?: PostingStatus; notes?: string }) {
   try {
     take(await api(`career/postings/${props.id}`, { method: 'PATCH', body }));
+    return true;
   } catch (e) {
     report(e);
+    return false;
   }
+}
+
+/** A failed save puts the select back on the saved status. */
+async function setStatus(el: HTMLSelectElement) {
+  if (!(await patch({ status: el.value as PostingStatus }))) el.value = posting.value!.status;
 }
 
 onMounted(async () => {
@@ -82,8 +89,8 @@ onMounted(async () => {
 
       <section class="adm-card" aria-labelledby="job-fit">
         <h2 id="job-fit" class="adm-h2">Fit</h2>
-        <p v-if="posting.gate" class="adm-err">Filtered out: {{ posting.gate }}</p>
-        <p v-if="posting.scoreError" class="adm-err">Scoring failed: {{ posting.scoreError }}</p>
+        <p v-if="posting.gate" class="adm-err">Filtered out: {{ visible(posting.gate) }}</p>
+        <p v-if="posting.scoreError" class="adm-err">Scoring failed: {{ visible(posting.scoreError) }}</p>
         <p v-if="posting.score === null && !posting.gate && !posting.scoreError" class="adm-muted">Not scored yet.</p>
         <template v-if="posting.score !== null && detail">
           <p>
@@ -97,21 +104,21 @@ onMounted(async () => {
             </li>
           </ul>
           <p class="adm-muted">
-            <template v-for="v in VERDICTS" :key="v">{{ v }}: {{ detail[v] }} · </template>
+            {{ VERDICTS.map((v) => `${v}: ${detail[v]}`).join(' · ') }}
           </p>
-          <template v-if="detail.strengths.length">
+          <template v-if="detail.strengths?.length">
             <h3>Strengths</h3>
             <ul>
-              <li v-for="s in detail.strengths" :key="s">{{ s }}</li>
+              <li v-for="s in detail.strengths" :key="s">{{ visible(s) }}</li>
             </ul>
           </template>
-          <template v-if="detail.gaps.length">
+          <template v-if="detail.gaps?.length">
             <h3>Gaps</h3>
             <ul>
-              <li v-for="g in detail.gaps" :key="g">{{ g }}</li>
+              <li v-for="g in detail.gaps" :key="g">{{ visible(g) }}</li>
             </ul>
           </template>
-          <p v-if="detail.notes" class="adm-muted">{{ detail.notes }}</p>
+          <p v-if="detail.notes" class="adm-muted">{{ visible(detail.notes) }}</p>
         </template>
       </section>
 
@@ -119,10 +126,7 @@ onMounted(async () => {
         <h2 id="job-status" class="adm-h2">Status</h2>
         <label class="adm-field">
           <span>Status</span>
-          <select
-            :value="posting.status"
-            @change="patch({ status: ($event.target as HTMLSelectElement).value as PostingStatus })"
-          >
+          <select :value="posting.status" @change="setStatus($event.target as HTMLSelectElement)">
             <option v-for="s in STATUSES" :key="s" :value="s">{{ s }}</option>
           </select>
         </label>

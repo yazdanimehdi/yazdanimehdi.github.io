@@ -27,8 +27,7 @@ export interface RunStatus {
 /** Still working: poll until it isn't. */
 export const isRunning = (status: string | null) => status === 'running' || status === 'pending';
 
-/** Third-party excerpts shown in the admin: drop format characters (bidi overrides, zero-width) and line separators so they can't reorder the UI. */
-export const visible = (s: string) => s.replace(/[\p{Cf}\u2028\u2029]/gu, '');
+export { visible } from '../lib/career/text';
 
 /** The URL when it is http(s), else null: only those become links. */
 export function httpUrl(u: string | null | undefined): string | null {

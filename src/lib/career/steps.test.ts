@@ -306,6 +306,19 @@ test('a posting the guard cannot scan is skipped; the source carries on', async 
   assert.deepEqual(await gatherSource('fake'), { id: 'fake', found: 2, added: 1 });
 });
 
+test('invisible characters in title, company and location are stripped before storing', async () => {
+  fakeSource(async () => [
+    { ...fake(1, '<p>x</p>'), title: 'Dev\u202Eevil', company: 'A\u200Bcme', location: 'Be\u2028rn' },
+  ]);
+  await gatherSource('fake');
+  const [r] = await sql<{
+    title: string;
+    company: string;
+    location: string;
+  }>`select title, company, location from career_postings`;
+  assert.deepEqual({ ...r }, { title: 'Devevil', company: 'Acme', location: 'Bern' });
+});
+
 test('detail is fetched for at most 30 new postings; the rest wait for a later night', async () => {
   let calls = 0;
   const postings = Array.from({ length: 35 }, (_, i) => fake(i));
