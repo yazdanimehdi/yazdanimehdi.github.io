@@ -794,6 +794,47 @@ pdf:
   pageSize: A4 # or LETTER (default)
 ```
 
+### Job search (Postgres mode)
+
+A private job search inside the admin. Each night it gathers postings from the sources you turn on, scores them against your CV and preferences, and lists the best matches. On a posting you can **Draft**: it writes a tailored CV (rendered to PDF in one of your [CV styles](#cv-styles)), a cover letter and, for Greenhouse forms, proposed answers. Nothing is ever submitted for you.
+
+**Owner only, Postgres mode only.** Only the owner sees the screens, the data and the source keys. The owner is the `owner` entry in `config/site.yml`; when that is empty, it is the first `adminUsers` entry. An entry is a GitHub login or `password:<username>`, matched like `publishers`. Anyone else gets a 404, so they cannot tell the feature exists. In static and git mode every job-search screen and route answers 404 and the nav link is hidden (CV styles keep working in all modes).
+
+**Sources.** Turn them on under Preferences. A source that needs a key you have not saved reports `skipped: no <KEY>`; that is not a failure. Keys live in the `secrets` table, never in content or the git backup.
+
+| Source                                 | Key                               | On by default | Notes                                                                                                                                                       |
+| -------------------------------------- | --------------------------------- | ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Watched companies (`watched`)          | none                              | yes           | Greenhouse, Lever, Ashby and SmartRecruiters boards from your watched list                                                                                  |
+| Company careers pages (`careers-page`) | none                              | yes           | Watched URLs that are not a known board                                                                                                                     |
+| Remotive (`remotive`)                  | none                              | yes           |                                                                                                                                                             |
+| Remote OK (`remoteok`)                 | none                              | yes           |                                                                                                                                                             |
+| Arbeitnow (`arbeitnow`)                | none                              | yes           |                                                                                                                                                             |
+| Google Jobs (`google-jobs`)            | `SERPAPI_KEY`                     | yes           | Spends SerpAPI credits on every run                                                                                                                         |
+| RSS feeds (`rss`)                      | none                              | yes           | Feeds you add. `SUGGESTED_FEEDS` currently lists only the two HigherEdJobs feeds that were confirmed (Chemistry; Geology, Earth Sciences, and Oceanography) |
+| Adzuna (`adzuna`)                      | `ADZUNA_APP_ID`, `ADZUNA_APP_KEY` | no            |                                                                                                                                                             |
+| USAJobs (`usajobs`)                    | `USAJOBS_API_KEY`                 | no            |                                                                                                                                                             |
+| LinkedIn guest search (`linkedin`)     | none                              | no            | See the warning below                                                                                                                                       |
+
+**LinkedIn warning.** LinkedIn's terms forbid automated access; using this can get your account or IP blocked. It reads only the public guest search, never your account. LinkedIn's `robots.txt` disallows the guest search and the source honors it, so while it is on, its run result reports an error starting "robots.txt disallows" and finds nothing.
+
+**The nightly run.** The daily cron (03:00 UTC) starts it once preferences have a role, keyword or watched company; **Run now** starts it any time, and a run that is still going is not started twice. It is a [Vercel Workflow](https://vercel.com/docs/workflows), so each run shows in the Workflow dashboard. It gathers every enabled source in parallel, fetches the detail of new postings that came without a description (at most 30 per source), then scores the new postings five at a time. At most `maxScoresPerRun` postings are scored a night (default 100); the rest wait for the next night and are counted as `deferred`. A provider or network error also leaves a posting deferred. A reply the model cannot get right after three tries marks that posting `failed`. If the AI key or the CV is missing, nothing is scored and the run says why (`scoreSkipped`). Posting text is untrusted: it is guarded before any AI call or storage, wrapped as data in every prompt, never rendered as HTML, and capped at 20,000 characters.
+
+**Drafts do not fabricate.** The AI may only select, reorder, condense and reword what is in your CV and Application answers. The tailored CV is assembled from that CV by `assembleCv`, so a claim that is not in it cannot enter, and a second AI pass (the reviewer) checks the result against the CV. If the reviewer finds issues, the draft is revised once; one that still has issues is saved as `needs-review` with the issues listed. A draft makes at most 6 AI calls (7 with Greenhouse answers). Form answers come from your CV and Application answers; EEO questions follow your setting and decline by default; a fact that is not there is left empty as a hand-off for you to fill in, never guessed. Answers are proposals only.
+
+**Where the data lives.** Preferences, Application answers, postings and events are in the Postgres tables `career_settings`, `career_postings` and `career_events` (migration `005_career.sql`), not in `documents`, so they never reach the git backup or the generic config API. The daily jobs record only a neutral `done` for this step. Tailored PDFs go to Vercel Blob under `career/` with a random suffix and no row in the media library. They are public URLs that cannot be guessed, but anyone with the link can open the PDF.
+
+**Previews share production data.** A Vercel preview uses the same database and Blob store as production. Deploying one applies the migration to the live database, and a run on it writes real postings and spends your real AI and SerpAPI credits.
+
+#### Checking it on a preview
+
+Do this once, as the owner, after a preview deploys:
+
+1. Sign in on the preview's `/admin`. In the browser console run `const { runId } = await (await fetch('/api/admin/career/run', { method: 'POST' })).json();`, then poll `GET /api/admin/career/run` until the status is `completed`. This confirms Workflow runs on the preview.
+2. Save test preferences (one role, a few sources, a low `maxScoresPerRun`), click **Run now**, and wait for `completed`. Note the run id.
+3. Open one job and **Draft** it. The PDF should render.
+4. Find the run in the Vercel Workflow dashboard.
+5. Clean up with `delete from career_postings; update career_settings set last_run = null, run_id = null;` in the Neon SQL editor, then clear the test preferences.
+
 ### Cookie Consent (GDPR)
 
 Optional GDPR-compliant cookie consent banner:
