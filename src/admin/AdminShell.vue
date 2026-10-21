@@ -22,6 +22,7 @@ const GROUPS = computed(() => [
       ['content/people', 'People'],
       ['publications', 'Publications'],
       ['cv', 'CV'],
+      ...(props.ctx.mode === 'static' ? [] : [['cv-styles', 'CV styles']]),
     ],
     more: [
       ['content/projects', 'Projects'],

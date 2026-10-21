@@ -14,6 +14,8 @@ import fs from 'node:fs';
 import { POST as importCv } from '../../admin/routes/api/cv/import';
 import { GET as pdfStatus, POST as generatePdf } from '../../admin/routes/api/cv/pdf';
 import { POST as publishCv } from '../../admin/routes/api/cv/publish';
+import { GET as getStyles } from '../../admin/routes/api/cv/styles';
+import { DELETE as deleteTheme, PUT as putTheme } from '../../admin/routes/api/cv/themes/[name]';
 import { PUT as hideFeed } from '../../admin/routes/api/feeds/hidden';
 import { DELETE as deleteMedia, GET as listMedia, POST as uploadMedia } from '../../admin/routes/api/media';
 import { POST as syncFeedsRoute } from '../../admin/routes/api/feeds/sync';
@@ -434,4 +436,80 @@ test('feeds/sync with no feeds configured: 200, nothing changed, nothing committ
   assert.equal(body.changed, false);
   assert.deepEqual(body.failed, []);
   assert.equal(store.log.length, commits);
+});
+
+const THEME = { 'Header.j2.typ': '= {{ cv.name }}', 'components/entry.typ': '#let entry = none' };
+
+test('cv/themes: only publishers may upload or delete a theme', async () => {
+  adminSettings().publishers = ['priya'];
+  try {
+    const put = await call(putTheme, { method: 'PUT', params: { name: 'mine' }, body: { files: THEME } });
+    assert.equal(put.status, 403);
+    assert.equal((await call(deleteTheme, { method: 'DELETE', params: { name: 'mine' } })).status, 403);
+    assert.equal(store.log.length, 0);
+  } finally {
+    adminSettings().publishers = [];
+  }
+});
+
+test('cv/themes: bad names and files → 400 with nothing committed', async () => {
+  const put = (name: string, files: unknown) =>
+    call(putTheme, { method: 'PUT', params: { name }, body: { files } }).then((r) => r.status);
+  assert.equal(await put('Mine', THEME), 400);
+  assert.equal(await put('classic', THEME), 400);
+  assert.equal(await put('mine', { '../x.j2.typ': '' }), 400);
+  assert.equal(await put('mine', { '__init__.py': '' }), 400);
+  assert.equal(await put('mine', { 'a.typ': 'x'.repeat(600 * 1024) }), 400);
+  assert.equal(await put('mine', { 'a.typ': 1 }), 400);
+  assert.equal(await put('mine', {}), 400);
+  assert.equal(await put('mine', undefined), 400);
+  assert.equal((await call(deleteTheme, { method: 'DELETE', params: { name: '..' } })).status, 400);
+  assert.equal(store.log.length, 0);
+});
+
+test('cv/themes: PUT replaces the folder in one commit; the styles list shows it', async () => {
+  const first = await call(putTheme, { method: 'PUT', params: { name: 'mine' }, body: { files: THEME } });
+  assert.equal(first.status, 200);
+  const res = await call(putTheme, {
+    method: 'PUT',
+    params: { name: 'mine' },
+    body: { files: { 'Header.j2.typ': '= New' } },
+  });
+  assert.equal(res.status, 200);
+  assert.equal(store.log.length, 2);
+  assert.deepEqual(store.log[1].paths.sort(), ['cv/themes/mine/Header.j2.typ', 'cv/themes/mine/components/entry.typ']);
+  assert.equal((await store.read('cv/themes/mine/Header.j2.typ'))!.content, '= New');
+  assert.equal(await store.read('cv/themes/mine/components/entry.typ'), null);
+  const styles = await (await call(getStyles)).json();
+  assert.deepEqual(styles.themes, ['mine']);
+  assert.ok(styles.builtIn.includes('classic'));
+});
+
+test('cv/themes: DELETE refuses while a style uses the theme', async () => {
+  await call(putTheme, { method: 'PUT', params: { name: 'mine' }, body: { files: THEME } });
+  const styles = (theme: string) =>
+    `public: a\nstyles:\n  - { id: a, name: Mine, theme: ${theme}, density: normal, design: {} }\n`;
+  const current = await store.read('config/cv-styles.yml');
+  await store.commit([{ path: 'config/cv-styles.yml', content: styles('mine') }], 'seed', {
+    'config/cv-styles.yml': current?.version ?? null,
+  });
+  const used = await call(deleteTheme, { method: 'DELETE', params: { name: 'mine' } });
+  assert.equal(used.status, 409);
+  assert.match((await used.json()).error, /Mine/);
+  assert.ok(await store.read('cv/themes/mine/Header.j2.typ'));
+
+  const seeded = (await store.read('config/cv-styles.yml'))!;
+  await store.commit([{ path: 'config/cv-styles.yml', content: styles('classic') }], 'unuse', {
+    'config/cv-styles.yml': seeded.version,
+  });
+  assert.equal((await call(deleteTheme, { method: 'DELETE', params: { name: 'mine' } })).status, 200);
+  assert.deepEqual(await store.list('cv/themes/mine'), []);
+  assert.equal((await call(deleteTheme, { method: 'DELETE', params: { name: 'mine' } })).status, 404);
+});
+
+test('cv/styles: the stored styles (or the defaults) with the file version', async () => {
+  const res = await (await call(getStyles)).json();
+  const file = await store.read('config/cv-styles.yml');
+  assert.equal(res.version, file?.version ?? null);
+  assert.ok(res.data.styles.some((s: { id: string }) => s.id === res.data.public));
 });

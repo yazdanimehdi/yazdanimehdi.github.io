@@ -599,6 +599,58 @@
   gap: 20px;
   align-items: start;
 }
+/* CV styles: the list, the settings form, then the PDF preview, which takes what is left (past the 1080px cap). */
+.adm-main:has(> .adm-styles) > :not(.adm-modal) {
+  max-inline-size: 1500px;
+}
+.adm-styles {
+  display: grid;
+  grid-template-columns: 220px 300px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.adm-styles h2 {
+  margin: 0;
+  padding-inline: 0;
+}
+.adm-design-group > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.adm-design-group:not([open]) {
+  gap: 0;
+}
+.adm-styles-preview {
+  position: sticky;
+  inset-block-start: 16px;
+}
+.adm-styles-error {
+  margin: 0;
+  overflow-x: auto;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.adm-styles-preview iframe {
+  inline-size: 100%;
+  block-size: min(85vh, 1100px);
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+}
+/* Too narrow for three columns: the preview moves below the list and the form, then everything stacks. */
+@media (max-width: 1199px) {
+  .adm-styles {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+  .adm-styles-preview {
+    grid-column: 1 / -1;
+    position: static;
+  }
+}
+@media (max-width: 860px) {
+  .adm-styles {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 .adm-pick {
   list-style: none;
   margin: 0;

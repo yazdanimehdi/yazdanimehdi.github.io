@@ -148,6 +148,23 @@ test('cv: a stale save shows the conflict dialog and keeps the edits', async ({ 
   await expect(page.getByRole('button', { name: 'Restore edits' })).toBeVisible();
 });
 
+test('cv styles: create, set public, persists', async ({ page }) => {
+  await signIn(page);
+  await page.goto(`${ADMIN}/cv-styles`);
+  const list = page.getByRole('region', { name: 'My styles' });
+  await list.getByRole('button', { name: /^Compact/ }).click();
+  page.once('dialog', (d) => d.accept('Tight'));
+  await page.getByRole('button', { name: 'Duplicate' }).click();
+  await expect(list.getByRole('button', { name: 'Tight', exact: true })).toHaveAttribute('aria-current', 'true');
+  await page.getByLabel('Top margin', { exact: true }).fill('1cm');
+  await page.getByRole('button', { name: 'Set as public download' }).click();
+  await page.getByRole('button', { name: 'Publish styles' }).click();
+  await expect(page.getByText(COMMITTED)).toBeVisible();
+  await page.reload();
+  await expect(list.getByRole('button', { name: /^Tight/ })).toContainText('Public');
+  await expect(page.getByLabel('Top margin', { exact: true })).toHaveValue('1cm');
+});
+
 test('pages: reorder home sections and publish', async ({ page }) => {
   await signIn(page);
   await page.goto(`${ADMIN}/pages`);

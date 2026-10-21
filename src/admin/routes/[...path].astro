@@ -2,6 +2,7 @@
 import Ai from '../Ai.vue';
 import Collection from '../Collection.vue';
 import Cv from '../Cv.vue';
+import CvStyles from '../CvStyles.vue';
 import Editor from '../Editor.vue';
 import Dashboard from '../Dashboard.vue';
 import Login from '../Login.vue';
@@ -37,6 +38,7 @@ const SCREENS = new Set([
   'publications',
   'content',
   'cv',
+  'cv-styles',
   'pages',
   'settings',
   'users',
@@ -47,6 +49,7 @@ const CONTENT = ['announcements', 'people', 'projects', 'talks', 'positions'];
 if (!SCREENS.has(screen)) return new Response('Not found', { status: 404 });
 if (screen === 'content' && !CONTENT.includes(arg)) return new Response('Not found', { status: 404 });
 if (screen === 'users' && getMode() !== 'postgres') return new Response('Not found', { status: 404 });
+if (screen === 'cv-styles' && getMode() === 'static') return new Response('Not found', { status: 404 });
 
 // The post editor's "Import to Medium" needs the public site URL. Read from the store like the medium API route, so
 // it is current in both modes (git: GitHub; Postgres: the database, where site.yml lives); unreadable → the editor
@@ -125,6 +128,7 @@ if (screen === 'login' && error === 'denied') Astro.response.status = 403;
     {screen === 'editor' && <Editor client:only="vue" ctx={ctx} />}
     {screen === 'users' && <Users client:only="vue" ctx={ctx} />}
     {screen === 'cv' && <Cv client:only="vue" ctx={ctx} />}
+    {screen === 'cv-styles' && <CvStyles client:only="vue" ctx={ctx} />}
     {screen === '' && <Dashboard client:only="vue" ctx={ctx} />}
     {screen === 'posts' && !arg && <Posts client:only="vue" ctx={ctx} />}
     {screen === 'posts' && arg && <PostEditor client:only="vue" ctx={ctx} slug={arg} />}
