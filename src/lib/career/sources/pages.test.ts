@@ -173,6 +173,27 @@ test('parseExtract resolves URLs and drops untitled, non-http, and excess entrie
   assert.deepEqual(out[0], { title: 'A', url: 'https://acme.com/a', location: 'Boston' });
   assert.deepEqual(out[1], { title: 'T0', url: 'https://acme.com/t/0', location: '' });
   assert.throws(() => parseExtract('no json here', 'https://acme.com/'), /JSON/);
+  const junkFirst = [
+    ...Array.from({ length: 60 }, (_, i) => ({ title: `Off${i}`, url: `https://elsewhere.example/${i}` })),
+    { title: 'Real', url: '/real' },
+  ];
+  const kept = parseExtract(JSON.stringify({ postings: junkFirst }), 'https://acme.com/', (u) => u.host === 'acme.com');
+  assert.deepEqual(
+    kept,
+    [{ title: 'Real', url: 'https://acme.com/real', location: '' }],
+    'the cap counts kept entries',
+  );
+});
+
+test('careers page caps the link list at 15,000 characters, leaving the page text room', async () => {
+  const many = Array.from({ length: 2000 }, (_, i) => `<a href="/careers/${i}">Job ${i}</a>`).join('');
+  serve({ 'https://many.example/jobs': `<p>Visible intro</p>${many}` });
+  const c = ctx({ watched: ['https://many.example/jobs'] }, '{"postings":[]}');
+  await SOURCES['careers-page'].search(c);
+  const links = /Links:\n([\s\S]*?)\n\nPage:/.exec(c.prompts[0].prompt)?.[1] ?? '';
+  assert.ok(links.length > 14_000 && links.length <= 15_000, String(links.length));
+  assert.match(links, /\)$/, 'whole lines only');
+  assert.match(c.prompts[0].prompt, /Page:\nVisible intro/);
 });
 
 const LINKEDIN = fs.readFileSync('tests/fixtures/career/linkedin.html', 'utf8');

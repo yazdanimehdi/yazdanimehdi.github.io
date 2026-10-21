@@ -7,15 +7,11 @@ const RULE_FIELDS = ['user-agent', 'allow', 'disallow'];
 
 const lines = (text: string) => text.replace(/^\ufeff/, '').split(/\r\n|\r|\n/);
 
-/** Percent-decodes what decodes and leaves malformed escapes as they are, as Python's `unquote` does. */
+const utf8 = new TextDecoder();
+
+/** Percent-decodes as Python's `unquote` does: bytes that are not UTF-8 become U+FFFD, the rest still decode. */
 const unquote = (s: string) =>
-  s.replace(/(?:%[0-9a-f]{2})+/gi, (m) => {
-    try {
-      return decodeURIComponent(m);
-    } catch {
-      return m;
-    }
-  });
+  s.replace(/(?:%[0-9a-f]{2})+/gi, (m) => utf8.decode(Uint8Array.from(m.slice(1).split('%'), (h) => parseInt(h, 16))));
 
 /** A misconfigured host can answer 200 with an HTML page; that is not permission. Empty is a valid allow-all. */
 export function isRobotsBody(text: string): boolean {
@@ -81,7 +77,9 @@ export function robotsAllows(robotsTxt: string, url: string, agent = 'ScholarOS'
   const u = new URL(url);
   const path = unquote(u.pathname) + (u.search ? `?${unquote(u.search.slice(1))}` : '');
   const g = groups(robotsTxt);
-  const rules = g.get(agent.toLowerCase()) ?? g.get('*') ?? [];
+  // An empty group for the agent falls back to `*`, as Python's `or` does.
+  const own = g.get(agent.toLowerCase());
+  const rules = own?.length ? own : (g.get('*') ?? []);
   let bestLen = -1;
   let bestAllow = true;
   for (const [allow, pattern] of rules) {

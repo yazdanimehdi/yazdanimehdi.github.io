@@ -31,8 +31,11 @@ export interface Extracted {
 
 const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
 
-/** The postings in a model reply, URLs resolved against the page (fragment dropped); untitled or non-http(s) entries dropped; at most 50. */
-export function parseExtract(text: string, pageUrl: string): Extracted[] {
+/**
+ * The postings in a model reply, URLs resolved against the page (fragment dropped); untitled, non-http(s), and
+ * `keep`-rejected entries dropped; at most 50 of what is left.
+ */
+export function parseExtract(text: string, pageUrl: string, keep: (url: URL) => boolean = () => true): Extracted[] {
   let raw: { postings?: unknown };
   try {
     raw = JSON.parse(text.slice(text.indexOf('{'), text.lastIndexOf('}') + 1));
@@ -48,7 +51,7 @@ export function parseExtract(text: string, pageUrl: string): Extracted[] {
     } catch {
       continue;
     }
-    if (!title || !str(p?.url) || !/^https?:$/.test(url.protocol)) continue;
+    if (!title || !str(p?.url) || !/^https?:$/.test(url.protocol) || !keep(url)) continue;
     url.hash = '';
     out.push({ title, url: url.href, location: str(p?.location) });
     if (out.length === 50) break;

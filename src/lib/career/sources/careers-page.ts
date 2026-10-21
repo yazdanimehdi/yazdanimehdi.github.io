@@ -29,6 +29,8 @@ export function siteOf(host: string): string {
 export const textOf = (n: Nodes): string =>
   n.type === 'text' ? n.value : 'children' in n ? n.children.map(textOf).join('') : '';
 
+const MAX_LINKS_CHARS = 15_000;
+
 const fold = (s: string) => s.replace(/\s+/g, ' ').trim();
 
 /**
@@ -51,7 +53,9 @@ function linksOf(html: string, pageUrl: string, visible: string): string {
     const text = fold(textOf(el));
     if (!links.has(u.href)) links.set(u.href, text && visible.includes(text) ? `${text} (${u.href})` : u.href);
   });
-  return guardPosting([...links.values()].join('\n'), 'text').text;
+  const text = guardPosting([...links.values()].join('\n'), 'text').text;
+  // Whole lines only, so the page text always has room under the 20,000-character cap.
+  return text.length > MAX_LINKS_CHARS ? text.slice(0, text.lastIndexOf('\n', MAX_LINKS_CHARS)) : text;
 }
 
 const companyOf = (host: string) =>
@@ -70,18 +74,16 @@ async function pagePostings(pageUrl: string, ctx: SourceContext): Promise<RawPos
   // Links first: the 20,000-character cap trims the page text before them.
   const reply = await ctx.ai(extractPrompt(`Links:\n${linksOf(html, pageUrl, text)}\n\nPage:\n${text}`, pageUrl));
   const site = siteOf(new URL(pageUrl).hostname);
-  return parseExtract(reply, pageUrl)
-    .filter((p) => siteOf(new URL(p.url).hostname) === site)
-    .map((p) => ({
-      source: 'careers-page',
-      externalId: p.url,
-      company: companyOf(new URL(pageUrl).hostname),
-      title: p.title,
-      location: p.location,
-      url: p.url,
-      description: '',
-      format: 'text',
-    }));
+  return parseExtract(reply, pageUrl, (u) => siteOf(u.hostname) === site).map((p) => ({
+    source: 'careers-page',
+    externalId: p.url,
+    company: companyOf(new URL(pageUrl).hostname),
+    title: p.title,
+    location: p.location,
+    url: p.url,
+    description: '',
+    format: 'text',
+  }));
 }
 
 /** Watched companies whose careers page is the company's own site, not a known board. */

@@ -74,6 +74,14 @@ test('comments are stripped', () => {
   assert.equal(allows('User-agent: *\nDisallow: /x  # nope\n', '*', '/x'), false);
 });
 
+test('an empty group for the agent falls back to *', () => {
+  assert.equal(robotsAllows('User-agent: *\nDisallow: /\n\nUser-agent: ScholarOS\n', at('/a')), false);
+});
+
+test('a run with an invalid UTF-8 byte still decodes its valid bytes', () => {
+  assert.equal(robotsAllows('User-agent: *\nDisallow: /職\n', at('/%E8%81%B7%FF')), false);
+});
+
 test('agent match is case-insensitive; several agents share one ruleset; absent agent falls back to *', () => {
   assert.equal(allows('User-agent: CLAUDE-USER\nDisallow: /x\n', 'claude-user', '/x'), false);
   const shared = 'User-agent: A\nUser-agent: Claude-User\nDisallow: /z\n';
