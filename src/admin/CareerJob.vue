@@ -2,13 +2,13 @@
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import AdminShell from './AdminShell.vue';
 import { api, report, toast } from './api';
-import { httpUrl, visible } from './career';
+import { coverageLine, coverageState, httpUrl, visible } from './career';
 import { PostingText } from './PostingText';
 import type { AdminCtx } from './types';
 import { entryText } from '../lib/career/profile';
 import type { FormAnswer } from '../lib/career/answers';
 import type { ScoreDetail } from '../lib/career/score';
-import type { ReviewIssue, TailorPlan } from '../lib/career/tailor';
+import type { Requirement, ReviewIssue, TailorPlan } from '../lib/career/tailor';
 import type { Posting, PostingStatus } from '../lib/career/types';
 import type { CvConfig } from '../lib/types';
 
@@ -38,7 +38,7 @@ interface JobEvent {
 }
 
 type Part = 'all' | 'cv' | 'letter' | 'render' | 'answers';
-type Plan = Pick<TailorPlan, 'sections'>;
+type Plan = Pick<TailorPlan, 'sections'> & { requirements?: Requirement[] };
 interface EditEntry {
   ref: number;
   on: boolean;
@@ -197,7 +197,9 @@ function move(i: number, by: number) {
 
 /** Saves the edited plan, then re-renders it (no AI). */
 async function savePlan() {
+  const requirements = (posting.value?.cv as Plan | null)?.requirements;
   const cv: Plan = {
+    ...(requirements ? { requirements } : {}),
     sections: editor.value
       .filter((s) => s.on)
       .map((s) => ({
@@ -220,6 +222,24 @@ async function savePlan() {
       })),
   };
   if (await patch({ cv })) await draft('render');
+}
+
+const requirements = computed(() => {
+  const reqs = (posting.value?.cv as Plan | null)?.requirements;
+  return reqs && [...reqs.filter((r) => r.kind === 'required'), ...reqs.filter((r) => r.kind === 'preferred')];
+});
+
+function coverageNote(r: Requirement): string {
+  const state = coverageState(r);
+  const base =
+    state === 'shown'
+      ? 'In the CV'
+      : state === 'cut'
+        ? 'In your CV, not in this version; restore it in the editor below'
+        : state === 'reworded'
+          ? `Supported by ${visible(r.evidence ?? '')}, in other words`
+          : 'Not in your CV';
+  return r.uses && r.uses > 3 ? `${base}; used ${r.uses} times; may read as stuffing` : base;
 }
 
 const SOURCES: Record<FormAnswer['source'], string> = {
@@ -375,6 +395,15 @@ onMounted(async () => {
 
       <section v-if="posting.cv" class="adm-card" aria-labelledby="job-cv">
         <h2 id="job-cv" class="adm-h2">Tailored CV</h2>
+        <div v-if="requirements">
+          <h3>Posting requirements</h3>
+          <p class="adm-muted">{{ coverageLine(requirements) }}</p>
+          <ul v-if="requirements.length">
+            <li v-for="r in requirements" :key="r.kind + r.term">
+              <strong>{{ visible(r.term) }}</strong> ({{ r.kind }}): {{ coverageNote(r) }}
+            </li>
+          </ul>
+        </div>
         <p v-if="pdf" class="adm-actions">
           <a class="adm-btn" :href="pdf" target="_blank" rel="noopener noreferrer">Open PDF</a>
         </p>
