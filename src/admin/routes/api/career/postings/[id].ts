@@ -2,7 +2,7 @@ import { z } from 'astro/zod';
 import { HttpError, json, readBody } from '../../../../../lib/admin/http';
 import { addEvent, getPosting, listEvents, updatePosting } from '../../../../../lib/career/db';
 import { careerRoute } from '../../../../../lib/career/route';
-import { assembleCv, baseCv, FabricationError } from '../../../../../lib/career/tailor';
+import { baseCv, FabricationError, type TailorPlan, withCoverage } from '../../../../../lib/career/tailor';
 import type { ContentStore } from '../../../../../lib/admin/store';
 import type { PostingStatus } from '../../../../../lib/career/types';
 import { getSql } from '../../../../../lib/db';
@@ -40,6 +40,20 @@ const Plan = z.strictObject({
       }),
     )
     .max(50),
+  // The coverage fields may come back from the editor; they are recomputed on save.
+  requirements: z
+    .array(
+      z.strictObject({
+        term: z.string().min(1).max(80),
+        kind: z.enum(['required', 'preferred']),
+        evidence: z.string().max(200).nullable(),
+        inCv: z.boolean().optional(),
+        inBase: z.boolean().optional(),
+        uses: z.number().optional(),
+      }),
+    )
+    .max(15)
+    .optional(),
 });
 
 const Answers = z
@@ -81,25 +95,39 @@ async function view(id: string | undefined, store: ContentStore) {
 
 export const GET = careerRoute(async (ctx, store) => view(ctx.params.id, store));
 
+/** A plan's sections and requirements without the computed coverage, to tell an edit from a no-op. */
+const bare = (cv: Pick<TailorPlan, 'sections' | 'requirements'>) =>
+  JSON.stringify([cv.sections, cv.requirements.map(({ term, kind, evidence }) => [term, kind, evidence])]);
+
 /**
  * `{ status?, notes?, cv?, letter?, answers? }`: each change that differs from the stored value is saved and logged as an event.
  * The owner may reword `cv` freely, but it still goes through assembleCv: only the CV's own sections and entries, and
- * no more highlights than an entry has, and no skills item it lacks.
+ * no more highlights than an entry has, and no skills item it lacks. A `cv` without `requirements` keeps the stored
+ * ones; their coverage is recomputed for the new sections.
  */
 export const PATCH = careerRoute(async (ctx, store) => {
   const posting = await load(ctx.params.id);
   const body = Patch.parse(await readBody(ctx));
   const sql = getSql();
-  if (body.cv !== undefined && JSON.stringify(body.cv) !== JSON.stringify(posting.cv)) {
+  const stored = posting.cv as Partial<TailorPlan> | null;
+  const cv = body.cv && {
+    sections: body.cv.sections,
+    requirements: body.cv.requirements ?? stored?.requirements ?? [],
+  };
+  if (
+    cv &&
+    (!stored?.sections || bare(cv) !== bare({ sections: stored.sections, requirements: stored.requirements ?? [] }))
+  ) {
     const base = await baseCv(store);
     if (!base.cv?.sections) throw new HttpError(400, 'There is no CV to tailor: add one on the CV screen');
+    let next: Pick<TailorPlan, 'sections' | 'requirements'>;
     try {
-      assembleCv(base, body.cv);
+      next = withCoverage(base, cv);
     } catch (e) {
       if (e instanceof FabricationError) throw new HttpError(400, e.message);
       throw e;
     }
-    await updatePosting(sql, posting.id, { cv: body.cv });
+    await updatePosting(sql, posting.id, { cv: next });
     await addEvent(sql, posting.id, 'cv edited');
   }
   if (body.letter !== undefined && body.letter !== posting.letter) {

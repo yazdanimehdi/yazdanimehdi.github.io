@@ -14,7 +14,7 @@ import { BUILT_IN_THEMES, parseStyles, readThemeFiles } from '../cv-styles';
 import { getSql } from '../db';
 import type { CvConfig } from '../types';
 import { addEvent, getPosting, readCareer, updatePosting, upsertPostings, writeCareer } from './db';
-import { putCareerPdf } from './files';
+import { pdfPages, putCareerPdf } from './files';
 import { answersPrompt, type FormAnswer, greenhouseQuestions, parseFormAnswers, splitQuestions } from './answers';
 import { guardPosting } from './guard';
 import { hardGate, postingKey, tidyPosting } from './match';
@@ -37,6 +37,7 @@ import {
   type DraftPart,
   type ReviewIssue,
   type TailorPlan,
+  withCoverage,
 } from './tailor';
 import type { RunSummary } from './types';
 
@@ -266,7 +267,9 @@ export async function draftStep(
     }
   }
   await updatePosting(sql, id, {
-    ...(part === 'letter' ? {} : { cv: { sections: plan.sections } }),
+    ...(part === 'letter'
+      ? {}
+      : { cv: withCoverage(base, { sections: plan.sections, requirements: plan.requirements }) }),
     ...(part === 'cv' ? {} : { letter: plan.letter }),
   });
   return null;
@@ -387,6 +390,9 @@ export async function renderStep(id: number): Promise<string | null> {
     throw e;
   }
   await putCareerPdf(id, pdf);
+  // The model can't see the rendered length, so the page count is checked here.
+  const pages = pdfPages(pdf);
+  if (pages > 2) await addEvent(sql, id, 'long cv', `The tailored CV runs to ${pages} pages; the aim is at most 2.`);
   return null;
 }
 renderStep.maxRetries = 1;

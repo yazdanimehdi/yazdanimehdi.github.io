@@ -5,7 +5,21 @@ import type { CvConfig } from '../types';
 import { fold } from './match';
 import { jsonObject, posting, UNTRUSTED } from './prompts';
 import type { ApplicationAnswers } from './settings';
+import { visible } from './text';
 import type { Posting } from './types';
+
+/**
+ * One of the posting's key requirements as the drafter read it: `evidence` names the CV entry it says supports it
+ * (null for a gap). `inCv`, `inBase` and `uses` are computed in code (withCoverage), never taken from the model.
+ */
+export interface Requirement {
+  term: string;
+  kind: 'required' | 'preferred';
+  evidence: string | null;
+  inCv?: boolean;
+  inBase?: boolean;
+  uses?: number;
+}
 
 /**
  * What the drafter returns: which of the owner's entries to keep, in what order, and reworded how. `title` names a
@@ -15,6 +29,7 @@ import type { Posting } from './types';
  */
 export interface TailorPlan {
   sections: { title: string; entries: { ref: number; highlights?: string[]; text?: string; details?: string }[] }[];
+  requirements: Requirement[];
   letter: string;
 }
 
@@ -168,6 +183,41 @@ export function assembleCv(base: CvConfig, plan: Pick<TailorPlan, 'sections'>): 
   return out;
 }
 
+/** Every string value in a CV's sections, folded, space-padded so a term matches whole words only. */
+function cvText(cv: CvConfig): string {
+  const out: string[] = [];
+  const walk = (v: unknown): void => {
+    if (typeof v === 'string') out.push(fold(v));
+    else if (v && typeof v === 'object') Object.values(v).forEach(walk);
+  };
+  walk(cv.cv.sections);
+  return ` ${out.join(' ')} `;
+}
+
+/** How many times the folded `term` occurs, as whole words, in a cvText. */
+function occurrences(text: string, term: string): number {
+  const t = fold(term);
+  let n = 0;
+  if (t) for (let i = text.indexOf(` ${t} `); i >= 0; i = text.indexOf(` ${t} `, i + t.length + 1)) n++;
+  return n;
+}
+
+/** The plan with each requirement's coverage computed against the tailored CV (`inCv`, `uses`) and the base (`inBase`). */
+export function withCoverage<P extends Pick<TailorPlan, 'sections' | 'requirements'>>(
+  base: CvConfig,
+  plan: P,
+): Omit<P, 'requirements'> & { requirements: Requirement[] } {
+  const tailored = cvText(assembleCv(base, plan));
+  const own = cvText(base);
+  return {
+    ...plan,
+    requirements: plan.requirements.map((r) => {
+      const uses = occurrences(tailored, r.term);
+      return { ...r, inCv: uses > 0, inBase: occurrences(own, r.term) > 0, uses };
+    }),
+  };
+}
+
 /** Each reworded line next to what it came from (an entry's own highlights, or the original line), for the reviewer. */
 export function rewordedPairs(
   base: CvConfig,
@@ -227,15 +277,21 @@ export function draftPrompt(
   return {
     system: [
       'You tailor a candidate’s CV and write a cover letter for one job posting.',
-      'CV rules: select, reorder, condense, reword only; never add an employer, title, date, degree, skill, metric, or result that isn’t in the CV; at most the original number of highlights per entry; keep it to one page.',
+      'First list the posting\'s key requirements (at most 15, in the posting\'s own short terms, e.g. "causal inference", "SQL", "A/B testing") as "requirements": "kind" is "required" for what the posting requires and "preferred" for nice-to-haves; "evidence" names the CV entry that supports it (e.g. "researchExperience 1") or is null when the CV does not. Every requirement is listed, met or not; never fill a gap.',
+      'CV rules: select, reorder, condense, reword only; never add an employer, title, date, degree, skill, metric, or result that isn’t in the CV; at most the original number of highlights per entry.',
+      "Where an entry supports a requirement, use the posting's term for it (spell out an acronym once with its short form, e.g. \"large language models (LLMs)\") in that entry's highlights, the summary, or a skills line's order. Never use a term the CV does not support, and use no term more than three times.",
+      'Choose what to keep by relevance to this posting, from any section: an older entry that speaks to the posting beats a recent one that does not. Put evidence for the required items first. Order sections by what this job weighs (experience before education for industry roles).',
+      'Summary: name the role this posting is for, if the CV supports it, and lead with the strongest evidence for its requirements; keep it specific, two or three sentences. Never change a past job title.',
+      "Publications: keep the most relevant to this job, judged by title and abstract, most relevant first: 5 to 8 for a research role, 2 to 4 otherwise. Keep each one's authors and venue as they are.",
+      'Length: at most two pages.',
       'Each CV entry has a "ref". List the sections to keep (by their exact title) and the entries to keep (by ref) in the order to show them. Give "highlights" only for an entry that has highlights, and "text" only for an entry that is a plain string. Leave out both to keep an entry as it is.',
       'For an entry with "details" (a list such as skills), you may give "details": the same items, reordered with the ones this job asks for first, and trimmed; never add an item.',
-      'Letter rules: 250-400 words, first person, addressed to the company by name. Use only the CV and the candidate’s reason for looking; invent no facts about the company beyond what the posting says.',
+      "Letter rules: 250-350 words, first person, addressed to the company by name. Say early why this role and company, from what the posting says. Give two or three examples from the CV mapped to the posting's top requirements; don't restate the CV. If a required item is a gap, you may name it honestly as something to grow into from related CV work; never claim it. Use only the CV and the candidate's reason for looking; invent no facts about the company beyond what the posting says.",
       abstracts?.size
         ? `A publication's "abstract" is only for judging how relevant it is to this job; never quote or cite it in the CV or the letter.`
         : '',
       UNTRUSTED,
-      'Reply with one JSON object only: {"sections":[{"title":string,"entries":[{"ref":number,"highlights"?:[string],"text"?:string,"details"?:string}]}],"letter":string}.',
+      'Reply with one JSON object only: {"requirements":[{"term":string,"kind":"required"|"preferred","evidence":string|null}],"sections":[{"title":string,"entries":[{"ref":number,"highlights"?:[string],"text"?:string,"details"?:string}]}],"letter":string}.',
     ]
       .filter(Boolean)
       .join('\n'),
@@ -283,7 +339,17 @@ export function parseTailorPlan(text: string): TailorPlan {
       }),
     };
   });
-  return { sections, letter: r.letter.trim() };
+  const requirements = (Array.isArray(r.requirements) ? r.requirements : [])
+    .map(
+      (q: Record<string, unknown>): Requirement => ({
+        term: typeof q?.term === 'string' ? visible(q.term).trim() : '',
+        kind: q?.kind === 'required' ? 'required' : 'preferred',
+        evidence: typeof q?.evidence === 'string' ? q.evidence.slice(0, 200) : null,
+      }),
+    )
+    .filter((q: Requirement) => q.term.length >= 1 && q.term.length <= 80)
+    .slice(0, 15);
+  return { sections, requirements, letter: r.letter.trim() };
 }
 
 /** Asks a second model pass to flag any rewritten line or letter sentence that claims more than the CV supports. */

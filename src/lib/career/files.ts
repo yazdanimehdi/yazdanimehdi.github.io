@@ -65,3 +65,15 @@ export async function putCareerPdf(postingId: number, bytes: Uint8Array): Promis
   }
   return url;
 }
+
+/**
+ * Page objects in a PDF (`/Type /Page`, not the `/Pages` tree).
+ * ponytail: a byte scan; pages inside compressed object streams are not seen (0), so a miss only skips the warning.
+ */
+export function pdfPages(pdf: Uint8Array): number {
+  return (
+    Buffer.from(pdf)
+      .toString('latin1')
+      .match(/\/Type\s*\/Page(?!s)/g)?.length ?? 0
+  );
+}

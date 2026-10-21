@@ -16,7 +16,7 @@ import { POST } from '../../admin/routes/api/career/postings/[id]/draft';
 import { setLookupForTests } from './sources/http';
 import { PATCH } from '../../admin/routes/api/career/postings/[id]';
 import { getPosting, listEvents, updatePosting, upsertPostings, writeCareer } from './db';
-import { setBlobForTests } from './files';
+import { pdfPages, setBlobForTests } from './files';
 import {
   assembleCv,
   baseCv,
@@ -28,6 +28,7 @@ import {
   reviewPrompt,
   rewordedPairs,
   type TailorPlan,
+  withCoverage,
 } from './tailor';
 
 const CV_YML = `cv:
@@ -82,6 +83,7 @@ const PLAN: TailorPlan = {
     { title: 'experience', entries: [{ ref: 1 }, { ref: 0, highlights: ['Led a five-person team'] }] },
     { title: 'summary', entries: [{ ref: 0, text: 'Builds language systems' }] },
   ],
+  requirements: [],
   letter: 'Dear Acme, I am writing to apply.',
 };
 
@@ -207,6 +209,55 @@ test('parseTailorPlan keeps string details and refuses others', () => {
   assert.throws(() => parseTailorPlan(reply(['SQL'])), /details that are not a string/);
 });
 
+test('parseTailorPlan reads requirements, capped and cleaned', () => {
+  const reqs = Array.from({ length: 20 }, (_, i) => ({
+    term: `t${i}\u200b`,
+    kind: i ? 'preferred' : 'required',
+    evidence: i % 2 ? null : 'skills 0',
+  }));
+  const plan = parseTailorPlan(
+    JSON.stringify({ requirements: [...reqs, { term: '', evidence: null }], sections: [], letter: 'x' }),
+  );
+  assert.equal(plan.requirements.length, 15);
+  assert.deepEqual(plan.requirements[0], { term: 't0', kind: 'required', evidence: 'skills 0' });
+  assert.equal(
+    parseTailorPlan('{"requirements":[{"term":"SQL","kind":"must","evidence":null}],"sections":[],"letter":"x"}')
+      .requirements[0].kind,
+    'preferred',
+  );
+  assert.deepEqual(parseTailorPlan('{"sections":[],"letter":"x"}').requirements, []);
+});
+test('withCoverage tells shown, cut, worded-differently and gap apart, and counts uses', () => {
+  const plan = withCoverage(base({ skills: [{ label: 'L', details: 'Python, SQL' }] }), {
+    sections: [{ title: 'skills', entries: [{ ref: 0, details: 'SQL' }] }],
+    requirements: [
+      { term: 'sql', kind: 'required', evidence: 'skills 0' },
+      { term: 'Python', kind: 'required', evidence: 'skills 0' },
+      { term: 'deep learning', kind: 'preferred', evidence: 'skills 0' },
+      { term: 'Causal inference', kind: 'required', evidence: null },
+    ],
+    letter: '',
+  });
+  assert.deepEqual(
+    plan.requirements.map((r) => [r.inCv, r.inBase, r.uses]),
+    [
+      [true, true, 1],
+      [false, true, 0],
+      [false, false, 0],
+      [false, false, 0],
+    ],
+  );
+});
+test('pdfPages counts page objects, not the page tree', () => {
+  const pdf = (n: number) =>
+    new TextEncoder().encode(
+      `%PDF-1.7\n1 0 obj << /Type /Pages /Count ${n} >> endobj\n` +
+        Array.from({ length: n }, (_, i) => `${i + 2} 0 obj <</Type/Page /Parent 1 0 R>> endobj\n`).join(''),
+    );
+  assert.equal(pdfPages(pdf(2)), 2);
+  assert.equal(pdfPages(pdf(3)), 3);
+});
+
 test('contact details always come from the base CV', () => {
   const plan = parseTailorPlan(
     JSON.stringify({
@@ -216,7 +267,11 @@ test('contact details always come from the base CV', () => {
       letter: 'Hello',
     }),
   );
-  assert.deepEqual(plan, { sections: [{ title: 'experience', entries: [{ ref: 0 }] }], letter: 'Hello' });
+  assert.deepEqual(plan, {
+    sections: [{ title: 'experience', entries: [{ ref: 0 }] }],
+    requirements: [],
+    letter: 'Hello',
+  });
   const out = assembleCv(BASE, { ...plan, cv: { name: 'Evil' } } as unknown as TailorPlan);
   assert.equal(out.cv.name, 'Jane Doe');
   assert.equal(out.cv.email, 'jane@doe.test');
@@ -365,7 +420,7 @@ test('a clean review marks done and moves found → drafted', async () => {
   const p = (await getPosting(sql, id))!;
   assert.deepEqual([p.draftState, p.status, p.draftIssues], ['done', 'drafted', null]);
   assert.deepEqual(calls, { draft: 1, review: 1 });
-  assert.deepEqual(p.cv, { sections: PLAN.sections });
+  assert.deepEqual(p.cv, { sections: PLAN.sections, requirements: [] });
   assert.deepEqual(blob.put, [`career/${id}.pdf`]);
   assert.equal(p.cvPdfUrl, `https://x.public.blob.vercel-storage.com/career/${id}.pdf`);
   assert.deepEqual(blob.del, ['https://x.public.blob.vercel-storage.com/career/old.pdf'], 'the old PDF is deleted');
@@ -377,6 +432,53 @@ test('a clean review marks done and moves found → drafted', async () => {
   await updatePosting(sql, id, { status: 'submitted' });
   await careerDraft(id, 'letter', '');
   assert.equal((await getPosting(sql, id))!.status, 'submitted', 'only found moves');
+});
+
+test('a draft stores the requirements with their coverage; a letter redraft keeps them', async () => {
+  const requirements = [
+    { term: 'Python', kind: 'required', evidence: 'skills 0' },
+    { term: 'tests', kind: 'preferred', evidence: 'experience 1' },
+    { term: 'Kubernetes', kind: 'required', evidence: null },
+  ];
+  draftReply = () => JSON.stringify({ ...PLAN, requirements });
+  await careerDraft(id, 'all', '');
+  const cv = (await getPosting(sql, id))!.cv as TailorPlan;
+  assert.deepEqual(
+    cv.requirements.map((r) => [r.term, r.inCv, r.inBase, r.uses]),
+    [
+      ['Python', false, true, 0],
+      ['tests', true, true, 1],
+      ['Kubernetes', false, false, 0],
+    ],
+  );
+  draftReply = () => JSON.stringify({ ...PLAN, requirements: [] });
+  await careerDraft(id, 'letter', '');
+  assert.deepEqual((await getPosting(sql, id))!.cv, cv, 'a letter draft leaves the CV and its requirements alone');
+});
+
+test('a posting with no description and no requirements still drafts', async () => {
+  await sql`update career_postings set description = ''`;
+  draftReply = () => JSON.stringify({ sections: PLAN.sections, letter: PLAN.letter });
+  await careerDraft(id, 'all', '');
+  const p = (await getPosting(sql, id))!;
+  assert.equal(p.draftState, 'done');
+  assert.deepEqual(p.cv, { sections: PLAN.sections, requirements: [] });
+});
+
+test('a CV that renders past two pages is noted, and still saved', async () => {
+  const pages = (n: number) => new TextEncoder().encode('%PDF /Type /Pages ' + '/Type /Page '.repeat(n));
+  await updatePosting(sql, id, { cv: { sections: PLAN.sections } });
+  setRendererForTests(async () => pages(2));
+  await careerDraft(id, 'render', '');
+  assert.ok(!(await listEvents(sql, id)).some((e) => e.kind === 'long cv'), 'two pages is fine');
+  setRendererForTests(async () => pages(3));
+  await careerDraft(id, 'render', '');
+  const long = (await listEvents(sql, id)).filter((e) => e.kind === 'long cv');
+  assert.deepEqual(
+    long.map((e) => e.detail),
+    ['The tailored CV runs to 3 pages; the aim is at most 2.'],
+  );
+  assert.equal(blob.put.length, 2, 'the PDF is saved anyway');
 });
 
 test('a plan that fabricates twice fails the draft; once is re-asked', async () => {
@@ -392,7 +494,7 @@ test('a plan that fabricates twice fails the draft; once is re-asked', async () 
   const p = (await getPosting(sql, id))!;
   assert.equal(p.draftState, 'failed');
   assert.deepEqual(calls, { draft: 2, review: 0 });
-  assert.deepEqual(p.cv, { sections: PLAN.sections }, 'the last good plan stays');
+  assert.deepEqual(p.cv, { sections: PLAN.sections, requirements: [] }, 'the last good plan stays');
   assert.match((await listEvents(sql, id))[0].detail!, /awards/);
 });
 
@@ -646,7 +748,7 @@ test('PATCH cv and letter: the plan is checked against the CV', async () => {
   const ok = await call(PATCH as typeof POST, ownerUser(), { cv: { sections: PLAN.sections }, letter: 'Hi' }, 'PATCH');
   assert.equal(ok.status, 200);
   const p = (await getPosting(sql, id))!;
-  assert.deepEqual([p.cv, p.letter], [{ sections: PLAN.sections }, 'Hi']);
+  assert.deepEqual([p.cv, p.letter], [{ sections: PLAN.sections, requirements: [] }, 'Hi']);
   const extra = { sections: [{ title: 'experience', entries: [{ ref: 1, highlights: ['a', 'b'] }] }] };
   assert.equal((await call(PATCH as typeof POST, ownerUser(), { cv: extra }, 'PATCH')).status, 400);
 });

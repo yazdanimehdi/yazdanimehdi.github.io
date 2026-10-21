@@ -6,7 +6,7 @@ import { pgliteSql } from '../pglite-sql';
 import { setStoreForTests } from '../admin/get-store';
 import { nonOwnerUser, ownerUser } from './test-owner';
 import { PostgresStore } from '../admin/postgres-store';
-import { upsertPostings } from './db';
+import { getPosting, updatePosting, upsertPostings } from './db';
 import { GET, PATCH } from '../../admin/routes/api/career/postings/[id]';
 
 const call = (fn: typeof GET, user: ReturnType<typeof ownerUser>, id: string, body?: unknown) =>
@@ -103,4 +103,17 @@ test('PATCH cv refuses a skills line that adds an item, with the reason', async 
   const res = await call(PATCH, ownerUser(), id, { cv: cv('SQL, Rust') });
   assert.equal(res.status, 400);
   assert.equal((await res.json()).error, 'skills entry 0 adds "Rust"');
+});
+
+test('PATCH cv keeps the stored requirements and recomputes their coverage', async () => {
+  await sql`insert into documents (path, content) values ('config/cv.yml', ${'cv:\n  name: J\n  sections:\n    skills:\n      - label: Languages\n        details: Python, SQL\n'})`;
+  const cv = (details: string) => ({ sections: [{ title: 'skills', entries: [{ ref: 0, details }] }] });
+  const requirements = [{ term: 'Python', kind: 'required', evidence: 'skills 0', inCv: true, inBase: true, uses: 1 }];
+  await updatePosting(sql, Number(id), { cv: { ...cv('Python, SQL'), requirements } });
+  assert.equal((await call(PATCH, ownerUser(), id, { cv: cv('SQL') })).status, 200);
+  const saved = (await getPosting(sql, Number(id)))!.cv as { requirements: unknown };
+  assert.deepEqual(saved, {
+    ...cv('SQL'),
+    requirements: [{ ...requirements[0], inCv: false, uses: 0 }],
+  });
 });
