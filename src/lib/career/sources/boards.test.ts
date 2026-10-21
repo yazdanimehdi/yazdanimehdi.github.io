@@ -176,19 +176,62 @@ test('google-jobs maps its fixture and pages at most twice per query', async () 
   assert.equal(q.remote, true);
 });
 
-test('linkedin keeps only the Google Jobs results LinkedIn lists, one page per location, never fetching linkedin.com', async () => {
-  const calls = serve({ 'https://serpapi.com/search.json?': fixture('google-jobs') });
+const GUEST = 'https://www.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/search?';
+
+test('linkedin guest search parses cards, two pages per location, without robots.txt or SerpAPI', async () => {
+  const calls = serve({ [GUEST]: file('linkedin.html'), 'https://serpapi.com/': fixture('google-jobs') });
   const ps = await SOURCES.linkedin.search(ctx({}, { SERPAPI_KEY: 'serp-key' }));
   assert.deepEqual(
-    calls.map((c) => new URL(c.url).host),
-    ['serpapi.com'],
+    calls.map((c) => c.url),
+    [
+      `${GUEST}keywords=data+scientist+python&location=Boston&start=0`,
+      `${GUEST}keywords=data+scientist+python&location=Boston&start=10`,
+    ],
   );
-  assert.equal(ps.length, 1, 'the Indeed-only job is left out');
-  assert.equal(ps[0].source, 'linkedin');
-  assert.equal(ps[0].url, 'https://www.linkedin.com/jobs/view/1234567890');
-  assert.match(ps[0].description, /research software engineer/);
+  assert.match(calls[0].headers['User-Agent'], /^ScholarOS job search/, 'identifies honestly');
+  assert.equal(ps.length, 2, 'the same cards on both pages are two postings');
+  assert.deepEqual(ps[0], {
+    source: 'linkedin',
+    externalId: '4012345678',
+    company: 'Example Labs',
+    title: 'Data Scientist',
+    location: 'Boston, MA',
+    url: 'https://www.linkedin.com/jobs/view/4012345678',
+    description: '',
+    format: 'text',
+    postedAt: '2026-10-20',
+  });
   assert.equal(SOURCES.linkedin.defaultOn, false);
-  assert.deepEqual(SOURCES.linkedin.needs, ['SERPAPI_KEY']);
+  assert.equal(SOURCES.linkedin.needs, undefined, 'the guest search needs no key');
+  assert.match(SOURCES.linkedin.warning ?? '', /terms forbid automated access/);
+});
+
+test('linkedin falls back to its Google Jobs listings when LinkedIn refuses or finds nothing', async () => {
+  for (const guest of [undefined, '<ul></ul>']) {
+    const calls = serve({
+      ...(guest ? { [GUEST]: guest } : {}),
+      'https://serpapi.com/search.json?': fixture('google-jobs'),
+    });
+    const ps = await SOURCES.linkedin.search(ctx({}, { SERPAPI_KEY: 'serp-key' }));
+    assert.equal(
+      calls.filter((c) => c.url.startsWith('https://serpapi.com/')).length,
+      1,
+      'one Google page per location',
+    );
+    assert.equal(ps.length, 1, 'the Indeed-only job is left out');
+    assert.equal(ps[0].source, 'linkedin');
+    assert.equal(ps[0].url, 'https://www.linkedin.com/jobs/view/1234567890');
+    mock.restoreAll();
+  }
+});
+
+test('linkedin without SERPAPI_KEY reports the refusal, and keeps pages found before one', async () => {
+  serve({});
+  await assert.rejects(SOURCES.linkedin.search(ctx({})), (e) => e instanceof SourceError && e.status === 404);
+  mock.restoreAll();
+  const calls = serve({ [`${GUEST}keywords=data+scientist+python&location=Boston&start=0`]: file('linkedin.html') });
+  assert.equal((await SOURCES.linkedin.search(ctx({}))).length, 2);
+  assert.equal(calls.length, 2, 'stops at the refusal');
 });
 
 test('rss: one malformed item is skipped, the rest kept', async () => {
