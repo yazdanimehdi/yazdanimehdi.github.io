@@ -2,10 +2,10 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import AdminShell from './AdminShell.vue';
 import { api, report, toast } from './api';
-import { groupFeed, visible, isRunning, type RunStatus } from './career';
+import { visible, isRunning, type RunStatus } from './career';
 import type { AdminCtx } from './types';
 import type { CareerPrefs } from '../lib/career/settings';
-import type { PostingStatus, PostingSummary } from '../lib/career/types';
+import type { Feed, PostingStatus, PostingSummary } from '../lib/career/types';
 
 // Every string from a posting or a source error is third-party text: shown with {{ }} only, never as HTML.
 const props = defineProps<{ ctx: AdminCtx }>();
@@ -23,20 +23,20 @@ const STATUSES: PostingStatus[] = [
   'withdrawn',
 ];
 
-const rows = ref<PostingSummary[]>([]);
+const empty = { rows: [], total: 0 };
+const groups = ref<Feed>({ matches: empty, below: empty, gated: empty, unscored: empty });
 const threshold = ref(70);
-const filter = ref('');
+const filter = ref('open');
 const run = ref<RunStatus>({ runId: null, status: null, lastRun: null });
 const loading = ref(true);
 const starting = ref(false);
 let timer: ReturnType<typeof setInterval> | undefined;
 
-const groups = computed(() => groupFeed(rows.value, threshold.value));
 const running = computed(() => starting.value || isRunning(run.value.status));
 
 async function loadRows() {
   try {
-    rows.value = await api<PostingSummary[]>(`career/postings${filter.value ? `?status=${filter.value}` : ''}`);
+    groups.value = await api<Feed>(`career/postings${filter.value ? `?status=${filter.value}` : ''}`);
   } catch (e) {
     report(e);
   } finally {
@@ -132,6 +132,7 @@ onBeforeUnmount(stop);
       <label class="adm-field">
         <span>Status</span>
         <select v-model="filter" @change="loadRows">
+          <option value="open">Open</option>
           <option value="">All</option>
           <option v-for="s in STATUSES" :key="s" :value="s">{{ s }}</option>
         </select>
@@ -140,10 +141,10 @@ onBeforeUnmount(stop);
 
     <p v-if="loading" class="adm-muted">Loading…</p>
     <template v-else>
-      <h2 class="adm-h2">Matches ({{ groups.matches.length }})</h2>
-      <p v-if="!groups.matches.length" class="adm-muted">Nothing at or above {{ threshold }} yet.</p>
+      <h2 class="adm-h2">Matches ({{ groups.matches.total }})</h2>
+      <p v-if="!groups.matches.total" class="adm-muted">Nothing at or above {{ threshold }} yet.</p>
       <ul v-else class="adm-rows">
-        <li v-for="r in groups.matches" :key="r.id">
+        <li v-for="r in groups.matches.rows" :key="r.id">
           <strong class="adm-row-label" :aria-label="`Score ${r.score}`">{{ r.score }}</strong>
           <span class="adm-row-main">
             <a :href="`${base}/career/${r.id}`">{{ r.title }}</a>
@@ -155,6 +156,9 @@ onBeforeUnmount(stop);
           <span class="adm-row-date">{{ r.status }}</span>
         </li>
       </ul>
+      <p v-if="groups.matches.total > groups.matches.rows.length" class="adm-muted">
+        Showing the best {{ groups.matches.rows.length }}.
+      </p>
 
       <details
         v-for="[label, list, gate] in [
@@ -165,9 +169,9 @@ onBeforeUnmount(stop);
         :key="label"
         class="adm-nav-more"
       >
-        <summary>{{ label }} ({{ list.length }})</summary>
+        <summary>{{ label }} ({{ list.total }})</summary>
         <ul class="adm-rows">
-          <li v-for="r in list" :key="r.id">
+          <li v-for="r in list.rows" :key="r.id">
             <strong v-if="r.score !== null" class="adm-row-label">{{ r.score }}</strong>
             <span class="adm-row-main">
               <a :href="`${base}/career/${r.id}`">{{ r.title }}</a>
@@ -182,6 +186,7 @@ onBeforeUnmount(stop);
             <span class="adm-row-date">{{ r.status }}</span>
           </li>
         </ul>
+        <p v-if="list.total > list.rows.length" class="adm-muted">Showing the first {{ list.rows.length }}.</p>
       </details>
     </template>
   </AdminShell>

@@ -1,5 +1,14 @@
 import type { Sql } from '../db';
-import type { DraftState, GuardFlags, Posting, PostingStatus, PostingSummary, RawPosting, RunSummary } from './types';
+import type {
+  DraftState,
+  Feed,
+  GuardFlags,
+  Posting,
+  PostingStatus,
+  PostingSummary,
+  RawPosting,
+  RunSummary,
+} from './types';
 
 // JSON goes in as `${text}::text::jsonb`: with a bare `::jsonb`, postgres.js sees a jsonb parameter and encodes the
 // string again, storing a jsonb string instead of the object (PGlite doesn't, so only a real Postgres shows it).
@@ -30,6 +39,20 @@ export async function upsertPostings(
   return added;
 }
 
+const summary = (r: Row): PostingSummary => ({
+  id: Number(r.id),
+  company: r.company as string,
+  title: r.title as string,
+  location: r.location as string | null,
+  remote: r.remote as boolean | null,
+  score: r.score as number | null,
+  gate: r.gate as string | null,
+  status: r.status as PostingStatus,
+  foundAt: iso(r.found_at)!,
+  flagged: !!(r.flags as GuardFlags).warn,
+  draftState: r.draft_state as DraftState,
+});
+
 export async function listPostings(
   sql: Sql,
   f: { status?: PostingStatus; scored?: boolean; limit?: number },
@@ -41,19 +64,46 @@ export async function listPostings(
       and (${f.scored ?? null}::boolean is null or (score is not null) = ${f.scored ?? null})
     order by score desc nulls last, found_at desc
     limit ${f.limit ?? 200}`;
-  return rows.map((r) => ({
-    id: Number(r.id),
-    company: r.company as string,
-    title: r.title as string,
-    location: r.location as string | null,
-    remote: r.remote as boolean | null,
-    score: r.score as number | null,
-    gate: r.gate as string | null,
-    status: r.status as PostingStatus,
-    foundAt: iso(r.found_at)!,
-    flagged: !!(r.flags as GuardFlags).warn,
-    draftState: r.draft_state as DraftState,
-  }));
+  return rows.map(summary);
+}
+
+/**
+ * The feed, grouped in SQL so every heading's count is true however many rows there are: matches are scored at or
+ * over the threshold and ungated, the rest stay visible in their own groups. Each group returns its best `perGroup`.
+ * `open` leaves out the statuses the owner has closed (skipped, rejected, withdrawn).
+ */
+export async function feedPostings(
+  sql: Sql,
+  f: { status?: PostingStatus | 'open'; threshold: number; perGroup?: number },
+): Promise<Feed> {
+  const status = f.status ?? null;
+  const rows = await sql<Row>`
+    select * from (
+      select g.*, row_number() over (partition by grp order by score desc nulls last, found_at desc) as n,
+        count(*) over (partition by grp) as total
+      from (
+        select id, company, title, location, remote, score, gate, status, found_at, flags, draft_state,
+          case when gate is not null then 'gated' when score is null then 'unscored'
+            when score >= ${f.threshold}::int then 'matches' else 'below' end as grp
+        from career_postings
+        where ${status}::text is null or status = ${status}
+          or (${status}::text = 'open' and status not in ('skipped', 'rejected', 'withdrawn'))
+      ) g
+    ) r
+    where n <= ${f.perGroup ?? 200}
+    order by n`;
+  const feed: Feed = {
+    matches: { rows: [], total: 0 },
+    below: { rows: [], total: 0 },
+    gated: { rows: [], total: 0 },
+    unscored: { rows: [], total: 0 },
+  };
+  for (const r of rows) {
+    const g = feed[r.grp as keyof Feed];
+    g.rows.push(summary(r));
+    g.total = Number(r.total);
+  }
+  return feed;
 }
 
 export async function getPosting(sql: Sql, id: number): Promise<Posting | null> {

@@ -5,6 +5,7 @@ import type { Sql } from '../db';
 import { pgliteSql } from '../pglite-sql';
 import {
   addEvent,
+  feedPostings,
   getPosting,
   listEvents,
   listPostings,
@@ -75,6 +76,27 @@ test('updatePosting stamps scored_at on score, leaves untouched fields, and clea
   );
   assert.equal((await listPostings(sql, { scored: false })).length, 0);
   assert.equal((await listPostings(sql, { status: 'skipped' })).length, 0);
+});
+
+test('feedPostings groups in SQL with true counts past the per-group cap, and open hides closed statuses', async () => {
+  await upsertPostings(sql, ['A', 'B', 'C', 'D', 'E', 'F'].map(row));
+  const ids = (await listPostings(sql, {})).map((r) => r.id).sort((a, b) => a - b);
+  await updatePosting(sql, ids[0], { score: 90 });
+  await updatePosting(sql, ids[1], { score: 70 });
+  await updatePosting(sql, ids[2], { score: 50, status: 'skipped' });
+  await updatePosting(sql, ids[3], { score: 95, gate: 'language' });
+  const feed = await feedPostings(sql, { threshold: 70, perGroup: 1 });
+  assert.deepEqual(Object.fromEntries(Object.entries(feed).map(([k, g]) => [k, [g.total, g.rows.map((r) => r.id)]])), {
+    matches: [2, [ids[0]]],
+    below: [1, [ids[2]]],
+    gated: [1, [ids[3]]],
+    unscored: [2, feed.unscored.rows.map((r) => r.id)],
+  });
+  assert.equal(feed.unscored.rows.length, 1);
+  const open = await feedPostings(sql, { status: 'open', threshold: 70 });
+  assert.equal(open.below.total, 0);
+  assert.equal(open.matches.total, 2);
+  assert.equal((await feedPostings(sql, { status: 'skipped', threshold: 70 })).below.total, 1);
 });
 
 test('events list newest first and cascade with their posting', async () => {

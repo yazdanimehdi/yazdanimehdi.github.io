@@ -64,6 +64,9 @@ export interface PostingSummary {
   draftState: DraftState;
 }
 
+/** The feed's groups, each with its best rows and its true count. */
+export type Feed = Record<'matches' | 'below' | 'gated' | 'unscored', { rows: PostingSummary[]; total: number }>;
+
 export interface Posting {
   id: number;
   key: string;

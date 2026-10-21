@@ -29,8 +29,10 @@ after(() => {
 test('postings lists for the owner, 404 for others', async () => {
   const ok = await call(owner);
   assert.equal(ok.status, 200);
-  assert.deepEqual(await ok.json(), []);
+  const empty = { rows: [], total: 0 };
+  assert.deepEqual(await ok.json(), { matches: empty, below: empty, gated: empty, unscored: empty });
   assert.equal((await call(`${owner}-other`)).status, 404);
   assert.equal((await call(owner, '?status=bogus')).status, 400);
   assert.equal((await call(owner, '?status=found')).status, 200);
+  assert.equal((await call(owner, '?status=open')).status, 200);
 });
