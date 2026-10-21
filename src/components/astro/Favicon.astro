@@ -6,12 +6,15 @@ interface Props {
   favicon?: string;
 }
 
-// An uploaded favicon serves the tab and the home screen; without one, the icons in public/. An SVG is linked as
-// uploaded: Vercel's image optimizer does not serve SVG.
+// An uploaded favicon serves the tab and the home screen; without one, the icons in public/. SVG and ICO are linked
+// as uploaded: image optimizers do not resize them. iOS takes no ICO, so the home screen keeps the built-in icon.
 const { favicon } = Astro.props;
-const sized = async (src: string, width: number) =>
-  /\.svg(\?|$)/i.test(src) ? src : (await resolveImage(src, width)).src;
-const icon = favicon ? { tab: await sized(favicon, 64), touch: await sized(favicon, 180) } : null;
+const asUploaded = favicon && /\.(svg|ico)(\?|$)/i.test(favicon);
+const ico = favicon && /\.ico(\?|$)/i.test(favicon);
+const sized = async (src: string, width: number) => (asUploaded ? src : (await resolveImage(src, width)).src);
+const icon = favicon
+  ? { tab: await sized(favicon, 64), touch: ico ? '/apple-touch-icon.png' : await sized(favicon, 180) }
+  : null;
 ---
 
 {

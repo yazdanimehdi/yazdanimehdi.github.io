@@ -20,6 +20,8 @@ const SIGNATURES: [ext: string, test: (b: Uint8Array) => boolean][] = [
   ['gif', (b) => ascii(b, 0, 6) === 'GIF87a' || ascii(b, 0, 6) === 'GIF89a'],
   ['webp', (b) => ascii(b, 0, 4) === 'RIFF' && ascii(b, 8, 12) === 'WEBP'],
   ['avif', (b) => ascii(b, 4, 8) === 'ftyp' && ['avif', 'avis'].includes(ascii(b, 8, 12))],
+  // Reserved 0, type 1 (icon), then a count of at least one image.
+  ['ico', (b) => b[0] === 0 && b[1] === 0 && b[2] === 1 && b[3] === 0 && (b[4] > 0 || b[5] > 0)],
 ];
 
 /**
@@ -140,6 +142,7 @@ const CONTENT_TYPES: Record<string, string> = {
   webp: 'image/webp',
   avif: 'image/avif',
   svg: 'image/svg+xml',
+  ico: 'image/x-icon',
 };
 
 /** Validates an upload and names it `<slug>-<6 hex of sha256>.<ext>`. Throws MediaError (413 / 415). */
@@ -149,7 +152,7 @@ export function prepareUpload(
 ): { filename: string; base64: string; contentType: string } {
   if (bytes.length > MAX_UPLOAD) throw new MediaError('Files must be 4 MB or smaller', 413);
   const ext = sniffImage(bytes);
-  if (!ext) throw new MediaError('Only PNG, JPEG, WebP, GIF, AVIF and SVG images can be uploaded', 415);
+  if (!ext) throw new MediaError('Only PNG, JPEG, WebP, GIF, AVIF, SVG and ICO images can be uploaded', 415);
   if (ext === 'svg') {
     const text = svgText(bytes)!;
     const danger = SVG_DANGER.find(([re]) => re.test(text));

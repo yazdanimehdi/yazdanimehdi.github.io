@@ -2,7 +2,7 @@ import { SITE_MEDIA, assertAllowed, assertMediaPath } from './paths';
 import { adminSettings } from './settings';
 import type { CommitResult, ContentStore, MediaFile, MediaFolder, UploadResult } from './store';
 
-const IMAGE = /\.(png|jpe?g|webp|gif|avif|svg)$/i;
+const IMAGE = /\.(png|jpe?g|webp|gif|avif|svg|ico)$/i;
 
 /** The repo folder and URL prefix of a media folder. */
 export function mediaFolder(folder: MediaFolder): { dir: string; url: string } {

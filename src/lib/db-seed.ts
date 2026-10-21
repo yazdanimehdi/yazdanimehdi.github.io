@@ -13,7 +13,7 @@ import {
 } from './admin/paths';
 import { parseMarkdown } from './admin/serialize';
 
-const IMAGE = /\.(png|jpe?g|webp|gif|avif|svg)$/i;
+const IMAGE = /\.(png|jpe?g|webp|gif|avif|svg|ico)$/i;
 
 /** Repo-relative POSIX paths of the files under `dir`; [] when it doesn't exist. */
 function walk(root: string, dir: string): string[] {

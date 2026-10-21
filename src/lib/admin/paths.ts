@@ -25,7 +25,7 @@ export class PathError extends Error {}
 
 const SLUG = /^[a-z0-9-]{1,80}$/;
 const SEGMENT = /^[A-Za-z0-9_][A-Za-z0-9._-]*$/;
-const IMAGE = /\.(png|jpe?g|webp|gif|avif|svg)$/i;
+const IMAGE = /\.(png|jpe?g|webp|gif|avif|svg|ico)$/i;
 
 export function assertSlug(slug: unknown): string {
   if (typeof slug !== 'string' || !SLUG.test(slug)) {

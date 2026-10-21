@@ -85,11 +85,13 @@ function drop(e: DragEvent) {
       @dragleave="over = false"
       @drop.prevent="drop"
     >
-      {{ busy ? 'Uploading…' : 'Drop images here or click to choose (PNG, JPEG, WebP, GIF, AVIF, SVG; up to 4 MB)' }}
+      {{
+        busy ? 'Uploading…' : 'Drop images here or click to choose (PNG, JPEG, WebP, GIF, AVIF, SVG, ICO; up to 4 MB)'
+      }}
       <input
         type="file"
         multiple
-        accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/svg+xml"
+        accept="image/png,image/jpeg,image/webp,image/gif,image/avif,image/svg+xml,image/x-icon,.ico"
         class="adm-visually-hidden"
         aria-label="Upload images"
         @change="pickFiles"

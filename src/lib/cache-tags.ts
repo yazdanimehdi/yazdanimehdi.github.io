@@ -14,7 +14,7 @@ export function tagsForPath(path: string): string[] {
   if ((m = /^src\/content\/([^/]+)\/([^/]+)\.mdx?$/.exec(path))) return [`col:${m[1]}`, `doc:${m[1]}/${m[2]}`];
   if (path === 'src/data/feeds.json') return ['col:feeds'];
   if ((m = /^src\/data\/([^/]+)\.json$/.exec(path))) return [`data:${m[1]}`];
-  if (/^https:\/\//.test(path) || /\.(png|jpe?g|webp|gif|avif|svg)$/i.test(path)) return [];
+  if (/^https:\/\//.test(path) || /\.(png|jpe?g|webp|gif|avif|svg|ico)$/i.test(path)) return [];
   return [ALL];
 }
 

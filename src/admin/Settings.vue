@@ -36,7 +36,7 @@ const GROUPS: { label: string; fields: FieldDef[] }[] = [
         label: 'Favicon',
         type: 'image',
         folder: 'site',
-        hint: 'The browser-tab and phone home-screen icon. A square PNG, at least 180px, on a solid background. Empty: the built-in icons.',
+        hint: 'The browser-tab and phone home-screen icon: a square PNG (at least 180px, solid background), SVG or ICO. Empty: the built-in icons.',
       },
       text('lang', 'Language (BCP 47, e.g. en)'),
     ],
