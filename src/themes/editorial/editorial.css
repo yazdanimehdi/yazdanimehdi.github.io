@@ -1908,6 +1908,15 @@
       max-height: 116px;
       object-fit: contain;
     }
+    & .ed-hero .ed-figure--portrait {
+      order: -1;
+    }
+    & .ed-hero .ed-figure--portrait .ed-figure-box {
+      padding: 24px;
+    }
+    & .ed-hero .ed-figure--portrait .ed-figure-box img {
+      max-height: none;
+    }
     & .ed-topic {
       gap: 12px;
     }
