@@ -9,7 +9,7 @@
   <br>
   Designed for researchers, professors, and labs who want their public presence to stay current by default.
   <br>
-  Built with <strong>Astro 5</strong>, <strong>Vue 3</strong>, and <strong>Tailwind CSS v4</strong>.
+  Built with <strong>Astro 7</strong>, <strong>Vue 3</strong>, and <strong>Tailwind CSS v4</strong>.
   <br><br>
   <a href="https://github.com/yazdanimehdi/ScholarOS/stargazers">
     <img src="https://img.shields.io/github/stars/yazdanimehdi/ScholarOS?style=social" alt="GitHub Stars">
@@ -238,7 +238,7 @@ If you prefer working locally, want to customize components, or need to run auto
 
 #### Prerequisites
 
-- [Node.js 22+](https://nodejs.org/)
+- [Node.js 22.22+](https://nodejs.org/)
 - [pnpm](https://pnpm.io/)
 
 #### Setup
@@ -1247,7 +1247,7 @@ pnpm migrate:al-folio
 
 | Technology                                 | Purpose                                         |
 | ------------------------------------------ | ----------------------------------------------- |
-| [Astro 5](https://astro.build)             | Static site generator with island architecture  |
+| [Astro 7](https://astro.build)             | Static site generator with island architecture  |
 | [Vue 3](https://vuejs.org)                 | Interactive components (search, filters, forms) |
 | [Tailwind CSS v4](https://tailwindcss.com) | Utility-first styling with CSS variables        |
 | [MDX](https://mdxjs.com)                   | Enhanced Markdown with component support        |

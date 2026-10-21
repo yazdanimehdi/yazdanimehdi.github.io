@@ -31,7 +31,7 @@ A system, not a theme. Structured data (YAML/Markdown or Postgres) is the single
 
 ## Capabilities and Constraints
 
-- Stack: Astro 5, Vue 3 islands, Tailwind CSS v4, TypeScript; Tiptap editor with KaTeX; pdfmake for CV PDF.
+- Stack: Astro 7, Vue 3 islands, Tailwind CSS v4, TypeScript; Tiptap editor with KaTeX; pdfmake for CV PDF.
 - Content collections: publications, posts, projects, people, positions, talks, announcements; CV from structured YAML (RenderCV-compatible import).
 - Public pages: home, research, publications, CV, blog (native + Medium import), news, people, positions/join, projects, talks, repositories, contact, RSS.
 - Admin: dashboard, posts editor, collections, CV editor with PDF generation, media library, pages, settings, user accounts (postgres mode).
