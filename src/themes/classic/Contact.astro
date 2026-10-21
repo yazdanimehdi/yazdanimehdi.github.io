@@ -24,24 +24,20 @@ const { config, siteName, personal, web3formsKey } = Astro.props;
   <div class="grid gap-8 lg:grid-cols-[1fr_280px]">
     <!-- Contact Form -->
     <div>
-      <h2
-        class="mb-4 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading"
-      >
+      <h2 class="mb-4 border-b border-surface-200 pb-2 font-serif text-lg font-normal text-surface-900 dark:border-dm-border dark:text-dm-heading">
         Send a Message
       </h2>
-      {
-        web3formsKey ? (
-          <ContactForm client:visible accessKey={web3formsKey} />
-        ) : (
-          <p class="text-sm text-surface-500 dark:text-dm-muted">
-            Get in touch via email:{' '}
-            <ObfuscatedEmail
-              email={config.socials.email!}
-              class="text-primary-600 underline underline-offset-2 dark:text-accent-400"
-            />
-          </p>
-        )
-      }
+      {web3formsKey ? (
+        <ContactForm client:visible accessKey={web3formsKey} />
+      ) : (
+        <p class="text-sm text-surface-500 dark:text-dm-muted">
+          Get in touch via email:{' '}
+          <ObfuscatedEmail
+            email={config.socials.email!}
+            class="text-primary-600 underline underline-offset-2 dark:text-accent-400"
+          />
+        </p>
+      )}
     </div>
 
     <!-- Contact Info -->
@@ -52,21 +48,27 @@ const { config, siteName, personal, web3formsKey } = Astro.props;
         </h3>
         <div class="space-y-2 text-sm text-surface-500 dark:text-dm-muted">
           <div>
-            <span class="text-surface-900 dark:text-dm-heading">{siteName}</span><br />
-            {config.department}<br />
+            <span class="text-surface-900 dark:text-dm-heading">{siteName}</span>
+            <br />
+            {config.department}
+            <br />
             {config.university}
           </div>
           <div>
-            <span class="text-surface-700 dark:text-dm-text">Email:</span><br />
+            <span class="text-surface-700 dark:text-dm-text">Email:</span>
+            <br />
             <ObfuscatedEmail
               email={config.socials.email!}
               class="text-primary-600 underline underline-offset-2 dark:text-accent-400"
             />
           </div>
           <div>
-            <span class="text-surface-700 dark:text-dm-text">Address:</span><br />
-            Room 123, CS Building<br />
-            123 University Ave<br />
+            <span class="text-surface-700 dark:text-dm-text">Address:</span>
+            <br />
+            Room 123, CS Building
+            <br />
+            123 University Ave
+            <br />
             City, State 12345
           </div>
         </div>

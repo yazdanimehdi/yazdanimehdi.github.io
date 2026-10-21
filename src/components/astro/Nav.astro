@@ -23,18 +23,16 @@ const linkClass = (href: string) => [
 ---
 
 <nav class="relative flex items-center gap-0.5" aria-label={t('nav.primary')} data-nav-overflow>
-  {
-    items.map((item) => (
-      <a
-        href={item.href}
-        class:list={linkClass(item.href)}
-        aria-current={isActive(item.href) ? 'page' : undefined}
-        data-nav-item
-      >
-        {item.label}
-      </a>
-    ))
-  }
+  {items.map((item) => (
+    <a
+      href={item.href}
+      class:list={linkClass(item.href)}
+      aria-current={isActive(item.href) ? 'page' : undefined}
+      data-nav-item
+    >
+      {item.label}
+    </a>
+  ))}
 
   <!-- Disclosure for the links that don't fit; filled by the script below -->
   <div class="relative hidden" data-nav-more>
@@ -61,21 +59,18 @@ const linkClass = (href: string) => [
       id="nav-more-list"
       class="absolute end-0 top-full z-50 hidden min-w-[160px] rounded-md border border-surface-200 bg-white py-1 shadow-lg dark:border-dm-border-alt dark:bg-dm-alt"
       data-nav-more-menu
-    >
-    </ul>
+    ></ul>
   </div>
 
-  {
-    contact && (
-      <a
-        href={contact.href}
-        class:list={linkClass(contact.href)}
-        aria-current={isActive(contact.href) ? 'page' : undefined}
-      >
-        {contact.label}
-      </a>
-    )
-  }
+  {contact && (
+    <a
+      href={contact.href}
+      class:list={linkClass(contact.href)}
+      aria-current={isActive(contact.href) ? 'page' : undefined}
+    >
+      {contact.label}
+    </a>
+  )}
 </nav>
 
 <script>

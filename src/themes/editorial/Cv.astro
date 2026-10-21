@@ -18,58 +18,54 @@ const t = uiStrings(config);
     <div class="ed-cv-head">
       <div class="ed-stack">
         <h1 class="ed-cv-title">{t('cv.heading')}</h1>
-        <p class="ed-meta" dir="auto">{name}</p>
-        {
-          updated && (
-            <span class="ed-cv-updated">
-              {t('cv.updated', {
-                date: formatMonthYear(updated, config.lang),
-              })}
-            </span>
-          )
-        }
+        <p class="ed-meta" dir="auto">
+          {name}
+        </p>
+        {updated && (
+          <span class="ed-cv-updated">
+            {t('cv.updated', {
+              date: formatMonthYear(updated, config.lang),
+            })}
+          </span>
+        )}
       </div>
-      {
-        pdfHref && (
-          <a href={pdfHref} class="ed-btn-outline" download="cv.pdf">
-            {t('cv.download')}
-          </a>
-        )
-      }
+      {pdfHref && (
+        <a href={pdfHref} class="ed-btn-outline" download="cv.pdf">
+          {t('cv.download')}
+        </a>
+      )}
     </div>
 
-    {
-      sections.map((s) => (
-        <section class="ed-cv-section" aria-labelledby={`cv-${slugify(s.key)}`}>
-          <h2 id={`cv-${slugify(s.key)}`}>{s.title}</h2>
-          <div class="ed-cv-entries">
-            {s.entries.map((e) => (
-              <div class="ed-cv-entry">
-                <div class="ed-cv-entry-top">
-                  <span class="ed-cv-entry-title" dir="auto">
-                    <CvText text={e.title} />
-                  </span>
-                  {e.when && <span class="ed-cv-when num">{e.when}</span>}
-                </div>
-                {e.org && (
-                  <span class="ed-cv-org" dir="auto">
-                    <CvText text={e.org} />
-                  </span>
-                )}
-                {e.points.length > 0 && (
-                  <ul class="ed-cv-points">
-                    {e.points.map((p) => (
-                      <li dir="auto">
-                        <CvText text={p} />
-                      </li>
-                    ))}
-                  </ul>
-                )}
+    {sections.map((s) => (
+      <section class="ed-cv-section" aria-labelledby={`cv-${slugify(s.key)}`}>
+        <h2 id={`cv-${slugify(s.key)}`}>{s.title}</h2>
+        <div class="ed-cv-entries">
+          {s.entries.map((e) => (
+            <div class="ed-cv-entry">
+              <div class="ed-cv-entry-top">
+                <span class="ed-cv-entry-title" dir="auto">
+                  <CvText text={e.title} />
+                </span>
+                {e.when && <span class="ed-cv-when num">{e.when}</span>}
               </div>
-            ))}
-          </div>
-        </section>
-      ))
-    }
+              {e.org && (
+                <span class="ed-cv-org" dir="auto">
+                  <CvText text={e.org} />
+                </span>
+              )}
+              {e.points.length > 0 && (
+                <ul class="ed-cv-points">
+                  {e.points.map((p) => (
+                    <li dir="auto">
+                      <CvText text={p} />
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+    ))}
   </div>
 </Layout>

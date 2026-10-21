@@ -29,62 +29,60 @@ const categories = [...new Set(announcements.map((a) => a.data.category))].sort(
 const journal = getTheme() === 'editorial';
 ---
 
-{
-  journal ? (
-    <EditorialNews
-      title="News"
-      description={
-        personal ? 'Latest updates and announcements.' : 'Latest announcements, publications, grants, and awards.'
-      }
-      heading="News"
-      intro={personal ? 'Latest updates and announcements.' : 'Latest announcements from our lab.'}
-      items={announcementsRaw}
-      {categories}
-    />
-  ) : (
-    <PageLayout
-      title="News"
-      description={
-        personal ? 'Latest updates and announcements.' : 'Latest announcements, publications, grants, and awards.'
-      }
-    >
-      <h1 class="mb-2 font-serif text-2xl font-normal text-surface-900 sm:text-3xl dark:text-dm-heading">News</h1>
-      <p class="mb-6 text-sm text-surface-500 dark:text-dm-muted">
-        {personal ? 'Latest updates and announcements.' : 'Latest announcements from our lab.'}
-      </p>
+{journal ? (
+  <EditorialNews
+    title="News"
+    description={
+      personal ? 'Latest updates and announcements.' : 'Latest announcements, publications, grants, and awards.'
+    }
+    heading="News"
+    intro={personal ? 'Latest updates and announcements.' : 'Latest announcements from our lab.'}
+    items={announcementsRaw}
+    {categories}
+  />
+) : (
+  <PageLayout
+    title="News"
+    description={
+      personal ? 'Latest updates and announcements.' : 'Latest announcements, publications, grants, and awards.'
+    }
+  >
+    <h1 class="mb-2 font-serif text-2xl font-normal text-surface-900 sm:text-3xl dark:text-dm-heading">News</h1>
+    <p class="mb-6 text-sm text-surface-500 dark:text-dm-muted">
+      {personal ? 'Latest updates and announcements.' : 'Latest announcements from our lab.'}
+    </p>
 
-      {/* Category filters */}
-      <div class="mb-6 flex flex-wrap items-center gap-1 text-sm">
-        <span class="me-1 text-surface-400 dark:text-dm-faint">Filter:</span>
+    {/* Category filters */}
+    <div class="mb-6 flex flex-wrap items-center gap-1 text-sm">
+      <span class="me-1 text-surface-400 dark:text-dm-faint">Filter:</span>
+      <a
+        href="/news"
+        class="border-b-2 border-primary-600 px-2 py-1 font-medium text-primary-600 dark:border-accent-400 dark:text-accent-400"
+      >
+        All
+      </a>
+      {categories.map((cat) => (
         <a
-          href="/news"
-          class="border-b-2 border-primary-600 px-2 py-1 font-medium text-primary-600 dark:border-accent-400 dark:text-accent-400"
+          href={`/news/category/${cat}`}
+          class="border-b-2 border-transparent px-2 py-1 text-surface-500 capitalize transition-colors hover:text-surface-700 dark:text-dm-muted dark:hover:text-[#c9d1d9]"
         >
-          All
+          {cat}
         </a>
-        {categories.map((cat) => (
-          <a
-            href={`/news/category/${cat}`}
-            class="border-b-2 border-transparent px-2 py-1 text-surface-500 capitalize transition-colors hover:text-surface-700 dark:text-dm-muted dark:hover:text-[#c9d1d9]"
-          >
-            {cat}
-          </a>
-        ))}
-      </div>
+      ))}
+    </div>
 
-      <div class="divide-y divide-surface-100 dark:divide-dm-border">
-        {announcements.map((a) => (
-          <AnnouncementCard
-            id={a.id}
-            title={a.data.title}
-            date={a.data.date}
-            category={a.data.category}
-            excerpt={a.data.excerpt}
-            pinned={a.data.pinned}
-            datePrecision={a.data.datePrecision}
-          />
-        ))}
-      </div>
-    </PageLayout>
-  )
-}
+    <div class="divide-y divide-surface-100 dark:divide-dm-border">
+      {announcements.map((a) => (
+        <AnnouncementCard
+          id={a.id}
+          title={a.data.title}
+          date={a.data.date}
+          category={a.data.category}
+          excerpt={a.data.excerpt}
+          pinned={a.data.pinned}
+          datePrecision={a.data.datePrecision}
+        />
+      ))}
+    </div>
+  </PageLayout>
+)}

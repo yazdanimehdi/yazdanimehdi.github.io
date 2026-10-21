@@ -28,13 +28,11 @@ const initials = name
 ---
 
 <div class="ed-ppl-photo" data-shape={shape}>
-  {
-    real ? (
-      <Image src={real} {alt} {width} {height} loading={eager ? 'eager' : 'lazy'} class:list={[{ 'ed-ink': ink }]} />
-    ) : (
-      <span class="ed-ppl-initials" aria-hidden="true">
-        {initials}
-      </span>
-    )
-  }
+  {real ? (
+    <Image src={real} {alt} {width} {height} loading={eager ? 'eager' : 'lazy'} class:list={[{ 'ed-ink': ink }]} />
+  ) : (
+    <span class="ed-ppl-initials" aria-hidden="true">
+      {initials}
+    </span>
+  )}
 </div>

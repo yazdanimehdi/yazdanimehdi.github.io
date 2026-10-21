@@ -12,11 +12,9 @@ const { items, label, isActive } = Astro.props;
 ---
 
 <nav class="ed-footer-nav" aria-label={label}>
-  {
-    items.map((item) => (
-      <a class="ul" href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
-        {item.label}
-      </a>
-    ))
-  }
+  {items.map((item) => (
+    <a class="ul" href={item.href} aria-current={isActive(item.href) ? 'page' : undefined}>
+      {item.label}
+    </a>
+  ))}
 </nav>

@@ -23,35 +23,31 @@ const { personal, projects, publications, researchAreas, researchDescription } =
 >
   <h1 class="mb-2 font-serif text-2xl font-normal text-surface-900 sm:text-3xl dark:text-dm-heading">Research</h1>
   <p class="mb-8 max-w-2xl text-sm text-surface-500 dark:text-dm-muted">
-    {
-      researchDescription ||
-        (personal
-          ? 'My research focuses on artificial intelligence, with an emphasis on building systems that are capable, safe, and beneficial.'
-          : 'Our lab explores the frontiers of artificial intelligence, with a focus on building systems that are capable, safe, and beneficial.')
-    }
+    {researchDescription ||
+      (personal
+        ? 'My research focuses on artificial intelligence, with an emphasis on building systems that are capable, safe, and beneficial.'
+        : 'Our lab explores the frontiers of artificial intelligence, with a focus on building systems that are capable, safe, and beneficial.')}
   </p>
 
   <!-- Research Areas -->
   <section class="mb-10">
     <SectionHeading title="Research Areas" />
     <div class="mt-4 space-y-6">
-      {
-        normalizeAreas(researchAreas).map((area) => (
-          <div id={area.id} class="scroll-mt-20 border-b border-surface-100 pb-5 last:border-0 dark:border-dm-border">
-            <h3 class="mb-1 text-base font-medium text-surface-900 dark:text-dm-heading">{area.title}</h3>
-            <p class="mb-2 text-sm text-surface-600 dark:text-dm-muted">{area.description}</p>
-            {area.tags && area.tags.length > 0 && (
-              <div class="flex flex-wrap gap-1.5">
-                {area.tags.map((tag) => (
-                  <span class="text-xs text-surface-400 dark:text-dm-faint">
-                    #{tag.toLowerCase().replace(/\s+/g, '-')}
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        ))
-      }
+      {normalizeAreas(researchAreas).map((area) => (
+        <div id={area.id} class="scroll-mt-20 border-b border-surface-100 pb-5 last:border-0 dark:border-dm-border">
+          <h3 class="mb-1 text-base font-medium text-surface-900 dark:text-dm-heading">{area.title}</h3>
+          <p class="mb-2 text-sm text-surface-600 dark:text-dm-muted">{area.description}</p>
+          {area.tags && area.tags.length > 0 && (
+            <div class="flex flex-wrap gap-1.5">
+              {area.tags.map((tag) => (
+                <span class="text-xs text-surface-400 dark:text-dm-faint">
+                  #{tag.toLowerCase().replace(/\s+/g, '-')}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
     </div>
   </section>
 
@@ -59,20 +55,18 @@ const { personal, projects, publications, researchAreas, researchDescription } =
   <section class="mb-10">
     <SectionHeading title="Current Projects" viewAllHref="/projects" />
     <div class="mt-4 space-y-3">
-      {
-        projects.map((p) => (
-          <ProjectCard
-            id={p.id}
-            title={p.data.title}
-            type={p.data.type}
-            status={p.data.status}
-            excerpt={p.data.excerpt}
-            tags={p.data.tags}
-            url={p.data.url}
-            repoUrl={p.data.repoUrl}
-          />
-        ))
-      }
+      {projects.map((p) => (
+        <ProjectCard
+          id={p.id}
+          title={p.data.title}
+          type={p.data.type}
+          status={p.data.status}
+          excerpt={p.data.excerpt}
+          tags={p.data.tags}
+          url={p.data.url}
+          repoUrl={p.data.repoUrl}
+        />
+      ))}
     </div>
   </section>
 
@@ -80,20 +74,18 @@ const { personal, projects, publications, researchAreas, researchDescription } =
   <section>
     <SectionHeading title="Key Publications" viewAllHref="/publications" />
     <div class="mt-4 space-y-3">
-      {
-        publications.map((pub) => (
-          <PublicationEntry
-            title={pub.data.title}
-            authors={pub.data.authors}
-            venue={pub.data.venue}
-            year={pub.data.year}
-            doi={pub.data.doi}
-            url={pub.data.url}
-            type={pub.data.type}
-            featured={pub.data.featured}
-          />
-        ))
-      }
+      {publications.map((pub) => (
+        <PublicationEntry
+          title={pub.data.title}
+          authors={pub.data.authors}
+          venue={pub.data.venue}
+          year={pub.data.year}
+          doi={pub.data.doi}
+          url={pub.data.url}
+          type={pub.data.type}
+          featured={pub.data.featured}
+        />
+      ))}
     </div>
   </section>
 </PageLayout>

@@ -23,10 +23,8 @@ const alumni = groups['Alumni'] || [];
 const orderedGroups = tabOrder.filter((t) => groups[t]?.length).map((name) => ({ name, people: groups[name] }));
 ---
 
-{
-  getTheme() === 'editorial' ? (
-    <EditorialPeople {personal} groups={orderedGroups} />
-  ) : (
-    <ClassicPeople {personal} {currentMembers} {alumni} />
-  )
-}
+{getTheme() === 'editorial' ? (
+  <EditorialPeople {personal} groups={orderedGroups} />
+) : (
+  <ClassicPeople {personal} {currentMembers} {alumni} />
+)}

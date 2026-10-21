@@ -17,39 +17,37 @@ const hasImage = !!about?.image;
 const shapeClass = getImageShapeClass();
 ---
 
-{
-  show && (
-    <section class="mx-auto max-w-[930px] px-4 py-8 sm:px-6">
-      <SectionHeading title={title} />
-      <div class:list={['mt-4 flex flex-col gap-8', hasImage && 'md:flex-row']}>
-        <div class:list={[hasImage ? 'md:flex-1' : 'w-full']}>
-          {bioHtml ? (
-            <div
-              dir="auto"
-              class="max-w-[68ch] space-y-3 text-base leading-relaxed text-surface-600 dark:text-dm-text [&_a]:text-primary-600 [&_a]:underline [&_a]:underline-offset-2 dark:[&_a]:text-accent-400"
-              set:html={bioHtml}
-            />
-          ) : (
-            <p dir="auto" class="max-w-[68ch] text-base leading-relaxed text-surface-600 dark:text-dm-text">
-              {about!.text}
-            </p>
-          )}
-        </div>
-        {hasImage && (
-          <div class="flex-shrink-0 md:w-[280px]">
-            <img
-              src={about!.image}
-              alt={about!.imageAlt ?? ''}
-              width="280"
-              height="280"
-              class:list={['w-full object-cover', shapeClass]}
-              loading="eager"
-              fetchpriority="high"
-              decoding="async"
-            />
-          </div>
+{show && (
+  <section class="mx-auto max-w-[930px] px-4 py-8 sm:px-6">
+    <SectionHeading title={title} />
+    <div class:list={['mt-4 flex flex-col gap-8', hasImage && 'md:flex-row']}>
+      <div class:list={[hasImage ? 'md:flex-1' : 'w-full']}>
+        {bioHtml ? (
+          <div
+            dir="auto"
+            class="max-w-[68ch] space-y-3 text-base leading-relaxed text-surface-600 dark:text-dm-text [&_a]:text-primary-600 [&_a]:underline [&_a]:underline-offset-2 dark:[&_a]:text-accent-400"
+            set:html={bioHtml}
+          />
+        ) : (
+          <p dir="auto" class="max-w-[68ch] text-base leading-relaxed text-surface-600 dark:text-dm-text">
+            {about!.text}
+          </p>
         )}
       </div>
-    </section>
-  )
-}
+      {hasImage && (
+        <div class="flex-shrink-0 md:w-[280px]">
+          <img
+            src={about!.image}
+            alt={about!.imageAlt ?? ''}
+            width="280"
+            height="280"
+            class:list={['w-full object-cover', shapeClass]}
+            loading="eager"
+            fetchpriority="high"
+            decoding="async"
+          />
+        </div>
+      )}
+    </div>
+  </section>
+)}

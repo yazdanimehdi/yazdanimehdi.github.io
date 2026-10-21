@@ -43,79 +43,72 @@ const ld = {
     <div class="ed-pubs-head">
       <div class="ed-stack">
         <h1 class="ed-h1">{t('pubs.heading')}</h1>
-        {
-          (personal || scholar) && (
-            <p class="ed-intro">
-              {personal && `${t('pubs.ownerBold')} `}
-              {scholar && (
-                <>
-                  {t('pubs.seeAlso')}{' '}
-                  <span class="ed-link-punct">
-                    <a href={scholar} class="ul">
-                      Google Scholar
-                    </a>
-                    .
-                  </span>
-                </>
-              )}
-            </p>
-          )
-        }
+        {(personal || scholar) && (
+          <p class="ed-intro">
+            {personal && `${t('pubs.ownerBold')} `}
+            {scholar && (
+              <>
+                {t('pubs.seeAlso')}{' '}
+                <span class="ed-link-punct">
+                  <a href={scholar} class="ul">
+                    Google Scholar
+                  </a>
+                  .
+                </span>
+              </>
+            )}
+          </p>
+        )}
       </div>
       <div class="ed-stats">
         <div class="ed-stat">
-          <span class="ed-stat-num num">{total}</span><span class="ed-stat-label">{t('pubs.count')}</span>
+          <span class="ed-stat-num num">{total}</span>
+          <span class="ed-stat-label">{t('pubs.count')}</span>
         </div>
-        {
-          personal && (
-            <div class="ed-stat">
-              <span class="ed-stat-num num">{firstCount}</span>
-              <span class="ed-stat-label">{t('pubs.firstAuthorCount')}</span>
-            </div>
-          )
-        }
+        {personal && (
+          <div class="ed-stat">
+            <span class="ed-stat-num num">{firstCount}</span>
+            <span class="ed-stat-label">{t('pubs.firstAuthorCount')}</span>
+          </div>
+        )}
       </div>
     </div>
 
     <div class="ed-filterbar" data-pub-filters>
-      {
-        filters.length > 2 ? (
-          <div class="ed-tabs" role="group" aria-label={t('pubs.filterByTopic')}>
-            {filters.map((f) => (
-              <button type="button" class="ed-tab" data-filter={f.id} aria-pressed={f.id === 'all' ? 'true' : 'false'}>
-                {filterLabel(f)} <span class="ed-tab-count num">{f.count}</span>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <span />
-        )
-      }
-      {
-        personal && (
-          <label class="ed-toggle">
-            <input type="checkbox" data-first-only /> {t('pubs.firstAuthorOnly')}
-          </label>
-        )
-      }
+      {filters.length > 2 ? (
+        <div class="ed-tabs" role="group" aria-label={t('pubs.filterByTopic')}>
+          {filters.map((f) => (
+            <button type="button" class="ed-tab" data-filter={f.id} aria-pressed={f.id === 'all' ? 'true' : 'false'}>
+              {filterLabel(f)} <span class="ed-tab-count num">{f.count}</span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <span />
+      )}
+      {personal && (
+        <label class="ed-toggle">
+          <input type="checkbox" data-first-only /> {t('pubs.firstAuthorOnly')}
+        </label>
+      )}
     </div>
 
-    <p class="ed-intro" data-pub-empty hidden>{t('pubs.empty')}</p>
+    <p class="ed-intro" data-pub-empty hidden>
+      {t('pubs.empty')}
+    </p>
 
-    {
-      groups.map((g) => (
-        <section class="ed-year" data-year={g.year} aria-labelledby={`y${g.year}`}>
-          <h2 id={`y${g.year}`} class="num">
-            {g.year}
-          </h2>
-          <ol class="ed-papers">
-            {g.items.map((i) => (
-              <PaperRow pub={i.pub} {owners} variant="list" topic={i.topic} first={i.first} />
-            ))}
-          </ol>
-        </section>
-      ))
-    }
+    {groups.map((g) => (
+      <section class="ed-year" data-year={g.year} aria-labelledby={`y${g.year}`}>
+        <h2 id={`y${g.year}`} class="num">
+          {g.year}
+        </h2>
+        <ol class="ed-papers">
+          {g.items.map((i) => (
+            <PaperRow pub={i.pub} {owners} variant="list" topic={i.topic} first={i.first} />
+          ))}
+        </ol>
+      </section>
+    ))}
   </div>
 </Layout>
 

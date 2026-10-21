@@ -21,38 +21,41 @@ const intro = t('tag.intro', { tag }).split(/(\{count\})/);
 
 <Layout title={t('tag.title', { tag })} description={t('tag.description', { tag })}>
   <div class="ed-wrap ed-main ed-main--narrow">
-    <a href="/blog" class="ed-back"><span class="arr" aria-hidden="true">←</span> {label}</a>
+    <a href="/blog" class="ed-back">
+      <span class="arr" aria-hidden="true">
+        ←
+      </span>{' '}
+      {label}
+    </a>
     <div class="ed-stack">
       <h1 class="ed-h1">{t('tag.heading', { tag })}</h1>
       <p class="ed-intro">{intro.map((part) => (part === '{count}' ? <span class="num">{count}</span> : part))}</p>
     </div>
 
     <ol class="ed-entries">
-      {
-        posts.map((post) => {
-          const date = formatNewsDate(post.data.date, 'month', config.lang);
-          const meta = `${date} · ${t('post.minutes', { n: readingTime(post.body ?? '') })}`;
-          return (
-            <li class="ed-entry">
-              <div class="ed-entry-tile" aria-hidden="true">
-                <span class="ed-entry-tag">{tag}</span>
-                <span class="ed-entry-date num">{date}</span>
-              </div>
-              <div class="ed-entry-body">
-                <a href={`/blog/${post.id}`} class="ed-entry-title" dir="auto">
-                  {post.data.title}
-                </a>
-                {post.data.excerpt && (
-                  <p class="ed-entry-excerpt" dir="auto">
-                    {post.data.excerpt}
-                  </p>
-                )}
-                <span class="ed-entry-meta num">{meta}</span>
-              </div>
-            </li>
-          );
-        })
-      }
+      {posts.map((post) => {
+        const date = formatNewsDate(post.data.date, 'month', config.lang);
+        const meta = `${date} · ${t('post.minutes', { n: readingTime(post.body ?? '') })}`;
+        return (
+          <li class="ed-entry">
+            <div class="ed-entry-tile" aria-hidden="true">
+              <span class="ed-entry-tag">{tag}</span>
+              <span class="ed-entry-date num">{date}</span>
+            </div>
+            <div class="ed-entry-body">
+              <a href={`/blog/${post.id}`} class="ed-entry-title" dir="auto">
+                {post.data.title}
+              </a>
+              {post.data.excerpt && (
+                <p class="ed-entry-excerpt" dir="auto">
+                  {post.data.excerpt}
+                </p>
+              )}
+              <span class="ed-entry-meta num">{meta}</span>
+            </div>
+          </li>
+        );
+      })}
     </ol>
   </div>
 </Layout>

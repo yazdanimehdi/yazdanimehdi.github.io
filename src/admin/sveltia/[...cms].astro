@@ -36,7 +36,8 @@ export function getStaticPaths() {
       is:inline
       src="https://cdn.jsdelivr.net/npm/@sveltia/cms@0.248.0/dist/sveltia-cms.js"
       integrity="sha384-Urfog1ZkX8/gPYm8Tx4edCW5WySoZL4U7d1uB6NVR4mM7A1uA1eYmI6ufnSRk5Wc"
-      crossorigin="anonymous"></script>
+      crossorigin="anonymous"
+    ></script>
     <script is:inline>
       (function () {
         const adminUsers = JSON.parse(document.getElementById('cms-config')?.dataset.adminUsers || '[]');

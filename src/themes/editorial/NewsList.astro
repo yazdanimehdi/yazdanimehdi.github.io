@@ -33,53 +33,49 @@ const rows = await Promise.all(
 );
 ---
 
-{
-  lead && (
-    <a href={`/news/${lead.entry.id}`} class="ed-news-lead">
-      <span class="ed-news-plate" aria-hidden="true">
-        <img src={lead.src} alt="" class:list={[lead.ink && 'ed-ink']} decoding="async" loading="lazy" />
+{lead && (
+  <a href={`/news/${lead.entry.id}`} class="ed-news-lead">
+    <span class="ed-news-plate" aria-hidden="true">
+      <img src={lead.src} alt="" class:list={[lead.ink && 'ed-ink']} decoding="async" loading="lazy" />
+    </span>
+    <span class="ed-news-lead-body">
+      <span class="ed-news-lead-date num">
+        {formatNewsDate(lead.entry.data.date, lead.entry.data.datePrecision, config.lang)}
       </span>
-      <span class="ed-news-lead-body">
-        <span class="ed-news-lead-date num">
-          {formatNewsDate(lead.entry.data.date, lead.entry.data.datePrecision, config.lang)}
+      <span class="ed-news-lead-title" dir="auto">
+        {lead.entry.data.title}
+      </span>
+      {lead.entry.data.excerpt && (
+        <span class="ed-news-lead-excerpt" dir="auto">
+          {lead.entry.data.excerpt}
         </span>
-        <span class="ed-news-lead-title" dir="auto">
-          {lead.entry.data.title}
-        </span>
-        {lead.entry.data.excerpt && (
-          <span class="ed-news-lead-excerpt" dir="auto">
-            {lead.entry.data.excerpt}
+      )}
+    </span>
+  </a>
+)}
+{rows.length > 0 && (
+  <ul class="ed-news">
+    {rows.map(({ n, thumb }) => (
+      <li>
+        {thumb && (
+          <span class="ed-news-plate ed-news-plate--row" aria-hidden="true">
+            <img src={thumb.src} alt="" class:list={[thumb.ink && 'ed-ink']} decoding="async" loading="lazy" />
           </span>
         )}
-      </span>
-    </a>
-  )
-}
-{
-  rows.length > 0 && (
-    <ul class="ed-news">
-      {rows.map(({ n, thumb }) => (
-        <li>
-          {thumb && (
-            <span class="ed-news-plate ed-news-plate--row" aria-hidden="true">
-              <img src={thumb.src} alt="" class:list={[thumb.ink && 'ed-ink']} decoding="async" loading="lazy" />
+        {n.data.datePrecision === 'year' ? (
+          <span class="ed-news-date num">
+            <span aria-hidden="true">{formatNewsDate(n.data.date, 'year', config.lang)}</span>
+            <span class="ed-sr-only">
+              {t('news.yearOnly', { year: formatNewsDate(n.data.date, 'year', config.lang) })}
             </span>
-          )}
-          {n.data.datePrecision === 'year' ? (
-            <span class="ed-news-date num">
-              <span aria-hidden="true">{formatNewsDate(n.data.date, 'year', config.lang)}</span>
-              <span class="ed-sr-only">
-                {t('news.yearOnly', { year: formatNewsDate(n.data.date, 'year', config.lang) })}
-              </span>
-            </span>
-          ) : (
-            <span class="ed-news-date num">{formatNewsDate(n.data.date, n.data.datePrecision, config.lang)}</span>
-          )}
-          <a href={`/news/${n.id}`} class="ed-news-text" dir="auto">
-            {n.data.title}
-          </a>
-        </li>
-      ))}
-    </ul>
-  )
-}
+          </span>
+        ) : (
+          <span class="ed-news-date num">{formatNewsDate(n.data.date, n.data.datePrecision, config.lang)}</span>
+        )}
+        <a href={`/news/${n.id}`} class="ed-news-text" dir="auto">
+          {n.data.title}
+        </a>
+      </li>
+    ))}
+  </ul>
+)}

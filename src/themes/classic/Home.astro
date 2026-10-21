@@ -88,247 +88,243 @@ const metaLink =
   <SEO type="website" title={personal ? siteName : config.title} />
   {!sections.includes('hero') && <h1 class="sr-only">{personal ? siteName : config.title}</h1>}
 
-  {
-    blocks.map((block, i) => (
-      <>
-        {block === 'hero' && sections.includes('hero') && (
-          <HeroSection
-            title={siteName}
-            role={role}
-            focus={focus}
-            {profiles}
-            portrait={portrait?.image ? { src: portrait.image, alt: portrait.alt ?? '' } : undefined}
-            primary={
-              personal
-                ? { text: t('home.viewPublications'), href: '/publications' }
-                : { text: t('hero.research'), href: '/research' }
-            }
-            secondary={heroSecondary}
-          />
-        )}
+  {blocks.map((block, i) => (
+    <>
+      {block === 'hero' && sections.includes('hero') && (
+        <HeroSection
+          title={siteName}
+          role={role}
+          focus={focus}
+          {profiles}
+          portrait={portrait?.image ? { src: portrait.image, alt: portrait.alt ?? '' } : undefined}
+          primary={
+            personal
+              ? { text: t('home.viewPublications'), href: '/publications' }
+              : { text: t('hero.research'), href: '/research' }
+          }
+          secondary={heroSecondary}
+        />
+      )}
 
-        {block === 'publications' && publications.length > 0 && (
-          <section class="mx-auto max-w-[930px] px-4 py-8 sm:px-6">
-            <SectionHeading
-              title={navItem('/publications')?.label ?? t('pubs.title')}
-              viewAllHref={isPageOn('/publications', config) ? '/publications' : undefined}
-            >
-              {hasFeatured && (
-                <span
-                  aria-hidden="true"
-                  class="inline-flex items-center gap-1 text-xs text-surface-500 dark:text-dm-muted"
-                >
-                  <svg class="h-3 w-3 text-primary-600 dark:text-accent-400" viewBox="0 0 24 24" fill="currentColor">
-                    <path d={star} />
-                  </svg>
-                  {t('paper.featured')}
-                </span>
-              )}
-            </SectionHeading>
-            <ul class="mt-3 divide-y divide-surface-100 dark:divide-dm-border">
-              {publications.map((pub) => {
-                const p = pub.data;
-                const link = paperLink(p);
-                return (
-                  <li class="flex items-start gap-3 py-3">
-                    {pub.imageUrl && (
-                      <img
-                        src={pub.imageUrl}
-                        alt=""
-                        class="mt-0.5 h-10 w-10 shrink-0 rounded object-cover"
-                        loading="lazy"
-                      />
-                    )}
-                    <div class="min-w-0">
-                      <h3 dir="auto" class="text-sm leading-snug font-medium text-surface-900 dark:text-dm-heading">
-                        {p.featured && (
-                          <svg
-                            class="me-1 inline h-3.5 w-3.5 -translate-y-px text-primary-600 dark:text-accent-400"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                            aria-hidden="true"
-                          >
-                            <path d={star} />
-                          </svg>
-                        )}
-                        {link ? (
-                          <a
-                            href={link}
-                            class="text-surface-900 underline-offset-2 transition-colors hover:text-primary-600 hover:underline focus-visible:text-primary-600 dark:text-dm-heading dark:hover:text-accent-400 dark:focus-visible:text-accent-400"
-                          >
-                            {p.title}
-                          </a>
-                        ) : (
-                          p.title
-                        )}
-                      </h3>
-                      {p.featured && <span class="sr-only">{t('paper.featured')}</span>}
-                      <p dir="auto" class="mt-1 text-sm text-surface-600 dark:text-dm-text">
-                        {p.authors.map((a, j) => (
-                          <>
-                            {j > 0 && ', '}
-                            {isOwner(a, config.author) ? (
-                              <strong class="text-surface-900 dark:text-dm-heading">{a}</strong>
-                            ) : (
-                              a
-                            )}
-                          </>
-                        ))}
-                      </p>
-                      <div class="mt-0.5 flex flex-wrap items-baseline gap-x-3 text-sm text-surface-500 dark:text-dm-muted">
-                        <span>
-                          <bdi class="text-surface-700 dark:text-dm-text">{venueLine(p)}</bdi>
-                          <span aria-hidden="true" class="mx-1.5">
-                            &middot;
-                          </span>
-                          <bdi>{t(`pubType.${p.type}` as UiStringId)}</bdi>
-                        </span>
-                        {p.pdf && (
-                          <a href={p.pdf} class={metaLink}>
-                            {t('paper.pdf')}
-                          </a>
-                        )}
-                        {p.code && (
-                          <a href={p.code} class={metaLink}>
-                            {t('paper.code')}
-                          </a>
-                        )}
-                        {p.bibtex && isPageOn('/publications', config) && (
-                          <a href={`/publications#${pub.id}`} class={metaLink}>
-                            {t('paper.cite')}
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        )}
-
-        {block === 'research' && (
-          <section class="mx-auto max-w-[930px] px-4 py-8 sm:px-6">
-            <SectionHeading title={navItem('/research')?.label ?? t('home.research')} viewAllHref="/research" />
-            <ul class="mt-3 divide-y divide-surface-100 dark:divide-dm-border">
-              {areas.map((a) => (
-                <li>
-                  <a
-                    href={`/research#${a.id}`}
-                    class="group flex min-h-11 flex-col gap-1 py-3 text-sm sm:flex-row sm:items-baseline sm:gap-4"
-                  >
-                    <span
-                      dir="auto"
-                      class="shrink-0 font-medium text-surface-900 transition-colors group-hover:text-primary-600 group-hover:underline dark:text-dm-heading dark:group-hover:text-accent-400"
-                    >
-                      {a.title}
-                    </span>
-                    <span dir="auto" class="line-clamp-2 min-w-0 text-surface-500 dark:text-dm-muted">
-                      {a.description}
-                    </span>
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {block === 'updates' && (showNews || showBlog) && (
-          <div class="mx-auto max-w-[930px] px-4 py-8 sm:px-6">
-            <div class:list={['grid grid-cols-1 gap-8', showNews && showBlog && 'md:grid-cols-2']}>
-              {showNews && (
-                <section>
-                  <SectionHeading title={navItem('/news')?.label ?? t('home.news')} viewAllHref="/news" />
-                  <ul class="mt-3">
-                    {announcementData.map((a) => (
-                      <li>
-                        <AnnouncementCard
-                          id={a.id}
-                          title={a.data.title}
-                          date={a.data.date}
-                          datePrecision={a.data.datePrecision}
-                          category={a.data.category}
-                          excerpt={a.data.excerpt}
-                          pinned={a.data.pinned}
-                        />
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
-              {showBlog && (
-                <section>
-                  <SectionHeading title={navItem('/blog')?.label ?? t('home.writing')} viewAllHref="/blog" />
-                  <div class="mt-3">
-                    {posts.map((post) => (
-                      <PostCard
-                        id={post.id}
-                        title={post.data.title}
-                        date={post.data.date}
-                        excerpt={post.data.excerpt}
-                        tags={post.data.tags}
-                        author={post.data.author}
-                      />
-                    ))}
-                    {feeds.slice(0, 1).map((feed) => (
-                      <FeedItem
-                        title={feed.data.title}
-                        link={feed.data.link}
-                        date={feed.data.date}
-                        source={feed.data.source}
-                        excerpt={feed.data.excerpt}
-                      />
-                    ))}
-                  </div>
-                </section>
-              )}
-            </div>
-          </div>
-        )}
-
-        {i === aboutAfter && sections.includes('about') && <AboutSection />}
-      </>
-    ))
-  }
-
-  {
-    (engageMain || email) && (
-      <section class="mx-auto max-w-[930px] px-4 pt-8 sm:px-6">
-        <SectionHeading title={engage?.heading || t('contact.heading')} />
-        {engage?.text && (
-          <p dir="auto" class="mt-3 max-w-[68ch] text-base leading-relaxed text-surface-600 dark:text-dm-text">
-            {engage.text}
-          </p>
-        )}
-        <div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
-          <a
-            href={engageMain?.href ?? `mailto:${email}`}
-            class="inline-flex min-h-11 items-center rounded bg-primary-600 px-4 font-medium text-white transition-colors hover:bg-primary-700 dark:bg-accent-600 dark:text-dm dark:hover:bg-accent-500"
+      {block === 'publications' && publications.length > 0 && (
+        <section class="mx-auto max-w-[930px] px-4 py-8 sm:px-6">
+          <SectionHeading
+            title={navItem('/publications')?.label ?? t('pubs.title')}
+            viewAllHref={isPageOn('/publications', config) ? '/publications' : undefined}
           >
-            <bdi>{engageMain?.label ?? email}</bdi>
-          </a>
-          {engageMore.map((l) => (
-            <a
-              href={l.href}
-              class="inline-flex min-h-11 items-center gap-1 font-medium text-primary-600 underline-offset-4 hover:underline dark:text-accent-400"
-            >
-              {l.label}
-              <span aria-hidden="true" class="inline-block rtl:-scale-x-100">
-                →
+            {hasFeatured && (
+              <span
+                aria-hidden="true"
+                class="inline-flex items-center gap-1 text-xs text-surface-500 dark:text-dm-muted"
+              >
+                <svg class="h-3 w-3 text-primary-600 dark:text-accent-400" viewBox="0 0 24 24" fill="currentColor">
+                  <path d={star} />
+                </svg>
+                {t('paper.featured')}
               </span>
-            </a>
-          ))}
-          {engageMain && email && (
-            <a
-              href={`mailto:${email}`}
-              dir="ltr"
-              class="inline-flex min-h-11 items-center text-surface-600 underline underline-offset-4 hover:text-primary-600 dark:text-dm-text dark:hover:text-accent-400"
-            >
-              {email}
-            </a>
-          )}
+            )}
+          </SectionHeading>
+          <ul class="mt-3 divide-y divide-surface-100 dark:divide-dm-border">
+            {publications.map((pub) => {
+              const p = pub.data;
+              const link = paperLink(p);
+              return (
+                <li class="flex items-start gap-3 py-3">
+                  {pub.imageUrl && (
+                    <img
+                      src={pub.imageUrl}
+                      alt=""
+                      class="mt-0.5 h-10 w-10 shrink-0 rounded object-cover"
+                      loading="lazy"
+                    />
+                  )}
+                  <div class="min-w-0">
+                    <h3 dir="auto" class="text-sm leading-snug font-medium text-surface-900 dark:text-dm-heading">
+                      {p.featured && (
+                        <svg
+                          class="me-1 inline h-3.5 w-3.5 -translate-y-px text-primary-600 dark:text-accent-400"
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                          aria-hidden="true"
+                        >
+                          <path d={star} />
+                        </svg>
+                      )}
+                      {link ? (
+                        <a
+                          href={link}
+                          class="text-surface-900 underline-offset-2 transition-colors hover:text-primary-600 hover:underline focus-visible:text-primary-600 dark:text-dm-heading dark:hover:text-accent-400 dark:focus-visible:text-accent-400"
+                        >
+                          {p.title}
+                        </a>
+                      ) : (
+                        p.title
+                      )}
+                    </h3>
+                    {p.featured && <span class="sr-only">{t('paper.featured')}</span>}
+                    <p dir="auto" class="mt-1 text-sm text-surface-600 dark:text-dm-text">
+                      {p.authors.map((a, j) => (
+                        <>
+                          {j > 0 && ', '}
+                          {isOwner(a, config.author) ? (
+                            <strong class="text-surface-900 dark:text-dm-heading">{a}</strong>
+                          ) : (
+                            a
+                          )}
+                        </>
+                      ))}
+                    </p>
+                    <div class="mt-0.5 flex flex-wrap items-baseline gap-x-3 text-sm text-surface-500 dark:text-dm-muted">
+                      <span>
+                        <bdi class="text-surface-700 dark:text-dm-text">{venueLine(p)}</bdi>
+                        <span aria-hidden="true" class="mx-1.5">
+                          &middot;
+                        </span>
+                        <bdi>{t(`pubType.${p.type}` as UiStringId)}</bdi>
+                      </span>
+                      {p.pdf && (
+                        <a href={p.pdf} class={metaLink}>
+                          {t('paper.pdf')}
+                        </a>
+                      )}
+                      {p.code && (
+                        <a href={p.code} class={metaLink}>
+                          {t('paper.code')}
+                        </a>
+                      )}
+                      {p.bibtex && isPageOn('/publications', config) && (
+                        <a href={`/publications#${pub.id}`} class={metaLink}>
+                          {t('paper.cite')}
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+
+      {block === 'research' && (
+        <section class="mx-auto max-w-[930px] px-4 py-8 sm:px-6">
+          <SectionHeading title={navItem('/research')?.label ?? t('home.research')} viewAllHref="/research" />
+          <ul class="mt-3 divide-y divide-surface-100 dark:divide-dm-border">
+            {areas.map((a) => (
+              <li>
+                <a
+                  href={`/research#${a.id}`}
+                  class="group flex min-h-11 flex-col gap-1 py-3 text-sm sm:flex-row sm:items-baseline sm:gap-4"
+                >
+                  <span
+                    dir="auto"
+                    class="shrink-0 font-medium text-surface-900 transition-colors group-hover:text-primary-600 group-hover:underline dark:text-dm-heading dark:group-hover:text-accent-400"
+                  >
+                    {a.title}
+                  </span>
+                  <span dir="auto" class="line-clamp-2 min-w-0 text-surface-500 dark:text-dm-muted">
+                    {a.description}
+                  </span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {block === 'updates' && (showNews || showBlog) && (
+        <div class="mx-auto max-w-[930px] px-4 py-8 sm:px-6">
+          <div class:list={['grid grid-cols-1 gap-8', showNews && showBlog && 'md:grid-cols-2']}>
+            {showNews && (
+              <section>
+                <SectionHeading title={navItem('/news')?.label ?? t('home.news')} viewAllHref="/news" />
+                <ul class="mt-3">
+                  {announcementData.map((a) => (
+                    <li>
+                      <AnnouncementCard
+                        id={a.id}
+                        title={a.data.title}
+                        date={a.data.date}
+                        datePrecision={a.data.datePrecision}
+                        category={a.data.category}
+                        excerpt={a.data.excerpt}
+                        pinned={a.data.pinned}
+                      />
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
+            {showBlog && (
+              <section>
+                <SectionHeading title={navItem('/blog')?.label ?? t('home.writing')} viewAllHref="/blog" />
+                <div class="mt-3">
+                  {posts.map((post) => (
+                    <PostCard
+                      id={post.id}
+                      title={post.data.title}
+                      date={post.data.date}
+                      excerpt={post.data.excerpt}
+                      tags={post.data.tags}
+                      author={post.data.author}
+                    />
+                  ))}
+                  {feeds.slice(0, 1).map((feed) => (
+                    <FeedItem
+                      title={feed.data.title}
+                      link={feed.data.link}
+                      date={feed.data.date}
+                      source={feed.data.source}
+                      excerpt={feed.data.excerpt}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+          </div>
         </div>
-      </section>
-    )
-  }
+      )}
+
+      {i === aboutAfter && sections.includes('about') && <AboutSection />}
+    </>
+  ))}
+
+  {(engageMain || email) && (
+    <section class="mx-auto max-w-[930px] px-4 pt-8 sm:px-6">
+      <SectionHeading title={engage?.heading || t('contact.heading')} />
+      {engage?.text && (
+        <p dir="auto" class="mt-3 max-w-[68ch] text-base leading-relaxed text-surface-600 dark:text-dm-text">
+          {engage.text}
+        </p>
+      )}
+      <div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+        <a
+          href={engageMain?.href ?? `mailto:${email}`}
+          class="inline-flex min-h-11 items-center rounded bg-primary-600 px-4 font-medium text-white transition-colors hover:bg-primary-700 dark:bg-accent-600 dark:text-dm dark:hover:bg-accent-500"
+        >
+          <bdi>{engageMain?.label ?? email}</bdi>
+        </a>
+        {engageMore.map((l) => (
+          <a
+            href={l.href}
+            class="inline-flex min-h-11 items-center gap-1 font-medium text-primary-600 underline-offset-4 hover:underline dark:text-accent-400"
+          >
+            {l.label}
+            <span aria-hidden="true" class="inline-block rtl:-scale-x-100">
+              →
+            </span>
+          </a>
+        ))}
+        {engageMain && email && (
+          <a
+            href={`mailto:${email}`}
+            dir="ltr"
+            class="inline-flex min-h-11 items-center text-surface-600 underline underline-offset-4 hover:text-primary-600 dark:text-dm-text dark:hover:text-accent-400"
+          >
+            {email}
+          </a>
+        )}
+      </div>
+    </section>
+  )}
 </PageLayout>

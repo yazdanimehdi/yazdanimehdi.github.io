@@ -56,64 +56,62 @@ const groups = GROUPS.map((g) => ({ ...g, cards: cards.filter((c) => c.data.stat
 
     {cards.length === 0 && <p class="ed-pj-empty">{t('projects.empty')}</p>}
 
-    {
-      groups.map((g) => (
-        <section class="ed-pj-group" aria-labelledby={`pj-${g.status}`}>
-          <h2 id={`pj-${g.status}`} class="ed-label ed-pj-group-head">
-            {g.title}
-          </h2>
-          <div class="ed-pj-grid">
-            {g.cards.map((c, i) => (
-              <article class="ed-pj-card">
-                {c.cover && (
-                  <a href={`/projects/${c.id}`} class="ed-pj-cover" tabindex="-1" aria-hidden="true">
-                    <img
-                      src={c.cover}
-                      alt=""
-                      {...c.size}
-                      class:list={[c.ink && 'ed-ink']}
-                      loading={i < 2 ? 'eager' : 'lazy'}
-                      decoding="async"
-                    />
-                  </a>
-                )}
-                <h3 class="ed-pj-title">
-                  <a href={`/projects/${c.id}`} dir="auto">
-                    {c.data.title}
-                  </a>
-                </h3>
-                <div class="ed-pj-notes">
-                  <span class="ed-note">{c.data.type}</span>
-                  <span class="ed-note">{c.data.status}</span>
+    {groups.map((g) => (
+      <section class="ed-pj-group" aria-labelledby={`pj-${g.status}`}>
+        <h2 id={`pj-${g.status}`} class="ed-label ed-pj-group-head">
+          {g.title}
+        </h2>
+        <div class="ed-pj-grid">
+          {g.cards.map((c, i) => (
+            <article class="ed-pj-card">
+              {c.cover && (
+                <a href={`/projects/${c.id}`} class="ed-pj-cover" tabindex="-1" aria-hidden="true">
+                  <img
+                    src={c.cover}
+                    alt=""
+                    {...c.size}
+                    class:list={[c.ink && 'ed-ink']}
+                    loading={i < 2 ? 'eager' : 'lazy'}
+                    decoding="async"
+                  />
+                </a>
+              )}
+              <h3 class="ed-pj-title">
+                <a href={`/projects/${c.id}`} dir="auto">
+                  {c.data.title}
+                </a>
+              </h3>
+              <div class="ed-pj-notes">
+                <span class="ed-note">{c.data.type}</span>
+                <span class="ed-note">{c.data.status}</span>
+              </div>
+              {c.data.excerpt && (
+                <p class="ed-pj-desc" dir="auto">
+                  {c.data.excerpt}
+                </p>
+              )}
+              {c.data.tags && c.data.tags.length > 0 && (
+                <p class="ed-pj-tags" dir="auto">
+                  {c.data.tags.join(' · ')}
+                </p>
+              )}
+              {c.links.length > 0 && (
+                <div class="ed-pj-links">
+                  {c.links.map((l) => (
+                    <a href={l.href} class="ul" rel="noopener noreferrer">
+                      {l.label}{' '}
+                      <span class="arr" aria-hidden="true">
+                        ↗
+                      </span>
+                      <span class="ed-sr-only">{t('link.external')}</span>
+                    </a>
+                  ))}
                 </div>
-                {c.data.excerpt && (
-                  <p class="ed-pj-desc" dir="auto">
-                    {c.data.excerpt}
-                  </p>
-                )}
-                {c.data.tags && c.data.tags.length > 0 && (
-                  <p class="ed-pj-tags" dir="auto">
-                    {c.data.tags.join(' · ')}
-                  </p>
-                )}
-                {c.links.length > 0 && (
-                  <div class="ed-pj-links">
-                    {c.links.map((l) => (
-                      <a href={l.href} class="ul" rel="noopener noreferrer">
-                        {l.label}{' '}
-                        <span class="arr" aria-hidden="true">
-                          ↗
-                        </span>
-                        <span class="ed-sr-only">{t('link.external')}</span>
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </article>
-            ))}
-          </div>
-        </section>
-      ))
-    }
+              )}
+            </article>
+          ))}
+        </div>
+      </section>
+    ))}
   </div>
 </Layout>

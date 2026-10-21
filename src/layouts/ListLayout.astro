@@ -24,11 +24,9 @@ const { title, description, heading, subtitle, currentPage = 1, totalPages = 1, 
 
   <slot />
 
-  {
-    totalPages > 1 && (
-      <div class="mt-12">
-        <Pagination currentPage={currentPage} totalPages={totalPages} baseUrl={baseUrl} />
-      </div>
-    )
-  }
+  {totalPages > 1 && (
+    <div class="mt-12">
+      <Pagination currentPage={currentPage} totalPages={totalPages} baseUrl={baseUrl} />
+    </div>
+  )}
 </PageLayout>

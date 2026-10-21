@@ -14,16 +14,14 @@ interface Props {
 const { title, description, ogImage, keywords } = Astro.props;
 ---
 
-{
-  getTheme() === 'editorial' ? (
-    <EditorialLayout title={title} description={description} ogImage={ogImage} keywords={keywords}>
-      <div class="ed-wrap ed-page">
-        <slot />
-      </div>
-    </EditorialLayout>
-  ) : (
-    <ClassicShell {...Astro.props}>
+{getTheme() === 'editorial' ? (
+  <EditorialLayout title={title} description={description} ogImage={ogImage} keywords={keywords}>
+    <div class="ed-wrap ed-page">
       <slot />
-    </ClassicShell>
-  )
-}
+    </div>
+  </EditorialLayout>
+) : (
+  <ClassicShell {...Astro.props}>
+    <slot />
+  </ClassicShell>
+)}

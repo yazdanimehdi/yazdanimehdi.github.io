@@ -19,16 +19,14 @@ const links = [
       <p class="ed-intro">{t('notFound.intro')}</p>
     </div>
     <nav class="ed-pj-links ed-pj-links--lg" aria-label={t('notFound.nav')}>
-      {
-        links.map((l) => (
-          <a href={l.href} class="ul">
-            {l.label}{' '}
-            <span class="arr" aria-hidden="true">
-              →
-            </span>
-          </a>
-        ))
-      }
+      {links.map((l) => (
+        <a href={l.href} class="ul">
+          {l.label}{' '}
+          <span class="arr" aria-hidden="true">
+            →
+          </span>
+        </a>
+      ))}
     </nav>
   </div>
 </Layout>

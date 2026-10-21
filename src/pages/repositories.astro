@@ -94,24 +94,22 @@ const journal = {
 };
 ---
 
-{
-  editorial ? (
-    <EditorialRepositories {...journal} />
-  ) : (
-    <ClassicRepositories
-      {personal}
-      {username}
-      {stats}
-      {trophies}
-      {showPinnedRepos}
-      {pinnedRepos}
-      {members}
-      {statsUrl}
-      {langsUrl}
-      {repoUrl}
-      {trophyUrl}
-      {lightTheme}
-      {darkTheme}
-    />
-  )
-}
+{editorial ? (
+  <EditorialRepositories {...journal} />
+) : (
+  <ClassicRepositories
+    {personal}
+    {username}
+    {stats}
+    {trophies}
+    {showPinnedRepos}
+    {pinnedRepos}
+    {members}
+    {statsUrl}
+    {langsUrl}
+    {repoUrl}
+    {trophyUrl}
+    {lightTheme}
+    {darkTheme}
+  />
+)}

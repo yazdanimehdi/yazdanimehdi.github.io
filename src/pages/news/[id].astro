@@ -27,18 +27,16 @@ if (entry.data.image) {
 const journal = getTheme() === 'editorial';
 ---
 
-{
-  journal ? (
-    <EditorialNewsEntry {entry} {ogImage} />
-  ) : (
-    <MarkdownLayout
-      title={entry.data.title}
-      description={entry.data.excerpt}
-      ogImage={ogImage}
-      date={entry.data.date}
-      headings={headings}
-    >
-      <EntryBody entry={entry} />
-    </MarkdownLayout>
-  )
-}
+{journal ? (
+  <EditorialNewsEntry {entry} {ogImage} />
+) : (
+  <MarkdownLayout
+    title={entry.data.title}
+    description={entry.data.excerpt}
+    ogImage={ogImage}
+    date={entry.data.date}
+    headings={headings}
+  >
+    <EntryBody entry={entry} />
+  </MarkdownLayout>
+)}

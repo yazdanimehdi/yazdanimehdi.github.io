@@ -59,11 +59,9 @@ const twitterUsername = twitterUrl
 {resolvedKeywords && <meta name="keywords" content={resolvedKeywords} />}
 
 {/* Search engine verification */}
-{
-  config.seo?.googleSiteVerification && (
-    <meta name="google-site-verification" content={config.seo.googleSiteVerification} />
-  )
-}
+{config.seo?.googleSiteVerification && (
+  <meta name="google-site-verification" content={config.seo.googleSiteVerification} />
+)}
 {config.seo?.bingSiteVerification && <meta name="msvalidate.01" content={config.seo.bingSiteVerification} />}
 
 <!-- Open Graph -->

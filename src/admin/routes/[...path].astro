@@ -107,18 +107,16 @@ if (screen === 'login' && error === 'denied') Astro.response.status = 403;
     />
   </head>
   <body class="adm">
-    {
-      screen === 'login' && (
-        <Login
-          client:only="vue"
-          adminPath={adminPath}
-          siteName={siteName}
-          password={mode === 'postgres'}
-          github={githubLogin}
-          error={loginError}
-        />
-      )
-    }
+    {screen === 'login' && (
+      <Login
+        client:only="vue"
+        adminPath={adminPath}
+        siteName={siteName}
+        password={mode === 'postgres'}
+        github={githubLogin}
+        error={loginError}
+      />
+    )}
     {screen === 'media' && <Media client:only="vue" ctx={ctx} />}
     {screen === 'pages' && <Pages client:only="vue" ctx={ctx} />}
     {screen === 'settings' && <Settings client:only="vue" ctx={ctx} />}

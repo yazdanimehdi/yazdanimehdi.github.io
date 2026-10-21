@@ -31,88 +31,88 @@ const coverInk = await isInkArt(cover);
     keywords={post.data.keywords}
   />
   <article class="ed-article">
-    <a href="/blog" class="ed-back"><span class="arr" aria-hidden="true">←</span> {label}</a>
+    <a href="/blog" class="ed-back">
+      <span class="arr" aria-hidden="true">
+        ←
+      </span>{' '}
+      {label}
+    </a>
     <header class="ed-article-head">
-      <h1 class="ed-article-title" dir="auto">{post.data.title}</h1>
-      {
-        post.data.subtitle && (
-          <p class="ed-subtitle" dir="auto">
-            {post.data.subtitle}
-          </p>
-        )
-      }
+      <h1 class="ed-article-title" dir="auto">
+        {post.data.title}
+      </h1>
+      {post.data.subtitle && (
+        <p class="ed-subtitle" dir="auto">
+          {post.data.subtitle}
+        </p>
+      )}
       <span class="ed-byline">
-        <span dir="auto">{author}</span> · <time datetime={post.data.date.toISOString()}
-          >{formatNewsDate(post.data.date, 'day', config.lang)}</time
-        > · {t('post.minutes', { n: minutes })}{
-          tags.length > 0 && (
-            <>
-              {' · '}
-              <span dir="auto">{tags.join(', ')}</span>
-            </>
-          )
-        }
+        <span dir="auto">{author}</span> ·{' '}
+        <time datetime={post.data.date.toISOString()}>{formatNewsDate(post.data.date, 'day', config.lang)}</time> ·{' '}
+        {t('post.minutes', { n: minutes })}
+        {tags.length > 0 && (
+          <>
+            {' · '}
+            <span dir="auto">{tags.join(', ')}</span>
+          </>
+        )}
       </span>
     </header>
 
-    {
-      coverImg && (
-        <figure class="ed-cover ed-figure-box">
-          <img
-            src={coverImg.src}
-            srcset={coverImg.srcset}
-            sizes={COVER_SIZES}
-            alt=""
-            width={coverImg.width}
-            height={coverImg.height}
-            class:list={[coverInk && 'ed-ink']}
-            fetchpriority="high"
-            decoding="async"
-          />
-        </figure>
-      )
-    }
+    {coverImg && (
+      <figure class="ed-cover ed-figure-box">
+        <img
+          src={coverImg.src}
+          srcset={coverImg.srcset}
+          sizes={COVER_SIZES}
+          alt=""
+          width={coverImg.width}
+          height={coverImg.height}
+          class:list={[coverInk && 'ed-ink']}
+          fetchpriority="high"
+          decoding="async"
+        />
+      </figure>
+    )}
 
-    <div class="ed-prose" dir="auto"><EntryBody entry={post} /></div>
+    <div class="ed-prose" dir="auto">
+      <EntryBody entry={post} />
+    </div>
     <ProseEnhancements />
 
-    {
-      related && (
-        <div class="ed-aside">
-          <span class="ed-aside-label">{t('post.relatedPaper')}</span>
-          <a href={paperLink(related.data) ?? `/publications#${related.id}`} dir="auto">
-            {related.data.title}
-          </a>
-          <span class="ed-aside-venue" dir="auto">
-            {related.data.venue}
-          </span>
-        </div>
-      )
-    }
+    {related && (
+      <div class="ed-aside">
+        <span class="ed-aside-label">{t('post.relatedPaper')}</span>
+        <a href={paperLink(related.data) ?? `/publications#${related.id}`} dir="auto">
+          {related.data.title}
+        </a>
+        <span class="ed-aside-venue" dir="auto">
+          {related.data.venue}
+        </span>
+      </div>
+    )}
 
-    {
-      (older || newer) && (
-        <nav class="ed-pager" aria-label={t('post.morePosts')}>
-          {older ? (
-            <a href={`/blog/${older.id}`}>
-              <span class="arr" aria-hidden="true">
-                ←
-              </span>{' '}
-              <span dir="auto">{older.data.title}</span>
-            </a>
-          ) : (
-            <span />
-          )}
-          {newer && (
-            <a href={`/blog/${newer.id}`}>
-              <span dir="auto">{newer.data.title}</span>{' '}
-              <span class="arr" aria-hidden="true">
-                →
-              </span>
-            </a>
-          )}
-        </nav>
-      )
-    }
+    {(older || newer) && (
+      <nav class="ed-pager" aria-label={t('post.morePosts')}>
+        {older ? (
+          <a href={`/blog/${older.id}`}>
+            <span class="arr" aria-hidden="true">
+              ←
+            </span>{' '}
+            <span dir="auto">{older.data.title}</span>
+          </a>
+        ) : (
+          <span />
+        )}
+        {newer && (
+          <a href={`/blog/${newer.id}`}>
+            <span dir="auto">{newer.data.title}</span>{' '}
+            <span class="arr" aria-hidden="true">
+              →
+            </span>
+          </a>
+        )}
+      </nav>
+    )}
   </article>
 </Layout>

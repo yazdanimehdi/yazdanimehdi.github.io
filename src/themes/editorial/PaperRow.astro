@@ -41,59 +41,49 @@ const figure = p.image
   data-topic={list ? topic : undefined}
   data-first={list ? String(first) : undefined}
 >
-  {
-    figure && (
-      <span class:list={['ed-paper-plate', { 'ed-paper-plate--home': !list }]} aria-hidden="true">
-        <img src={figure.src} alt="" class:list={[figure.ink && 'ed-ink']} decoding="async" loading="lazy" />
+  {figure && (
+    <span class:list={['ed-paper-plate', { 'ed-paper-plate--home': !list }]} aria-hidden="true">
+      <img src={figure.src} alt="" class:list={[figure.ink && 'ed-ink']} decoding="async" loading="lazy" />
+    </span>
+  )}
+  {!list && !figure && (
+    <div class="ed-venue-tile" aria-hidden="true">
+      <span class:list={['ed-venue-tile-short', { 'ed-venue-tile-short--long': !p.venueShort }]}>
+        {p.venueShort ?? p.venue}
       </span>
-    )
-  }
-  {
-    !list && !figure && (
-      <div class="ed-venue-tile" aria-hidden="true">
-        <span class:list={['ed-venue-tile-short', { 'ed-venue-tile-short--long': !p.venueShort }]}>
-          {p.venueShort ?? p.venue}
-        </span>
-        <span class="ed-venue-tile-year num">{p.year}</span>
-      </div>
-    )
-  }
+      <span class="ed-venue-tile-year num">{p.year}</span>
+    </div>
+  )}
   <div class="ed-paper-body">
-    {
-      link ? (
-        <a href={link} class="ed-paper-title">
-          <span dir="auto">{p.title}</span>
-          {offSite && (
-            <>
-              {' '}
-              <span class="arr" aria-hidden="true">
-                ↗
-              </span>
-              <span class="ed-sr-only">{t('link.external')}</span>
-            </>
-          )}
-        </a>
-      ) : (
-        <span class="ed-paper-title" dir="auto">
-          {p.title}
-        </span>
-      )
-    }
-    <span class="ed-authors" dir="auto">
-      {
-        p.authors.map((a, i) => (
+    {link ? (
+      <a href={link} class="ed-paper-title">
+        <span dir="auto">{p.title}</span>
+        {offSite && (
           <>
-            {i > 0 && ', '}
-            {isOwner(a, owners) ? <strong>{a}</strong> : a}
-            {i < (p.equalContribution ?? 0) && '*'}
+            {' '}
+            <span class="arr" aria-hidden="true">
+              ↗
+            </span>
+            <span class="ed-sr-only">{t('link.external')}</span>
           </>
-        ))
-      }
+        )}
+      </a>
+    ) : (
+      <span class="ed-paper-title" dir="auto">
+        {p.title}
+      </span>
+    )}
+    <span class="ed-authors" dir="auto">
+      {p.authors.map((a, i) => (
+        <>
+          {i > 0 && ', '}
+          {isOwner(a, owners) ? <strong>{a}</strong> : a}
+          {i < (p.equalContribution ?? 0) && '*'}
+        </>
+      ))}
     </span>
     <div class="ed-paper-meta">
-      {
-        /* When the home row's tile already shows the full venue, wider screens keep this line for screen readers only. */
-      }
+      {/* When the home row's tile already shows the full venue, wider screens keep this line for screen readers only. */}
       <span
         class:list={[
           'ed-venue',
@@ -105,13 +95,11 @@ const figure = p.image
       </span>
       {p.note && <span class="ed-note">{p.note}</span>}
       {p.equalContribution && <span>{t('paper.equalContribution')}</span>}
-      {
-        p.code && (
-          <a href={p.code} class="ul">
-            {t('paper.code')}
-          </a>
-        )
-      }
+      {p.code && (
+        <a href={p.code} class="ul">
+          {t('paper.code')}
+        </a>
+      )}
       <details class="ed-bib">
         <summary class="ul">{t('paper.cite')}</summary>
         <div class="ed-bib-body">

@@ -31,16 +31,21 @@ people.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
 
 <Layout title={entry.data.title} description={entry.data.excerpt} ogImage={ogImage}>
   <article class="ed-article">
-    <a href="/news" class="ed-back"><span class="arr" aria-hidden="true">←</span> {label}</a>
+    <a href="/news" class="ed-back">
+      <span class="arr" aria-hidden="true">
+        ←
+      </span>{' '}
+      {label}
+    </a>
     <header class="ed-article-head">
-      <h1 class="ed-article-title" dir="auto">{entry.data.title}</h1>
-      {
-        entry.data.excerpt && (
-          <p class="ed-subtitle" dir="auto">
-            {entry.data.excerpt}
-          </p>
-        )
-      }
+      <h1 class="ed-article-title" dir="auto">
+        {entry.data.title}
+      </h1>
+      {entry.data.excerpt && (
+        <p class="ed-subtitle" dir="auto">
+          {entry.data.excerpt}
+        </p>
+      )}
       <span class="ed-byline num">
         {entry.data.category && <span class="ed-meta-cap">{entry.data.category} · </span>}
         <time datetime={entry.data.date.toISOString()}>
@@ -49,44 +54,42 @@ people.sort((a, b) => ids.indexOf(a.id) - ids.indexOf(b.id));
       </span>
     </header>
 
-    {
-      coverImg && (
-        <figure class="ed-cover ed-figure-box">
-          <img
-            src={coverImg.src}
-            srcset={coverImg.srcset}
-            sizes={COVER_SIZES}
-            alt=""
-            width={coverImg.width ?? facts.width}
-            height={coverImg.height ?? facts.height}
-            class:list={[facts.ink && 'ed-ink']}
-            fetchpriority="high"
-            decoding="async"
-          />
-        </figure>
-      )
-    }
+    {coverImg && (
+      <figure class="ed-cover ed-figure-box">
+        <img
+          src={coverImg.src}
+          srcset={coverImg.srcset}
+          sizes={COVER_SIZES}
+          alt=""
+          width={coverImg.width ?? facts.width}
+          height={coverImg.height ?? facts.height}
+          class:list={[facts.ink && 'ed-ink']}
+          fetchpriority="high"
+          decoding="async"
+        />
+      </figure>
+    )}
 
-    <div class="ed-prose" dir="auto"><EntryBody entry={entry} /></div>
+    <div class="ed-prose" dir="auto">
+      <EntryBody entry={entry} />
+    </div>
     <ProseEnhancements />
 
-    {
-      people.length > 0 && (
-        <aside class="ed-tl-people" aria-labelledby="news-people">
-          <span id="news-people" class="ed-label">
-            {t('news.people')}
-          </span>
-          <ul>
-            {people.map((p) => (
-              <li>
-                <a href={`/people/${p.id}`} class="ul" dir="auto">
-                  {p.data.name}
-                </a>
-              </li>
-            ))}
-          </ul>
-        </aside>
-      )
-    }
+    {people.length > 0 && (
+      <aside class="ed-tl-people" aria-labelledby="news-people">
+        <span id="news-people" class="ed-label">
+          {t('news.people')}
+        </span>
+        <ul>
+          {people.map((p) => (
+            <li>
+              <a href={`/people/${p.id}`} class="ul" dir="auto">
+                {p.data.name}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </aside>
+    )}
   </article>
 </Layout>
