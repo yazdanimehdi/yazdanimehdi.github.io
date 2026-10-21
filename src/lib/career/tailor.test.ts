@@ -461,6 +461,9 @@ test('draftPrompt shows abstracts for papers, and the assembled CV never carries
   const p = { company: 'Acme', title: 'Dev', location: null, description: 'x', flags: { warn: false } };
   const prompt = draftPrompt(await baseCv(store), p as never, { whyLooking: '' }, '', undefined, abstracts).prompt;
   assert.match(prompt, /"abstract": "Graph neural networks for/);
+  const rule = `A publication's "abstract" is only for judging how relevant it is to this job; never quote or cite it in the CV or the letter.`;
+  assert.ok(draftPrompt(BASE, p as never, { whyLooking: '' }, '', undefined, abstracts).system.includes(rule));
+  assert.ok(!draftPrompt(BASE, p as never, { whyLooking: '' }).system.includes(rule), 'no abstracts, no rule');
   const cv = assembleCv(await baseCv(store), { sections: [{ title: 'selectedPublications', entries: [{ ref: 1 }] }] });
   assert.equal(JSON.stringify(cv).includes('abstract'), false);
 });

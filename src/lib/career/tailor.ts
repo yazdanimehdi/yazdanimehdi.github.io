@@ -202,9 +202,14 @@ export function draftPrompt(
       'CV rules: select, reorder, condense, reword only; never add an employer, title, date, degree, skill, metric, or result that isn’t in the CV; at most the original number of highlights per entry; keep it to one page.',
       'Each CV entry has a "ref". List the sections to keep (by their exact title) and the entries to keep (by ref) in the order to show them. Give "highlights" only for an entry that has highlights, and "text" only for an entry that is a plain string. Leave out both to keep an entry as it is.',
       'Letter rules: 250-400 words, first person, addressed to the company by name. Use only the CV and the candidate’s reason for looking; invent no facts about the company beyond what the posting says.',
+      abstracts?.size
+        ? `A publication's "abstract" is only for judging how relevant it is to this job; never quote or cite it in the CV or the letter.`
+        : '',
       UNTRUSTED,
       'Reply with one JSON object only: {"sections":[{"title":string,"entries":[{"ref":number,"highlights"?:[string],"text"?:string}]}],"letter":string}.',
-    ].join('\n'),
+    ]
+      .filter(Boolean)
+      .join('\n'),
     prompt: [
       `Candidate CV:\n${numbered(cv, abstracts)}`,
       `Why the candidate is looking:\n${prefs.whyLooking.trim() || '(not given)'}`,
