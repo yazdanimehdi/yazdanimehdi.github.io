@@ -7,6 +7,9 @@ import { lever } from './lever';
 import { smartrecruiters, smartrecruitersDetail } from './smartrecruiters';
 import { workable } from './workable';
 
+/** Big employers' boards run past the default 5 MB (Ashby `openai` is 14 MB). */
+export const ATS_MAX_BYTES = 25 * 1024 * 1024;
+
 const BOARDS = { greenhouse, lever, ashby, workable, smartrecruiters };
 export type AtsKind = keyof typeof BOARDS;
 
@@ -36,7 +39,7 @@ export function detectAts(url: string): { kind: AtsKind; token: string } | null 
 }
 
 export const atsPostings = (kind: AtsKind, token: string, init?: FetchInit): Promise<RawPosting[]> =>
-  BOARDS[kind](token, init);
+  BOARDS[kind](token, { maxBytes: ATS_MAX_BYTES, ...init });
 
 /** Companies the owner watches that sit on a known board. Other watched URLs are the careers-page source's. */
 export const watched: Source = {
@@ -54,6 +57,6 @@ export const watched: Source = {
   async detail(p, ctx) {
     const board = detectAts(p.url);
     if (board?.kind !== 'smartrecruiters') return p;
-    return smartrecruitersDetail(board.token, p.externalId, { siteUrl: ctx.siteUrl });
+    return smartrecruitersDetail(board.token, p.externalId, { siteUrl: ctx.siteUrl, maxBytes: ATS_MAX_BYTES });
   },
 };

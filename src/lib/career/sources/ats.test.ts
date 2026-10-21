@@ -1,7 +1,7 @@
 import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { atsPostings, detectAts, watched } from './ats';
+import { ATS_MAX_BYTES, atsPostings, detectAts, watched } from './ats';
 import { getText, SourceError } from './http';
 import { SOURCES, type SourceContext } from './index';
 import { parsePrefs } from '../settings';
@@ -164,4 +164,21 @@ test('getText follows public redirects, sends the User-Agent, and caps hops', as
 test('a body past 5 MB throws SourceError', async () => {
   mock.method(globalThis, 'fetch', async () => new Response('x'.repeat(5 * 1024 * 1024 + 1)));
   await assert.rejects(getText('https://example.com/big'), SourceError);
+});
+
+test('maxBytes raises or lowers the body cap per call', async () => {
+  mock.method(globalThis, 'fetch', async () => new Response('x'.repeat(100)));
+  await assert.rejects(getText('https://example.com/a', { maxBytes: 99 }), SourceError);
+  assert.equal((await getText('https://example.com/a', { maxBytes: 100 })).length, 100);
+});
+
+test('ATS board calls use the raised cap', async () => {
+  const fetchMock = mock.method(globalThis, 'fetch', async () => new Response('x'.repeat(5 * 1024 * 1024 + 1)));
+  await assert.rejects(
+    atsPostings('lever', 'palantir'),
+    /did not answer JSON/,
+    'past 5 MB is read, then fails as JSON',
+  );
+  assert.equal(fetchMock.mock.callCount(), 1);
+  assert.equal(ATS_MAX_BYTES, 25 * 1024 * 1024);
 });

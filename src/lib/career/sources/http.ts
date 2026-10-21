@@ -6,6 +6,8 @@ export interface FetchInit {
   headers?: Record<string, string>;
   /** Names the site in the User-Agent. */
   siteUrl?: string;
+  /** Body cap; 5 MB unless raised. */
+  maxBytes?: number;
 }
 
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -44,12 +46,12 @@ function toUrl(href: string, base?: URL): URL {
   }
 }
 
-async function readCapped(res: Response, host: string): Promise<string> {
+async function readCapped(res: Response, host: string, maxBytes: number): Promise<string> {
   const chunks: Uint8Array[] = [];
   let size = 0;
   for await (const chunk of res.body ?? []) {
     size += chunk.byteLength;
-    if (size > MAX_BYTES) throw new SourceError(`${host}: response is over 5 MB`);
+    if (size > maxBytes) throw new SourceError(`${host}: response is over ${maxBytes} bytes`);
     chunks.push(chunk);
   }
   return Buffer.concat(chunks).toString('utf8');
@@ -60,7 +62,7 @@ const fail = (url: URL) => (e: unknown) => {
   throw e instanceof SourceError ? e : new SourceError(`${url.host}: ${(e as Error).message}`);
 };
 
-/** GET with the job-search User-Agent, a 15 s timeout, checked redirects, and a 5 MB body cap. */
+/** GET with the job-search User-Agent, a 15 s timeout, checked redirects, and a body cap (`init.maxBytes`, 5 MB by default). */
 export async function getText(url: string, init: FetchInit = {}): Promise<string> {
   const signal = AbortSignal.timeout(15_000);
   const headers = {
@@ -78,7 +80,7 @@ export async function getText(url: string, init: FetchInit = {}): Promise<string
       continue;
     }
     if (!res.ok) throw new SourceError(`${current.host} answered ${res.status}`);
-    return readCapped(res, current.host).catch(fail(current));
+    return readCapped(res, current.host, init.maxBytes ?? MAX_BYTES).catch(fail(current));
   }
 }
 
