@@ -67,6 +67,10 @@ test('runJobs: a failing step is recorded and the others still run; jobs.json ho
       ran.push('papers');
       return { detail: 'skipped: no SERPAPI_KEY' };
     },
+    github: async () => {
+      ran.push('github');
+      return { detail: 'skipped: no GitHub username' };
+    },
     backup: async () => {
       ran.push('backup');
       return { detail: '2 file(s) changed', url: 'https://github.com/o/r/commit/c' };
@@ -79,12 +83,13 @@ test('runJobs: a failing step is recorded and the others still run; jobs.json ho
   } finally {
     console.error = original;
   }
-  assert.deepEqual(ran, ['scheduled', 'feeds', 'papers', 'backup']);
+  assert.deepEqual(ran, ['scheduled', 'feeds', 'papers', 'github', 'backup']);
   const at = '2026-10-07T03:00:00.000Z';
   assert.deepEqual(await jobs(), {
     feeds: { ok: false, at, detail: 'feed down' },
     scheduled: { ok: true, at, detail: 'nothing due' },
     papers: { ok: true, at, detail: 'skipped: no SERPAPI_KEY' },
+    github: { ok: true, at, detail: 'skipped: no GitHub username' },
     backup: { ok: true, at, detail: '2 file(s) changed', url: 'https://github.com/o/r/commit/c' },
   });
 });
@@ -163,6 +168,7 @@ test('cron in Postgres mode: runs every step, releases due posts, records jobs.j
         feeds: [true, 'no feeds configured'],
         scheduled: [true, 'released now'],
         papers: [true, 'skipped: no SERPAPI_KEY'],
+        github: [true, 'skipped: no GitHub username'],
         backup: [true, 'skipped: no GITHUB_TOKEN'],
       },
     );
@@ -186,7 +192,7 @@ test('Run now: Postgres only; runs the same jobs as the signed-in user', async (
     await sql`insert into documents (path, content) values ('config/feeds.yml', ${'feeds: []\n'})`;
     const res = await call();
     assert.equal(res.status, 200);
-    assert.deepEqual(Object.keys(await res.json()), ['scheduled', 'feeds', 'papers', 'backup']);
+    assert.deepEqual(Object.keys(await res.json()), ['scheduled', 'feeds', 'papers', 'github', 'backup']);
     setStoreForTests(() => new MemoryStore());
     assert.equal((await call()).status, 404);
   } finally {

@@ -13,6 +13,8 @@ test('sniffImage recognizes each allowed type by its bytes, not its name', () =>
   assert.equal(sniffImage(bytes('GIF89a')), 'gif');
   assert.equal(sniffImage(bytes('RIFF', 0, 0, 0, 0, 'WEBPVP8 ')), 'webp');
   assert.equal(sniffImage(bytes(0, 0, 0, 0x1c, 'ftypavif')), 'avif');
+  assert.equal(sniffImage(bytes(0, 0, 1, 0, 3, 0)), 'ico');
+  assert.equal(sniffImage(bytes(0, 0, 1, 0, 0, 0)), null, 'an icon file holds at least one image');
   assert.equal(
     sniffImage(bytes('<?xml version="1.0"?>\n<!-- c -->\n<svg xmlns="http://www.w3.org/2000/svg"/>')),
     'svg',

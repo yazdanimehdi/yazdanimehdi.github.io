@@ -4,9 +4,11 @@ import fs from 'node:fs';
 import {
   NIGHT_HOVER,
   NIGHT_PALETTES,
+  brandColors,
   clampNightAccent,
   editorialAccentCss,
   generateColorOverrides,
+  readableOn,
   type NightPalette,
 } from './colors';
 import type { SiteConfig } from './types';
@@ -94,4 +96,54 @@ test('generateColorOverrides: dark text tokens mix in oklab (oklch reads a near-
 test('generateColorOverrides: classic keeps its cyan dark accent when the owner sets no dark.primary', () => {
   const css = generateColorOverrides({ colors: {} } as unknown as SiteConfig);
   assert.match(css, /html\.dark \{[^}]*--color-accent-600: #22d3ee;/);
+});
+
+test('readableOn: darkens on a light surface, lifts on a dark one, and keeps what already passes', () => {
+  const yellow = readableOn('#f5c400', '#f3f5fa');
+  assert.notEqual(yellow, '#f5c400');
+  assert.ok(ratio(yellow, '#f3f5fa') >= 4.5, yellow);
+  const navy = readableOn('#1f3c88', '#0d1117');
+  assert.ok(ratio(navy, '#0d1117') >= 4.5, navy);
+  assert.equal(readableOn('#1f3c88', '#f3f5fa'), '#1f3c88');
+  assert.equal(readableOn('teal', '#ffffff'), 'teal');
+});
+
+test('brandColors: a valid primary turns brand on; bad hexes are ignored', () => {
+  const cfg = (brand: object) => ({ brand }) as unknown as SiteConfig;
+  assert.equal(brandColors(cfg({})), null);
+  assert.equal(brandColors(cfg({ primary: 'red' })), null);
+  assert.deepEqual(brandColors(cfg({ primary: '#ABC', secondary: 'nope' })), {
+    primary: '#aabbcc',
+    secondary: undefined,
+  });
+  assert.deepEqual(brandColors(cfg({ primary: '#7c3aed', secondary: '#14b8a6' })), {
+    primary: '#7c3aed',
+    secondary: '#14b8a6',
+  });
+});
+
+test('editorialAccentCss: brand colors replace colors.*, readable by day and at night, with the secondary for decoration', () => {
+  const css = editorialAccentCss({
+    brand: { primary: '#f5c400', secondary: '#14b8a6' },
+    colors: { light: { primary: '#1f3c88' }, dark: { primary: '#22d3ee' } },
+  } as unknown as SiteConfig);
+  const day = /html:root\[data-theme='editorial'\] \{\n {2}--ed-accent: (#[0-9a-f]{6});/.exec(css)![1];
+  const night = /html\.dark:root:root\[data-theme='editorial'\] \{\n {2}--ed-accent: (#[0-9a-f]{6});/.exec(css)![1];
+  assert.ok(ratio(day, '#f3f5fa') >= 4.5, day);
+  assert.ok(ratio(night, NIGHT_HOVER.lamplight) >= 4.5, night);
+  assert.doesNotMatch(css, /#1f3c88|#22d3ee/);
+  assert.match(css, /--ed-brand-2: #14b8a6;/);
+});
+
+test('generateColorOverrides: brand colors drive classic palettes in both modes, the dark accent kept readable', () => {
+  const css = generateColorOverrides({
+    brand: { primary: '#1f3c88', secondary: '#14b8a6' },
+    colors: { light: { primary: '#ff0000' }, dark: { primary: '#22d3ee' } },
+  } as unknown as SiteConfig);
+  assert.match(css, /--color-primary-600: #1f3c88;/);
+  assert.match(css, /--color-accent-600: #14b8a6;/);
+  assert.doesNotMatch(css, /#ff0000|#22d3ee/);
+  const darkAccent =
+    /html\.dark \{\n {2}--color-accent-50: [^\n]+\n(?:[^\n]*\n)*? {2}--color-accent-600: (#[0-9a-f]{6});/.exec(css)![1];
+  assert.ok(ratio(darkAccent, '#0d1117') >= 4.5, darkAccent);
 });

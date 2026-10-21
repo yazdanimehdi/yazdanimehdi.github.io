@@ -438,11 +438,15 @@ Recruit new team members with dedicated position listings:
 
 Showcase your lab's open-source work:
 
-- **GitHub stats card** -- contribution streak, language breakdown
-- **Profile trophies** -- GitHub achievement badges
-- **Pinned repos** -- highlight your most important repositories
+- **At a glance** -- total stars, forks, repositories, followers and the year you joined (`trophies: true`)
+- **Pinned repos** -- your chosen repositories with description, language, stars, forks, topics and last update
+- **Languages and recent activity** -- the main language of each repository, and the five last pushed (`stats: true`)
 - **Team activity** -- show GitHub profiles of all team members
-- **Self-hosted support** -- use your own github-readme-stats instance
+- **Self-hosted support** -- use your own github-readme-stats instance for the team cards
+
+The journal theme reads these from a snapshot, `src/data/github.json`: the daily job refreshes it in Postgres mode
+(or **Run daily jobs** on the admin Dashboard), and `pnpm sync:github` writes it otherwise. Until the first snapshot,
+the page shows the github-readme-stats cards. `GITHUB_TOKEN`, when set, raises GitHub's API rate limit.
 
 ### Global Search
 
@@ -471,7 +475,7 @@ Five hero background options for the homepage:
 | ----------- | ------------------------------------------------------------------------- |
 | `image`     | Static image with light/dark variants                                     |
 | `video`     | Background video with poster fallback                                     |
-| `pattern`   | SVG patterns: dots, grid, waves, diagonal, hexagons                       |
+| `pattern`   | 17 SVG patterns in any color or gradient (below)                          |
 | `animation` | GSAP-powered: particles, gradient-morph, geometric, wave-lines, or custom |
 | `none`      | Clean, minimal solid color                                                |
 
@@ -481,6 +485,25 @@ hero:
   animation:
     preset: 'wave-lines' # particles | gradient-morph | geometric | wave-lines | custom
 ```
+
+Patterns: grid, dots, diagonal, waves, hexagons, crosses, triangles, zigzag, rings, scales, topography, helix,
+circuit, molecules, cubes, stipple and sparkles. Set them in the admin (Settings → Hero) or in `site.yml`:
+
+```yaml
+hero:
+  type: 'pattern'
+  pattern:
+    name: 'circuit'
+    color: 'accent' # empty: the brand gradient, or the text color; 'accent' / 'secondary'; or any CSS color
+    color2: '#14b8a6' # optional: a second color runs the lines in a gradient
+    angle: 135 # the gradient's direction in degrees
+    strength: 'medium' # subtle | medium | strong
+    fade: true # false: full strength across the hero instead of fading toward the text
+    interactive: true # the pattern lights up around the cursor (mouse and trackpad; touch keeps it still)
+```
+
+Empty and `accent` follow light and dark mode; a fixed color stays the same in both, so a saturated one usually wants
+`strength: 'strong'` to show on a dark background.
 
 ### Newsletter Signup
 
@@ -804,7 +827,20 @@ imageShape: 'circular' # "rectangular" | "circular" | "oval"
 
 ### Colors & Typography
 
-Customize the visual identity with hex colors and Google Fonts:
+The quickest way to brand the site: two hex colors (Settings → Theme & colors → Brand, or `site.yml`):
+
+```yaml
+brand:
+  primary: '#7c3aed'
+  secondary: '#14b8a6'
+```
+
+The site derives the rest: the accent for links, buttons and tiles in light and dark mode (darkened or lifted only
+as far as 4.5:1 contrast needs), its hover, border and selection shades, the classic theme's palettes, and the hero
+pattern's gradient (primary to secondary, unless the pattern has its own color). Brand colors replace `colors`
+below; leave `brand` out to set each color yourself.
+
+Or customize the visual identity color by color, with Google Fonts:
 
 ```yaml
 colors:
@@ -897,10 +933,12 @@ homepageSections:
 Set a logo in the admin (Settings → Identity → Logo) or in `site.yml`:
 
 ```yaml
-logo: '/images/logo.png' # a file in public/images/
+logo: '/images/logo.svg' # a file in public/images/
 ```
 
-It shows beside the name in the header and replaces the default favicon. A square image works best. Dark line art on a transparent background is inverted in dark mode, so an ink logo stays visible.
+It shows beside the name in the header, 28px tall at its own proportions, so a wide wordmark works. Dark line art on a transparent background is inverted in dark mode, so an ink logo stays visible.
+
+The browser-tab and home-screen icons are the files in `public/`: `favicon.ico`, `favicon.svg`, `favicon-96x96.png`, `apple-touch-icon.png` (180px, opaque), `icon-192.png`, `icon-512.png`, `icon-maskable-512.png` and `site.webmanifest`. Replace them with your own, or upload one in the admin (Settings → Identity → Favicon, or `favicon:` in `site.yml`): a square PNG, at least 180px, on a solid background, used for the tab and the phone home screen.
 
 ### Turning Pages Off
 
@@ -1087,7 +1125,7 @@ ScholarOS/
 | `/talks` | Talks and presentations timeline |
 | `/positions` | Open positions with application status |
 | `/positions/[id]` | Position detail with application form |
-| `/repositories` | GitHub stats, trophies, and pinned repos |
+| `/repositories` | GitHub totals, pinned repos, languages and recent activity |
 | `/cv` | CV page with PDF download |
 | `/contact` | Contact form |
 | `/join` | Lab recruitment page |

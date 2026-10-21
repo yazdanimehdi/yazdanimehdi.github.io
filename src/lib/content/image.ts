@@ -1,5 +1,6 @@
 import type { ImageMetadata } from 'astro';
 import { getImage } from 'astro:assets';
+import { imageFacts } from '../inkArt';
 
 export interface ResolvedImage {
   src: string;
@@ -28,6 +29,16 @@ export async function resolveImage(
     width: w === undefined ? undefined : Number(w),
     height: h === undefined ? undefined : Number(h),
   };
+}
+
+/**
+ * The header logo: 28px tall and as wide as its shape, so a wordmark keeps its proportions. Dark line art on
+ * transparency (an ink logo) is inverted in dark mode.
+ */
+export async function headerLogo(src: string): Promise<{ src: string; width: number; ink: boolean }> {
+  const facts = await imageFacts(src);
+  const width = facts.width && facts.height ? Math.round((28 * facts.width) / facts.height) : 28;
+  return { src: (await resolveImage(src, width * 2)).src, width, ink: facts.ink };
 }
 
 /** The `sizes` for a detail-page cover: full width on phones, the 680px article column otherwise. */

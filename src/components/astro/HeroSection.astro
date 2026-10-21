@@ -61,7 +61,7 @@ const darkBg = hero.dark?.bgColor ?? '#0d1117';
 
     {
       hero.type === 'pattern' && hero.pattern && (
-        <HeroBgPattern name={hero.pattern.name} light={hero.light} dark={hero.dark} />
+        <HeroBgPattern pattern={hero.pattern} light={hero.light} dark={hero.dark} />
       )
     }
 

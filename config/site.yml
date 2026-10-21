@@ -76,7 +76,13 @@ hero:
     src: '/videos/hero-bg.mp4'
     poster: '/images/hero-poster.jpg'
   pattern:
-    name: 'grid' # "dots" | "grid" | "waves" | "diagonal" | "hexagons"
+    name: 'grid' # grid | dots | diagonal | waves | hexagons | crosses | triangles | zigzag | rings | scales | topography | helix | circuit | molecules | cubes | stipple | sparkles
+    # color: 'accent' # empty: the brand gradient, or text color; 'accent' / 'secondary'; or any CSS color
+    # color2: '#14b8a6' # a second color: the lines run in a gradient
+    # angle: 135 # gradient direction in degrees
+    # strength: 'subtle' # subtle | medium | strong
+    # fade: true # false: full strength across the hero
+    # interactive: true # the pattern lights up around the cursor
   animation:
     preset: 'wave-lines' # "particles" | "gradient-morph" | "geometric" | "wave-lines" | "custom"
     customScript: '' # path to JS file in /public (when preset: "custom")
@@ -99,6 +105,12 @@ fonts:
     h3: '1.5rem' # Subsection headings in prose (default: 1.25rem / 20px)
 
 # Colors
+# Brand: two hexes that color the whole site (accents in both modes, hover and selection shades, the hero
+# pattern's gradient). Set, they replace `colors` below.
+# brand:
+#   primary: '#7c3aed'
+#   secondary: '#14b8a6'
+
 colors:
   light:
     primary: '#1f3c88'
@@ -149,6 +161,7 @@ labName: 'Smith Research Lab'
 university: 'University of Technology'
 department: 'Department of Computer Science'
 siteUrl: 'https://example.com'
+logo: '/images/logo.svg' # beside the name in the header; tab icons are the favicon files in public/
 
 # Navigation items
 nav:

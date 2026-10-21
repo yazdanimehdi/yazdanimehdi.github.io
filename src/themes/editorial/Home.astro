@@ -165,8 +165,9 @@ const ld =
                   </div>
                 )}
               </div>
+              {/* Without a caption the figure is a portrait: on phones it leads the hero at full size. */}
               {ed.figure?.image && (
-                <figure class="ed-figure">
+                <figure class:list={['ed-figure', { 'ed-figure--portrait': !ed.figure.caption?.trim() }]}>
                   <div class="ed-figure-box">
                     <img
                       src={ed.figure.image}

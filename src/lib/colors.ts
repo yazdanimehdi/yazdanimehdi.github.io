@@ -51,12 +51,13 @@ function palette(hex: string, prefix: string): Record<string, string> {
 export function generateColorOverrides(config: SiteConfig): string {
   const colors = config.colors;
   const bg = config.background;
+  const brand = brandColors(config);
 
   const parts: string[] = [];
 
-  // ── Light mode overrides ──
-  const lightPrimary = colors?.light?.primary;
-  const lightSecondary = colors?.light?.secondary;
+  // ── Light mode overrides ── (brand colors, when set, stand in for colors.* everywhere)
+  const lightPrimary = brand?.primary ?? colors?.light?.primary;
+  const lightSecondary = brand ? brand.secondary : colors?.light?.secondary;
   const lightBgColor = bg?.light?.color;
   const lightBgImage = bg?.light?.image;
 
@@ -94,9 +95,9 @@ export function generateColorOverrides(config: SiteConfig): string {
 
   // ── Dark mode overrides ──
   // Classic's dark accent when the owner sets none; the journal's dark block overrides these.
-  const darkPrimary = colors?.dark?.primary || '#22d3ee';
-  const darkSecondary = colors?.dark?.secondary;
   const darkBgColor = bg?.dark?.color;
+  const darkPrimary = brand ? readableOn(brand.primary, darkBgColor || '#0d1117') : colors?.dark?.primary || '#22d3ee';
+  const darkSecondary = brand ? brand.secondary : colors?.dark?.secondary;
   const darkBgImage = bg?.dark?.image;
 
   const darkVars: string[] = [];
@@ -168,6 +169,33 @@ const luminance = (rgb: number[]) => {
   const [r, g, b] = rgb.map((c) => (c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 };
+const HEX = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i;
+const fullHex = (color: string) => {
+  const m = HEX.exec(color.trim());
+  return m ? (m[1].length === 3 ? `#${[...m[1]].map((c) => c + c).join('')}` : `#${m[1]}`).toLowerCase() : null;
+};
+
+/**
+ * Mixes `color` toward white (on a dark surface) or black (on a light one) until it clears 4.5:1 against
+ * `surface`, so text in it stays AA. Values that already pass, and anything not a 3- or 6-digit hex, are kept.
+ */
+export function readableOn(color: string, surface: string): string {
+  const hex = fullHex(color);
+  const bg = fullHex(surface);
+  if (!hex || !bg) return color;
+  const base = channels(hex);
+  const lb = luminance(channels(bg));
+  const lift = lb < 0.18;
+  const passes = (l: number) => (lift ? (l + 0.05) / (lb + 0.05) : (lb + 0.05) / (l + 0.05)) >= 4.5;
+  if (passes(luminance(base))) return color;
+  for (let p = 1; p <= 100; p++) {
+    // Measured after rounding to 8-bit channels: the emitted hex is what has to pass.
+    const rgb = base.map((c) => Math.round((lift ? c + (1 - c) * (p / 100) : c * (1 - p / 100)) * 255));
+    if (passes(luminance(rgb.map((c) => c / 255))))
+      return `#${rgb.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
+  }
+  return lift ? '#ffffff' : '#000000';
+}
 
 /**
  * Lifts an owner's dark-mode accent toward white until it clears 4.5:1 on the palette's Hover, so links,
@@ -175,37 +203,44 @@ const luminance = (rgb: number[]) => {
  * that is not a 3- or 6-digit hex, are returned unchanged.
  */
 export function clampNightAccent(color: string, night: NightPalette): string {
-  const m = /^#([0-9a-f]{3}|[0-9a-f]{6})$/i.exec(color);
-  if (!m) return color;
-  const hex = m[1].length === 3 ? `#${[...m[1]].map((c) => c + c).join('')}` : color;
-  const base = channels(hex);
-  const floor = 4.5 * (luminance(channels(NIGHT_HOVER[night])) + 0.05) - 0.05;
-  if (luminance(base) >= floor) return color;
-  for (let p = 1; p <= 100; p++) {
-    // Measured after rounding to 8-bit channels: the emitted hex is what has to pass.
-    const rgb = base.map((c) => Math.round((c + (1 - c) * (p / 100)) * 255));
-    if (luminance(rgb.map((c) => c / 255)) >= floor)
-      return `#${rgb.map((c) => c.toString(16).padStart(2, '0')).join('')}`;
-  }
-  return '#ffffff';
+  return readableOn(color, NIGHT_HOVER[night]);
+}
+
+/** The journal's light surface accent text sits on (--ed-tint in editorial.css), the strictest by day. */
+export const DAY_TINT = '#f3f5fa';
+
+/**
+ * Brand colors (brand.primary, brand.secondary): two hexes that color the whole site. Invalid values count as
+ * unset. With a primary set they stand in for the colors.* accents in both themes and both modes.
+ */
+export function brandColors(config: SiteConfig): { primary: string; secondary?: string } | null {
+  const primary = fullHex(config.brand?.primary ?? '');
+  if (!primary) return null;
+  return { primary, secondary: fullHex(config.brand?.secondary ?? '') ?? undefined };
 }
 
 /**
  * Journal (editorial) accent from colors.light.primary, and the dark-mode accent from colors.dark.primary
- * (lifted by clampNightAccent for the chosen night palette). When unset, editorial.css supplies the defaults.
+ * (lifted by clampNightAccent for the chosen night palette). Brand colors, when set, stand in for both: the
+ * primary darkened only as far as AA by day needs, and lifted for the night palette; the secondary becomes
+ * --ed-brand-2 (the hero pattern's gradient). When unset, editorial.css supplies the defaults.
  * `html:root[…]` outranks the `:root[…]` defaults in editorial.css, and the doubled `:root` outranks its
  * `html.dark:root[…]` block, regardless of stylesheet order.
  */
 export function editorialAccentCss(config: SiteConfig): string {
-  const light = config.colors?.light?.primary?.trim();
-  const owner = config.colors?.dark?.primary?.trim();
-  const dark = owner && clampNightAccent(owner, config.editorial?.night ?? 'lamplight');
+  const night = config.editorial?.night ?? 'lamplight';
+  const brand = brandColors(config);
+  const light = brand ? readableOn(brand.primary, DAY_TINT) : config.colors?.light?.primary?.trim();
+  const owner = brand ? brand.primary : config.colors?.dark?.primary?.trim();
+  const dark = owner && clampNightAccent(owner, night);
+  // Decoration only, so no contrast floor by day; lifted at night so it shows on the dark paper.
+  const second = brand && (brand.secondary ?? brand.primary);
   let css = '';
   if (light) {
-    css += `\nhtml:root[data-theme='editorial'] {\n  --ed-accent: ${light};\n  --ed-accent-hover: color-mix(in oklab, ${light}, black 25%);\n  --ed-accent-border: color-mix(in oklab, ${light}, white 75%);\n  --ed-selection: color-mix(in oklab, ${light}, white 84%);\n}`;
+    css += `\nhtml:root[data-theme='editorial'] {\n  --ed-accent: ${light};\n  --ed-accent-hover: color-mix(in oklab, ${light}, black 25%);\n  --ed-accent-border: color-mix(in oklab, ${light}, white 75%);\n  --ed-selection: color-mix(in oklab, ${light}, white 84%);${second ? `\n  --ed-brand-2: ${second};` : ''}\n}`;
   }
   if (dark) {
-    css += `\nhtml.dark:root:root[data-theme='editorial'] {\n  --ed-accent: ${dark};\n  --ed-accent-hover: color-mix(in oklab, ${dark}, white 35%);\n}`;
+    css += `\nhtml.dark:root:root[data-theme='editorial'] {\n  --ed-accent: ${dark};\n  --ed-accent-hover: color-mix(in oklab, ${dark}, white 35%);${second ? `\n  --ed-brand-2: ${clampNightAccent(second, night)};` : ''}\n}`;
   }
   return css;
 }

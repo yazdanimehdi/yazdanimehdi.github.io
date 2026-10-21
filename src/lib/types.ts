@@ -1,4 +1,5 @@
 import type { NightPalette } from './colors';
+import type { HeroPatternName, HeroPatternStrength } from './hero-patterns';
 
 export interface NavItem {
   label: string;
@@ -37,7 +38,7 @@ export interface TopBarConfig {
 
 // Hero background
 export type HeroBackgroundType = 'image' | 'video' | 'pattern' | 'animation' | 'none';
-export type HeroPatternName = 'dots' | 'grid' | 'waves' | 'diagonal' | 'hexagons';
+export type { HeroPatternName, HeroPatternStrength } from './hero-patterns';
 export type HeroAnimationPreset = 'particles' | 'gradient-morph' | 'geometric' | 'wave-lines' | 'custom';
 
 export interface HeroModeConfig {
@@ -52,6 +53,20 @@ export interface HeroVideoConfig {
 
 export interface HeroPatternConfig {
   name: HeroPatternName;
+  /**
+   * The lines' color: 'accent' or 'secondary' for the theme's (brand) colors, or any CSS color. Empty: the brand
+   * gradient when brand colors are set, otherwise the theme's text color.
+   */
+  color?: string;
+  /** Set: the lines run in a gradient from `color` to this one. */
+  color2?: string;
+  /** The gradient's direction in degrees (default 135). */
+  angle?: number;
+  strength?: HeroPatternStrength;
+  /** False: full strength across the hero instead of fading toward the text. */
+  fade?: boolean;
+  /** The pattern lights up around the cursor (devices with a pointer that hovers). */
+  interactive?: boolean;
 }
 
 export interface HeroAnimationConfig {
@@ -231,8 +246,12 @@ export interface SiteConfig {
   hero?: HeroConfig;
   about?: AboutConfig;
   homepageSections?: HomepageSectionEntry[];
-  /** Shown beside the name in the header and used as the favicon: a public/ path or, in Postgres mode, a Blob URL. */
+  /** Shown beside the name in the header: a public/ path or, in Postgres mode, a Blob URL. */
   logo?: string;
+  /** The browser-tab and home-screen icon, same sources as `logo`. Absent: the icons in public/. */
+  favicon?: string;
+  /** Two hexes that color the whole site (lib/colors.ts brandColors): set, they stand in for `colors`. */
+  brand?: { primary?: string; secondary?: string };
   /** Built-in pages turned on or off; absent means on. */
   pages?: Partial<Record<SitePageId, boolean>>;
   imageShape?: ImageShape;

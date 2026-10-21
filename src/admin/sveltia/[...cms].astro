@@ -1,6 +1,7 @@
 ---
 // Dynamic CMS admin page — path is read from config/site.yml → adminPath
 // Uses Sveltia CMS (drop-in replacement for Decap CMS) with is:inline to prevent module bundling
+import Favicon from '../../components/astro/Favicon.astro';
 import { getSiteConfig } from '../../lib/config';
 
 const config = getSiteConfig();
@@ -19,6 +20,7 @@ export function getStaticPaths() {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex" />
     <title>Content Manager</title>
+    <Favicon favicon={config.favicon} />
     <style>
       body {
         margin: 0;

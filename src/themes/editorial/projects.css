@@ -197,6 +197,88 @@
     line-height: 1.6;
     color: var(--ed-muted);
   }
+  & .ed-pj-repo-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 16px;
+    font-size: 13px;
+    color: var(--ed-caption);
+  }
+  & .ed-pj-topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 2px;
+  }
+  /* The note badge's shape (DESIGN.md: rounded.xs). */
+  & .ed-pj-topic {
+    padding: 1px 6px;
+    border: 1px solid var(--ed-rule);
+    border-radius: 3px;
+    font-size: 12px;
+    color: var(--ed-muted);
+  }
+  & .ed-pj-repo--compact {
+    padding-block: 10px;
+  }
+  & .ed-pj-repo--compact .ed-pj-repo-desc {
+    font-size: 14px;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    overflow: hidden;
+  }
+  & .ed-pj-glance {
+    flex-wrap: wrap;
+    gap: 20px 48px;
+  }
+  /* Languages beside recent activity on wide screens, stacked on narrow ones; the pair spaces like one group. */
+  & .ed-pj-group + .ed-pj-split,
+  & .ed-pj-split + .ed-pj-group {
+    margin-top: 24px;
+  }
+  & .ed-pj-split > .ed-pj-group + .ed-pj-group {
+    margin-top: 0;
+  }
+  & .ed-pj-split {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr));
+    gap: 40px 64px;
+    align-items: start;
+  }
+  & .ed-pj-langs {
+    display: grid;
+    gap: 12px;
+    margin: 4px 0 0;
+    padding: 0;
+    list-style: none;
+  }
+  & .ed-pj-lang {
+    display: grid;
+    grid-template-columns: minmax(84px, max-content) 1fr 3.5ch;
+    align-items: center;
+    gap: 14px;
+    font-size: 14px;
+    color: var(--ed-ink);
+  }
+  /* A thin single-hue bar on a recessive track; the printed share carries the value. */
+  & .ed-pj-lang-bar {
+    block-size: 6px;
+    border-radius: 3px;
+    background: var(--ed-rule-soft);
+    overflow: hidden;
+  }
+  & .ed-pj-lang-bar > span {
+    display: block;
+    block-size: 100%;
+    border-radius: 3px;
+    background: var(--ed-accent);
+  }
+  & .ed-pj-lang-pct {
+    text-align: end;
+    color: var(--ed-muted);
+  }
   & .ed-pj-shots {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr));

@@ -11,7 +11,13 @@ import PostEditor from '../PostEditor.vue';
 import Posts from '../Posts.vue';
 import Settings from '../Settings.vue';
 import Users from '../Users.vue';
+import yaml from 'js-yaml';
+import Favicon from '../../components/astro/Favicon.astro';
+import { getSiteConfig } from '../../lib/config';
+import { loadSiteFiles } from '../../lib/content/context';
+import { getSql } from '../../lib/db';
 import { getMode } from '../../lib/mode';
+import type { SiteConfig } from '../../lib/types';
 import { readConfig } from '../../lib/admin/content';
 import { getStore } from '../../lib/admin/get-store';
 import { authorOf } from '../../lib/admin/http';
@@ -55,6 +61,16 @@ if (screen === 'posts' && arg && user) {
   }
 }
 const mode = getMode();
+// Admin pages render outside the public request context, so Postgres mode reads the favicon from the database here.
+let favicon: string | undefined;
+try {
+  favicon =
+    mode === 'postgres'
+      ? (yaml.load((await loadSiteFiles(getSql())).get('config/site.yml') ?? '') as SiteConfig | null)?.favicon
+      : getSiteConfig().favicon;
+} catch {
+  // the built-in icons
+}
 const ctx = {
   adminPath,
   siteName,
@@ -81,6 +97,7 @@ if (screen === 'login' && error === 'denied') Astro.response.status = 403;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="robots" content="noindex" />
     <title>Site admin · {siteName}</title>
+    <Favicon favicon={favicon} />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
