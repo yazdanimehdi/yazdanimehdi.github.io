@@ -2,7 +2,7 @@ import { createHmac } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { listEntries, readConfig } from './admin/content';
 import { UpstreamError, type ContentStore } from './admin/store';
-import { configPath } from './admin/paths';
+import { PathError, THEME_NAME, configPath } from './admin/paths';
 import { BUILT_IN_THEMES, parseStyles, readThemeFiles, type CvStyle } from './cv-styles';
 import type { CvConfig } from './types';
 
@@ -26,9 +26,9 @@ export function setRendererForTests(fn: ((req: CvRenderRequest) => Promise<Uint8
 }
 
 async function viaService(url: string, body: string): Promise<Uint8Array> {
-  const key = createHmac('sha256', process.env.SESSION_SECRET ?? '')
-    .update('cv-render')
-    .digest('hex');
+  const secret = process.env.SESSION_SECRET;
+  if (!secret) throw new UpstreamError('SESSION_SECRET is not set');
+  const key = createHmac('sha256', secret).update('cv-render').digest('hex');
   let res: Response;
   try {
     res = await fetch(`${url.replace(/\/$/, '')}/render`, {
@@ -86,6 +86,8 @@ export async function cvRenderRequest(store: ContentStore, style?: CvStyle): Pro
   const styles = parseStyles(stylesFile?.content, cv.data as unknown as CvConfig);
   const chosen = style ?? styles.styles.find((s) => s.id === styles.public)!;
   const custom = !(BUILT_IN_THEMES as readonly string[]).includes(chosen.theme);
+  // The theme names a folder under cv/themes: never let a client-supplied value reach the store as a path.
+  if (custom && !THEME_NAME.test(chosen.theme)) throw new PathError(`Invalid theme name: ${chosen.theme}`);
   return {
     cv: cv.data,
     upload: upload.data as CvRenderRequest['upload'],

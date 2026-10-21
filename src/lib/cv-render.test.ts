@@ -1,7 +1,10 @@
 import test, { afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createHmac } from 'node:crypto';
-import { CvRenderError, renderCv, type CvRenderRequest } from './cv-render';
+import { CvRenderError, cvRenderRequest, renderCv, type CvRenderRequest } from './cv-render';
+import { MemoryStore } from './admin/memory-store';
+import { PathError } from './admin/paths';
+import type { CvStyle } from './cv-styles';
 import { UpstreamError } from './admin/store';
 
 const req = {
@@ -41,6 +44,26 @@ test('renderCv posts to the binding with the key', async () => {
 test('renderCv maps 422 to CvRenderError', async () => {
   stub(Response.json({ error: 'bad margin' }, { status: 422 }));
   await assert.rejects(renderCv(req), (e) => e instanceof CvRenderError && e.message === 'bad margin');
+});
+
+test('renderCv without SESSION_SECRET is an UpstreamError, not an empty-key request', async () => {
+  stub(new Response('%PDF-1'));
+  delete process.env.SESSION_SECRET;
+  await assert.rejects(renderCv(req), /SESSION_SECRET/);
+});
+
+test('cvRenderRequest rejects a theme that is a path and reads nothing outside cv/themes', async () => {
+  const store = new MemoryStore();
+  const reads: string[] = [];
+  const listed: string[] = [];
+  const read = store.read.bind(store);
+  const list = store.list.bind(store);
+  store.read = async (p) => (reads.push(p), read(p));
+  store.list = async (d) => (listed.push(d), list(d));
+  const style = { id: 'x', name: 'X', theme: '../../config', density: 'normal', design: {} } as CvStyle;
+  await assert.rejects(cvRenderRequest(store, style), PathError);
+  assert.deepEqual(listed, ['src/content/publications']);
+  assert.ok(reads.every((p) => !p.includes('..')));
 });
 
 test('renderCv maps 5xx to UpstreamError', async () => {

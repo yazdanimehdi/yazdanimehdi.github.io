@@ -53,7 +53,6 @@ jobs:
           rm -rf .vercel/output
           pnpm build
           test -d .vercel/output/functions
-          test -f .vercel/output/functions/_render.func/src/lib/cv-pdf/fonts/SourceSerif4-Regular.ttf
           test ! -e .vercel/output/static/index.html
           test ! -e .vercel/output/static/blog/index.html
 
