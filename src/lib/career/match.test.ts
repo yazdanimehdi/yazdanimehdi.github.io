@@ -107,3 +107,17 @@ test('deal-breaker java does not match JavaScript', () => {
 test('normalizeUrl leaves non-http URLs alone', () => {
   assert.equal(normalizeUrl(' mailto:a@b.com '), 'mailto:a@b.com');
 });
+
+test('google-jobs keys ignore the apply link, so one job found via two links is one posting', () => {
+  const a = {
+    source: 'google-jobs',
+    company: 'Uber',
+    title: 'Senior Scientist - Marketplace',
+    location: 'New York, NY',
+    url: 'https://a.test/1',
+  };
+  assert.equal(postingKey(a), postingKey({ ...a, url: 'https://b.test/2' }));
+  assert.notEqual(postingKey(a), postingKey({ ...a, location: 'San Francisco, CA' }));
+  const g = { source: 'greenhouse', company: 'Uber', title: 'X', location: 'NY', url: 'https://a.test/1' };
+  assert.notEqual(postingKey(g), postingKey({ ...g, url: 'https://b.test/2' }), 'other sources still key on the URL');
+});

@@ -30,11 +30,15 @@ export const normalizeUrl = (url: string): string => {
 
 /**
  * One posting, one key, night after night. A careers page's title is the AI's reading, which can change: its URL alone
- * names it.
+ * names it. A Google Jobs result's first apply link varies between searches for one job, so it keys on the location.
  */
-export const postingKey = (p: Pick<RawPosting, 'company' | 'title' | 'url'> & { source?: string }): string =>
+export const postingKey = (
+  p: Pick<RawPosting, 'company' | 'title' | 'url' | 'location'> & { source?: string },
+): string =>
   createHash('sha256')
-    .update(`${fold(p.company)}|${p.source === 'careers-page' ? '' : fold(p.title)}|${normalizeUrl(p.url)}`)
+    .update(
+      `${fold(p.company)}|${p.source === 'careers-page' ? '' : fold(p.title)}|${p.source === 'google-jobs' ? fold(p.location ?? '') : normalizeUrl(p.url)}`,
+    )
     .digest('hex')
     .slice(0, 32);
 
