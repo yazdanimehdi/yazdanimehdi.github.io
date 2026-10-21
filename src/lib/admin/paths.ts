@@ -10,7 +10,7 @@ export const COLLECTIONS = [
   'positions',
 ] as const;
 export type CollectionName = (typeof COLLECTIONS)[number];
-export const CONFIG_FILES = ['site', 'research', 'feeds', 'cv', 'cv-upload', 'ai', 'scholar'] as const;
+export const CONFIG_FILES = ['site', 'research', 'feeds', 'cv', 'cv-upload', 'cv-styles', 'ai', 'scholar'] as const;
 export type ConfigFile = (typeof CONFIG_FILES)[number];
 export const FEEDS_JSON = 'src/data/feeds.json';
 /** Last daily-jobs results (Postgres mode): admin-only, never rendered. */
@@ -42,6 +42,17 @@ export function assertCollection(name: unknown): CollectionName {
 export function assertConfigFile(file: unknown): ConfigFile {
   if (!CONFIG_FILES.includes(file as ConfigFile)) throw new PathError(`Unknown config file "${String(file)}"`);
   return file as ConfigFile;
+}
+
+/** Custom RenderCV themes: `cv/themes/<name>/<template files>`. */
+export const THEMES_DIR = 'cv/themes';
+const THEME_NAME = /^[a-z0-9]+$/;
+const THEME_FILE = /\.typ$/;
+
+export function isThemePath(path: string): boolean {
+  if (!path.startsWith(`${THEMES_DIR}/`)) return false;
+  const [name, ...rel] = path.slice(THEMES_DIR.length + 1).split('/');
+  return THEME_NAME.test(name) && rel.length > 0 && THEME_FILE.test(path) && rel.every((s) => SEGMENT.test(s));
 }
 
 export const collectionDir = (name: CollectionName) => `src/content/${name}`;
@@ -77,6 +88,7 @@ export function assertAllowed(path: string): void {
     path === FEEDS_JSON ||
     path === JOBS_JSON ||
     path === SCHOLAR_JSON ||
+    isThemePath(path) ||
     isMediaPath(path)
   )
     return;

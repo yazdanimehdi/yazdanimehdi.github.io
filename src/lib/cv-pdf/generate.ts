@@ -13,6 +13,8 @@ export const affectsCvPdf = (paths: string[]) =>
     (p) =>
       p === 'config/cv.yml' ||
       p === 'config/cv-upload.yml' ||
+      p === 'config/cv-styles.yml' ||
+      p.startsWith('cv/themes/') ||
       p === 'config/site.yml' ||
       p.startsWith('src/content/publications/'),
   );

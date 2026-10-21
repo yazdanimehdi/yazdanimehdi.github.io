@@ -1,0 +1,96 @@
+import { parse } from 'yaml';
+import { PathError, THEMES_DIR } from './admin/paths';
+import type { ContentStore } from './admin/store';
+import type { CvConfig, CvStyle, CvStylesConfig, Density } from './types';
+
+export type { CvStyle, CvStylesConfig, Density };
+
+export const BUILT_IN_THEMES = [
+  'classic',
+  'sb2nov',
+  'engineeringresumes',
+  'moderncv',
+  'engineeringclassic',
+  'harvard',
+  'ink',
+  'opal',
+  'ember',
+] as const;
+
+const DENSITIES: Density[] = ['compact', 'normal', 'airy'];
+const STYLE_ID = /^[a-z0-9-]{1,40}$/;
+const THEME_NAME = /^[a-z0-9]+$/;
+const FILE_SEGMENT = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/;
+const MAX_FILES = 40;
+const MAX_BYTES = 512 * 1024;
+const PAGE_SIZES: Record<string, string> = { LETTER: 'us-letter', A4: 'a4' };
+
+const isMap = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
+
+/** The styles to start from when config/cv-styles.yml is missing: same rules as `default_styles` in cvrender.py. */
+export function defaultStyles(cv: CvConfig): CvStylesConfig {
+  const { theme, ...design } = { ...cv.design } as Record<string, unknown>;
+  const size = PAGE_SIZES[(cv.pdf?.pageSize ?? '').toUpperCase()];
+  if (size) design.page = { size, ...(isMap(design.page) ? design.page : {}) };
+  const custom = Object.keys(cv.design ?? {}).some((k) => k !== 'theme');
+  const style: CvStyle = {
+    id: custom ? 'my-style' : 'compact',
+    name: custom ? 'My style' : 'Compact',
+    theme: (theme as string) || 'classic',
+    density: custom ? 'normal' : 'compact',
+    design,
+  };
+  return { public: style.id, styles: [style] };
+}
+
+export function parseStyles(text: string | undefined, cv: CvConfig): CvStylesConfig {
+  let raw: unknown;
+  try {
+    raw = text ? parse(text) : undefined;
+  } catch {
+    return defaultStyles(cv);
+  }
+  const list: unknown[] = isMap(raw) && Array.isArray(raw.styles) ? raw.styles : [];
+  const styles = list.filter(
+    (s): s is CvStyle =>
+      isMap(s) &&
+      typeof s.id === 'string' &&
+      STYLE_ID.test(s.id) &&
+      DENSITIES.includes(s.density as Density) &&
+      isMap(s.design) &&
+      typeof s.name === 'string' &&
+      typeof s.theme === 'string',
+  );
+  if (!styles.length) return defaultStyles(cv);
+  const pub = (raw as Record<string, unknown>).public;
+  return { public: styles.some((s) => s.id === pub) ? (pub as string) : styles[0].id, styles };
+}
+
+/** Rejects a custom theme the renderer would refuse or that could escape its folder; the API answers 400. */
+export function assertThemeFiles(name: string, files: Record<string, string>): void {
+  if (!THEME_NAME.test(name)) throw new PathError('A theme name is lowercase letters and digits');
+  if ((BUILT_IN_THEMES as readonly string[]).includes(name)) throw new PathError(`"${name}" is a built-in theme`);
+  const entries = Object.entries(files);
+  if (entries.length > MAX_FILES) throw new PathError(`A theme has at most ${MAX_FILES} files`);
+  let bytes = 0;
+  for (const [rel, text] of entries) {
+    if (!rel.endsWith('.typ') || !rel.split('/').every((s) => FILE_SEGMENT.test(s)) || rel.includes('..')) {
+      throw new PathError(`Invalid theme file: ${rel}`);
+    }
+    bytes += Buffer.byteLength(text);
+  }
+  if (bytes > MAX_BYTES) throw new PathError('A theme is at most 512 KB');
+}
+
+export const themeFilePath = (name: string, rel: string) => `${THEMES_DIR}/${name}/${rel}`;
+
+/** A custom theme's files, keyed by path relative to its folder. */
+export async function readThemeFiles(store: ContentStore, name: string): Promise<Record<string, string>> {
+  const dir = `${THEMES_DIR}/${name}`;
+  const out: Record<string, string> = {};
+  for (const { path } of await store.list(dir)) {
+    const file = await store.read(path);
+    if (file) out[path.slice(dir.length + 1)] = file.content;
+  }
+  return out;
+}

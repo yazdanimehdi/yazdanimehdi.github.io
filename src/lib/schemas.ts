@@ -303,12 +303,17 @@ export const scholarConfigSchema = z
   })
   .passthrough();
 
+export const cvStylesSchema = z
+  .object({ public: z.string(), styles: z.array(z.object({ id: z.string() }).passthrough()) })
+  .passthrough();
+
 export const configSchemas = {
   site: siteSchema,
   research: researchSchema,
   feeds: feedsConfigSchema,
   cv: cvSchema,
   'cv-upload': cvUploadSchema,
+  'cv-styles': cvStylesSchema,
   ai: aiConfigSchema,
   scholar: scholarConfigSchema,
 };

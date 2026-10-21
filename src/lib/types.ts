@@ -393,6 +393,22 @@ export interface CvConfig {
   };
 }
 
+export type Density = 'compact' | 'normal' | 'airy';
+
+export interface CvStyle {
+  id: string;
+  name: string;
+  theme: string;
+  density: Density;
+  /** RenderCV design keys (snake_case), stored verbatim. */
+  design: Record<string, unknown>;
+}
+
+export interface CvStylesConfig {
+  public: string;
+  styles: CvStyle[];
+}
+
 export interface CvMetadata {
   lastGenerated: string;
   pdfPath: string;
