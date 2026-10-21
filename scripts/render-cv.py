@@ -22,7 +22,7 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "services" / "cv-render"))
 
-from cvrender import build_input, build_rendercv_input, default_styles, render_pdf  # noqa: E402
+from cvrender import build_input, build_rendercv_input, convert_keys, default_styles, render_pdf  # noqa: E402
 CONFIG_PATH = ROOT / "config" / "cv.yml"
 UPLOAD_PATH = ROOT / "config" / "cv-upload.yml"
 OUTPUT_PDF = ROOT / "public" / "cv.pdf"
@@ -77,26 +77,50 @@ def convert_keys_to_camel(obj):
     return obj
 
 
-def sync_upload_to_structured(uploaded: dict) -> None:
+def sync_upload_to_structured(uploaded: dict, root: Path = ROOT) -> None:
     """Convert uploaded RenderCV data back to CMS-friendly format and write to config/cv.yml.
 
     Also disables the upload in cv-upload.yml so the structured config takes over.
     """
+    config_path, upload_path = root / "config" / "cv.yml", root / "config" / "cv-upload.yml"
     camel_data = convert_keys_to_camel(uploaded)
+    if isinstance(uploaded.get("design"), dict) and uploaded["design"]:
+        keep_upload_design(root, uploaded["design"], read_yaml(config_path) or {})
 
-    CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
-    with open(CONFIG_PATH, "w") as f:
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    with open(config_path, "w") as f:
         yaml.dump(camel_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
-    print(f"Synced upload to structured config at {CONFIG_PATH}")
+    print(f"Synced upload to structured config at {config_path}")
 
     # Disable the upload so structured config takes over
-    if UPLOAD_PATH.exists():
-        with open(UPLOAD_PATH, "r") as f:
+    if upload_path.exists():
+        with open(upload_path, "r") as f:
             upload_data = yaml.safe_load(f) or {}
         upload_data["enabled"] = False
-        with open(UPLOAD_PATH, "w") as f:
+        with open(upload_path, "w") as f:
             yaml.dump(upload_data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
         print("Disabled cv-upload.yml (enabled: false)")
+
+
+def keep_upload_design(root: Path, design: dict, old_config: dict) -> None:
+    """Once the upload is disabled its design would be lost: store it as the public style "uploaded-design"."""
+    path = root / "config" / "cv-styles.yml"
+    data = read_yaml(path)
+    if not (isinstance(data, dict) and isinstance(data.get("styles"), list) and data["styles"]):
+        data = default_styles(old_config if isinstance(old_config, dict) else {})
+    design = convert_keys(design)
+    style = {
+        "id": "uploaded-design",
+        "name": "Uploaded design",
+        "theme": design.pop("theme", None) or "classic",
+        "density": "normal",
+        "design": design,
+    }
+    data["styles"] = [s for s in data["styles"] if not (isinstance(s, dict) and s.get("id") == style["id"])] + [style]
+    data["public"] = style["id"]
+    with open(path, "w") as f:
+        yaml.dump(data, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
+    print(f"Kept the upload's design as the public style in {path}")
 
 
 def read_front_matter(path: Path) -> dict:

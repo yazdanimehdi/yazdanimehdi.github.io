@@ -758,8 +758,8 @@ RenderCV renders the CV PDF everywhere: on GitHub Actions in git mode and on sta
 admin modes) in a private Python service deployed beside Astro. A style is a RenderCV theme (`classic`, `sb2nov`,
 `engineeringresumes`, `moderncv`, `engineeringclassic`, `harvard`, `ink`, `opal` or `ember`), a density (`compact`,
 `normal` or `airy`) and optional `design` overrides in RenderCV's own keys. Styles live in `config/cv-styles.yml`, and
-`public` names the one used for the public PDF. Without the file you get a compact style built from the design in
-your `cv.yml`.
+`public` names the one used for the public PDF. Without the file you get one style built from your `cv.yml`: "My
+style" at `normal` density when its `design` has overrides beyond the theme, otherwise a compact style in its theme.
 
 ```yaml
 # config/cv-styles.yml
@@ -774,7 +774,9 @@ styles:
 
 On Vercel, **CV → Styles** in the admin edits the list with a live preview; the preview and **Generate PDF** render
 through the service. A design RenderCV rejects (a bad margin, say) shows its error and leaves the public PDF alone. A
-raw YAML upload that carries its own `design` keeps it. On Sveltia the same file is under **CV (Styles)**, without
+raw YAML upload that carries its own `design` keeps it. When the GitHub Action folds such an upload into `cv.yml` and
+disables it, it also saves that design as the public style "Uploaded design" (`uploaded-design`) in
+`config/cv-styles.yml`, creating the file if needed. On Sveltia the same file is under **CV (Styles)**, without
 the preview.
 
 Custom themes are RenderCV theme folders under `cv/themes/<name>/` (`*.j2.typ` and `*.typ` files, names `a-z0-9`, at

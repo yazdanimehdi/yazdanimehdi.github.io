@@ -93,4 +93,30 @@ with tempfile.TemporaryDirectory() as d:
     (root / "cv" / "themes" / "mine" / "link.typ").symlink_to(root / "outside.typ")
     (root / "config" / "cv-styles.yml").write_text("styles:\n  - {id: m, name: M, theme: mine, density: normal}\n")
     assert rc.main_input(root)[1] == {"Preamble.j2.typ": "x"}
+
+# Syncing an upload that carries its own design keeps that design as the public style.
+with tempfile.TemporaryDirectory() as d:
+    root = Path(d)
+    (root / "config").mkdir()
+    (root / "config" / "cv.yml").write_text("cv:\n  name: Old\n")
+    (root / "config" / "cv-upload.yml").write_text("enabled: true\ncontent: x\n")
+    upload = {"cv": {"name": "N"}, "design": {"theme": "ink", "page": {"top_margin": "1in"}}}
+    rc.sync_upload_to_structured(upload, root)
+    assert yaml.safe_load((root / "config" / "cv-upload.yml").read_text())["enabled"] is False
+    styles = yaml.safe_load((root / "config" / "cv-styles.yml").read_text())
+    assert styles["public"] == "uploaded-design", styles
+    assert [s["id"] for s in styles["styles"]] == ["compact", "uploaded-design"], styles
+    assert styles["styles"][1] == {
+        "id": "uploaded-design", "name": "Uploaded design", "theme": "ink", "density": "normal",
+        "design": {"page": {"top_margin": "1in"}},
+    }, styles
+    design = yaml.safe_load(rc.main_input(root)[0])["design"]
+    assert design == {"page": {"top_margin": "1in"}, "theme": "ink"}, design
+    # A second sync replaces the style instead of adding another; one without a design leaves the styles alone.
+    rc.sync_upload_to_structured({"cv": {"name": "N"}, "design": {"page": {"top_margin": "2in"}}}, root)
+    styles = yaml.safe_load((root / "config" / "cv-styles.yml").read_text())
+    assert [s["id"] for s in styles["styles"]] == ["compact", "uploaded-design"], styles
+    assert styles["styles"][1]["theme"] == "classic" and styles["styles"][1]["design"]["page"]["top_margin"] == "2in"
+    rc.sync_upload_to_structured({"cv": {"name": "N"}}, root)
+    assert yaml.safe_load((root / "config" / "cv-styles.yml").read_text()) == styles
 print("render-cv self-check passed")
