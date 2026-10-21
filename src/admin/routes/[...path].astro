@@ -26,8 +26,6 @@ import { adminSettings, canPublish } from '../../lib/admin/settings';
 import '../../themes/editorial/editorial.css';
 import '../admin.css';
 
-export const prerender = false;
-
 const { adminPath, siteName } = adminSettings();
 const [screen = '', arg = ''] = (Astro.params.path ?? '').split('/');
 const SCREENS = new Set([
