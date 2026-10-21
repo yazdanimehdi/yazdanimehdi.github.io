@@ -1,5 +1,5 @@
-// Job-search settings suggested from the owner's own site: the AI reads the CV and publications for prefs; contact
-// answers are copied from the CV in code.
+// Job-search settings suggested from the owner's own site: the AI reads the CV and publications for prefs; locations
+// and contact answers are copied from the CV in code.
 import type { TextInput } from '../ai/providers';
 import type { CvConfig } from '../types';
 import { networkUrl } from './answers';
@@ -7,11 +7,11 @@ import { jsonObject } from './prompts';
 import type { ApplicationAnswers, CareerPrefs } from './settings';
 import { visible } from './text';
 
-export type Suggestion = Pick<CareerPrefs, 'roles' | 'keywords' | 'seniority' | 'fields' | 'locations' | 'languages'>;
+export type Suggestion = Pick<CareerPrefs, 'roles' | 'keywords' | 'seniority' | 'fields' | 'languages'>;
 
 const MAX_PAPERS = 40;
 const MAX_ITEMS = 8;
-const LISTS = ['roles', 'keywords', 'seniority', 'fields', 'locations'] as const;
+const LISTS = ['roles', 'keywords', 'seniority', 'fields'] as const;
 
 export function suggestPrompt(
   cvText: string,
@@ -28,9 +28,9 @@ export function suggestPrompt(
   return {
     system: [
       'You suggest job-search settings for a candidate from their own CV and publications.',
-      'Use only what that material says: never invent roles, skills, places or languages it does not support.',
-      'Reply with JSON only: {"roles":[string],"keywords":[string],"seniority":[string],"fields":[string],"locations":[string],"languages":[{"language":string,"level":string}]}.',
-      'At most 8 short items per list. roles: job titles the candidate fits; keywords: skills and methods to search for; seniority: levels such as "Senior" or "Postdoc"; fields: research or industry fields; locations: places the CV names; languages: spoken languages with the level the CV gives. Leave a list empty when the material does not say.',
+      'Use only what that material says: never invent roles, skills or languages it does not support.',
+      'Reply with JSON only: {"roles":[string],"keywords":[string],"seniority":[string],"fields":[string],"languages":[{"language":string,"level":string}]}.',
+      'At most 8 short items per list. roles: job titles the candidate fits; keywords: skills and methods to search for; seniority: levels such as "Senior" or "Postdoc"; fields: research or industry fields; languages: spoken languages with the level the CV gives. Leave a list empty when the material does not say.',
     ].join(' '),
     prompt: [`Candidate CV:\n${cvText}`, list && `Candidate publications:\n${list}`].filter(Boolean).join('\n\n'),
     maxTokens: 1500,
@@ -69,7 +69,6 @@ export function parseSuggestion(text: string): Suggestion {
     keywords: strings('keywords'),
     seniority: strings('seniority'),
     fields: strings('fields'),
-    locations: strings('locations'),
     languages: firstEight(languages, (l) => l.language),
   };
 }
@@ -81,6 +80,12 @@ const isHttp = (url: string) => {
     return false;
   }
 };
+
+/** The CV's contact location as the one suggested location; no AI (past places on the CV would filter postings out). */
+export function cvLocations(cv: CvConfig): string[] {
+  const l = cv.cv.location?.trim();
+  return l ? [l] : [];
+}
 
 /** Phone, address and links copied from the CV; no AI. */
 export function contactAnswers(cv: CvConfig): Pick<ApplicationAnswers, 'phone' | 'address' | 'links'> {

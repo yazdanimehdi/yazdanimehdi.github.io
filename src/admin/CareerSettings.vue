@@ -48,7 +48,7 @@ const WANT_FIELDS: FieldDef[] = [
   strings('roles', 'Roles'),
   strings('keywords', 'Keywords'),
   strings('seniority', 'Seniority'),
-  strings('locations', 'Locations'),
+  strings('locations', 'Locations', "Postings outside these places that aren't remote are filtered out."),
   {
     key: 'remote',
     label: 'Remote',
@@ -142,8 +142,8 @@ const SUGGESTED_PREFS = ['roles', 'keywords', 'seniority', 'fields', 'locations'
 
 /**
  * Asks the server for settings suggested from the CV and publications; nothing is saved until Save. `replace` swaps
- * the suggested prefs in (the button); otherwise only empty ones are filled (the first visit). Answers only ever fill
- * empty fields. A failure leaves the form as it was.
+ * the suggested prefs in (the button); otherwise only empty ones are filled (the first visit). Locations and answers
+ * only ever fill empty fields. A failure leaves the form as it was.
  */
 async function suggest(replace: boolean) {
   suggesting.value = true;
@@ -154,7 +154,7 @@ async function suggest(replace: boolean) {
     }>('career/suggest', { method: 'POST' });
     const p = prefs.value!;
     for (const k of SUGGESTED_PREFS)
-      if (replace || !p[k].length) {
+      if ((replace && k !== 'locations') || !p[k].length) {
         (p as Record<string, unknown>)[k] = s.prefs[k];
         unsaved.value.prefs = true;
       }

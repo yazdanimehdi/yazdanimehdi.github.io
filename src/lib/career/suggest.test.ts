@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { CvConfig } from '../types';
 import { validatePrefs } from './settings';
-import { contactAnswers, parseSuggestion, suggestPrompt } from './suggest';
+import { contactAnswers, cvLocations, parseSuggestion, suggestPrompt } from './suggest';
 
 test('parseSuggestion caps, cleans and dedupes', () => {
   const s = parseSuggestion(
@@ -22,10 +22,12 @@ test('parseSuggestion caps, cleans and dedupes', () => {
       languages: [{ language: 'Farsi', level: 'native' }],
     }),
   );
+  assert.doesNotThrow(() => parseSuggestion('{"roles":[],"keywords":[],"seniority":[],"fields":[],"languages":[]}'));
   assert.equal(s.roles.length, 8);
   assert.equal(s.roles[0], 'Research Scientist');
   assert.equal(s.roles.filter((r) => /research scientist/i.test(r)).length, 1);
   assert.deepEqual(s.keywords, ['Python']);
+  assert.equal('locations' in s, false, 'locations never come from the model');
   assert.doesNotThrow(() => validatePrefs({ ...s }));
   assert.throws(() => parseSuggestion('not json'));
 });
@@ -72,4 +74,12 @@ test('suggestPrompt sends at most 40 papers with abstracts cut to 200 characters
   assert.match(prompt, /Paper 39\b/);
   assert.doesNotMatch(prompt, /Paper 40\b/);
   assert.ok(prompt.includes('a'.repeat(200)) && !prompt.includes('a'.repeat(201)));
+});
+
+test('suggested locations are the CV’s contact location only, and the prompt asks for none', () => {
+  const cv = (location?: string) => ({ cv: { name: 'M', location, sections: {} } }) as CvConfig;
+  assert.deepEqual(cvLocations(cv(' Orlando, FL ')), ['Orlando, FL']);
+  assert.deepEqual(cvLocations(cv()), []);
+  assert.deepEqual(cvLocations(cv('  ')), []);
+  assert.doesNotMatch(suggestPrompt('CV', []).system, /locations/);
 });
