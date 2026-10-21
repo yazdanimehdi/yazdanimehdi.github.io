@@ -248,6 +248,37 @@ test('withCoverage tells shown, cut, worded-differently and gap apart, and count
     ],
   );
 });
+test('coverage tells C++, C# and C apart', () => {
+  const plan = withCoverage(base({ skills: [{ label: 'L', details: 'C++, Python' }] }), {
+    sections: [{ title: 'skills', entries: [{ ref: 0 }] }],
+    requirements: ['C++', 'C#', 'C'].map((term) => ({ term, kind: 'required' as const, evidence: null })),
+    letter: '',
+  });
+  assert.deepEqual(
+    plan.requirements.map((r) => [r.term, r.inCv, r.inBase]),
+    [
+      ['C++', true, true],
+      ['C#', false, false],
+      ['C', false, false],
+    ],
+  );
+});
+
+test('coverage ignores hidden entries in the base', () => {
+  const cv = base({
+    skills: [
+      { label: 'L', details: 'SQL' },
+      { label: 'K', details: 'Kubernetes', visible: false },
+    ],
+  });
+  const plan = withCoverage(cv, {
+    sections: [{ title: 'skills', entries: [{ ref: 0 }] }],
+    requirements: [{ term: 'Kubernetes', kind: 'required', evidence: null }],
+    letter: '',
+  });
+  assert.equal(plan.requirements[0].inBase, false, 'not "cut": the editor cannot restore a hidden entry');
+});
+
 test('pdfPages counts page objects, not the page tree', () => {
   const pdf = (n: number) =>
     new TextEncoder().encode(

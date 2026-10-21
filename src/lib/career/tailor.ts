@@ -187,12 +187,21 @@ export function assembleCv(base: CvConfig, plan: Pick<TailorPlan, 'sections'>): 
   return out;
 }
 
-/** Every string value in a CV's sections, folded, space-padded so a term matches whole words only. */
+/** `fold` that keeps `+` and `#`, so C++, C# and C stay three terms. */
+const foldTerm = (s: string): string =>
+  s
+    .normalize('NFKD')
+    .replace(/\p{M}+/gu, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}+#]+/gu, ' ')
+    .trim();
+
+/** Every string value in a CV's shown entries, folded, space-padded so a term matches whole words only. */
 function cvText(cv: CvConfig): string {
   const out: string[] = [];
   const walk = (v: unknown): void => {
-    if (typeof v === 'string') out.push(fold(v));
-    else if (v && typeof v === 'object') Object.values(v).forEach(walk);
+    if (typeof v === 'string') out.push(foldTerm(v));
+    else if (v && typeof v === 'object' && !hidden(v)) Object.values(v).forEach(walk);
   };
   walk(cv.cv.sections);
   return ` ${out.join(' ')} `;
@@ -200,7 +209,7 @@ function cvText(cv: CvConfig): string {
 
 /** How many times the folded `term` occurs, as whole words, in a cvText. */
 function occurrences(text: string, term: string): number {
-  const t = fold(term);
+  const t = foldTerm(term);
   let n = 0;
   if (t) for (let i = text.indexOf(` ${t} `); i >= 0; i = text.indexOf(` ${t} `, i + t.length + 1)) n++;
   return n;
