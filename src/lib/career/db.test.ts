@@ -105,6 +105,8 @@ test('feedPostings groups in SQL with true counts past the per-group cap, and op
   assert.equal(open.below.total, 0);
   assert.equal(open.matches.total, 2);
   assert.equal((await feedPostings(sql, { status: 'skipped', threshold: 70 })).below.total, 1);
+  // The schema allows a fractional threshold; it must not break the feed query.
+  assert.equal((await feedPostings(sql, { threshold: 70.5 })).matches.total, 1);
 });
 
 test('events list newest first and cascade with their posting', async () => {

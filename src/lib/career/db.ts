@@ -92,7 +92,7 @@ export async function feedPostings(
       from (
         select id, company, title, location, remote, score, gate, status, found_at, flags, draft_state,
           case when gate is not null then 'gated' when score is null then 'unscored'
-            when score >= ${f.threshold}::int then 'matches' else 'below' end as grp
+            when score >= ${f.threshold}::numeric then 'matches' else 'below' end as grp
         from career_postings
         where ${status}::text is null or status = ${status}
           or (${status}::text = 'open' and status not in ('skipped', 'rejected', 'withdrawn'))
