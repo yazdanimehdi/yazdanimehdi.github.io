@@ -66,6 +66,41 @@ papers that lack information completed too.
   fields the owner ticked, through the same content store and change path the editor uses (works in git and Postgres
   modes).
 
+## Owner additions (2026-10-21)
+
+The owner asked for three more things. Scholar's list stays the source of _which_ papers exist ("the details are only
+things need filling"); nothing new discovers papers.
+
+1. **A sync schedule set in the admin.** On the Scholar & AI screen, the papers sync gets a frequency: off, daily,
+   weekly (with a weekday) or monthly (with a day of the month, 1–28). Stored in `config/ai.yml` under `papers`
+   (`schedule: { every: 'off' | 'day' | 'week' | 'month', weekday?: 0–6, monthday?: 1–28 }`, default `day`, matching
+   today). The daily cron (`vercel.json`, 03:00 UTC; Vercel Hobby allows at most one run a day) still runs every day and
+   the papers step skips unless today is due (designer's call: frequency, not time of day). The git-mode GitHub Action
+   (`.github/workflows/sync-scholar.yml`) runs daily and its first step exits unless the same setting says today is due.
+   "Check now" always runs.
+2. **Every place the owner publishes, not only arXiv.** Completion consults, in this order, stopping at the first
+   confident match for identity and then merging fields by source quality:
+   - **arXiv** export API (preprints; full authors, abstract, PDF, arXiv BibTeX).
+   - **bioRxiv / medRxiv** API (`https://api.biorxiv.org/details/<server>/<doi>`; biology preprints, DOI `10.1101/…`).
+   - **Crossref** REST API and DOI content negotiation (journals and proceedings with DOIs; publisher BibTeX).
+   - **PubMed** E-utilities (`esearch`/`efetch` at `eutils.ncbi.nlm.nih.gov`, ≤3 requests/s without a key, with
+     `tool` and `email` parameters) for biomedical abstracts and full author names.
+   - **OpenAlex** works API (`https://api.openalex.org/works`, `mailto` parameter) as the catch-all, including
+     conference papers without a DOI (abstract from its inverted index, full authors, venue, open-access PDF link).
+   Field precedence (designer's call): authors/title/abstract from the paper's own server (arXiv or bioRxiv/medRxiv)
+   when it's a preprint there, else Crossref, then PubMed, then OpenAlex; venue/type/year/DOI from the published record
+   (Crossref, then PubMed, then OpenAlex) on proof of publication; BibTeX from the DOI when there is one, else
+   arXiv-style when on arXiv, else built from the merged fields. Every source: free, no key, its published rate limits
+   respected, through the same safe fetch.
+3. **Upload a PDF for a paper.** In the Publications editor each paper gets "Upload PDF"; the file is stored with the
+   site's media (Postgres mode: Vercel Blob; git mode: the repo's media folder) and its URL becomes the paper's `pdf`.
+   PDFs up to 4 MB go through the existing upload path (designer's call; the platform's request limit is 4.5 MB); a
+   larger file gets a clear "over 4 MB" message. When no source matches a paper (or it's still missing an abstract or
+   full authors), "Complete papers" can read its uploaded PDF: the configured AI model receives the PDF's first pages
+   (all three providers accept a PDF document input; extend `TextInput` with an optional PDF attachment, no new
+   dependency) and proposes title/authors/abstract/year marked **from your PDF** — never applied without approval, even
+   for empty fields.
+
 ## Decided after review (the designer's calls, not the owner's)
 
 1. **Venue and type change only on proof of publication.** Proof is a DOI record from Crossref, or arXiv's
