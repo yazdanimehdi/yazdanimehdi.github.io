@@ -7,7 +7,8 @@ export default defineConfig({
   use: { baseURL: 'http://localhost:4329', trace: 'retain-on-failure' },
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
   webServer: {
-    command: 'pnpm astro dev --port 4329',
+    // --ignore-lock: run in the foreground; Astro 7 backgrounds `astro dev` when it detects an AI agent.
+    command: 'pnpm astro dev --port 4329 --ignore-lock',
     url: 'http://localhost:4329/admin/login',
     reuseExistingServer: false,
     timeout: 120_000,
