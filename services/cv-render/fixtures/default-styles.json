@@ -50,5 +50,23 @@
         }
       ]
     }
+  },
+  {
+    "input": {
+      "cv": { "name": "N" },
+      "design": { "theme": "sb2nov", "page": { "topMargin": "1in" }, "textAlignment": "left" }
+    },
+    "expected": {
+      "public": "my-style",
+      "styles": [
+        {
+          "id": "my-style",
+          "name": "My style",
+          "theme": "sb2nov",
+          "density": "normal",
+          "design": { "page": { "top_margin": "1in" }, "text_alignment": "left" }
+        }
+      ]
+    }
   }
 ]

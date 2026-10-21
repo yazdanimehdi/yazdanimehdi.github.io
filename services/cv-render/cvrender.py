@@ -228,7 +228,8 @@ def build_rendercv_input(config: dict, publications: list[dict] | None = None) -
 
 def default_styles(cv_config: dict) -> dict:
     """The styles to start from when config/cv-styles.yml is missing: compact, or the cv.yml design kept as is."""
-    design = dict(cv_config.get("design") or {})
+    # Import YAML and the Actions upload sync store design keys camelCase; RenderCV's are snake_case.
+    design = convert_keys(dict(cv_config.get("design") or {}))
     theme = design.pop("theme", None) or "classic"
     size = PAGE_SIZES.get(((cv_config.get("pdf") or {}).get("pageSize") or "").upper())
     if size:

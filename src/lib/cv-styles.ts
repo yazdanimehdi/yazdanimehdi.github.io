@@ -25,9 +25,23 @@ const PAGE_SIZES: Record<string, string> = { LETTER: 'us-letter', A4: 'a4' };
 
 const isMap = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v);
 
+const camelToSnake = (k: string) =>
+  k
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .toLowerCase();
+
+/** Keys camelCase → snake_case, recursively (`convert_keys` in cvrender.py). */
+function snakeKeys(v: unknown): unknown {
+  if (Array.isArray(v)) return v.map(snakeKeys);
+  if (!isMap(v)) return v;
+  return Object.fromEntries(Object.entries(v).map(([k, x]) => [camelToSnake(k), snakeKeys(x)]));
+}
+
 /** The styles to start from when config/cv-styles.yml is missing: same rules as `default_styles` in cvrender.py. */
 export function defaultStyles(cv: CvConfig): CvStylesConfig {
-  const { theme, ...design } = { ...cv.design } as Record<string, unknown>;
+  // Import YAML and the Actions upload sync store design keys camelCase; RenderCV's are snake_case.
+  const { theme, ...design } = snakeKeys({ ...cv.design }) as Record<string, unknown>;
   const size = PAGE_SIZES[(cv.pdf?.pageSize ?? '').toUpperCase()];
   if (size) design.page = { size, ...(isMap(design.page) ? design.page : {}) };
   const custom = Object.keys(cv.design ?? {}).some((k) => k !== 'theme');
