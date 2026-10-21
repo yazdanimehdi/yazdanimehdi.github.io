@@ -19,6 +19,6 @@ export const PUT = careerRoute(async (ctx, _store, user) => {
   const patch: Parameters<typeof writeCareer>[1] = {};
   if (body.prefs !== undefined) patch.prefs = validatePrefs(body.prefs);
   if (body.answers !== undefined) patch.answers = validateAnswers(body.answers);
-  await writeCareer(getSql(), patch, user.login);
+  if (Object.keys(patch).length) await writeCareer(getSql(), patch, user.login);
   return current();
 });

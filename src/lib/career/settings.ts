@@ -4,6 +4,27 @@ import { z } from 'astro/zod';
 const field = <T extends z.ZodType>(lenient: boolean, schema: T, fallback: z.output<T>) =>
   (lenient ? schema.catch(fallback) : schema.default(fallback as never)) as z.ZodType<z.output<T>>;
 
+const httpUrl = z.string().refine((v) => {
+  try {
+    return ['http:', 'https:'].includes(new URL(v).protocol);
+  } catch {
+    return false;
+  }
+}, 'Must be an http(s) URL');
+
+/** Lenient: invalid entries are dropped, the rest kept. Strict: any invalid entry is a field error. */
+const list = <T extends z.ZodType>(lenient: boolean, item: T) =>
+  (lenient
+    ? z
+        .array(z.unknown())
+        .transform((a) => a.filter((x) => item.safeParse(x).success).map((x) => item.parse(x)))
+        .catch([])
+    : z.array(item).default([])) as z.ZodType<z.output<T>[]>;
+
+/** Lenient `.catch`es the whole object; strict only defaults a missing one, so inner field errors surface. */
+const lenientOnly = <T extends z.ZodType>(lenient: boolean, schema: T, fallback: () => z.output<T>) =>
+  (lenient ? schema.catch(fallback as never) : schema.default(fallback() as never)) as z.ZodType<z.output<T>>;
+
 const strings = (l: boolean) => field(l, z.array(z.string()), []);
 
 const prefsSchema = (l: boolean) =>
@@ -32,8 +53,8 @@ const prefsSchema = (l: boolean) =>
       z.record(z.string(), z.object({ on: z.boolean(), options: z.record(z.string(), z.string()).optional() })),
       {},
     ),
-    watched: strings(l),
-    feeds: strings(l),
+    watched: list(l, httpUrl),
+    feeds: list(l, httpUrl),
     /** A style id; '' means the public style. */
     cvStyle: field(l, z.string(), ''),
   });
@@ -47,17 +68,19 @@ const answersSchema = (l: boolean) =>
     salaryExpectation: field(l, z.string(), ''),
     phone: field(l, z.string(), ''),
     address: field(l, z.string(), ''),
-    links: field(l, z.array(z.object({ label: z.string(), url: z.string() })), []),
+    links: list(l, z.object({ label: z.string(), url: httpUrl })),
     whyLooking: field(l, z.string(), ''),
-    eeo: z
-      .object({
+    eeo: lenientOnly(
+      l,
+      z.object({
         mode: field(l, z.enum(['decline', 'answer']), 'decline'),
         gender: field(l, z.string(), ''),
         race: field(l, z.string(), ''),
         veteran: field(l, z.string(), ''),
         disability: field(l, z.string(), ''),
-      })
-      .catch(() => ({ mode: 'decline' as const, gender: '', race: '', veteran: '', disability: '' })),
+      }),
+      () => ({ mode: 'decline' as const, gender: '', race: '', veteran: '', disability: '' }),
+    ),
   });
 
 export type CareerPrefs = z.output<ReturnType<typeof prefsSchema>>;
@@ -68,10 +91,11 @@ const strictPrefs = prefsSchema(false);
 const lenientAnswers = answersSchema(true);
 const strictAnswers = answersSchema(false);
 
+const isObject = (raw: unknown) => !!raw && typeof raw === 'object' && !Array.isArray(raw);
+
 /** Stored data never breaks the screen: unknown keys dropped, wrong types replaced by defaults. */
-export const parsePrefs = (raw: unknown): CareerPrefs => lenientPrefs.parse(raw && typeof raw === 'object' ? raw : {});
-export const parseAnswers = (raw: unknown): ApplicationAnswers =>
-  lenientAnswers.parse(raw && typeof raw === 'object' ? raw : {});
+export const parsePrefs = (raw: unknown): CareerPrefs => lenientPrefs.parse(isObject(raw) ? raw : {});
+export const parseAnswers = (raw: unknown): ApplicationAnswers => lenientAnswers.parse(isObject(raw) ? raw : {});
 
 /** For PUT: throws ZodError, which `route()` turns into field errors. */
 export const validatePrefs = (raw: unknown): CareerPrefs => strictPrefs.parse(raw);
