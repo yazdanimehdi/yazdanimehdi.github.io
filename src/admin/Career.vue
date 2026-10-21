@@ -99,6 +99,9 @@ onBeforeUnmount(stop);
   <AdminShell :ctx="ctx" active="career" title="Job search">
     <section class="adm-card" aria-labelledby="career-run">
       <h2 id="career-run" class="adm-h2">Last run</h2>
+      <p v-if="run.status === 'failed'" class="adm-err" role="status">
+        The last run failed. The summary below is from the last run that finished.
+      </p>
       <template v-if="run.lastRun">
         <p class="adm-muted">
           {{ when(run.lastRun.at) }} · scored {{ run.lastRun.scored }}
@@ -106,15 +109,15 @@ onBeforeUnmount(stop);
           <template v-if="run.lastRun.failed"> · {{ run.lastRun.failed }} failed to score</template>
         </p>
         <p v-if="run.lastRun.scoreSkipped" class="adm-err" role="status">
-          Nothing was scored: {{ run.lastRun.scoreSkipped }}
+          Nothing was scored: {{ visible(run.lastRun.scoreSkipped) }}
         </p>
         <ul class="adm-rows">
           <li v-for="s in run.lastRun.sources" :key="s.id">
             <span class="adm-row-label">{{ s.id }}</span>
             <span class="adm-row-main">
               found {{ s.found }} · added {{ s.added }}
-              <span v-if="s.skipped" class="adm-row-detail">Skipped: {{ s.skipped }}</span>
-              <span v-if="s.error" class="adm-row-detail adm-err">{{ s.error }}</span>
+              <span v-if="s.skipped" class="adm-row-detail">Skipped: {{ visible(s.skipped) }}</span>
+              <span v-if="s.error" class="adm-row-detail adm-err">{{ visible(s.error) }}</span>
             </span>
           </li>
         </ul>

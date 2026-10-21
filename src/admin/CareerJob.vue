@@ -534,7 +534,7 @@ onMounted(async () => {
         <ul v-else class="adm-rows">
           <li v-for="(e, i) in events" :key="i">
             <span class="adm-row-label">{{ e.kind }}</span>
-            <span class="adm-row-main">{{ e.detail }}</span>
+            <span class="adm-row-main">{{ e.detail && visible(e.detail) }}</span>
             <span class="adm-row-date">{{ when(e.at) }}</span>
           </li>
         </ul>
