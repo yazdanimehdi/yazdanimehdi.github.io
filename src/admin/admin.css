@@ -1528,3 +1528,12 @@ details.adm-editor-ask[open] > summary {
   border-color: var(--adm-accent);
   color: var(--adm-accent);
 }
+
+.adm-job-text {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.adm-job-bar {
+  flex: 1;
+  min-width: 0;
+}

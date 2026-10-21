@@ -146,7 +146,7 @@ onBeforeUnmount(stop);
         <li v-for="r in groups.matches" :key="r.id">
           <strong class="adm-row-label" :aria-label="`Score ${r.score}`">{{ r.score }}</strong>
           <span class="adm-row-main">
-            {{ r.title }}
+            <a :href="`${base}/career/${r.id}`">{{ r.title }}</a>
             <span class="adm-row-detail"
               >{{ r.company }}<template v-if="where(r)"> · {{ where(r) }}</template></span
             >
@@ -170,7 +170,7 @@ onBeforeUnmount(stop);
           <li v-for="r in list" :key="r.id">
             <strong v-if="r.score !== null" class="adm-row-label">{{ r.score }}</strong>
             <span class="adm-row-main">
-              {{ r.title }}
+              <a :href="`${base}/career/${r.id}`">{{ r.title }}</a>
               <span class="adm-row-detail">
                 {{ r.company }}<template v-if="where(r)"> · {{ where(r) }}</template>
                 <template v-if="gate && r.gate"> · {{ r.gate }}</template>

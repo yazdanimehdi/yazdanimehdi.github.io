@@ -1,6 +1,7 @@
 ---
 import Ai from '../Ai.vue';
 import Career from '../Career.vue';
+import CareerJob from '../CareerJob.vue';
 import CareerSettings from '../CareerSettings.vue';
 import Collection from '../Collection.vue';
 import Cv from '../Cv.vue';
@@ -55,7 +56,7 @@ if (
   (getMode() !== 'postgres' ||
     !Astro.locals.user ||
     !isOwner(Astro.locals.user, adminSettings()) ||
-    (arg && arg !== 'settings'))
+    (arg && arg !== 'settings' && !/^\d+$/.test(arg)))
 )
   return new Response('Not found', { status: 404 });
 if (screen === 'cv-styles' && getMode() === 'static') return new Response('Not found', { status: 404 });
@@ -137,6 +138,7 @@ if (screen === 'login' && error === 'denied') Astro.response.status = 403;
     {screen === 'users' && <Users client:only="vue" ctx={ctx} />}
     {screen === 'career' && !arg && <Career client:only="vue" ctx={ctx} />}
     {screen === 'career' && arg === 'settings' && <CareerSettings client:only="vue" ctx={ctx} />}
+    {screen === 'career' && /^\d+$/.test(arg) && <CareerJob client:only="vue" ctx={ctx} id={arg} />}
     {screen === 'cv' && <Cv client:only="vue" ctx={ctx} />}
     {screen === 'cv-styles' && <CvStyles client:only="vue" ctx={ctx} />}
     {screen === '' && <Dashboard client:only="vue" ctx={ctx} />}
