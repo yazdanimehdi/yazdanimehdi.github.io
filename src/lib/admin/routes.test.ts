@@ -287,13 +287,15 @@ test('media: a collection image used in front matter cannot be deleted', async (
   assert.match((await refused.json()).error, /^In use by posts\/uses-image/);
   assert.equal(store.log.length, commits, 'no commit');
 
-  const avatar = 'src/assets/images/people/placeholder-avatar.svg'; // referenced as ../../assets/images/…
-  const relative = await call(deleteMedia, {
-    method: 'DELETE',
-    body: { path: avatar, version: (await store.read(avatar))!.version },
+  const avatar = await (await upload('content', 'Avatar.png')).json();
+  const person = 'src/content/people/jane-smith.md'; // references it as ../../assets/images/…
+  const photo = `../../assets/images/${avatar.path.split('/').pop()}`;
+  await store.commit([{ path: person, content: `---\nname: Jane\nrole: pi\nphoto: '${photo}'\n---\n` }], 'seed', {
+    [person]: (await store.read(person))?.version ?? null,
   });
+  const relative = await call(deleteMedia, { method: 'DELETE', body: { path: avatar.path, version: avatar.version } });
   assert.equal(relative.status, 409);
-  assert.match((await relative.json()).error, /people\/jane-smith/);
+  assert.match((await relative.json()).error, /^In use by people\/jane-smith$/);
 });
 
 test('collections: creating over an existing slug names the clash', async () => {

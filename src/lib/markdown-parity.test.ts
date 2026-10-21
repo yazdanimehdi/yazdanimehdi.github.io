@@ -10,8 +10,8 @@ const cases = [
   ['posts', 'blog'],
   ['announcements', 'news'],
 ].flatMap(([dir, route]) =>
-  fs
-    .readdirSync(`src/content/${dir}`)
+  // A site may have no posts or announcements at all.
+  (fs.existsSync(`src/content/${dir}`) ? fs.readdirSync(`src/content/${dir}`) : [])
     .filter((f) => f.endsWith('.md'))
     .map((f) => ({
       file: `src/content/${dir}/${f}`,

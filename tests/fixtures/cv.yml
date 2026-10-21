@@ -1,0 +1,48 @@
+# CV Configuration
+# Edit this file to update your CV. Changes trigger PDF regeneration via GitHub Actions.
+# Fields use camelCase for CMS compatibility; the render script converts to RenderCV format.
+
+cv:
+  name: 'Prof. Jane Smith'
+  location: 'City, Country'
+  email: 'jane.smith@example.com'
+  phone: '+1-617-555-0100'
+  website: 'https://example.com'
+
+  socialNetworks:
+    - network: 'LinkedIn'
+      username: 'janesmith'
+    - network: 'GitHub'
+      username: 'janesmith'
+
+  sections:
+    education:
+      - institution: 'University of Example'
+        area: 'Computer Science'
+        degree: 'Ph.D.'
+        location: 'City, Country'
+        startDate: '2010-09'
+        endDate: '2015-05'
+        highlights:
+          - 'Thesis: Adaptive Methods for Low-Resource NLP'
+          - 'Advisor: Prof. John Doe'
+      - institution: 'University of Example'
+        area: 'Computer Science'
+        degree: 'M.S.'
+        location: 'City, Country'
+        startDate: '2008-09'
+        endDate: '2010-05'
+        highlights: []
+      - institution: 'Another University'
+        area: 'Mathematics'
+        degree: 'B.S.'
+        location: 'City, Country'
+        startDate: '2004-09'
+        endDate: '2008-05'
+        highlights: []
+    # Most recent first.
+    awards:
+      - label: 'Best Paper Award, ACL 2023'
+        details: '2023'
+      - label: 'NSF CAREER Award'
+        details: '2022'

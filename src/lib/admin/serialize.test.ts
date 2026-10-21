@@ -53,7 +53,7 @@ test('updateYaml: an unchanged document comes back byte-identical', () => {
 });
 
 test('updateYaml: edits touch only the changed lines and keep comments and quoting', () => {
-  const src = read('config/cv.yml');
+  const src = read('tests/fixtures/cv.yml');
   const data = parse(src);
   data.cv.name = 'Dr. Changed';
   delete data.cv.phone;

@@ -1,6 +1,5 @@
 import test, { after, before } from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import { migrate } from '../db-migrate';
 import { pgliteSql } from '../pglite-sql';
 import { setSqlForTests, type Sql } from '../db';
@@ -47,11 +46,17 @@ const inRequest = async <T>(fn: (ctx: RequestContext) => Promise<T>, files = new
   return runWithContext(ctx, () => fn(ctx));
 };
 
-test('parseDocuments: demo content parses to getCollection-shaped entries', () => {
-  const dir = 'src/content/people';
-  const docs = fs
-    .readdirSync(dir)
-    .map((f) => ({ path: `${dir}/${f}`, content: fs.readFileSync(`${dir}/${f}`, 'utf8') }));
+test('parseDocuments: people documents parse to getCollection-shaped entries', () => {
+  const docs = [
+    {
+      path: 'src/content/people/jane-smith.md',
+      content:
+        "---\nname: 'Jane Smith'\nrole: 'pi'\nphoto: 'https://x.public.blob.vercel-storage.com/jane.png'\n" +
+        "socials:\n  github: 'https://github.com/janesmith'\nresearchInterests:\n  - 'NLP'\n" +
+        'startDate: 2020-01-01\nsortOrder: 1\n---\n\nJane leads the lab.\n',
+    },
+    { path: 'src/content/people/alex-chen.md', content: "---\nname: 'Alex Chen'\nrole: 'postdoc'\n---\n" },
+  ];
   const entries = parseDocuments('people', docs);
   assert.equal(entries.length, docs.length);
   const jane = entries.find((e) => e.id === 'jane-smith')!;
