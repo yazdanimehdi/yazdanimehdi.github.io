@@ -176,6 +176,21 @@ test('google-jobs maps its fixture and pages at most twice per query', async () 
   assert.equal(q.remote, true);
 });
 
+test('linkedin keeps only the Google Jobs results LinkedIn lists, one page per location, never fetching linkedin.com', async () => {
+  const calls = serve({ 'https://serpapi.com/search.json?': fixture('google-jobs') });
+  const ps = await SOURCES.linkedin.search(ctx({}, { SERPAPI_KEY: 'serp-key' }));
+  assert.deepEqual(
+    calls.map((c) => new URL(c.url).host),
+    ['serpapi.com'],
+  );
+  assert.equal(ps.length, 1, 'the Indeed-only job is left out');
+  assert.equal(ps[0].source, 'linkedin');
+  assert.equal(ps[0].url, 'https://www.linkedin.com/jobs/view/1234567890');
+  assert.match(ps[0].description, /research software engineer/);
+  assert.equal(SOURCES.linkedin.defaultOn, false);
+  assert.deepEqual(SOURCES.linkedin.needs, ['SERPAPI_KEY']);
+});
+
 test('rss: one malformed item is skipped, the rest kept', async () => {
   const xml = file('rss.xml').replace(
     '</channel>',
@@ -212,5 +227,6 @@ test('google-jobs with no roles or keywords makes no request', async () => {
   assert.deepEqual(await SOURCES['google-jobs'].search(ctx(empty, { SERPAPI_KEY: 'k' })), []);
   assert.deepEqual(await SOURCES.adzuna.search(ctx(empty, { ADZUNA_APP_ID: 'i', ADZUNA_APP_KEY: 'k' })), []);
   assert.deepEqual(await SOURCES.usajobs.search(ctx(empty, { USAJOBS_API_KEY: 'k' })), []);
+  assert.deepEqual(await SOURCES.linkedin.search(ctx(empty, { SERPAPI_KEY: 'k' })), []);
   assert.equal(calls.length, 0);
 });
