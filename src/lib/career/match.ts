@@ -2,10 +2,11 @@ import { createHash } from 'node:crypto';
 import type { CareerPrefs } from './settings';
 import type { RawPosting } from './types';
 
-/** NFKD, lowercase, runs of non-alphanumerics collapsed to one space, trimmed. */
+/** NFKD, accents stripped, lowercase, runs of non-alphanumerics collapsed to one space, trimmed. */
 export const fold = (s: string): string =>
   s
     .normalize('NFKD')
+    .replace(/\p{M}+/gu, '')
     .toLowerCase()
     .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
@@ -18,6 +19,7 @@ export const normalizeUrl = (url: string): string => {
   } catch {
     return url.trim();
   }
+  if (!/^https?:$/.test(u.protocol)) return url.trim();
   for (const k of [...u.searchParams.keys()]) {
     if (k.startsWith('utm_') || k === 'ref' || k === 'source') u.searchParams.delete(k);
   }
@@ -47,13 +49,10 @@ export const hardGate = (p: RawPosting, prefs: CareerPrefs): string | null => {
 
   if (prefs.remote === 'remote' && p.remote === false) return 'not remote';
 
-  if (p.remote !== true && prefs.locations.length && p.location) {
-    const loc = p.location.toLowerCase();
-    const match = prefs.locations.some((l) => {
-      const want = l.toLowerCase();
-      return want && (loc.includes(want) || want.includes(loc));
-    });
-    if (!match) return 'location';
+  const wanted = prefs.locations.map(fold).filter(Boolean);
+  if (p.remote !== true && wanted.length && p.location) {
+    const loc = fold(p.location);
+    if (loc && !wanted.some((w) => loc.includes(w) || w.includes(loc))) return 'location';
   }
 
   const floor = prefs.salaryFloor;

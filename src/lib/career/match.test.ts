@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { hardGate, normalizeUrl, postingKey } from './match';
+import { fold, hardGate, normalizeUrl, postingKey } from './match';
 import { parsePrefs } from './settings';
 import type { RawPosting } from './types';
 
@@ -74,4 +74,28 @@ test('below salary floor', () => {
   assert.equal(hardGate(pay(), prefs), null);
   assert.equal(hardGate(pay(5000, 'USD'), prefs), null);
   assert.equal(hardGate(pay(5000, 'EUR', 'month'), prefs), null);
+});
+
+test('fold strips accents', () => {
+  assert.equal(fold('Zürich'), fold('Zurich'));
+  const u = 'https://c.com/j';
+  assert.equal(
+    postingKey({ company: 'Café', title: 'Chef', url: u }),
+    postingKey({ company: 'Cafe', title: 'Chef', url: u }),
+  );
+});
+
+test('accented location matches', () => {
+  assert.equal(hardGate(posting({ location: 'Zürich' }), parsePrefs({ locations: ['zurich'] })), null);
+  assert.equal(hardGate(posting({ location: 'Paris' }), parsePrefs({ locations: ['  ', ''] })), null);
+});
+
+test('deal-breaker java does not match JavaScript', () => {
+  const prefs = parsePrefs({ dealBreakers: ['java'] });
+  assert.equal(hardGate(posting({ description: 'JavaScript only' }), prefs), null);
+  assert.equal(hardGate(posting({ description: 'Java only' }), prefs), 'deal-breaker: java');
+});
+
+test('normalizeUrl leaves non-http URLs alone', () => {
+  assert.equal(normalizeUrl(' mailto:a@b.com '), 'mailto:a@b.com');
 });
