@@ -1,4 +1,5 @@
 /* eslint-disable no-console -- the tests silence expected error logs */
+import { nonOwnerUser, ownerUser } from '../career/test-owner';
 import test, { after, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { migrate } from '../db-migrate';
@@ -368,20 +369,20 @@ test('Run now starts the job search for the owner only', async () => {
     }),
     start: async () => (starts++, { runId: 'wrun_owner' }),
   });
-  const call = (login: string) =>
+  const call = (user: ReturnType<typeof ownerUser>) =>
     runNow({
       request: new Request('https://site.test/api/admin/jobs/run', { method: 'POST' }),
       url: new URL('https://site.test/api/admin/jobs/run'),
       params: {},
-      locals: { user: { login, name: login, avatar: '', provider: 'github' } },
+      locals: { user },
     } as never);
   try {
     await sql`insert into documents (path, content) values ('config/feeds.yml', ${'feeds: []\n'})`;
     await writeCareer(sql, { prefs: { roles: ['data scientist'] } }, 'test');
-    const other = await (await call('someone-else')).json();
+    const other = await (await call(nonOwnerUser())).json();
     assert.equal(starts, 0, "another admin's Run now never starts the owner's search");
     assert.deepEqual(other.career.detail, 'done');
-    const owner = await (await call('janesmith')).json();
+    const owner = await (await call(ownerUser())).json();
     assert.equal(starts, 1);
     assert.deepEqual(owner.career.detail, 'done');
   } finally {

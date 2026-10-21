@@ -4,16 +4,14 @@ import { migrate } from '../db-migrate';
 import { setSqlForTests } from '../db';
 import { pgliteSql } from '../pglite-sql';
 import { setStoreForTests } from '../admin/get-store';
-import { adminLogin, adminSettings } from '../admin/settings';
+import { nonOwnerUser, ownerUser } from './test-owner';
 import { PostgresStore } from '../admin/postgres-store';
 import { upsertPostings } from './db';
 import { GET, PATCH } from '../../admin/routes/api/career/postings/[id]';
 
-const owner = adminLogin(adminSettings().owner);
-const user = (login: string) => ({ login, name: login, avatar: '', provider: 'github' });
-const call = (fn: typeof GET, login: string, id: string, body?: unknown) =>
+const call = (fn: typeof GET, user: ReturnType<typeof ownerUser>, id: string, body?: unknown) =>
   fn({
-    locals: { user: user(login) },
+    locals: { user },
     params: { id },
     request: new Request('http://x/', { method: 'PATCH', body: body === undefined ? undefined : JSON.stringify(body) }),
     url: new URL('http://x/'),
@@ -58,15 +56,15 @@ after(() => {
 });
 
 test('GET returns the posting and events; text comes back verbatim', async () => {
-  const body = await (await call(GET, owner, id)).json();
+  const body = await (await call(GET, ownerUser(), id)).json();
   assert.equal(body.posting.description, EVIL);
   assert.deepEqual(body.events, []);
 });
 
 test('PATCH status records an event', async () => {
-  const res = await call(PATCH, owner, id, { status: 'skipped' });
+  const res = await call(PATCH, ownerUser(), id, { status: 'skipped' });
   assert.equal(res.status, 200);
-  const body = await (await call(GET, owner, id)).json();
+  const body = await (await call(GET, ownerUser(), id)).json();
   assert.equal(body.posting.status, 'skipped');
   assert.deepEqual(
     body.events.map((e: { kind: string; detail: string }) => [e.kind, e.detail]),
@@ -75,9 +73,9 @@ test('PATCH status records an event', async () => {
 });
 
 test('PATCH notes records an event; a no-op records none', async () => {
-  await call(PATCH, owner, id, { notes: 'hi' });
-  await call(PATCH, owner, id, { notes: 'hi', status: 'found' });
-  const body = await (await call(GET, owner, id)).json();
+  await call(PATCH, ownerUser(), id, { notes: 'hi' });
+  await call(PATCH, ownerUser(), id, { notes: 'hi', status: 'found' });
+  const body = await (await call(GET, ownerUser(), id)).json();
   assert.equal(body.posting.notes, 'hi');
   assert.deepEqual(
     body.events.map((e: { kind: string }) => e.kind),
@@ -86,14 +84,14 @@ test('PATCH notes records an event; a no-op records none', async () => {
 });
 
 test('PATCH rejects an unknown status, unknown keys and long notes with 400', async () => {
-  assert.equal((await call(PATCH, owner, id, { status: 'bogus' })).status, 400);
-  assert.equal((await call(PATCH, owner, id, { nope: 1 })).status, 400);
-  assert.equal((await call(PATCH, owner, id, { notes: 'x'.repeat(20_001) })).status, 400);
+  assert.equal((await call(PATCH, ownerUser(), id, { status: 'bogus' })).status, 400);
+  assert.equal((await call(PATCH, ownerUser(), id, { nope: 1 })).status, 400);
+  assert.equal((await call(PATCH, ownerUser(), id, { notes: 'x'.repeat(20_001) })).status, 400);
 });
 
 test('a non-owner gets 404, and so does a bad or missing id', async () => {
-  assert.equal((await call(GET, `${owner}-other`, id)).status, 404);
-  assert.equal((await call(PATCH, `${owner}-other`, id, { status: 'skipped' })).status, 404);
-  assert.equal((await call(GET, owner, '999999')).status, 404);
-  assert.equal((await call(GET, owner, 'abc')).status, 404);
+  assert.equal((await call(GET, nonOwnerUser(), id)).status, 404);
+  assert.equal((await call(PATCH, nonOwnerUser(), id, { status: 'skipped' })).status, 404);
+  assert.equal((await call(GET, ownerUser(), '999999')).status, 404);
+  assert.equal((await call(GET, ownerUser(), 'abc')).status, 404);
 });

@@ -11,7 +11,7 @@ import { getSecret, listSecrets, openSecret, sealSecret, setSecret } from './sec
 import type { Change } from './store';
 import { GET as listKeys, PUT as putKey } from '../../admin/routes/api/ai/keys';
 import { GET as careerKeys } from '../../admin/routes/api/career/keys';
-import { adminLogin, adminSettings } from './settings';
+import { ownerUser } from '../career/test-owner';
 
 const A = 'a'.repeat(32);
 const KEY = 'sk-live-0123456789abcd';
@@ -144,12 +144,11 @@ test('career keys are listed only by the career route', async () => {
   assert.ok((await names(listKeys)).includes('SERPAPI_KEY'));
   assert.equal((await call(putKey, { name: 'ADZUNA_APP_KEY', value: KEY })).status, 400);
 
-  const owner = adminLogin(adminSettings().owner);
   const asOwner = await careerKeys({
     request: new Request('https://site.test/api/admin/career/keys'),
     url: new URL('https://site.test/api/admin/career/keys'),
     params: {},
-    locals: { user: { login: owner, name: owner, avatar: '', provider: 'github' } },
+    locals: { user: ownerUser() },
   } as never);
   const listed = await asOwner.text();
   assert.ok(listed.includes('ADZUNA_APP_KEY') && listed.includes('SERPAPI_KEY'));

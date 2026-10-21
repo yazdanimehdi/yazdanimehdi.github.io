@@ -7,7 +7,7 @@ import { pgliteSql } from '../pglite-sql';
 import { setSqlForTests, type Sql } from '../db';
 import { setStoreForTests } from '../admin/get-store';
 import { PostgresStore } from '../admin/postgres-store';
-import { adminLogin, adminSettings } from '../admin/settings';
+import { nonOwnerUser, ownerUser } from './test-owner';
 import { setRendererForTests, type CvRenderRequest } from '../cv-render';
 import type { CvConfig } from '../types';
 import { WorkflowRunNotFoundError } from 'workflow/errors';
@@ -392,7 +392,7 @@ test('a tailored CV can select papers from the collection, and only those are re
     ('src/content/publications/old.md', ${paper('Old paper', 2020)}),
     ('src/content/publications/new.md', ${paper('New paper', 2024)})`;
   const plan = { sections: [...PLAN.sections, { title: 'publications', entries: [{ ref: 1 }] }] };
-  const res = await call(PATCH as typeof POST, owner, { cv: plan }, 'PATCH');
+  const res = await call(PATCH as typeof POST, ownerUser(), { cv: plan }, 'PATCH');
   assert.equal(res.status, 200, 'the virtual section is part of the base the PATCH checks');
   assert.deepEqual(
     (await res.json()).cvSections.publications.map((p: { title: string }) => p.title),
@@ -474,10 +474,9 @@ test('a running draft blocks a new one until its run ends, vanishes or is an hou
   assert.deepEqual(await startDraftRun(sql, id, 'all', '', fakeRuns(null).runs, now), { runId: 'wrun_new' });
 });
 
-const owner = adminLogin(adminSettings().owner);
-const call = (fn: typeof POST, login: string, body: unknown, method = 'POST') =>
+const call = (fn: typeof POST, user: ReturnType<typeof ownerUser>, body: unknown, method = 'POST') =>
   fn({
-    locals: { user: { login, name: login, avatar: '', provider: 'github' } },
+    locals: { user },
     params: { id: String(id) },
     request: new Request('http://x/', { method, body: JSON.stringify(body) }),
     url: new URL('http://x/'),
@@ -489,34 +488,34 @@ test('draft while running is 409', async () => {
     ...fakeRuns('running').runs,
     start: async (...args) => (started.push(args), { runId: 'wrun_1' }),
   });
-  const res = await call(POST, owner, { part: 'cv', instruction: 'shorter' });
+  const res = await call(POST, ownerUser(), { part: 'cv', instruction: 'shorter' });
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), { runId: 'wrun_1' });
   assert.deepEqual(started, [[id, 'cv', 'shorter', false]]);
   let p = (await getPosting(sql, id))!;
   assert.deepEqual([p.draftState, p.draftRunId], ['running', 'wrun_1']);
-  assert.equal((await call(POST, owner, {})).status, 409);
+  assert.equal((await call(POST, ownerUser(), {})).status, 409);
   assert.equal(started.length, 1);
 
   await updatePosting(sql, id, { draftState: 'done' });
   setDraftRunsForTests({ ...fakeRuns('running').runs, start: async () => Promise.reject(new Error('queue down')) });
   mock.method(console, 'error', () => {});
-  assert.equal((await call(POST, owner, {})).status, 500);
+  assert.equal((await call(POST, ownerUser(), {})).status, 500);
   p = (await getPosting(sql, id))!;
   assert.equal(p.draftState, 'failed', 'a failed start does not leave it running');
 
-  assert.equal((await call(POST, owner, { instruction: 'x'.repeat(501) })).status, 400);
-  assert.equal((await call(POST, owner, { part: 'answers' })).status, 400);
-  assert.equal((await call(POST, `${owner}-other`, {})).status, 404);
+  assert.equal((await call(POST, ownerUser(), { instruction: 'x'.repeat(501) })).status, 400);
+  assert.equal((await call(POST, ownerUser(), { part: 'answers' })).status, 400);
+  assert.equal((await call(POST, nonOwnerUser(), {})).status, 404);
 });
 
 test('PATCH cv and letter: the plan is checked against the CV', async () => {
-  const ok = await call(PATCH as typeof POST, owner, { cv: { sections: PLAN.sections }, letter: 'Hi' }, 'PATCH');
+  const ok = await call(PATCH as typeof POST, ownerUser(), { cv: { sections: PLAN.sections }, letter: 'Hi' }, 'PATCH');
   assert.equal(ok.status, 200);
   const p = (await getPosting(sql, id))!;
   assert.deepEqual([p.cv, p.letter], [{ sections: PLAN.sections }, 'Hi']);
   const extra = { sections: [{ title: 'experience', entries: [{ ref: 1, highlights: ['a', 'b'] }] }] };
-  assert.equal((await call(PATCH as typeof POST, owner, { cv: extra }, 'PATCH')).status, 400);
+  assert.equal((await call(PATCH as typeof POST, ownerUser(), { cv: extra }, 'PATCH')).status, 400);
 });
 
 // ---- form answers (Greenhouse) ----
@@ -549,7 +548,7 @@ test('non-Greenhouse postings get no answers panel', async () => {
   await careerDraft(id, 'all', '');
   assert.equal((await getPosting(sql, id))!.answers, null);
   setDraftRunsForTests(fakeRuns('completed').runs);
-  assert.equal((await call(POST, owner, { part: 'answers' })).status, 400);
+  assert.equal((await call(POST, ownerUser(), { part: 'answers' })).status, 400);
   assert.equal(await startDraftRun(sql, id, 'answers', '', fakeRuns('completed').runs), 'no-form');
 });
 
@@ -616,8 +615,11 @@ test('a failed form fetch or reply does not fail the CV draft', async () => {
 
 test('PATCH answers saves the owner’s edits and rejects unknown keys', async () => {
   const row = { question: 'Q', field: 'f', type: 'input_text', required: false, value: 'mine', source: 'ai' };
-  assert.equal((await call(PATCH as typeof POST, owner, { answers: [row] }, 'PATCH')).status, 200);
+  assert.equal((await call(PATCH as typeof POST, ownerUser(), { answers: [row] }, 'PATCH')).status, 200);
   assert.deepEqual((await getPosting(sql, id))!.answers, [row]);
   assert.ok((await listEvents(sql, id)).some((e) => e.kind === 'answers edited'));
-  assert.equal((await call(PATCH as typeof POST, owner, { answers: [{ ...row, extra: 1 }] }, 'PATCH')).status, 400);
+  assert.equal(
+    (await call(PATCH as typeof POST, ownerUser(), { answers: [{ ...row, extra: 1 }] }, 'PATCH')).status,
+    400,
+  );
 });
