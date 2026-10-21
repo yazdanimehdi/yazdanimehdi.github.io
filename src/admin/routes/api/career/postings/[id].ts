@@ -33,6 +33,7 @@ const Plan = z.strictObject({
               ref: z.number().int().min(0),
               highlights: z.array(z.string().max(2000)).max(50).optional(),
               text: z.string().max(2000).optional(),
+              details: z.string().max(2000).optional(),
             }),
           )
           .max(200),
@@ -83,7 +84,7 @@ export const GET = careerRoute(async (ctx, store) => view(ctx.params.id, store))
 /**
  * `{ status?, notes?, cv?, letter?, answers? }`: each change that differs from the stored value is saved and logged as an event.
  * The owner may reword `cv` freely, but it still goes through assembleCv: only the CV's own sections and entries, and
- * no more highlights than an entry has.
+ * no more highlights than an entry has, and no skills item it lacks.
  */
 export const PATCH = careerRoute(async (ctx, store) => {
   const posting = await load(ctx.params.id);

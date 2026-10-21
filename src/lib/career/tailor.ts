@@ -10,10 +10,11 @@ import type { Posting } from './types';
 /**
  * What the drafter returns: which of the owner's entries to keep, in what order, and reworded how. `title` names a
  * section of `cv.sections` and `ref` indexes into it; `highlights` replaces that entry's highlights, `text` a
- * plain-string entry. Everything else about an entry comes from the CV.
+ * plain-string entry, `details` an entry's comma list (its own items, reordered or trimmed). Everything else about an
+ * entry comes from the CV.
  */
 export interface TailorPlan {
-  sections: { title: string; entries: { ref: number; highlights?: string[]; text?: string }[] }[];
+  sections: { title: string; entries: { ref: number; highlights?: string[]; text?: string; details?: string }[] }[];
   letter: string;
 }
 
@@ -97,13 +98,32 @@ export async function paperAbstracts(store: ContentStore): Promise<Map<string, s
   return out;
 }
 
+const items = (s: string) => s.split(/\s*[,;]\s*/).filter(Boolean);
+
+/** `details` as a subset of the entry's own items, in the plan's order; throws for an item it doesn't have. */
+function trimDetails(at: string, had: unknown, details: string): string {
+  if (typeof had !== 'string') throw new FabricationError(`${at} has no details`);
+  if (details === had) return had; // unchanged, even when the CV's own line is empty or repeats an item
+  const own = new Set(items(had).map((i) => i.toLowerCase()));
+  const picked = items(details);
+  if (!picked.length) throw new FabricationError(`${at} has no details left`);
+  const seen = new Set<string>();
+  for (const item of picked) {
+    const key = item.toLowerCase();
+    if (!own.has(key)) throw new FabricationError(`${at} adds "${item}"`);
+    if (seen.has(key)) throw new FabricationError(`${at} repeats "${item}"`);
+    seen.add(key);
+  }
+  return picked.join(', ');
+}
+
 const ownHighlights = (e: unknown) =>
   e && typeof e === 'object' && Array.isArray((e as Entry).highlights) ? ((e as Entry).highlights as unknown[]) : null;
 
 /**
  * The tailored CV: only the sections and entries the plan lists, in plan order, each a copy of the base entry with
- * only `highlights` or `text` replaced. Contact details and design always come from `base`. Throws FabricationError
- * for anything the base doesn't have.
+ * only `highlights`, `text` or `details` replaced. Contact details and design always come from `base`. Throws
+ * FabricationError for anything the base doesn't have.
  */
 export function assembleCv(base: CvConfig, plan: Pick<TailorPlan, 'sections'>): CvConfig {
   const own = base.cv.sections ?? {};
@@ -114,7 +134,7 @@ export function assembleCv(base: CvConfig, plan: Pick<TailorPlan, 'sections'>): 
     if (!Array.isArray(from)) throw new FabricationError(`"${title}" is not a section of the CV`);
     if (Object.hasOwn(sections, title)) throw new FabricationError(`"${title}" is listed twice`);
     const seen = new Set<number>();
-    sections[title] = entries.map(({ ref, highlights, text }) => {
+    sections[title] = entries.map(({ ref, highlights, text, details }) => {
       const at = `${title} entry ${ref}`;
       if (!Number.isInteger(ref) || ref < 0 || ref >= from.length) throw new FabricationError(`${at} is not in the CV`);
       if (seen.has(ref)) throw new FabricationError(`${at} is listed twice`);
@@ -132,6 +152,7 @@ export function assembleCv(base: CvConfig, plan: Pick<TailorPlan, 'sections'>): 
           throw new FabricationError(`${at} has ${had.length} highlights, not ${highlights.length}`);
         (entry as Entry).highlights = highlights;
       }
+      if (details !== undefined) (entry as Entry).details = trimDetails(at, isEntry(entry) && entry.details, details);
       return entry;
     });
   }
@@ -201,12 +222,13 @@ export function draftPrompt(
       'You tailor a candidate’s CV and write a cover letter for one job posting.',
       'CV rules: select, reorder, condense, reword only; never add an employer, title, date, degree, skill, metric, or result that isn’t in the CV; at most the original number of highlights per entry; keep it to one page.',
       'Each CV entry has a "ref". List the sections to keep (by their exact title) and the entries to keep (by ref) in the order to show them. Give "highlights" only for an entry that has highlights, and "text" only for an entry that is a plain string. Leave out both to keep an entry as it is.',
+      'For an entry with "details" (a list such as skills), you may give "details": the same items, reordered with the ones this job asks for first, and trimmed; never add an item.',
       'Letter rules: 250-400 words, first person, addressed to the company by name. Use only the CV and the candidate’s reason for looking; invent no facts about the company beyond what the posting says.',
       abstracts?.size
         ? `A publication's "abstract" is only for judging how relevant it is to this job; never quote or cite it in the CV or the letter.`
         : '',
       UNTRUSTED,
-      'Reply with one JSON object only: {"sections":[{"title":string,"entries":[{"ref":number,"highlights"?:[string],"text"?:string}]}],"letter":string}.',
+      'Reply with one JSON object only: {"sections":[{"title":string,"entries":[{"ref":number,"highlights"?:[string],"text"?:string,"details"?:string}]}],"letter":string}.',
     ]
       .filter(Boolean)
       .join('\n'),
@@ -240,14 +262,16 @@ export function parseTailorPlan(text: string): TailorPlan {
     if (typeof s?.title !== 'string' || !Array.isArray(s.entries)) throw bad('a section without a title or entries');
     return {
       title: s.title,
-      entries: s.entries.map((e: { ref?: unknown; highlights?: unknown; text?: unknown }) => {
+      entries: s.entries.map((e: { ref?: unknown; highlights?: unknown; text?: unknown; details?: unknown }) => {
         if (typeof e?.ref !== 'number') throw bad('an entry without a numeric ref');
         if (e.highlights !== undefined && !isStrings(e.highlights)) throw bad('highlights that are not strings');
         if (e.text !== undefined && typeof e.text !== 'string') throw bad('text that is not a string');
+        if (e.details !== undefined && typeof e.details !== 'string') throw bad('details that are not a string');
         return {
           ref: e.ref,
           ...(e.highlights === undefined ? {} : { highlights: e.highlights as string[] }),
           ...(e.text === undefined ? {} : { text: e.text as string }),
+          ...(e.details === undefined ? {} : { details: e.details as string }),
         };
       }),
     };

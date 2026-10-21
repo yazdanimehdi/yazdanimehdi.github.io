@@ -95,3 +95,12 @@ test('a non-owner gets 404, and so does a bad or missing id', async () => {
   assert.equal((await call(GET, ownerUser(), '999999')).status, 404);
   assert.equal((await call(GET, ownerUser(), 'abc')).status, 404);
 });
+
+test('PATCH cv refuses a skills line that adds an item, with the reason', async () => {
+  await sql`insert into documents (path, content) values ('config/cv.yml', ${'cv:\n  name: J\n  sections:\n    skills:\n      - label: Languages\n        details: Python, SQL\n'})`;
+  const cv = (details: string) => ({ sections: [{ title: 'skills', entries: [{ ref: 0, details }] }] });
+  assert.equal((await call(PATCH, ownerUser(), id, { cv: cv('SQL, Python') })).status, 200);
+  const res = await call(PATCH, ownerUser(), id, { cv: cv('SQL, Rust') });
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).error, 'skills entry 0 adds "Rust"');
+});

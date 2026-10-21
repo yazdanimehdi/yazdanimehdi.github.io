@@ -47,6 +47,8 @@ interface EditEntry {
   /** One per line. */
   highlights?: string;
   max?: number;
+  /** A comma list (skills): its own items, reordered or trimmed. */
+  details?: string;
 }
 interface EditSection {
   title: string;
@@ -107,12 +109,14 @@ function buildEditor() {
         const entry = entries[ref];
         const picked = chosen.find((e) => e.ref === ref);
         const had = (entry as { highlights?: unknown })?.highlights;
+        const details = (entry as { details?: unknown })?.details;
         return {
           ref,
           on: !!picked,
           label: entryText(entry).split('\n')[0] || '(hidden entry)',
           ...(typeof entry === 'string' ? { text: picked?.text ?? entry } : {}),
           ...(Array.isArray(had) ? { highlights: (picked?.highlights ?? had).join('\n'), max: had.length } : {}),
+          ...(typeof details === 'string' ? { details: picked?.details ?? details } : {}),
         };
       }),
     };
@@ -203,6 +207,7 @@ async function savePlan() {
           .map((e) => ({
             ref: e.ref,
             ...(e.text === undefined ? {} : { text: e.text }),
+            ...(e.details === undefined ? {} : { details: e.details }),
             ...(e.highlights === undefined
               ? {}
               : {
@@ -416,6 +421,10 @@ onMounted(async () => {
                   <label v-if="e.on && e.highlights !== undefined" class="adm-field">
                     <span>Highlights (at most {{ e.max }})</span>
                     <textarea v-model="e.highlights" :rows="Math.max(2, e.max ?? 0)" />
+                  </label>
+                  <label v-if="e.on && e.details !== undefined" class="adm-field">
+                    <span>Items (reorder or remove; no new ones)</span>
+                    <input v-model="e.details" maxlength="2000" />
                   </label>
                 </div>
               </template>

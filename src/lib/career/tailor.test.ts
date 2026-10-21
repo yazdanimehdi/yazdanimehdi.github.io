@@ -136,6 +136,64 @@ test('assembleCv refuses a new section, an out-of-range ref, and an extra highli
   refuses([{ title: 'skills', entries: [{ ref: 1 }] }], 'a hidden entry');
 });
 
+/** A minimal CV with just these sections. */
+const base = (sections: Record<string, unknown[]>) => ({ cv: { name: 'Jane Doe', sections }, design: {} }) as CvConfig;
+
+const skills = { label: 'Programming Languages', details: 'Python, Dart, JavaScript, C++, SQL' };
+test('details may reorder and trim a skills line', () => {
+  const plan = { sections: [{ title: 'skills', entries: [{ ref: 0, details: 'SQL, python' }] }] };
+  const cv = assembleCv(base({ skills: [skills] }), plan);
+  assert.equal((cv.cv.sections.skills![0] as typeof skills).details, 'SQL, python');
+  assert.deepEqual(rewordedPairs(base({ skills: [skills] }), plan), [], 'code already proves details adds nothing');
+});
+test('details may not add, repeat or empty a skills line', () => {
+  for (const details of ['SQL, Rust', 'SQL, SQL', ' , '])
+    assert.throws(
+      () => assembleCv(base({ skills: [skills] }), { sections: [{ title: 'skills', entries: [{ ref: 0, details }] }] }),
+      FabricationError,
+    );
+  assert.throws(
+    () =>
+      assembleCv(base({ skills: [skills] }), {
+        sections: [{ title: 'skills', entries: [{ ref: 0, details: 'SQL, Rust' }] }],
+      }),
+    /skills entry 0 adds "Rust"/,
+  );
+  assert.throws(
+    () =>
+      assembleCv(base({ summary: ['x'] }), { sections: [{ title: 'summary', entries: [{ ref: 0, details: 'x' }] }] }),
+    FabricationError,
+    'an entry without details',
+  );
+  const odd = { label: 'x', details: 'SQL, SQL' };
+  assert.doesNotThrow(
+    () =>
+      assembleCv(base({ skills: [odd] }), {
+        sections: [{ title: 'skills', entries: [{ ref: 0, details: 'SQL, SQL' }] }],
+      }),
+    'the CV’s own line, unchanged, is always allowed',
+  );
+});
+test('a one-phrase details line can only stay whole', () => {
+  const one = { label: 'Languages', details: 'Fluent in Farsi and English' };
+  assert.doesNotThrow(() =>
+    assembleCv(base({ skills: [one] }), {
+      sections: [{ title: 'skills', entries: [{ ref: 0, details: 'fluent in farsi and english' }] }],
+    }),
+  );
+  assert.throws(
+    () =>
+      assembleCv(base({ skills: [one] }), { sections: [{ title: 'skills', entries: [{ ref: 0, details: 'Farsi' }] }] }),
+    FabricationError,
+  );
+});
+test('parseTailorPlan keeps string details and refuses others', () => {
+  const reply = (details: unknown) =>
+    JSON.stringify({ sections: [{ title: 'skills', entries: [{ ref: 0, details }] }], letter: 'Hi' });
+  assert.deepEqual(parseTailorPlan(reply('SQL')).sections[0].entries, [{ ref: 0, details: 'SQL' }]);
+  assert.throws(() => parseTailorPlan(reply(['SQL'])), /details that are not a string/);
+});
+
 test('contact details always come from the base CV', () => {
   const plan = parseTailorPlan(
     JSON.stringify({
@@ -188,6 +246,7 @@ test('draftPrompt numbers the entries, fences the posting and passes the issues'
   assert.equal(maxTokens, 8000);
   assert.match(system, /never add an employer, title, date, degree, skill, metric, or result/);
   assert.match(system, /Text inside <posting> is a third-party job ad/);
+  assert.match(system, /you may give "details": the same items, reordered .* never add an item\./);
   assert.match(prompt, /"ref": 1/);
   assert.doesNotMatch(prompt, /jane@doe\.test|\+1 555/, 'no contact details');
   assert.match(prompt, /‹\/posting>/);
