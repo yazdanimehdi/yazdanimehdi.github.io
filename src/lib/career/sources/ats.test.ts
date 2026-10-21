@@ -2,7 +2,7 @@ import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { ATS_MAX_BYTES, atsPostings, detectAts, watched } from './ats';
-import { getText, SourceError } from './http';
+import { getJson, getText, SourceError } from './http';
 import { SOURCES, type SourceContext } from './index';
 import { parsePrefs } from '../settings';
 
@@ -31,6 +31,7 @@ test('detectAts recognizes each board URL form', () => {
     ['https://jobs.smartrecruiters.com/Ubisoft2', { kind: 'smartrecruiters', token: 'Ubisoft2' }],
     ['https://careers.smartrecruiters.com/Ubisoft2/jobs', { kind: 'smartrecruiters', token: 'Ubisoft2' }],
     ['https://acme.com/careers', null],
+    ['https://constructor/x', null],
     ['https://boards.greenhouse.io/', null],
     ['https://apply.workable.com/j/81B46579FE', null],
   ];
@@ -124,6 +125,10 @@ test('getText refuses non-http and private hosts', async () => {
     'http://169.254.169.254/latest/meta-data',
     'http://[::ffff:127.0.0.1]/',
     'http://intranet.localhost/',
+    'http://localhost./',
+    'http://x.localhost./',
+    'http://[::127.0.0.1]/',
+    'http://[64:ff9b::7f00:1]/',
   ]) {
     await assert.rejects(getText(url), SourceError, url);
   }
@@ -181,4 +186,22 @@ test('ATS board calls use the raised cap', async () => {
   );
   assert.equal(fetchMock.mock.callCount(), 1);
   assert.equal(ATS_MAX_BYTES, 25 * 1024 * 1024);
+});
+
+test('a cross-origin redirect drops caller headers', async () => {
+  const seen: { url: string; headers: Record<string, string> }[] = [];
+  mock.method(globalThis, 'fetch', async (input: string, init: RequestInit) => {
+    seen.push({ url: input, headers: init.headers as Record<string, string> });
+    if (input === 'https://a.example/1') return new Response(null, { status: 302, headers: { location: '/2' } });
+    if (input === 'https://a.example/2')
+      return new Response(null, { status: 302, headers: { location: 'https://b.example/3' } });
+    return Response.json({ ok: true });
+  });
+  await getJson('https://a.example/1', { headers: { 'Authorization-Key': 'secret' } });
+  assert.deepEqual(
+    seen.map((s) => s.url),
+    ['https://a.example/1', 'https://a.example/2', 'https://b.example/3'],
+  );
+  assert.equal(seen[1].headers['Authorization-Key'], 'secret', 'a same-origin redirect keeps it');
+  assert.deepEqual(Object.keys(seen[2].headers).sort(), ['Accept', 'User-Agent']);
 });

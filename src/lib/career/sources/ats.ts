@@ -31,7 +31,8 @@ export function detectAts(url: string): { kind: AtsKind; token: string } | null 
   } catch {
     return null;
   }
-  const kind = HOSTS[u.hostname.toLowerCase()];
+  const host = u.hostname.toLowerCase();
+  const kind = Object.hasOwn(HOSTS, host) ? HOSTS[host] : undefined;
   const token = u.pathname.split('/')[1];
   // apply.workable.com/j/<shortcode> is one job, not an account.
   if (!kind || !token || (kind === 'workable' && token === 'j')) return null;

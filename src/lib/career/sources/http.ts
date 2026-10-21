@@ -24,15 +24,16 @@ for (const [net, bits] of [
   ['0.0.0.0', 8],
 ] as const)
   PRIVATE.addSubnet(net, bits, 'ipv4');
-PRIVATE.addAddress('::1', 'ipv6');
-PRIVATE.addAddress('::', 'ipv6');
+// ::/96 holds ::, ::1, and IPv4-compatible addresses; 64:ff9b::/96 is NAT64.
+PRIVATE.addSubnet('::', 96, 'ipv6');
+PRIVATE.addSubnet('64:ff9b::', 96, 'ipv6');
 PRIVATE.addSubnet('fc00::', 7, 'ipv6');
 PRIVATE.addSubnet('fe80::', 10, 'ipv6');
 
 /** Throws unless `url` is http(s) on a public host. DNS names are not resolved (accepted gap). */
 function assertPublic(url: URL) {
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new SourceError(`Refused ${url.protocol} URL`);
-  const host = url.hostname.replace(/^\[|\]$/g, '');
+  const host = url.hostname.replace(/^\[|\]$/g, '').replace(/\.+$/, '');
   const ip = isIP(host);
   if (host === 'localhost' || host.endsWith('.localhost') || (ip && PRIVATE.check(host, ip === 6 ? 'ipv6' : 'ipv4')))
     throw new SourceError(`Refused private host ${url.hostname}`);
@@ -57,6 +58,9 @@ async function readCapped(res: Response, host: string, maxBytes: number): Promis
   return Buffer.concat(chunks).toString('utf8');
 }
 
+/** Lets the connection go without reading the body. */
+const discard = (res: Response) => void res.body?.cancel().catch(() => {});
+
 /** Network and timeout errors become SourceErrors; SourceErrors pass through. */
 const fail = (url: URL) => (e: unknown) => {
   throw e instanceof SourceError ? e : new SourceError(`${url.host}: ${(e as Error).message}`);
@@ -65,21 +69,31 @@ const fail = (url: URL) => (e: unknown) => {
 /** GET with the job-search User-Agent, a 15 s timeout, checked redirects, and a body cap (`init.maxBytes`, 5 MB by default). */
 export async function getText(url: string, init: FetchInit = {}): Promise<string> {
   const signal = AbortSignal.timeout(15_000);
-  const headers = {
+  let headers: Record<string, string> = {
     'User-Agent': init.siteUrl ? `ScholarOS job search (+${init.siteUrl})` : 'ScholarOS job search',
     ...init.headers,
   };
   let current = toUrl(url);
+  const origin = current.origin;
   for (let hop = 0; ; hop++) {
     assertPublic(current);
+    // Off the original origin, caller headers (keys, tokens) are dropped for this hop and every later one.
+    if (current.origin !== origin)
+      headers = Object.fromEntries(
+        Object.entries(headers).filter(([k]) => ['user-agent', 'accept'].includes(k.toLowerCase())),
+      );
     const res = await fetch(current.href, { headers, redirect: 'manual', signal }).catch(fail(current));
     const location = res.headers.get('location');
     if (res.status >= 300 && res.status < 400 && location) {
+      discard(res);
       if (hop >= MAX_REDIRECTS) throw new SourceError(`${url}: more than ${MAX_REDIRECTS} redirects`);
       current = toUrl(location, current);
       continue;
     }
-    if (!res.ok) throw new SourceError(`${current.host} answered ${res.status}`);
+    if (!res.ok) {
+      discard(res);
+      throw new SourceError(`${current.host} answered ${res.status}`);
+    }
     return readCapped(res, current.host, init.maxBytes ?? MAX_BYTES).catch(fail(current));
   }
 }
