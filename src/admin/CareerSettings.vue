@@ -32,6 +32,9 @@ const typed = ref<Record<string, string>>({});
 const savingKey = ref('');
 const saving = ref(false);
 const errors = ref<Record<string, string>>({});
+const SUGGESTED = 'Suggested from your CV and publications. Review, then Save.';
+const banner = ref<{ text: string; error: boolean } | null>(null);
+const suggesting = ref(false);
 
 // Per-source settings the source reads from `prefs.sources[id].options`.
 const SOURCE_OPTIONS: Record<string, { key: string; label: string; placeholder: string }[]> = {
@@ -134,12 +137,42 @@ function addFeed(url: string) {
   prefs.value!.feeds = [...prefs.value!.feeds, url];
 }
 
+const SUGGESTED_PREFS = ['roles', 'keywords', 'seniority', 'fields', 'locations', 'languages'] as const;
+
+/**
+ * Asks the server for settings suggested from the CV and publications; nothing is saved until Save. `replace` swaps
+ * the suggested prefs in (the button); otherwise only empty ones are filled (the first visit). Answers only ever fill
+ * empty fields. A failure leaves the form as it was.
+ */
+async function suggest(replace: boolean) {
+  suggesting.value = true;
+  try {
+    const s = await api<{
+      prefs: Pick<CareerPrefs, (typeof SUGGESTED_PREFS)[number]>;
+      answers: Pick<ApplicationAnswers, 'phone' | 'address' | 'links'>;
+    }>('career/suggest', { method: 'POST' });
+    const p = prefs.value!;
+    for (const k of SUGGESTED_PREFS) if (replace || !p[k].length) (p as Record<string, unknown>)[k] = s.prefs[k];
+    const a = answers.value!;
+    if (!a.phone.trim()) a.phone = s.answers.phone;
+    if (!a.address.trim()) a.address = s.answers.address;
+    if (!a.links.length) a.links = s.answers.links;
+    banner.value = { text: SUGGESTED, error: false };
+  } catch (e) {
+    banner.value = { text: (e as Error).message, error: true };
+  } finally {
+    suggesting.value = false;
+  }
+}
+
 async function load() {
   try {
     const s = await api<{ prefs: CareerPrefs; answers: ApplicationAnswers }>('career/settings');
     prefs.value = s.prefs;
     answers.value = s.answers;
     floor.value = { ...s.prefs.salaryFloor };
+    const p = s.prefs;
+    if (![p.roles, p.keywords, p.fields, p.watched, p.feeds].some((l) => l.length)) void suggest(false);
   } catch (e) {
     report(e);
   }
@@ -156,6 +189,7 @@ async function save(body: { prefs: CareerPrefs } | { answers: ApplicationAnswers
     prefs.value = s.prefs;
     answers.value = s.answers;
     floor.value = { ...s.prefs.salaryFloor };
+    banner.value = null;
     toast('Saved');
   } catch (e) {
     if (e instanceof ApiError && e.status === 400 && e.details && typeof e.details === 'object')
@@ -211,8 +245,20 @@ onMounted(async () => {
     <p><a :href="`${base}/career`">← Back to the feed</a></p>
 
     <template v-if="prefs && answers">
+      <p
+        v-if="banner"
+        :class="['adm-banner', { 'adm-banner-error': banner.error }]"
+        :role="banner.error ? 'alert' : 'status'"
+      >
+        {{ banner.text }}
+      </p>
       <fieldset class="adm-group">
         <legend>What I want</legend>
+        <div class="adm-actions">
+          <button type="button" class="adm-btn adm-btn-small" :disabled="suggesting" @click="suggest(true)">
+            {{ suggesting ? 'Suggesting…' : 'Suggest from my site' }}
+          </button>
+        </div>
         <FormFields :fields="WANT_FIELDS" :model="prefs" :errors="errors" />
         <FormFields :fields="FLOOR_FIELDS" :model="floor" />
       </fieldset>

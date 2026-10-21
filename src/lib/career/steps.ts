@@ -149,13 +149,15 @@ export async function pendingScores(limit: number): Promise<{ ids: number[]; def
   return { ids, deferred: rows.length ? Number(rows[0].total) - ids.length : 0 };
 }
 
-/** The CV as prompt text, read through the store as cv-render does; '' when there is none. */
-async function cvTextOf(store: PostgresStore): Promise<string> {
+/** The CV read through the store as cv-render does (an enabled upload wins); `cv` is missing when there is none. */
+export async function readCv(store: PostgresStore): Promise<CvConfig> {
   const [cv, upload] = await Promise.all([readConfig(store, 'cv'), readConfig(store, 'cv-upload')]);
-  const resolved = resolveCvConfig(
-    upload.data as { enabled?: boolean; content?: string },
-    () => cv.data as unknown as CvConfig,
-  );
+  return resolveCvConfig(upload.data as { enabled?: boolean; content?: string }, () => cv.data as unknown as CvConfig);
+}
+
+/** The CV as prompt text; '' when there is none. */
+export async function cvTextOf(store: PostgresStore): Promise<string> {
+  const resolved = await readCv(store);
   return resolved?.cv ? cvText(resolved).trim() : '';
 }
 

@@ -207,11 +207,17 @@ function eeoAnswer(q: GhQuestion, a: ApplicationAnswers): FormAnswer {
   );
 }
 
+/** A CV social network's profile URL (`https://<network>.com/<username>`, LinkedIn under `/in/`). */
+export const networkUrl = (network: string, username: string) => {
+  const n = network.toLowerCase();
+  return `https://${n}.com/${n === 'linkedin' ? 'in/' : ''}${username}`;
+};
+
 const link = (cv: CvConfig, a: ApplicationAnswers, re: RegExp, network: string): string => {
   const own = a.links.find((l) => re.test(l.label) || re.test(l.url));
   if (own) return own.url;
   const n = cv.cv.socialNetworks?.find((s) => s.network.toLowerCase() === network);
-  return n?.username ? `https://${network}.com/${network === 'linkedin' ? 'in/' : ''}${n.username}` : '';
+  return n?.username ? networkUrl(network, n.username) : '';
 };
 
 /** Known field → [value, source]; null when the question isn't one the owner's data answers. */
