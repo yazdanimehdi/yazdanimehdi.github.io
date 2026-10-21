@@ -20,6 +20,9 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT / "services" / "cv-render"))
+
+from cvrender import build_rendercv_input, render_pdf, strip_site_markup  # noqa: E402
 CONFIG_PATH = ROOT / "config" / "cv.yml"
 UPLOAD_PATH = ROOT / "config" / "cv-upload.yml"
 OUTPUT_PDF = ROOT / "public" / "cv.pdf"
@@ -59,21 +62,6 @@ def load_config() -> dict:
         return yaml.safe_load(f)
 
 
-def camel_to_snake(name: str) -> str:
-    """Convert camelCase to snake_case."""
-    s1 = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", name)
-    return re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", s1).lower()
-
-
-def convert_keys(obj):
-    """Recursively convert all dict keys from camelCase to snake_case."""
-    if isinstance(obj, dict):
-        return {camel_to_snake(k): convert_keys(v) for k, v in obj.items()}
-    if isinstance(obj, list):
-        return [convert_keys(item) for item in obj]
-    return obj
-
-
 def snake_to_camel(name: str) -> str:
     """Convert snake_case to camelCase."""
     parts = name.split("_")
@@ -111,126 +99,6 @@ def sync_upload_to_structured(uploaded: dict) -> None:
         print("Disabled cv-upload.yml (enabled: false)")
 
 
-def transform_section_entries(sections: dict) -> dict:
-    """Transform our CV section format to RenderCV entry types."""
-    result = {}
-
-    for section_name, entries in sections.items():
-        if not entries:
-            continue
-
-        if section_name == "education":
-            result[section_name] = [
-                transform_education_entry(e) for e in entries
-            ]
-        elif section_name == "experience":
-            result[section_name] = [
-                transform_experience_entry(e) for e in entries
-            ]
-        elif section_name == "publications":
-            result[section_name] = [
-                transform_publication_entry(e) for e in entries
-            ]
-        elif section_name == "awards":
-            result[section_name] = [
-                transform_one_line_entry(e) for e in entries
-            ]
-        elif section_name == "skills":
-            result[section_name] = [
-                transform_one_line_entry(e) for e in entries
-            ]
-        else:
-            # Pass through unknown sections as-is
-            print(f"INFO: Passing through unknown section '{section_name}' ({len(entries)} entries)")
-            result[section_name] = entries
-
-    return result
-
-
-def transform_education_entry(entry: dict) -> dict:
-    """Map education entry to RenderCV EducationEntry."""
-    result = {
-        "institution": entry.get("institution", ""),
-        "area": entry.get("area", ""),
-        "degree": entry.get("degree", ""),
-    }
-    if entry.get("location"):
-        result["location"] = entry["location"]
-    if entry.get("start_date"):
-        result["start_date"] = entry["start_date"]
-    if entry.get("end_date"):
-        result["end_date"] = entry["end_date"]
-    highlights = entry.get("highlights", [])
-    if highlights:
-        result["highlights"] = highlights
-    return result
-
-
-def transform_experience_entry(entry: dict) -> dict:
-    """Map experience entry to RenderCV ExperienceEntry."""
-    result = {
-        "company": entry.get("company", ""),
-        "position": entry.get("position", ""),
-    }
-    if entry.get("location"):
-        result["location"] = entry["location"]
-    if entry.get("start_date"):
-        result["start_date"] = entry["start_date"]
-    if entry.get("end_date"):
-        result["end_date"] = entry["end_date"]
-    highlights = entry.get("highlights", [])
-    if highlights:
-        result["highlights"] = highlights
-    return result
-
-
-def transform_publication_entry(entry: dict) -> dict:
-    """Map publication entry to RenderCV PublicationEntry."""
-    result = {
-        "title": entry.get("title", ""),
-        "authors": entry.get("authors", []),
-    }
-    if entry.get("journal"):
-        result["journal"] = entry["journal"]
-    if entry.get("date"):
-        result["date"] = str(entry["date"])
-    if entry.get("doi"):
-        result["doi"] = entry["doi"]
-    if entry.get("url"):
-        result["url"] = entry["url"]
-    return result
-
-
-def transform_one_line_entry(entry: dict) -> dict:
-    """Map award/skill entry to RenderCV OneLineEntry."""
-    return {
-        "label": entry.get("label", ""),
-        "details": entry.get("details", ""),
-    }
-
-
-def drop_hidden(sections: dict) -> dict:
-    """Remove entries marked visible: false and strip the key from the rest (RenderCV rejects unknown keys)."""
-    result = {}
-    for name, entries in (sections or {}).items():
-        if not isinstance(entries, list):
-            result[name] = entries
-            continue
-        kept = []
-        for entry in entries:
-            if isinstance(entry, dict):
-                if entry.get("visible") is False:
-                    continue
-                entry = {k: v for k, v in entry.items() if k != "visible"}
-            kept.append(entry)
-        result[name] = kept
-    return result
-
-
-def is_publication(entry) -> bool:
-    return isinstance(entry, dict) and "title" in entry and "authors" in entry
-
-
 def read_front_matter(path: Path) -> dict:
     match = re.match(r"^---\r?\n(.*?)\r?\n---", path.read_text(encoding="utf-8"), re.S)
     if not match:
@@ -247,81 +115,9 @@ def read_front_matter(path: Path) -> dict:
 
 
 def collection_publications(directory: Path = PUBLICATIONS_DIR) -> list:
-    """RenderCV publication entries built from the publications collection, newest first."""
-    entries = []
-    for path in sorted([*directory.glob("*.md"), *directory.glob("*.mdx")]):
-        data = read_front_matter(path)
-        if not data.get("title"):
-            continue
-        entry = {"title": data["title"], "authors": data.get("authors") or []}
-        if data.get("venue"):
-            entry["journal"] = data["venue"]
-        if data.get("year"):
-            entry["date"] = str(data["year"])
-        if data.get("doi"):
-            entry["doi"] = data["doi"]
-        if data.get("url"):
-            entry["url"] = data["url"]
-        entries.append(entry)
-    return sorted(entries, key=lambda e: e.get("date", ""), reverse=True)
-
-
-FONT_SPAN = re.compile(r"\[([^\]]*)\]\{\.[A-Za-z]+\}")
-EMPTY_BOLD = re.compile(r"(?<![*\\])\*{4}(?!\*)")
-
-
-def strip_site_markup(value):
-    """Markup only the site and the built-in PDF understand: `[text]{.mono}` becomes `text` (its `**`/`*` and
-    `[link](url)` stay for RenderCV), and an empty `****` goes. Strings, lists and mappings, recursively."""
-    if isinstance(value, str):
-        return EMPTY_BOLD.sub("", FONT_SPAN.sub(r"\1", value))
-    if isinstance(value, list):
-        return [strip_site_markup(v) for v in value]
-    if isinstance(value, dict):
-        return {k: strip_site_markup(v) for k, v in value.items()}
-    return value
-
-
-def build_rendercv_input(config: dict, with_collection: bool = False) -> dict:
-    """Convert our cv.yml format to RenderCV's expected YAML input.
-
-    with_collection: when no section lists publications, add one from src/content/publications
-    (the collection is the single source of publications for the site CV).
-    """
-    # Convert all keys from camelCase to snake_case
-    converted = convert_keys(config)
-
-    cv = converted.get("cv", {})
-    written = cv.pop("sections", {}) or {}
-    # Decided before hiding: a CV that lists its own publications (even all hidden) never gets the collection.
-    has_own_publications = any(
-        isinstance(entries, list) and entries and is_publication(entries[0]) for entries in written.values()
-    )
-    sections_raw = drop_hidden(written)
-
-    if with_collection and not has_own_publications:
-        publications = collection_publications()
-        if publications:
-            sections_raw["publications"] = publications
-
-    # Transform section entries to proper RenderCV types
-    cv["sections"] = transform_section_entries(sections_raw)
-
-    result = {"cv": cv}
-
-    # Include design settings if present
-    design = converted.get("design")
-    if design:
-        result["design"] = design
-
-    return strip_site_markup(result)
-
-
-def find_output_pdf(output_dir: Path) -> Path | None:
-    """Find the generated PDF in RenderCV's output directory."""
-    for pdf in output_dir.rglob("*.pdf"):
-        return pdf
-    return None
+    """Front matter of every publication in the collection (build_rendercv_input turns it into entries)."""
+    front_matters = [read_front_matter(path) for path in sorted([*directory.glob("*.md"), *directory.glob("*.mdx")])]
+    return [data for data in front_matters if data.get("title")]
 
 
 def render_cv(rendercv_input: dict | str) -> Path:
@@ -330,49 +126,12 @@ def render_cv(rendercv_input: dict | str) -> Path:
     rendercv_input can be a dict (YAML-dumped) or a raw YAML string
     (written verbatim to preserve section order).
     """
-    with tempfile.TemporaryDirectory() as tmpdir:
-        tmpdir_path = Path(tmpdir)
-        input_file = tmpdir_path / "cv_input.yaml"
-
-        with open(input_file, "w") as f:
-            if isinstance(rendercv_input, str):
-                f.write(rendercv_input)
-            else:
-                yaml.dump(rendercv_input, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
-
-        print(f"Running rendercv render on {input_file}...")
-
-        result = subprocess.run(
-            ["rendercv", "render", str(input_file)],
-            capture_output=True,
-            text=True,
-            cwd=tmpdir,
-            timeout=120,
-        )
-
-        if result.stdout:
-            print(result.stdout)
-        if result.stderr:
-            print(result.stderr, file=sys.stderr)
-
-        if result.returncode != 0:
-            raise RuntimeError(f"rendercv exited with code {result.returncode}")
-
-        # RenderCV outputs to rendercv_output/ by default
-        output_dir = tmpdir_path / "rendercv_output"
-        pdf_path = find_output_pdf(output_dir)
-
-        # Fallback: search entire tmpdir if not found in expected location
-        if pdf_path is None:
-            pdf_path = find_output_pdf(tmpdir_path)
-
-        if pdf_path is None:
-            raise RuntimeError("RenderCV did not produce a PDF file")
-
-        # Copy to a stable temp location before tmpdir is cleaned up
-        stable_path = Path(tempfile.mktemp(suffix=".pdf"))
-        shutil.copy2(pdf_path, stable_path)
-        return stable_path
+    if not isinstance(rendercv_input, str):
+        rendercv_input = yaml.dump(rendercv_input, default_flow_style=False, allow_unicode=True, sort_keys=False)
+    print("Running rendercv render...")
+    stable_path = Path(tempfile.mktemp(suffix=".pdf"))
+    stable_path.write_bytes(render_pdf(rendercv_input))
+    return stable_path
 
 
 def validate_pdf(pdf_path: Path) -> None:
@@ -493,7 +252,7 @@ def main():
             sys.exit(1)
 
         # Build RenderCV input from structured config
-        rendercv_input = build_rendercv_input(config, with_collection=True)
+        rendercv_input = build_rendercv_input(config, collection_publications())
 
     # Render PDF
     try:
