@@ -6,7 +6,7 @@ import globals from 'globals';
 
 export default [
   // Global ignores
-  { ignores: ['dist/', 'dist-*/', '.vercel/', 'node_modules/', '.astro/', 'src/content/', 'src/data/'] },
+  { ignores: ['dist/', 'dist-*/', '.vercel/', 'node_modules/', '.astro/', 'src/content/', 'src/data/', 'src/pages/.well-known/workflow/'] },
 
   // Base JS recommended rules
   js.configs.recommended,

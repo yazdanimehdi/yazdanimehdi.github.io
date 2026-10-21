@@ -45,4 +45,5 @@ __pycache__/
 
 # Workflow SDK: local run data and its compiler cache (Postgres-mode builds)
 .workflow-data/
+src/pages/.well-known/workflow/
 /.swc
