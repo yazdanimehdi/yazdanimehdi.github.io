@@ -33,6 +33,15 @@ test('parseStyles repairs public', () => {
   );
 });
 
+test('parseStyles reads design as YAML text and defaults a missing one', () => {
+  const head = 'id: a, name: a, theme: classic, density: normal';
+  const text = parseStyles(`styles:\n  - { ${head}, design: "page:\\n  top_margin: 1cm\\n" }\n`, cv);
+  assert.deepStrictEqual(text.styles[0].design, { page: { top_margin: '1cm' } });
+  assert.deepStrictEqual(parseStyles(`styles:\n  - { ${head} }\n`, cv).styles[0].design, {});
+  assert.deepStrictEqual(parseStyles(`styles:\n  - { ${head}, design: "[1, 2]" }\n`, cv), defaultStyles(cv));
+  assert.deepStrictEqual(parseStyles(`styles:\n  - { ${head}, design: "a: [" }\n`, cv), defaultStyles(cv));
+});
+
 test('assertThemeFiles rejects', () => {
   assertThemeFiles('mine', { 'Header.j2.typ': '' });
   const many = Object.fromEntries(Array.from({ length: 41 }, (_, i) => [`f${i}.typ`, '']));

@@ -84,4 +84,13 @@ with tempfile.TemporaryDirectory() as d:
     # Garbled styles file: defaults.
     (root / "config" / "cv-styles.yml").write_text(": [\n")
     assert yaml.safe_load(rc.main_input(root)[0])["design"]["theme"] == "classic"
+    # A theme name that is a path never touches disk; symlinked theme files are skipped.
+    (root / "config" / "cv-styles.yml").write_text(
+        "styles:\n  - {id: x, name: X, theme: '../..', density: normal}\n"
+    )
+    assert rc.main_input(root)[1] == {}
+    (root / "outside.typ").write_text("secret")
+    (root / "cv" / "themes" / "mine" / "link.typ").symlink_to(root / "outside.typ")
+    (root / "config" / "cv-styles.yml").write_text("styles:\n  - {id: m, name: M, theme: mine, density: normal}\n")
+    assert rc.main_input(root)[1] == {"Preamble.j2.typ": "x"}
 print("render-cv self-check passed")

@@ -268,10 +268,12 @@ def main_input(root: Path) -> tuple[str, dict]:
     })
     theme = yaml.safe_load(text).get("design", {}).get("theme")  # a raw upload may bring its own
     theme_dir = root / "cv" / "themes" / str(theme)
-    theme_files = {
-        str(p.relative_to(theme_dir)): p.read_text(encoding="utf-8")
-        for p in sorted(theme_dir.rglob("*.typ")) if p.is_file()
-    } if theme_dir.is_dir() else {}
+    theme_files = {}
+    if re.fullmatch(r"[a-z0-9]+", str(theme)) and theme_dir.is_dir():
+        base = theme_dir.resolve()
+        for p in sorted(theme_dir.rglob("*.typ")):
+            if p.is_file() and not p.is_symlink() and p.resolve().is_relative_to(base):
+                theme_files[str(p.relative_to(theme_dir))] = p.read_text(encoding="utf-8")
     return text, theme_files
 
 

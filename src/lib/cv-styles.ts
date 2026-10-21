@@ -41,6 +41,19 @@ export function defaultStyles(cv: CvConfig): CvStylesConfig {
   return { public: style.id, styles: [style] };
 }
 
+/** A style's design: a mapping, YAML text (Sveltia's code field) or missing (`{}`); null when it is anything else. */
+function styleDesign(design: unknown): Record<string, unknown> | null {
+  if (design == null || design === '') return {};
+  if (typeof design === 'string') {
+    try {
+      design = parse(design) ?? {};
+    } catch {
+      return null;
+    }
+  }
+  return isMap(design) ? design : null;
+}
+
 export function parseStyles(text: string | undefined, cv: CvConfig): CvStylesConfig {
   let raw: unknown;
   try {
@@ -50,18 +63,22 @@ export function parseStyles(text: string | undefined, cv: CvConfig): CvStylesCon
   }
   const list: unknown[] = isMap(raw) && Array.isArray(raw.styles) ? raw.styles : [];
   const seen = new Set<string>();
-  const styles = list.filter(
-    (s): s is CvStyle =>
-      isMap(s) &&
-      typeof s.id === 'string' &&
-      STYLE_ID.test(s.id) &&
-      DENSITIES.includes(s.density as Density) &&
-      isMap(s.design) &&
-      typeof s.name === 'string' &&
-      typeof s.theme === 'string' &&
-      !seen.has(s.id) &&
-      !!seen.add(s.id),
-  );
+  const styles = list.flatMap((s): CvStyle[] => {
+    if (!isMap(s)) return [];
+    const design = styleDesign(s.design);
+    if (
+      !design ||
+      typeof s.id !== 'string' ||
+      !STYLE_ID.test(s.id) ||
+      !DENSITIES.includes(s.density as Density) ||
+      typeof s.name !== 'string' ||
+      typeof s.theme !== 'string' ||
+      seen.has(s.id)
+    )
+      return [];
+    seen.add(s.id);
+    return [{ ...s, id: s.id, name: s.name, theme: s.theme, density: s.density as Density, design }];
+  });
   if (!styles.length) return defaultStyles(cv);
   const pub = (raw as Record<string, unknown>).public;
   return { public: styles.some((s) => s.id === pub) ? (pub as string) : styles[0].id, styles };
