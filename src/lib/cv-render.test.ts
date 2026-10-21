@@ -16,10 +16,17 @@ const req = {
   themeFiles: {},
 } as unknown as CvRenderRequest;
 const realFetch = globalThis.fetch;
+const realSecret = process.env.SESSION_SECRET;
+const realUrl = process.env.CV_RENDER_URL;
 afterEach(() => {
   globalThis.fetch = realFetch;
-  delete process.env.CV_RENDER_URL;
-  delete process.env.SESSION_SECRET;
+  for (const [k, v] of [
+    ['CV_RENDER_URL', realUrl],
+    ['SESSION_SECRET', realSecret],
+  ] as const) {
+    if (v === undefined) delete process.env[k];
+    else process.env[k] = v;
+  }
 });
 
 function stub(res: Response, seen: { url?: string; key?: string } = {}) {
@@ -63,7 +70,8 @@ test('cvRenderRequest rejects a theme that is a path and reads nothing outside c
   const style = { id: 'x', name: 'X', theme: '../../config', density: 'normal', design: {} } as CvStyle;
   await assert.rejects(cvRenderRequest(store, style), PathError);
   assert.deepEqual(listed, ['src/content/publications']);
-  assert.ok(reads.every((p) => !p.includes('..')));
+  const outside = (p: string) => p.includes('..') || !/^(config\/|src\/content\/publications|cv\/themes\/)/.test(p);
+  assert.deepEqual([...reads, ...listed].filter(outside), []);
 });
 
 test('renderCv maps 5xx to UpstreamError', async () => {
