@@ -100,7 +100,8 @@ test('adzuna maps its fixture', async () => {
   assert.equal(p.company, 'Example Labs');
   assert.equal(p.title, 'Research Software Engineer');
   assert.equal(p.location, 'Boston, Suffolk County');
-  assert.equal(p.url, 'https://www.adzuna.com/land/ad/4350987651?se=abc&v=123');
+  assert.equal(p.url, 'https://www.adzuna.com/details/4350987651', 'stable across searches');
+  assert.equal(p.applyUrl, 'https://www.adzuna.com/land/ad/4350987651?se=abc&v=123');
   assert.equal(p.format, 'text');
   assert.equal(p.postedAt, '2026-10-19T08:15:00Z');
   assert.deepEqual(p.salary, { min: 90000, max: 120000, period: 'year' });

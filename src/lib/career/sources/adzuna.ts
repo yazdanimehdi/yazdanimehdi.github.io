@@ -16,6 +16,15 @@ interface Job {
   salary_is_predicted?: string;
 }
 
+/** The ad's own page: `redirect_url` carries per-search tokens (`se`, `v`), so it would key one job afresh each night. */
+function detailsUrl(j: Job): string {
+  try {
+    return `${new URL(j.redirect_url).origin}/details/${encodeURIComponent(j.id)}`;
+  } catch {
+    return j.redirect_url;
+  }
+}
+
 export const adzuna: Source = {
   id: 'adzuna',
   label: 'Adzuna',
@@ -41,7 +50,8 @@ export const adzuna: Source = {
           company: j.company?.display_name ?? '',
           title: j.title,
           location: j.location?.display_name,
-          url: j.redirect_url,
+          url: detailsUrl(j),
+          applyUrl: j.redirect_url,
           // A snippet, not the full ad.
           description: j.description,
           format: 'text',

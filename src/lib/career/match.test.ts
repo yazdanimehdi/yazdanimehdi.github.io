@@ -30,6 +30,14 @@ test('different titles at one company have different keys', () => {
   );
 });
 
+test('a careers-page key ignores the extracted title', () => {
+  const url = 'https://acme.test/jobs/42';
+  assert.equal(
+    postingKey({ source: 'careers-page', company: 'Acme', title: 'ML Engineer', url }),
+    postingKey({ source: 'careers-page', company: 'Acme', title: 'Machine Learning Engineer', url }),
+  );
+});
+
 test('normalizeUrl keeps meaningful query params', () => {
   assert.equal(normalizeUrl('https://A.com/j?id=5&ref=x&utm_medium=y&source=z'), 'https://a.com/j?id=5');
 });

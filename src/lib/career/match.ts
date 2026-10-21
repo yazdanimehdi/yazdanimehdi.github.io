@@ -27,9 +27,13 @@ export const normalizeUrl = (url: string): string => {
   return u.origin + u.pathname.replace(/\/$/, '') + u.search;
 };
 
-export const postingKey = (p: Pick<RawPosting, 'company' | 'title' | 'url'>): string =>
+/**
+ * One posting, one key, night after night. A careers page's title is the AI's reading, which can change: its URL alone
+ * names it.
+ */
+export const postingKey = (p: Pick<RawPosting, 'company' | 'title' | 'url'> & { source?: string }): string =>
   createHash('sha256')
-    .update(`${fold(p.company)}|${fold(p.title)}|${normalizeUrl(p.url)}`)
+    .update(`${fold(p.company)}|${p.source === 'careers-page' ? '' : fold(p.title)}|${normalizeUrl(p.url)}`)
     .digest('hex')
     .slice(0, 32);
 
