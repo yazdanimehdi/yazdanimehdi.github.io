@@ -475,7 +475,7 @@ Five hero background options for the homepage:
 | ----------- | ------------------------------------------------------------------------- |
 | `image`     | Static image with light/dark variants                                     |
 | `video`     | Background video with poster fallback                                     |
-| `pattern`   | SVG patterns: dots, grid, waves, diagonal, hexagons                       |
+| `pattern`   | 17 SVG patterns in any color or gradient (below)                          |
 | `animation` | GSAP-powered: particles, gradient-morph, geometric, wave-lines, or custom |
 | `none`      | Clean, minimal solid color                                                |
 
@@ -485,6 +485,24 @@ hero:
   animation:
     preset: 'wave-lines' # particles | gradient-morph | geometric | wave-lines | custom
 ```
+
+Patterns: grid, dots, diagonal, waves, hexagons, crosses, triangles, zigzag, rings, scales, topography, helix,
+circuit, molecules, cubes, stipple and sparkles. Set them in the admin (Settings → Hero) or in `site.yml`:
+
+```yaml
+hero:
+  type: 'pattern'
+  pattern:
+    name: 'circuit'
+    color: 'accent' # empty: the text color; 'accent': the theme accent; or any CSS color (#7c3aed)
+    color2: '#14b8a6' # optional: a second color runs the lines in a gradient
+    angle: 135 # the gradient's direction in degrees
+    strength: 'medium' # subtle | medium | strong
+    fade: true # false: full strength across the hero instead of fading toward the text
+```
+
+Empty and `accent` follow light and dark mode; a fixed color stays the same in both, so a saturated one usually wants
+`strength: 'strong'` to show on a dark background.
 
 ### Newsletter Signup
 

@@ -424,31 +424,20 @@
     z-index: -1;
     pointer-events: none;
   }
-  /* Hairline pattern in ink, strongest behind the figure side and fading out toward the text and the fold. */
+  /* A hairline pattern (hero.pattern: the tile, its color or gradient, its strength; see lib/hero-patterns.ts),
+     strongest behind the figure side and fading out toward the text and the fold unless fade is off. */
   & .ed-backdrop--pattern {
-    background: var(--ed-ink);
-    opacity: 0.07;
-    mask-image: var(--ed-pattern), radial-gradient(ellipse 70% 90% at 82% 40%, #000 0%, transparent 72%);
+    background: var(--hero-pattern-fill, var(--ed-ink));
+    opacity: var(--hero-pattern-opacity, 0.07);
+    mask-image: var(--hero-pattern), radial-gradient(ellipse 70% 90% at 82% 40%, #000 0%, transparent 72%);
     mask-composite: intersect;
     -webkit-mask-composite: source-in;
   }
   &[dir='rtl'] .ed-backdrop--pattern {
-    mask-image: var(--ed-pattern), radial-gradient(ellipse 70% 90% at 18% 40%, #000 0%, transparent 72%);
+    mask-image: var(--hero-pattern), radial-gradient(ellipse 70% 90% at 18% 40%, #000 0%, transparent 72%);
   }
-  & .ed-backdrop--pattern[data-pattern='dots'] {
-    --ed-pattern: url('data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2722%27 height=%2722%27><circle cx=%2711%27 cy=%2711%27 r=%271.1%27/></svg>');
-  }
-  & .ed-backdrop--pattern[data-pattern='grid'] {
-    --ed-pattern: url('data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2728%27 height=%2728%27><path fill=%27none%27 stroke=%27black%27 stroke-width=%271%27 d=%27M28 .5H.5V28%27/></svg>');
-  }
-  & .ed-backdrop--pattern[data-pattern='diagonal'] {
-    --ed-pattern: url('data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2718%27 height=%2718%27><path fill=%27none%27 stroke=%27black%27 stroke-width=%271%27 d=%27M-2 20 20-2%27/></svg>');
-  }
-  & .ed-backdrop--pattern[data-pattern='waves'] {
-    --ed-pattern: url('data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2748%27 height=%2716%27><path fill=%27none%27 stroke=%27black%27 stroke-width=%271%27 d=%27M0 8c6-6 18-6 24 0s18 6 24 0%27/></svg>');
-  }
-  & .ed-backdrop--pattern[data-pattern='hexagons'] {
-    --ed-pattern: url('data:image/svg+xml,<svg xmlns=%27http://www.w3.org/2000/svg%27 width=%2728%27 height=%2748%27><path fill=%27none%27 stroke=%27black%27 stroke-width=%271%27 d=%27M14 0v8L0 16v16l14 8 14-8V16L14 8M14 48v-8%27/></svg>');
+  & .ed-backdrop--pattern.ed-backdrop--full {
+    mask-image: var(--hero-pattern);
   }
   & .ed-backdrop--image {
     background: var(--ed-hero-img) center / cover no-repeat;

@@ -684,200 +684,32 @@
     background-color: var(--color-accent-500);
   }
 
-  /* ===== Hero CSS patterns ===== */
-  /* Patterns fade out toward the hero text's start edge, so the text never sits on full-strength lines
-     (waves keeps its own wave-shaped mask). */
+  /* ===== Hero patterns ===== */
+  /* hero.pattern: the tile, its color or gradient and its strength come from lib/hero-patterns.ts as custom
+     properties. Patterns fade out toward the hero text's start edge unless fade is off. */
   .hero-pattern {
+    --hero-ink: var(--color-surface-900);
+    --hero-accent: var(--color-primary-600);
     pointer-events: none;
-    mask-image: linear-gradient(to left, #000 15%, transparent 85%);
+    background: var(--hero-pattern-fill, var(--hero-ink));
+    opacity: var(--hero-pattern-opacity, 0.07);
+    mask-image: var(--hero-pattern), linear-gradient(to left, #000 15%, transparent 85%);
+    mask-composite: intersect;
+    -webkit-mask-composite: source-in;
+  }
+
+  html.dark .hero-pattern {
+    --hero-ink: #fff;
+    --hero-accent: var(--color-accent-400);
   }
 
   [dir='rtl'] .hero-pattern {
-    mask-image: linear-gradient(to right, #000 15%, transparent 85%);
+    mask-image: var(--hero-pattern), linear-gradient(to right, #000 15%, transparent 85%);
   }
 
-  /* Dots */
-  .hero-pattern--dots {
-    background-image: radial-gradient(circle, var(--color-surface-300) 1px, transparent 1px);
-    background-size: 20px 20px;
-  }
-
-  html.dark .hero-pattern--dots {
-    background-image: radial-gradient(circle, rgba(255, 255, 255, 0.12) 1px, transparent 1px);
-  }
-
-  /* Grid */
-  /* Half the contrast of a surface-200 rule. */
-  .hero-pattern--grid {
-    --grid-line: color-mix(in srgb, var(--color-surface-200) 50%, transparent);
-    background-image:
-      linear-gradient(var(--grid-line) 1px, transparent 1px),
-      linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-    background-size: 40px 40px;
-  }
-
-  html.dark .hero-pattern--grid {
-    --grid-line: rgba(255, 255, 255, 0.03);
-  }
-
-  /* Waves */
-  .hero-pattern--waves {
-    background-image: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 30px,
-      var(--color-surface-200) 30px,
-      var(--color-surface-200) 31px
-    );
-    background-size: 100% 60px;
-    mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 60'%3E%3Cpath d='M0,30 Q50,0 100,30 Q150,60 200,30 L200,60 L0,60Z' fill='white'/%3E%3C/svg%3E");
-    mask-size: 200px 60px;
-    mask-repeat: repeat;
-  }
-
-  html.dark .hero-pattern--waves {
-    background-image: repeating-linear-gradient(
-      0deg,
-      transparent,
-      transparent 30px,
-      rgba(255, 255, 255, 0.06) 30px,
-      rgba(255, 255, 255, 0.06) 31px
-    );
-  }
-
-  /* Diagonal */
-  .hero-pattern--diagonal {
-    background-image: repeating-linear-gradient(
-      45deg,
-      transparent,
-      transparent 10px,
-      var(--color-surface-200) 10px,
-      var(--color-surface-200) 11px
-    );
-  }
-
-  html.dark .hero-pattern--diagonal {
-    background-image: repeating-linear-gradient(
-      45deg,
-      transparent,
-      transparent 10px,
-      rgba(255, 255, 255, 0.06) 10px,
-      rgba(255, 255, 255, 0.06) 11px
-    );
-  }
-
-  /* Hexagons */
-  .hero-pattern--hexagons {
-    background-color: transparent;
-    background-image:
-      linear-gradient(
-        30deg,
-        var(--color-surface-200) 12%,
-        transparent 12.5%,
-        transparent 87%,
-        var(--color-surface-200) 87.5%,
-        var(--color-surface-200)
-      ),
-      linear-gradient(
-        150deg,
-        var(--color-surface-200) 12%,
-        transparent 12.5%,
-        transparent 87%,
-        var(--color-surface-200) 87.5%,
-        var(--color-surface-200)
-      ),
-      linear-gradient(
-        30deg,
-        var(--color-surface-200) 12%,
-        transparent 12.5%,
-        transparent 87%,
-        var(--color-surface-200) 87.5%,
-        var(--color-surface-200)
-      ),
-      linear-gradient(
-        150deg,
-        var(--color-surface-200) 12%,
-        transparent 12.5%,
-        transparent 87%,
-        var(--color-surface-200) 87.5%,
-        var(--color-surface-200)
-      ),
-      linear-gradient(
-        60deg,
-        var(--color-surface-100) 25%,
-        transparent 25.5%,
-        transparent 75%,
-        var(--color-surface-100) 75%,
-        var(--color-surface-100)
-      ),
-      linear-gradient(
-        60deg,
-        var(--color-surface-100) 25%,
-        transparent 25.5%,
-        transparent 75%,
-        var(--color-surface-100) 75%,
-        var(--color-surface-100)
-      );
-    background-size: 40px 70px;
-    background-position:
-      0 0,
-      0 0,
-      20px 35px,
-      20px 35px,
-      0 0,
-      20px 35px;
-  }
-
-  html.dark .hero-pattern--hexagons {
-    background-image:
-      linear-gradient(
-        30deg,
-        rgba(255, 255, 255, 0.06) 12%,
-        transparent 12.5%,
-        transparent 87%,
-        rgba(255, 255, 255, 0.06) 87.5%,
-        rgba(255, 255, 255, 0.06)
-      ),
-      linear-gradient(
-        150deg,
-        rgba(255, 255, 255, 0.06) 12%,
-        transparent 12.5%,
-        transparent 87%,
-        rgba(255, 255, 255, 0.06) 87.5%,
-        rgba(255, 255, 255, 0.06)
-      ),
-      linear-gradient(
-        30deg,
-        rgba(255, 255, 255, 0.06) 12%,
-        transparent 12.5%,
-        transparent 87%,
-        rgba(255, 255, 255, 0.06) 87.5%,
-        rgba(255, 255, 255, 0.06)
-      ),
-      linear-gradient(
-        150deg,
-        rgba(255, 255, 255, 0.06) 12%,
-        transparent 12.5%,
-        transparent 87%,
-        rgba(255, 255, 255, 0.06) 87.5%,
-        rgba(255, 255, 255, 0.06)
-      ),
-      linear-gradient(
-        60deg,
-        rgba(255, 255, 255, 0.03) 25%,
-        transparent 25.5%,
-        transparent 75%,
-        rgba(255, 255, 255, 0.03) 75%,
-        rgba(255, 255, 255, 0.03)
-      ),
-      linear-gradient(
-        60deg,
-        rgba(255, 255, 255, 0.03) 25%,
-        transparent 25.5%,
-        transparent 75%,
-        rgba(255, 255, 255, 0.03) 75%,
-        rgba(255, 255, 255, 0.03)
-      );
+  .hero-pattern--full,
+  [dir='rtl'] .hero-pattern--full {
+    mask-image: var(--hero-pattern);
   }
 }
 

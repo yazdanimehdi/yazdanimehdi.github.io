@@ -6,6 +6,7 @@ import DocBanners from './DocBanners.vue';
 import FormFields from './FormFields.vue';
 import { api } from './api';
 import { SOCIALS, select, text, type FieldDef } from './fields';
+import { HERO_PATTERN_NAMES, HERO_PATTERN_STRENGTH } from '../lib/hero-patterns';
 import { useDocument } from './useDocument';
 import type { AdminCtx, CommitResult } from './types';
 
@@ -105,6 +106,30 @@ const GROUPS: { label: string; fields: FieldDef[] }[] = [
     label: 'Hero',
     fields: [
       select('hero.type', 'Background', ['image', 'video', 'pattern', 'animation', 'none']),
+      select('hero.pattern.name', 'Pattern', HERO_PATTERN_NAMES),
+      {
+        key: 'hero.pattern.color',
+        label: 'Pattern color',
+        type: 'color',
+        hint: 'Empty: the text color, in light and dark mode. Type accent for the theme accent, or pick any color.',
+      },
+      {
+        key: 'hero.pattern.color2',
+        label: 'Pattern gradient to',
+        type: 'color',
+        hint: 'Set a second color to run the lines in a gradient. Empty: one color.',
+      },
+      { key: 'hero.pattern.angle', label: 'Gradient angle (degrees, default 135)', type: 'number' },
+      {
+        ...select('hero.pattern.strength', 'Pattern strength', Object.keys(HERO_PATTERN_STRENGTH)),
+        hint: 'A fixed color stays the same in dark mode: a saturated one usually wants strong there.',
+      },
+      {
+        key: 'hero.pattern.fade',
+        label: 'Fade the pattern toward the text',
+        type: 'checkbox',
+        default: true,
+      },
       { key: 'hero.light.bgColor', label: 'Background color', type: 'color' },
       { key: 'hero.light.bgImage', label: 'Background image', type: 'image', folder: 'site' },
       { key: 'hero.dark.bgColor', label: 'Background color (dark mode)', type: 'color' },

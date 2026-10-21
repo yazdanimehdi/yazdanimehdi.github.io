@@ -72,7 +72,12 @@ hero:
     src: '/videos/hero-bg.mp4'
     poster: '/images/hero-poster.jpg'
   pattern:
-    name: 'grid' # "dots" | "grid" | "waves" | "diagonal" | "hexagons"
+    name: 'grid' # grid | dots | diagonal | waves | hexagons | crosses | triangles | zigzag | rings | scales | topography | helix | circuit | molecules | cubes | stipple | sparkles
+    # color: 'accent' # empty: text color; 'accent'; or any CSS color
+    # color2: '#14b8a6' # a second color: the lines run in a gradient
+    # angle: 135 # gradient direction in degrees
+    # strength: 'subtle' # subtle | medium | strong
+    # fade: true # false: full strength across the hero
   animation:
     preset: 'wave-lines' # "particles" | "gradient-morph" | "geometric" | "wave-lines" | "custom"
     customScript: '' # path to JS file in /public (when preset: "custom")
@@ -202,7 +207,7 @@ newsletter:
 # SEO
 seo:
   ogImage: '/images/og-default.jpg' # default social card for pages without their own image; '' for none
-  keywords: "learning, models, mrna, drug, interaction, model, prediction, language, fairness, fair, dti, bias, target, modeling, drug-target, systems, conference, representations, mitigating, social, protein, information, language models, molecule, design, research, representation, methods, deep, diffusion"
+  keywords: 'learning, models, mrna, drug, interaction, model, prediction, language, fairness, fair, dti, bias, target, modeling, drug-target, systems, conference, representations, mitigating, social, protein, information, language models, molecule, design, research, representation, methods, deep, diffusion'
   googleSiteVerification: '' # Google Search Console verification code
   bingSiteVerification: '' # Bing Webmaster verification code
 

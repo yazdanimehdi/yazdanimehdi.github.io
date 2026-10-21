@@ -1,4 +1,5 @@
 import type { NightPalette } from './colors';
+import type { HeroPatternName, HeroPatternStrength } from './hero-patterns';
 
 export interface NavItem {
   label: string;
@@ -37,7 +38,7 @@ export interface TopBarConfig {
 
 // Hero background
 export type HeroBackgroundType = 'image' | 'video' | 'pattern' | 'animation' | 'none';
-export type HeroPatternName = 'dots' | 'grid' | 'waves' | 'diagonal' | 'hexagons';
+export type { HeroPatternName, HeroPatternStrength } from './hero-patterns';
 export type HeroAnimationPreset = 'particles' | 'gradient-morph' | 'geometric' | 'wave-lines' | 'custom';
 
 export interface HeroModeConfig {
@@ -52,6 +53,15 @@ export interface HeroVideoConfig {
 
 export interface HeroPatternConfig {
   name: HeroPatternName;
+  /** The lines' color: empty for the theme's text color, 'accent' for its accent, or any CSS color. */
+  color?: string;
+  /** Set: the lines run in a gradient from `color` to this one. */
+  color2?: string;
+  /** The gradient's direction in degrees (default 135). */
+  angle?: number;
+  strength?: HeroPatternStrength;
+  /** False: full strength across the hero instead of fading toward the text. */
+  fade?: boolean;
 }
 
 export interface HeroAnimationConfig {
