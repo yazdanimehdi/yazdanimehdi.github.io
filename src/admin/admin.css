@@ -1552,3 +1552,7 @@ details.adm-editor-ask[open] > summary {
   padding: 0;
   margin: 0;
 }
+
+.adm-job-handoff td {
+  background: var(--adm-warn-bg);
+}

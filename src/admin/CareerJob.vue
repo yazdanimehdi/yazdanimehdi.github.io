@@ -6,6 +6,7 @@ import { httpUrl, visible } from './career';
 import { PostingText } from './PostingText';
 import type { AdminCtx } from './types';
 import { entryText } from '../lib/career/profile';
+import type { FormAnswer } from '../lib/career/answers';
 import type { ScoreDetail } from '../lib/career/score';
 import type { ReviewIssue, TailorPlan } from '../lib/career/tailor';
 import type { Posting, PostingStatus } from '../lib/career/types';
@@ -36,7 +37,7 @@ interface JobEvent {
   detail: string | null;
 }
 
-type Part = 'all' | 'cv' | 'letter' | 'render';
+type Part = 'all' | 'cv' | 'letter' | 'render' | 'answers';
 type Plan = Pick<TailorPlan, 'sections'>;
 interface EditEntry {
   ref: number;
@@ -60,7 +61,8 @@ const loading = ref(true);
 const missing = ref(false);
 const cvSections = ref<CvConfig['cv']['sections']>({});
 const letter = ref('');
-const instruction = reactive({ all: '', cv: '', letter: '' });
+const instruction = reactive({ all: '', cv: '', letter: '', answers: '' });
+const answers = ref<FormAnswer[]>([]);
 const editor = ref<EditSection[]>([]);
 let timer: ReturnType<typeof setInterval> | undefined;
 
@@ -130,10 +132,17 @@ function take(res: JobView) {
   events.value = res.events;
   notes.value = res.posting.notes;
   letter.value = res.posting.letter ?? '';
+  answers.value = structuredClone((res.posting.answers as FormAnswer[] | null) ?? []);
   buildEditor();
 }
 
-async function patch(body: { status?: PostingStatus; notes?: string; cv?: Plan; letter?: string }) {
+async function patch(body: {
+  status?: PostingStatus;
+  notes?: string;
+  cv?: Plan;
+  letter?: string;
+  answers?: FormAnswer[];
+}) {
   try {
     take(await api(`career/postings/${props.id}`, { method: 'PATCH', body }));
     return true;
@@ -206,6 +215,31 @@ async function savePlan() {
       })),
   };
   if (await patch({ cv })) await draft('render');
+}
+
+const SOURCES: Record<FormAnswer['source'], string> = {
+  cv: 'Your CV',
+  answers: 'Your answers',
+  ai: 'Drafted by AI: check it',
+  handoff: 'You’ll answer this one',
+  file: 'File upload',
+};
+
+/** Saves an edited value; an owner-typed answer is no longer the AI's or a hand-off. */
+function saveAnswer(i: number) {
+  const a = answers.value[i];
+  const saved = (posting.value?.answers as FormAnswer[] | null)?.[i];
+  if (!saved || a.value === saved.value) return;
+  if (a.source === 'handoff' || a.source === 'ai') a.source = a.value.trim() ? 'answers' : 'handoff';
+  patch({ answers: answers.value });
+}
+
+function copyAnswers() {
+  const text = answers.value
+    .filter((a) => a.source !== 'file' && a.value)
+    .map((a) => `${visible(a.question)}\n${a.value}`)
+    .join('\n\n');
+  navigator.clipboard.writeText(text).then(() => toast('Copied'), report);
 }
 
 function copyLetter() {
@@ -412,6 +446,69 @@ onMounted(async () => {
         </label>
         <p class="adm-actions">
           <button class="adm-btn" :disabled="drafting" @click="draft('letter')">Regenerate letter</button>
+        </p>
+      </section>
+
+      <section v-if="posting.ats" class="adm-card" aria-labelledby="job-answers">
+        <h2 id="job-answers" class="adm-h2">Form answers</h2>
+        <p class="adm-muted">Not submitted. Review and copy these into the application.</p>
+        <p v-if="!answers.length" class="adm-muted">No answers yet.</p>
+        <table v-else class="adm-table">
+          <thead>
+            <tr>
+              <th scope="col">Question</th>
+              <th scope="col">Answer</th>
+              <th scope="col">Source</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(a, i) in answers" :key="a.field" :class="{ 'adm-job-handoff': a.source === 'handoff' }">
+              <td>
+                {{ visible(a.question) }}<span v-if="a.required" aria-label="required"> *</span>
+                <small v-if="a.note && a.source === 'handoff'" class="adm-muted"><br />{{ visible(a.note) }}</small>
+              </td>
+              <td>
+                <span v-if="a.source === 'file'" class="adm-muted">Uploaded with the application (later)</span>
+                <template v-else>
+                  <select
+                    v-if="a.options"
+                    v-model="a.value"
+                    :disabled="drafting"
+                    :aria-label="visible(a.question)"
+                    @change="saveAnswer(i)"
+                  >
+                    <option value="">(not answered)</option>
+                    <option v-for="o in a.options" :key="o" :value="o">{{ visible(o) }}</option>
+                  </select>
+                  <textarea
+                    v-else
+                    v-model="a.value"
+                    rows="2"
+                    maxlength="5000"
+                    :disabled="drafting"
+                    :aria-label="visible(a.question)"
+                    @blur="saveAnswer(i)"
+                  />
+                </template>
+              </td>
+              <td>
+                <strong v-if="a.source === 'handoff'">{{ SOURCES[a.source] }}</strong>
+                <template v-else>{{ SOURCES[a.source] }}</template>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <p class="adm-actions">
+          <button v-if="answers.length" class="adm-btn" @click="copyAnswers">Copy answers</button>
+        </p>
+        <label class="adm-field">
+          <span>Regenerate with an instruction</span>
+          <input v-model="instruction.answers" maxlength="500" placeholder="e.g. keep answers short" />
+        </label>
+        <p class="adm-actions">
+          <button class="adm-btn" :disabled="drafting" @click="draft('answers')">
+            {{ answers.length ? 'Regenerate answers' : 'Draft answers' }}
+          </button>
         </p>
       </section>
 

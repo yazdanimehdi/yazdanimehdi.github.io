@@ -16,6 +16,7 @@ import { getSql } from '../db';
 import type { CvConfig } from '../types';
 import { addEvent, getPosting, readCareer, updatePosting, upsertPostings, writeCareer } from './db';
 import { putCareerPdf } from './files';
+import { answersPrompt, type FormAnswer, greenhouseQuestions, parseFormAnswers, splitQuestions } from './answers';
 import { guardPosting } from './guard';
 import { hardGate, postingKey } from './match';
 import { cvText, prefsText } from './profile';
@@ -266,6 +267,58 @@ export async function draftStep(
     ...(part === 'cv' ? {} : { letter: plan.letter }),
   });
   return null;
+}
+
+/**
+ * Proposes answers to the posting's Greenhouse form and saves them: known fields from the CV and the Application
+ * answers, EEO by the owner's setting, the rest from the AI. Why not is returned as a value (a failed fetch, a reply
+ * that isn't the JSON asked for); provider errors throw. Nothing is submitted.
+ */
+export async function answersStep(id: number, instruction: string): Promise<string | null> {
+  'use step';
+  const sql = getSql();
+  const store = careerStore();
+  const p = await getPosting(sql, id);
+  if (!p) return 'The posting no longer exists';
+  if (p.ats?.kind !== 'greenhouse') return 'Only Greenhouse postings have a form to answer';
+  const [base, career, ai] = await Promise.all([baseCv(store), readCareer(sql), readAiConfig(store)]);
+  if (!base.cv?.sections) return NO_CV;
+  const a = parseAnswers(career.answers);
+  let qs: Awaited<ReturnType<typeof greenhouseQuestions>>;
+  try {
+    qs = await greenhouseQuestions(p.ats.board, p.ats.id);
+  } catch (e) {
+    if (e instanceof SourceError) return `Could not read the application form: ${e.message}`;
+    throw e;
+  }
+  const known = splitQuestions(qs, base, a);
+  let proposed: FormAnswer[] = [];
+  if (known.rest.length) {
+    const prompt = answersPrompt(known.rest, base, a, p);
+    const text = await generateText(
+      store,
+      ai,
+      instruction.trim()
+        ? { ...prompt, prompt: `${prompt.prompt}\n\nThe candidate asks: ${instruction.trim().slice(0, 500)}` }
+        : prompt,
+    );
+    try {
+      proposed = parseFormAnswers(text, known.rest);
+    } catch (e) {
+      return (e as Error).message;
+    }
+  }
+  // In the form's own order.
+  const byField = new Map([...known.answers, ...proposed].map((x) => [x.field, x]));
+  await updatePosting(sql, id, { answers: qs.flatMap((q) => byField.get(q.field) ?? []) });
+  return null;
+}
+answersStep.maxRetries = 0;
+
+/** A form-answers failure during a full draft doesn't fail the CV draft: it is only recorded. */
+export async function noteAnswersFailed(id: number, message: string): Promise<void> {
+  'use step';
+  await addEvent(getSql(), id, 'answers failed', message.slice(0, 500));
 }
 
 /**

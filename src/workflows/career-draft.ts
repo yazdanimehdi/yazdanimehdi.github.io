@@ -2,7 +2,17 @@ import { getRun, start } from 'workflow/api';
 import { WorkflowRunNotFoundError } from 'workflow/errors';
 import type { Sql } from '../lib/db';
 import { updatePosting } from '../lib/career/db';
-import { draftStep, failDraft, finishDraft, renderStep, reviewStep, scoreReady, startDraft } from '../lib/career/steps';
+import {
+  answersStep,
+  draftStep,
+  failDraft,
+  finishDraft,
+  noteAnswersFailed,
+  renderStep,
+  reviewStep,
+  scoreReady,
+  startDraft,
+} from '../lib/career/steps';
 import type { DraftPart, ReviewIssue } from '../lib/career/tailor';
 
 /** A step's own message: past its retries the SDK wraps the original error as `cause` (no classes cross over). */
@@ -13,12 +23,18 @@ function reasonOf(e: unknown): string {
 
 /**
  * A tailored CV and cover letter for one posting: draft, review, one revision when the review finds issues, then
- * render. `render` skips the AI (the owner edited the plan); `letter` doesn't re-render.
+ * render. `render` skips the AI (the owner edited the plan); `letter` doesn't re-render. `answers` proposes answers to the
+ * Greenhouse form only; `all` adds them for a Greenhouse posting (`greenhouse`, set by startDraftRun from the row).
  */
-export async function careerDraft(id: number, part: DraftPart, instruction: string): Promise<void> {
+export async function careerDraft(id: number, part: DraftPart, instruction: string, greenhouse = false): Promise<void> {
   'use workflow';
   try {
     await startDraft(id, part);
+    if (part === 'answers') {
+      const failed = (await scoreReady()) ?? (await answersStep(id, instruction));
+      if (failed) return await failDraft(id, failed);
+      return await finishDraft(id, null);
+    }
     let review: { ok: boolean; issues: ReviewIssue[] } | null = null;
     if (part !== 'render') {
       const failed = (await scoreReady()) ?? (await draftStep(id, part, instruction, null));
@@ -34,6 +50,15 @@ export async function careerDraft(id: number, part: DraftPart, instruction: stri
       const failed = await renderStep(id);
       if (failed) return await failDraft(id, failed);
     }
+    // Form answers never fail the CV draft: a problem is recorded and `answers` is left as it was.
+    if (greenhouse && part === 'all') {
+      try {
+        const failed = await answersStep(id, instruction);
+        if (failed) await noteAnswersFailed(id, failed);
+      } catch (e) {
+        await noteAnswersFailed(id, reasonOf(e));
+      }
+    }
     await finishDraft(id, review);
   } catch (e) {
     await failDraft(id, reasonOf(e));
@@ -48,7 +73,7 @@ const CLAIM = 'starting:';
 /** The slice of the Workflow API startDraftRun uses; tests pass their own. */
 export interface DraftRuns {
   get(runId: string): { status: Promise<string>; createdAt: Promise<Date>; cancel(): Promise<void> };
-  start(id: number, part: DraftPart, instruction: string): Promise<{ runId: string }>;
+  start(id: number, part: DraftPart, instruction: string, greenhouse: boolean): Promise<{ runId: string }>;
 }
 const workflowRuns: DraftRuns = { get: getRun, start: (...args) => start(careerDraft, args) };
 let testRuns: DraftRuns | null = null;
@@ -83,8 +108,8 @@ async function finished(runId: string | null, runs: DraftRuns, now: number): Pro
 }
 
 /**
- * Starts a draft of the posting unless one is running: `{ runId }`, `'running'`, or null when there is no such
- * posting. A run that finished, can't be found, or started over an hour ago without ending doesn't block a new one.
+ * Starts a draft of the posting unless one is running: `{ runId }`, `'running'`, `'no-form'` for `answers` on a posting
+ * without a Greenhouse form, or null when there is no such posting. A run that finished, can't be found, or started over an hour ago without ending doesn't block a new one.
  */
 export async function startDraftRun(
   sql: Sql,
@@ -93,10 +118,12 @@ export async function startDraftRun(
   instruction: string,
   runs: DraftRuns = testRuns ?? workflowRuns,
   now = Date.now(),
-): Promise<{ runId: string } | 'running' | null> {
-  const [row] = await sql<{ draft_state: string; draft_run_id: string | null }>`
-    select draft_state, draft_run_id from career_postings where id = ${id}`;
+): Promise<{ runId: string } | 'running' | 'no-form' | null> {
+  const [row] = await sql<{ draft_state: string; draft_run_id: string | null; ats: { kind?: string } | null }>`
+    select draft_state, draft_run_id, ats from career_postings where id = ${id}`;
   if (!row) return null;
+  const greenhouse = row.ats?.kind === 'greenhouse';
+  if (part === 'answers' && !greenhouse) return 'no-form';
   if (row.draft_state === 'running' && !(await finished(row.draft_run_id, runs, now))) return 'running';
   // One conditional update, so two clicks can't both start a draft: the second no longer finds the row it read.
   const [claimed] = await sql`update career_postings set draft_state = 'running', draft_run_id = ${CLAIM + now}
@@ -105,7 +132,7 @@ export async function startDraftRun(
   if (!claimed) return 'running';
   let runId: string;
   try {
-    ({ runId } = await runs.start(id, part, instruction));
+    ({ runId } = await runs.start(id, part, instruction, greenhouse));
   } catch (e) {
     await updatePosting(sql, id, { draftState: 'failed', draftRunId: null });
     throw e;

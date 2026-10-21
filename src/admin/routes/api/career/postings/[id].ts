@@ -41,12 +41,27 @@ const Plan = z.strictObject({
     .max(50),
 });
 
-// Task 14 adds answers here.
+const Answers = z
+  .array(
+    z.strictObject({
+      question: z.string().max(2000),
+      field: z.string().max(200),
+      type: z.string().max(100),
+      required: z.boolean(),
+      options: z.array(z.string().max(1000)).max(500).optional(),
+      value: z.string().max(5000),
+      source: z.enum(['cv', 'answers', 'ai', 'handoff', 'file']),
+      note: z.string().max(500).optional(),
+    }),
+  )
+  .max(200);
+
 const Patch = z.strictObject({
   status: z.enum(STATUSES).optional(),
   notes: z.string().max(20_000).optional(),
   cv: Plan.optional(),
   letter: z.string().max(20_000).optional(),
+  answers: Answers.optional(),
 });
 
 async function load(idParam: string | undefined) {
@@ -66,7 +81,7 @@ async function view(id: string | undefined, store: ContentStore) {
 export const GET = careerRoute(async (ctx, store) => view(ctx.params.id, store));
 
 /**
- * `{ status?, notes?, cv?, letter? }`: each change that differs from the stored value is saved and logged as an event.
+ * `{ status?, notes?, cv?, letter?, answers? }`: each change that differs from the stored value is saved and logged as an event.
  * The owner may reword `cv` freely, but it still goes through assembleCv: only the CV's own sections and entries, and
  * no more highlights than an entry has.
  */
@@ -89,6 +104,10 @@ export const PATCH = careerRoute(async (ctx, store) => {
   if (body.letter !== undefined && body.letter !== posting.letter) {
     await updatePosting(sql, posting.id, { letter: body.letter });
     await addEvent(sql, posting.id, 'letter edited');
+  }
+  if (body.answers !== undefined && JSON.stringify(body.answers) !== JSON.stringify(posting.answers)) {
+    await updatePosting(sql, posting.id, { answers: body.answers });
+    await addEvent(sql, posting.id, 'answers edited');
   }
   if (body.status !== undefined && body.status !== posting.status) {
     await updatePosting(sql, posting.id, { status: body.status });

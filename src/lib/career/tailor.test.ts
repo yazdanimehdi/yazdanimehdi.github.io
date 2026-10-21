@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import test, { afterEach, beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { parse } from 'yaml';
@@ -12,6 +13,7 @@ import type { CvConfig } from '../types';
 import { WorkflowRunNotFoundError } from 'workflow/errors';
 import { careerDraft, setDraftRunsForTests, startDraftRun, type DraftRuns } from '../../workflows/career-draft';
 import { POST } from '../../admin/routes/api/career/postings/[id]/draft';
+import { setLookupForTests } from './sources/http';
 import { PATCH } from '../../admin/routes/api/career/postings/[id]';
 import { getPosting, listEvents, updatePosting, upsertPostings, writeCareer } from './db';
 import { setBlobForTests } from './files';
@@ -422,7 +424,7 @@ test('a running draft blocks a new one until its run ends, vanishes or is an hou
     await stuck('wrun_old');
     const { runs, seen } = fakeRuns(status);
     assert.deepEqual(await startDraftRun(sql, id, 'cv', 'x', runs), { runId: 'wrun_new' }, String(status));
-    assert.deepEqual(seen.started, [[id, 'cv', 'x']]);
+    assert.deepEqual(seen.started, [[id, 'cv', 'x', false]]);
     assert.equal((await getPosting(sql, id))!.draftRunId, 'wrun_new');
   }
   await stuck('wrun_old');
@@ -463,7 +465,7 @@ test('draft while running is 409', async () => {
   const res = await call(POST, owner, { part: 'cv', instruction: 'shorter' });
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), { runId: 'wrun_1' });
-  assert.deepEqual(started, [[id, 'cv', 'shorter']]);
+  assert.deepEqual(started, [[id, 'cv', 'shorter', false]]);
   let p = (await getPosting(sql, id))!;
   assert.deepEqual([p.draftState, p.draftRunId], ['running', 'wrun_1']);
   assert.equal((await call(POST, owner, {})).status, 409);
@@ -488,4 +490,107 @@ test('PATCH cv and letter: the plan is checked against the CV', async () => {
   assert.deepEqual([p.cv, p.letter], [{ sections: PLAN.sections }, 'Hi']);
   const extra = { sections: [{ title: 'experience', entries: [{ ref: 1, highlights: ['a', 'b'] }] }] };
   assert.equal((await call(PATCH as typeof POST, owner, { cv: extra }, 'PATCH')).status, 400);
+});
+
+// ---- form answers (Greenhouse) ----
+
+const FORM = fs.readFileSync('tests/fixtures/career/greenhouse-questions.json', 'utf8');
+let answersReply: () => string;
+let answerPrompts: string[];
+
+/** The fake AI also answers the form; the greenhouse API serves the recorded fixture. */
+async function greenhousePosting() {
+  await sql`update career_postings set ats = ${JSON.stringify({ kind: 'greenhouse', board: 'discord', id: '8806482002' })}::jsonb`;
+  setLookupForTests(async () => [{ address: '93.184.216.34', family: 4 }]);
+  answerPrompts = [];
+  answersReply = () => JSON.stringify({ answers: [] });
+  mock.restoreAll();
+  mock.method(globalThis, 'fetch', async (input: string | URL, init?: RequestInit) => {
+    if (String(input).startsWith('https://boards-api.greenhouse.io/')) return new Response(FORM);
+    const body = JSON.parse(String(init?.body));
+    let text = JSON.stringify(PLAN);
+    if (/^You review/.test(body.system)) text = JSON.stringify({ ok: true, issues: [] });
+    else if (/^You answer/.test(body.system)) {
+      answerPrompts.push(body.messages[0].content);
+      text = answersReply();
+    }
+    return Response.json({ content: [{ type: 'text', text }] });
+  });
+}
+
+test('non-Greenhouse postings get no answers panel', async () => {
+  await careerDraft(id, 'all', '');
+  assert.equal((await getPosting(sql, id))!.answers, null);
+  setDraftRunsForTests(fakeRuns('completed').runs);
+  assert.equal((await call(POST, owner, { part: 'answers' })).status, 400);
+  assert.equal(await startDraftRun(sql, id, 'answers', '', fakeRuns('completed').runs), 'no-form');
+});
+
+test('a Greenhouse draft proposes form answers: known, EEO decline, AI and hand-off', async () => {
+  await greenhousePosting();
+  await writeCareer(sql, { answers: { whyLooking: 'growth', phone: '+49 1' } }, 'test');
+  answersReply = () =>
+    JSON.stringify({
+      answers: [{ field: 'question_38318888002', value: 'I like the mission.', handoff: false, note: '' }],
+    });
+  await careerDraft(id, 'all', '', true);
+  const p = (await getPosting(sql, id))!;
+  assert.equal(p.draftState, 'done');
+  const a = p.answers as { field: string; value: string; source: string }[];
+  const f = (field: string) => a.find((x) => x.field === field)!;
+  assert.deepEqual([f('first_name').value, f('first_name').source], ['Jane', 'cv']);
+  assert.deepEqual([f('phone').value, f('phone').source], ['+49 1', 'answers']);
+  assert.equal(f('question_38318888002').source, 'ai');
+  assert.equal(f('question_38318889002').source, 'handoff', 'no LinkedIn anywhere: a hand-off');
+  assert.equal(f('question_38318891002').source, 'handoff', 'a question the model skipped');
+  assert.match(f('veteran_status').value, /wish to answer/i);
+  assert.equal(a[0].field, 'first_name', 'form order');
+  assert.equal(answerPrompts.length, 1);
+  for (const secret of ['+49 1', 'jane@doe.test', 'veteran_status'])
+    assert.ok(!answerPrompts[0].includes(secret), secret);
+});
+
+test('part answers re-runs only the answers, with the instruction', async () => {
+  await greenhousePosting();
+  await careerDraft(id, 'answers', 'be brief', true);
+  assert.equal(calls.draft + calls.review, 0, 'no CV or letter work');
+  assert.match(answerPrompts[0], /The candidate asks: be brief/);
+  const p = (await getPosting(sql, id))!;
+  assert.equal(p.draftState, 'done');
+  assert.equal(p.cv, null);
+  assert.ok(Array.isArray(p.answers));
+});
+
+test('a failed form fetch or reply does not fail the CV draft', async () => {
+  await greenhousePosting();
+  const real = globalThis.fetch;
+  mock.method(globalThis, 'fetch', async (input: string | URL, init?: RequestInit) =>
+    String(input).startsWith('https://boards-api.greenhouse.io/')
+      ? new Response('no', { status: 500 })
+      : real(input, init),
+  );
+  await careerDraft(id, 'all', '', true);
+  let p = (await getPosting(sql, id))!;
+  assert.deepEqual([p.draftState, p.answers], ['done', null]);
+  assert.ok(p.cvPdfUrl);
+  assert.ok(
+    (await listEvents(sql, id)).some((e) => e.kind === 'answers failed' && /application form/.test(e.detail ?? '')),
+  );
+
+  await greenhousePosting();
+  answersReply = () => 'sorry, no';
+  await careerDraft(id, 'all', '', true);
+  p = (await getPosting(sql, id))!;
+  assert.equal(p.draftState, 'done');
+  assert.equal(p.answers, null, 'answers stay unset');
+  await careerDraft(id, 'answers', '', true);
+  assert.equal((await getPosting(sql, id))!.draftState, 'failed', 'asked for alone, a failure is the draft’s');
+});
+
+test('PATCH answers saves the owner’s edits and rejects unknown keys', async () => {
+  const row = { question: 'Q', field: 'f', type: 'input_text', required: false, value: 'mine', source: 'ai' };
+  assert.equal((await call(PATCH as typeof POST, owner, { answers: [row] }, 'PATCH')).status, 200);
+  assert.deepEqual((await getPosting(sql, id))!.answers, [row]);
+  assert.ok((await listEvents(sql, id)).some((e) => e.kind === 'answers edited'));
+  assert.equal((await call(PATCH as typeof POST, owner, { answers: [{ ...row, extra: 1 }] }, 'PATCH')).status, 400);
 });
