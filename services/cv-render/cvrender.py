@@ -307,6 +307,8 @@ def render_pdf(yaml_text: str, theme_files: dict[str, str] | None = None, theme:
         (root / "cv.yaml").write_text(yaml_text, encoding="utf-8")
         for rel, text in (theme_files or {}).items():
             path = root / theme / rel
+            if not path.resolve().is_relative_to((root / theme).resolve()):
+                raise RenderError(f"Invalid theme file path: {rel!r}")
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text(text, encoding="utf-8")
 
