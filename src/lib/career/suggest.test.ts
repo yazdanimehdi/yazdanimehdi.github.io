@@ -46,6 +46,21 @@ test('contactAnswers copies contact details from the CV without AI', () => {
     a.links.map((l) => l.url),
     ['https://linkedin.com/in/me'],
   );
+  const known = contactAnswers({
+    cv: {
+      name: 'M',
+      socialNetworks: [
+        { network: 'ORCID', username: '0000-0001-2345-6789' },
+        { network: 'Google Scholar', username: 'abc123' },
+        { network: 'Mastodon', username: 'me' },
+      ],
+      sections: {},
+    },
+  } as CvConfig);
+  assert.deepEqual(known.links, [
+    { label: 'ORCID', url: 'https://orcid.org/0000-0001-2345-6789' },
+    { label: 'Google Scholar', url: 'https://scholar.google.com/citations?user=abc123' },
+  ]);
   const w = contactAnswers({ cv: { name: 'M', website: 'https://me.test', sections: {} } } as CvConfig);
   assert.deepEqual(w, { phone: '', address: '', links: [{ label: 'Website', url: 'https://me.test' }] });
 });

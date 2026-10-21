@@ -207,10 +207,19 @@ function eeoAnswer(q: GhQuestion, a: ApplicationAnswers): FormAnswer {
   );
 }
 
-/** A CV social network's profile URL (`https://<network>.com/<username>`, LinkedIn under `/in/`). */
+const PROFILE_URLS: Record<string, string> = {
+  linkedin: 'https://linkedin.com/in/',
+  github: 'https://github.com/',
+  twitter: 'https://twitter.com/',
+  x: 'https://twitter.com/',
+  orcid: 'https://orcid.org/',
+  'google scholar': 'https://scholar.google.com/citations?user=',
+};
+
+/** A CV social network's profile URL; '' for a network not listed here. */
 export const networkUrl = (network: string, username: string) => {
-  const n = network.toLowerCase();
-  return `https://${n}.com/${n === 'linkedin' ? 'in/' : ''}${username}`;
+  const prefix = PROFILE_URLS[network.trim().toLowerCase()];
+  return prefix ? prefix + username : '';
 };
 
 const link = (cv: CvConfig, a: ApplicationAnswers, re: RegExp, network: string): string => {

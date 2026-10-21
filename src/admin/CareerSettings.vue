@@ -32,8 +32,9 @@ const typed = ref<Record<string, string>>({});
 const savingKey = ref('');
 const saving = ref(false);
 const errors = ref<Record<string, string>>({});
-const SUGGESTED = 'Suggested from your CV and publications. Review, then Save.';
-const banner = ref<{ text: string; error: boolean } | null>(null);
+// Which sections hold suggestions not yet saved; the banner shows while either does.
+const unsaved = ref({ prefs: false, answers: false });
+const suggestError = ref('');
 const suggesting = ref(false);
 
 // Per-source settings the source reads from `prefs.sources[id].options`.
@@ -152,14 +153,23 @@ async function suggest(replace: boolean) {
       answers: Pick<ApplicationAnswers, 'phone' | 'address' | 'links'>;
     }>('career/suggest', { method: 'POST' });
     const p = prefs.value!;
-    for (const k of SUGGESTED_PREFS) if (replace || !p[k].length) (p as Record<string, unknown>)[k] = s.prefs[k];
+    for (const k of SUGGESTED_PREFS)
+      if (replace || !p[k].length) {
+        (p as Record<string, unknown>)[k] = s.prefs[k];
+        unsaved.value.prefs = true;
+      }
     const a = answers.value!;
-    if (!a.phone.trim()) a.phone = s.answers.phone;
-    if (!a.address.trim()) a.address = s.answers.address;
-    if (!a.links.length) a.links = s.answers.links;
-    banner.value = { text: SUGGESTED, error: false };
+    const fill = <K extends 'phone' | 'address' | 'links'>(k: K, empty: boolean) => {
+      if (!empty || !s.answers[k].length) return;
+      a[k] = s.answers[k];
+      unsaved.value.answers = true;
+    };
+    fill('phone', !a.phone.trim());
+    fill('address', !a.address.trim());
+    fill('links', !a.links.length);
+    suggestError.value = '';
   } catch (e) {
-    banner.value = { text: (e as Error).message, error: true };
+    suggestError.value = (e as Error).message;
   } finally {
     suggesting.value = false;
   }
@@ -186,10 +196,16 @@ async function save(body: { prefs: CareerPrefs } | { answers: ApplicationAnswers
       method: 'PUT',
       body,
     });
-    prefs.value = s.prefs;
-    answers.value = s.answers;
-    floor.value = { ...s.prefs.salaryFloor };
-    banner.value = null;
+    // Only the part sent is replaced, so the other section keeps its unsaved edits and suggestions.
+    if ('prefs' in body) {
+      prefs.value = s.prefs;
+      floor.value = { ...s.prefs.salaryFloor };
+      unsaved.value.prefs = false;
+    } else {
+      answers.value = s.answers;
+      unsaved.value.answers = false;
+    }
+    suggestError.value = '';
     toast('Saved');
   } catch (e) {
     if (e instanceof ApiError && e.status === 400 && e.details && typeof e.details === 'object')
@@ -245,12 +261,9 @@ onMounted(async () => {
     <p><a :href="`${base}/career`">← Back to the feed</a></p>
 
     <template v-if="prefs && answers">
-      <p
-        v-if="banner"
-        :class="['adm-banner', { 'adm-banner-error': banner.error }]"
-        :role="banner.error ? 'alert' : 'status'"
-      >
-        {{ banner.text }}
+      <p v-if="suggestError" class="adm-banner adm-banner-error" role="alert">{{ suggestError }}</p>
+      <p v-else-if="unsaved.prefs || unsaved.answers" class="adm-banner" role="status">
+        Suggested from your CV and publications. Review, then Save.
       </p>
       <fieldset class="adm-group">
         <legend>What I want</legend>
