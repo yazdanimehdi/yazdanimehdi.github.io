@@ -9,9 +9,9 @@ import type { PostgresStore } from '../admin/postgres-store';
 import { getSecret, missingKey } from '../admin/secrets';
 import { TEXT_PROVIDERS } from '../ai/providers';
 import { resolveCvConfig } from '../cv';
-import { configPath } from '../admin/paths';
+import { configPath, PathError, THEME_NAME } from '../admin/paths';
 import { CvRenderError, cvRenderRequest, renderCv } from '../cv-render';
-import { parseStyles } from '../cv-styles';
+import { BUILT_IN_THEMES, parseStyles, readThemeFiles } from '../cv-styles';
 import { getSql } from '../db';
 import type { CvConfig } from '../types';
 import { addEvent, getPosting, readCareer, updatePosting, upsertPostings, writeCareer } from './db';
@@ -154,14 +154,14 @@ async function cvTextOf(store: PostgresStore): Promise<string> {
   return resolved?.cv ? cvText(resolved).trim() : '';
 }
 
-/** Why nothing can be scored tonight (no key for the configured text provider, or no CV), or null when ready. */
+/** Why the AI can't work on postings (no key for the configured text provider, or no CV), or null when ready. */
 export async function scoreReady(): Promise<string | null> {
   'use step';
   const store = careerStore();
   const ai = await readAiConfig(store);
   for (const name of TEXT_PROVIDERS[ai.text.provider].keys)
     if (!(await getSecret(getSql(), name))) return missingKey(name).message;
-  return (await cvTextOf(store)) ? null : 'There is no CV to score against: add one on the CV screen';
+  return (await cvTextOf(store)) ? null : 'There is no CV yet: add one on the CV screen';
 }
 
 const REPLIES = 3;
@@ -282,7 +282,10 @@ export async function reviewStep(id: number): Promise<{ ok: boolean; issues: Rev
 draftStep.maxRetries = 0;
 reviewStep.maxRetries = 0;
 
-/** Renders the saved plan in `prefs.cvStyle` (or the public style) and stores the PDF; why not, as a value. */
+/**
+ * Renders the saved plan in `prefs.cvStyle` (or the public style) and stores the PDF; why not, as a value. The
+ * publications collection is only included when the plan keeps a publications section.
+ */
 export async function renderStep(id: number): Promise<string | null> {
   'use step';
   const sql = getSql();
@@ -301,7 +304,18 @@ export async function renderStep(id: number): Promise<string | null> {
     const cv = assembleCv(base, plan);
     const wanted = parsePrefs(career.prefs).cvStyle;
     const style = parseStyles(styles?.content, base).styles.find((s) => s.id === wanted);
-    pdf = await renderCv({ ...(await cvRenderRequest(store, style)), cv, upload: null });
+    const req = await cvRenderRequest(store, style);
+    // The theme files are the style's own: with `upload: null` an enabled upload's design theme must not pick them.
+    const { theme } = req.style;
+    const custom = !(BUILT_IN_THEMES as readonly string[]).includes(theme);
+    if (custom && !THEME_NAME.test(theme)) throw new PathError(`Invalid theme name: ${theme}`);
+    pdf = await renderCv({
+      ...req,
+      cv,
+      upload: null,
+      publications: plan.sections.some((s) => s.title === 'publications') ? req.publications : [],
+      themeFiles: custom ? await readThemeFiles(store, theme) : {},
+    });
   } catch (e) {
     if (e instanceof FabricationError) return `The CV changed since this plan: ${e.message}`;
     if (e instanceof CvRenderError) return e.message;

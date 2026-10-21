@@ -162,7 +162,7 @@ test('a missing AI key defers scoring and marks nothing', async () => {
 test('no CV defers scoring too', async () => {
   await sql`delete from documents where path = 'config/cv.yml'`;
   await careerNightly();
-  assert.match((await lastRun()).scoreSkipped!, /no CV/);
+  assert.match((await lastRun()).scoreSkipped!, /^There is no CV yet/);
   assert.equal(aiCalls, 0);
 });
 

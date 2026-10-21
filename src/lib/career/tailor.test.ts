@@ -9,7 +9,7 @@ import { PostgresStore } from '../admin/postgres-store';
 import { adminLogin, adminSettings } from '../admin/settings';
 import { setRendererForTests, type CvRenderRequest } from '../cv-render';
 import type { CvConfig } from '../types';
-import { careerDraft, setDraftStartForTests } from '../../workflows/career-draft';
+import { careerDraft, setDraftRunsForTests, startDraftRun, type DraftRuns } from '../../workflows/career-draft';
 import { POST } from '../../admin/routes/api/career/postings/[id]/draft';
 import { PATCH } from '../../admin/routes/api/career/postings/[id]';
 import { getPosting, listEvents, updatePosting, upsertPostings, writeCareer } from './db';
@@ -48,6 +48,7 @@ const CV_YML = `cv:
     skills:
       - label: Python
         details: daily
+    publications: []
 design:
   theme: classic
 `;
@@ -61,6 +62,10 @@ styles:
   - id: sharp
     name: Sharp
     theme: sb2nov
+    density: normal
+  - id: own
+    name: Own
+    theme: mine
     density: normal
 `;
 
@@ -242,7 +247,7 @@ afterEach(() => {
   setStoreForTests(null);
   setRendererForTests(null);
   setBlobForTests(null);
-  setDraftStartForTests(null);
+  setDraftRunsForTests(null);
   if (savedKey === undefined) delete process.env.ANTHROPIC_API_KEY;
   else process.env.ANTHROPIC_API_KEY = savedKey;
 });
@@ -312,10 +317,80 @@ test('render-only skips the AI', async () => {
   assert.equal(p.status, 'ready');
   assert.ok(p.cvPdfUrl);
   assert.deepEqual(rendered[0].cv, assembleCv(BASE, PLAN));
+  assert.deepEqual(rendered[0].publications, [], 'the plan keeps no publications section');
   await updatePosting(sql, id, { draftState: 'needs-review', draftIssues: ISSUES });
   await careerDraft(id, 'render', '');
   const again = (await getPosting(sql, id))!;
   assert.deepEqual([again.draftState, again.draftIssues], ['needs-review', ISSUES], 'only a review clears issues');
+});
+
+test('a tailored CV lists publications only when the plan keeps that section', async () => {
+  await sql`insert into documents (path, content) values
+    ('src/content/publications/p1.md', ${'---\ntitle: A paper\nauthors: [Jane Doe]\nyear: 2024\n---\n'})`;
+  const plan = { sections: [...PLAN.sections, { title: 'publications', entries: [] }] };
+  await updatePosting(sql, id, { cv: plan });
+  await careerDraft(id, 'render', '');
+  assert.deepEqual(
+    rendered[0].publications.map((p) => p.title),
+    ['A paper'],
+  );
+  await updatePosting(sql, id, { cv: { sections: PLAN.sections } });
+  await careerDraft(id, 'render', '');
+  assert.deepEqual(rendered[1].publications, []);
+});
+
+test('the theme files are the chosen style’s, not an enabled upload’s', async () => {
+  const upload = 'enabled: true\ncontent: |\n  cv:\n    name: Up\n  design:\n    theme: upl\n';
+  await sql`insert into documents (path, content) values ('config/cv-upload.yml', ${upload}),
+    ('cv/themes/upl/Header.typ', 'upload theme'), ('cv/themes/mine/Header.typ', 'own theme')`;
+  await writeCareer(sql, { prefs: { cvStyle: 'own' } }, 'test');
+  await updatePosting(sql, id, { cv: { sections: PLAN.sections } });
+  await careerDraft(id, 'render', '');
+  assert.equal(rendered[0].style.theme, 'mine');
+  assert.deepEqual(rendered[0].themeFiles, { 'Header.typ': 'own theme' });
+  assert.equal(rendered[0].upload, null);
+});
+
+const HOUR = 60 * 60 * 1000;
+/** A fake Workflow API whose stored run has `status` (null: unknown to the world) and was created `age` ago. */
+function fakeRuns(status: string | null, age = 0) {
+  const seen = { started: [] as unknown[][], cancelled: [] as string[] };
+  const runs: DraftRuns = {
+    get: (runId) => ({
+      status: status === null ? Promise.reject(new Error('not found')) : Promise.resolve(status),
+      createdAt: Promise.resolve(new Date(Date.now() - age)),
+      cancel: async () => void seen.cancelled.push(runId),
+    }),
+    start: async (...args) => (seen.started.push(args), { runId: 'wrun_new' }),
+  };
+  return { runs, seen };
+}
+
+test('a running draft blocks a new one until its run ends, vanishes or is an hour old', async () => {
+  const stuck = async (draftRunId: string) => updatePosting(sql, id, { draftState: 'running', draftRunId });
+  for (const status of ['running', 'pending']) {
+    await stuck('wrun_old');
+    const { runs, seen } = fakeRuns(status, 10 * 60 * 1000);
+    assert.equal(await startDraftRun(sql, id, 'all', '', runs), 'running');
+    assert.deepEqual(seen, { started: [], cancelled: [] });
+  }
+  for (const status of ['completed', 'failed', 'cancelled', null]) {
+    await stuck('wrun_old');
+    const { runs, seen } = fakeRuns(status);
+    assert.deepEqual(await startDraftRun(sql, id, 'cv', 'x', runs), { runId: 'wrun_new' }, String(status));
+    assert.deepEqual(seen.started, [[id, 'cv', 'x']]);
+    assert.equal((await getPosting(sql, id))!.draftRunId, 'wrun_new');
+  }
+  await stuck('wrun_old');
+  const { runs, seen } = fakeRuns('running', HOUR + 1);
+  assert.deepEqual(await startDraftRun(sql, id, 'all', '', runs), { runId: 'wrun_new' });
+  assert.deepEqual(seen.cancelled, ['wrun_old'], 'a stale run is cancelled');
+
+  const now = Date.now();
+  await stuck(`starting:${now - 1000}`);
+  assert.equal(await startDraftRun(sql, id, 'all', '', fakeRuns(null).runs, now), 'running', 'a start in flight');
+  await stuck(`starting:${now - HOUR - 1}`);
+  assert.deepEqual(await startDraftRun(sql, id, 'all', '', fakeRuns(null).runs, now), { runId: 'wrun_new' });
 });
 
 const owner = adminLogin(adminSettings().owner);
@@ -329,7 +404,10 @@ const call = (fn: typeof POST, login: string, body: unknown, method = 'POST') =>
 
 test('draft while running is 409', async () => {
   const started: unknown[][] = [];
-  setDraftStartForTests(async (...args) => (started.push(args), { runId: 'wrun_1' }));
+  setDraftRunsForTests({
+    ...fakeRuns('running').runs,
+    start: async (...args) => (started.push(args), { runId: 'wrun_1' }),
+  });
   const res = await call(POST, owner, { part: 'cv', instruction: 'shorter' });
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), { runId: 'wrun_1' });
@@ -340,7 +418,7 @@ test('draft while running is 409', async () => {
   assert.equal(started.length, 1);
 
   await updatePosting(sql, id, { draftState: 'done' });
-  setDraftStartForTests(async () => Promise.reject(new Error('queue down')));
+  setDraftRunsForTests({ ...fakeRuns('running').runs, start: async () => Promise.reject(new Error('queue down')) });
   mock.method(console, 'error', () => {});
   assert.equal((await call(POST, owner, {})).status, 500);
   p = (await getPosting(sql, id))!;
