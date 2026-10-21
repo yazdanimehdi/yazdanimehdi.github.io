@@ -2,7 +2,7 @@
 // and contact answers are copied from the CV in code.
 import type { TextInput } from '../ai/providers';
 import type { CvConfig } from '../types';
-import { networkUrl } from './answers';
+import { networkUrl, phoneOf } from './answers';
 import { jsonObject } from './prompts';
 import type { ApplicationAnswers, CareerPrefs } from './settings';
 import { visible } from './text';
@@ -96,5 +96,5 @@ export function contactAnswers(cv: CvConfig): Pick<ApplicationAnswers, 'phone' |
       .map((s) => ({ label: s.network.trim(), url: networkUrl(s.network.trim(), s.username.trim()) })),
     ...(c.website?.trim() ? [{ label: 'Website', url: c.website.trim() }] : []),
   ].filter((l) => isHttp(l.url));
-  return { phone: c.phone?.trim() ?? '', address: c.location?.trim() ?? '', links };
+  return { phone: phoneOf(c.phone), address: c.location?.trim() ?? '', links };
 }

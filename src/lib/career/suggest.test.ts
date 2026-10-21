@@ -44,6 +44,11 @@ test('contactAnswers copies contact details from the CV without AI', () => {
   } as CvConfig);
   assert.equal(a.phone, '+1 407 555 0100');
   assert.equal(a.address, 'Orlando, FL');
+  // A RenderCV CV can store the phone as a tel: URI; the answer is the number.
+  assert.equal(
+    contactAnswers({ cv: { name: 'M', phone: 'tel:+1-407-555-0100', sections: {} } } as CvConfig).phone,
+    '+1-407-555-0100',
+  );
   assert.deepEqual(
     a.links.map((l) => l.url),
     ['https://linkedin.com/in/me'],

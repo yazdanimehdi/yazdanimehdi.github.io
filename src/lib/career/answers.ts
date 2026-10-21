@@ -222,6 +222,9 @@ export const networkUrl = (network: string, username: string) => {
   return prefix ? prefix + username : '';
 };
 
+/** The CV's phone as a person types it: a RenderCV CV can store it as a `tel:` URI. */
+export const phoneOf = (raw: string | undefined) => (raw ?? '').trim().replace(/^tel:/i, '');
+
 const link = (cv: CvConfig, a: ApplicationAnswers, re: RegExp, network: string): string => {
   const own = a.links.find((l) => re.test(l.label) || re.test(l.url));
   if (own) return own.url;
@@ -243,7 +246,7 @@ function known(q: GhQuestion, cv: CvConfig, a: ApplicationAnswers): FormAnswer |
     case 'email':
       return fromCv(cv.cv.email?.trim());
     case 'phone':
-      return a.phone.trim() ? fill(q, a.phone, 'answers') : fromCv(cv.cv.phone?.trim());
+      return a.phone.trim() ? fill(q, a.phone, 'answers') : fromCv(phoneOf(cv.cv.phone));
     case 'resume':
     case 'cover_letter':
       return answer(q, '', 'file', 'uploaded with the application');
