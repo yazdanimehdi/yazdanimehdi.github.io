@@ -8,7 +8,8 @@ import { setStoreForTests } from './get-store';
 import { MemoryStore } from './memory-store';
 import { PostgresStore } from './postgres-store';
 import { JOBS_JSON } from './paths';
-import { dailySteps, parseJobs, releaseScheduled, releaseSince, runJobs, type Steps } from './jobs';
+import { JOBS, dailySteps, parseJobs, releaseScheduled, releaseSince, runJobs, type Steps } from './jobs';
+import { writeCareer } from '../career/db';
 import { GET as cron } from '../../admin/routes/api/cron/daily';
 import { POST as runNow } from '../../admin/routes/api/jobs/run';
 
@@ -71,6 +72,10 @@ test('runJobs: a failing step is recorded and the others still run; jobs.json ho
       ran.push('github');
       return { detail: 'skipped: no GitHub username' };
     },
+    career: async () => {
+      ran.push('career');
+      return { detail: 'skipped: no job search set up' };
+    },
     backup: async () => {
       ran.push('backup');
       return { detail: '2 file(s) changed', url: 'https://github.com/o/r/commit/c' };
@@ -83,13 +88,14 @@ test('runJobs: a failing step is recorded and the others still run; jobs.json ho
   } finally {
     console.error = original;
   }
-  assert.deepEqual(ran, ['scheduled', 'feeds', 'papers', 'github', 'backup']);
+  assert.deepEqual(ran, ['scheduled', 'feeds', 'papers', 'github', 'career', 'backup']);
   const at = '2026-10-07T03:00:00.000Z';
   assert.deepEqual(await jobs(), {
     feeds: { ok: false, at, detail: 'feed down' },
     scheduled: { ok: true, at, detail: 'nothing due' },
     papers: { ok: true, at, detail: 'skipped: no SERPAPI_KEY' },
     github: { ok: true, at, detail: 'skipped: no GitHub username' },
+    career: { ok: true, at, detail: 'skipped: no job search set up' },
     backup: { ok: true, at, detail: '2 file(s) changed', url: 'https://github.com/o/r/commit/c' },
   });
 });
@@ -169,6 +175,7 @@ test('cron in Postgres mode: runs every step, releases due posts, records jobs.j
         scheduled: [true, 'released now'],
         papers: [true, 'skipped: no SERPAPI_KEY'],
         github: [true, 'skipped: no GitHub username'],
+        career: [true, 'skipped: no job search set up'],
         backup: [true, 'skipped: no GITHUB_TOKEN'],
       },
     );
@@ -192,7 +199,7 @@ test('Run now: Postgres only; runs the same jobs as the signed-in user', async (
     await sql`insert into documents (path, content) values ('config/feeds.yml', ${'feeds: []\n'})`;
     const res = await call();
     assert.equal(res.status, 200);
-    assert.deepEqual(Object.keys(await res.json()), ['scheduled', 'feeds', 'papers', 'github', 'backup']);
+    assert.deepEqual(Object.keys(await res.json()), ['scheduled', 'feeds', 'papers', 'github', 'career', 'backup']);
     setStoreForTests(() => new MemoryStore());
     assert.equal((await call()).status, 404);
   } finally {
@@ -314,4 +321,15 @@ test('papers step: skips cleanly without SERPAPI_KEY, and with a key but no Scho
   } finally {
     restore();
   }
+});
+
+test('career runs after github and before backup; an empty search is skipped', async () => {
+  assert.deepEqual(JOBS.slice(JOBS.indexOf('github')), ['github', 'career', 'backup']);
+  assert.deepEqual(await dailySteps(store()).career({}, new Date()), { detail: 'skipped: no job search set up' });
+  await writeCareer(sql, { prefs: { roles: [' '], watched: [] }, runId: 'wrun_busy' }, 'test');
+  assert.deepEqual(
+    await dailySteps(store()).career({}, new Date()),
+    { detail: 'skipped: no job search set up' },
+    'a blank role is no search',
+  );
 });

@@ -1,23 +1,28 @@
 import type { Sql } from '../db';
 import type { DraftState, GuardFlags, Posting, PostingStatus, PostingSummary, RawPosting, RunSummary } from './types';
 
+// JSON goes in as `${text}::text::jsonb`: with a bare `::jsonb`, postgres.js sees a jsonb parameter and encodes the
+// string again, storing a jsonb string instead of the object (PGlite doesn't, so only a real Postgres shows it).
 type Row = Record<string, unknown>;
 const iso = (v: unknown) => (v == null ? null : new Date(v as string | Date).toISOString());
 
-/** Inserts postings it has not seen (by `key`); a posting seen again only gets `last_seen_at` bumped. Returns the new rows. */
+/**
+ * Inserts postings it has not seen (by `key`), with their hard-gate reason; a posting seen again only gets
+ * `last_seen_at` bumped. Returns the new rows.
+ */
 export async function upsertPostings(
   sql: Sql,
-  rows: (RawPosting & { key: string; text: string; flags: GuardFlags })[],
+  rows: (RawPosting & { key: string; text: string; flags: GuardFlags; gate?: string | null })[],
 ): Promise<number> {
   let added = 0;
   for (const r of rows) {
     const out = await sql<{ inserted: boolean }>`
       insert into career_postings (key, source, external_id, company, title, location, remote, url, apply_url,
-        description, flags, salary, ats, posted_at)
+        description, flags, salary, ats, posted_at, gate)
       values (${r.key}, ${r.source}, ${r.externalId}, ${r.company}, ${r.title}, ${r.location ?? null}, ${r.remote ?? null},
-        ${r.url}, ${r.applyUrl ?? null}, ${r.text}, ${JSON.stringify(r.flags)}::jsonb,
-        ${r.salary ? JSON.stringify(r.salary) : null}::jsonb, ${r.ats ? JSON.stringify(r.ats) : null}::jsonb,
-        ${r.postedAt ?? null})
+        ${r.url}, ${r.applyUrl ?? null}, ${r.text}, ${JSON.stringify(r.flags)}::text::jsonb,
+        ${r.salary ? JSON.stringify(r.salary) : null}::text::jsonb, ${r.ats ? JSON.stringify(r.ats) : null}::text::jsonb,
+        ${r.postedAt ?? null}, ${r.gate ?? null})
       on conflict (key) do update set last_seen_at = clock_timestamp()
       returning (xmax = 0) as inserted`;
     if (out[0]?.inserted) added++;
@@ -119,17 +124,17 @@ export async function updatePosting(sql: Sql, id: number, patch: Patch): Promise
     update career_postings set
       status = case when ${has('status')} then ${patch.status ?? null}::text else status end,
       notes = case when ${has('notes')} then ${patch.notes ?? null}::text else notes end,
-      cv = case when ${has('cv')} then ${j('cv')}::jsonb else cv end,
+      cv = case when ${has('cv')} then ${j('cv')}::text::jsonb else cv end,
       cv_style = case when ${has('cvStyle')} then ${patch.cvStyle ?? null}::text else cv_style end,
       cv_pdf_url = case when ${has('cvPdfUrl')} then ${patch.cvPdfUrl ?? null}::text else cv_pdf_url end,
       letter = case when ${has('letter')} then ${patch.letter ?? null}::text else letter end,
-      answers = case when ${has('answers')} then ${j('answers')}::jsonb else answers end,
+      answers = case when ${has('answers')} then ${j('answers')}::text::jsonb else answers end,
       draft_state = case when ${has('draftState')} then ${patch.draftState ?? null}::text else draft_state end,
-      draft_issues = case when ${has('draftIssues')} then ${j('draftIssues')}::jsonb else draft_issues end,
+      draft_issues = case when ${has('draftIssues')} then ${j('draftIssues')}::text::jsonb else draft_issues end,
       draft_run_id = case when ${has('draftRunId')} then ${patch.draftRunId ?? null}::text else draft_run_id end,
       gate = case when ${has('gate')} then ${patch.gate ?? null}::text else gate end,
       score = case when ${has('score')} then ${patch.score ?? null}::int else score end,
-      score_detail = case when ${has('scoreDetail')} then ${j('scoreDetail')}::jsonb else score_detail end,
+      score_detail = case when ${has('scoreDetail')} then ${j('scoreDetail')}::text::jsonb else score_detail end,
       score_error = case when ${has('scoreError')} then ${patch.scoreError ?? null}::text else score_error end,
       description = case when ${has('description')} then ${patch.description ?? null}::text else description end,
       scored_at = case when ${has('score') || has('scoreError')} then now() else scored_at end
@@ -171,8 +176,8 @@ export async function writeCareer(
   const j = (v: unknown) => JSON.stringify(v);
   await sql`
     insert into career_settings (id, prefs, answers, last_run, run_id, updated_by)
-    values (1, ${j(patch.prefs ?? {})}::jsonb, ${j(patch.answers ?? {})}::jsonb,
-      ${patch.lastRun ? j(patch.lastRun) : null}::jsonb, ${patch.runId ?? null}, ${by})
+    values (1, ${j(patch.prefs ?? {})}::text::jsonb, ${j(patch.answers ?? {})}::text::jsonb,
+      ${patch.lastRun ? j(patch.lastRun) : null}::text::jsonb, ${patch.runId ?? null}, ${by})
     on conflict (id) do update set
       prefs = case when ${has('prefs')} then excluded.prefs else career_settings.prefs end,
       answers = case when ${has('answers')} then excluded.answers else career_settings.answers end,

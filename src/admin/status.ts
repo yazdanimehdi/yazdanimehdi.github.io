@@ -9,7 +9,7 @@ export interface Run {
   url?: string;
   detail?: string;
 }
-export type RunName = 'papers' | 'cv' | 'feeds' | 'scheduled' | 'backup';
+export type RunName = 'papers' | 'cv' | 'feeds' | 'scheduled' | 'career' | 'backup';
 
 /** GET /api/admin/dashboard: what the server can honestly know about the site's automation and content. */
 export interface DashboardData {
@@ -335,13 +335,24 @@ function backup(d: DashboardData): StatusRow {
   return { ...row, state: 'Backed up to GitHub', tone: 'ok', at: run.at, detail: run.detail, link: viewOn(run.url) };
 }
 
+/** The daily career step: only the owner's dashboard data carries it, so no row for anyone else. */
+function career(d: DashboardData): StatusRow[] {
+  const run = d.runs.career;
+  if (!run) return [];
+  const row = { key: 'career', label: 'Job search', at: run.at };
+  // Starting it only touches the database and the Workflow queue: the error as reported, retried tomorrow.
+  if (run.ok === false) return [{ ...row, state: 'Job search failed to start', tone: 'attention', detail: run.detail }];
+  if (skipped(run)) return [{ ...row, state: 'Not set up', tone: 'off', detail: run.detail }];
+  return [{ ...row, state: 'Nightly search started', tone: 'ok', detail: run.detail }];
+}
+
 /** Problems first, then suggestions, runs the token can't see, jobs never seen running, the healthy rows and, last, what is not set up. */
 const RANK: Record<Tone, number> = { attention: 0, nudge: 1, unseen: 2, unknown: 3, ok: 4, off: 5 };
 
 /** One row per automated concern this deployment mode actually has, plus how current the content is. */
 export function siteStatus(d: DashboardData, now = new Date()): StatusRow[] {
   const rows = [papers(d), cv(d), feeds(d), scheduled(d, now), news(d, now), people(d, now)];
-  if (d.mode === 'postgres') rows.push(backup(d));
+  if (d.mode === 'postgres') rows.push(...career(d), backup(d));
   if (d.lastCommit) {
     rows.push({
       key: 'publish',

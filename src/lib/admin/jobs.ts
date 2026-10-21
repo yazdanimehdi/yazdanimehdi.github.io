@@ -1,7 +1,10 @@
+import { readCareer } from '../career/db';
+import { parsePrefs } from '../career/settings';
 import { getSql } from '../db';
 import { feedSources, syncFeeds, type FeedsConfig } from '../feeds';
 import type { FeedItem, SiteConfig } from '../types';
 import { becameDue } from '../utils';
+import { startNightly } from '../../workflows/career-nightly';
 import { BACKUP_BRANCH, backupToGit } from './backup';
 import { listEntries, readConfig } from './content';
 import { GitHubStore, githubConfig } from './github-store';
@@ -13,8 +16,8 @@ import type { PostgresStore } from './postgres-store';
 import type { CommitResult, ContentStore } from './store';
 
 // Scheduled first: it is cheap and time-sensitive, while feeds can take 15 s per source. Papers and GitHub before the
-// backup, so it includes what they wrote.
-export const JOBS = ['scheduled', 'feeds', 'papers', 'github', 'backup'] as const;
+// backup, so it includes what they wrote. Career only starts the job search workflow, which writes nothing backed up.
+export const JOBS = ['scheduled', 'feeds', 'papers', 'github', 'career', 'backup'] as const;
 export type JobName = (typeof JOBS)[number];
 export interface StepResult {
   ok: boolean;
@@ -163,6 +166,13 @@ export function dailySteps(store: PostgresStore): Steps {
       if (!username) return { detail: 'skipped: no GitHub username' };
       const r = await syncGitHubFile(store, username);
       return { detail: `${r.changed ? 'updated' : 'unchanged'} · ${r.repos} repositories` };
+    },
+    career: async () => {
+      const prefs = parsePrefs((await readCareer(getSql())).prefs);
+      const terms = [...prefs.roles, ...prefs.keywords].filter((t) => t.trim());
+      if (!terms.length && !prefs.watched.length) return { detail: 'skipped: no job search set up' };
+      const r = await startNightly(getSql());
+      return { detail: 'runId' in r ? `started run ${r.runId}` : 'already running' };
     },
     backup: async (_previous, now) => {
       if (!process.env.GITHUB_TOKEN) return { detail: 'skipped: no GITHUB_TOKEN' };
