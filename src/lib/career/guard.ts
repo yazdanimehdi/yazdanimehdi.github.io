@@ -21,6 +21,10 @@ const INVISIBLE_SETS = [
   ['bom', BOM],
 ] as const;
 const INVISIBLE = new Set(ZERO_WIDTH + BIDI + FORMAT + BOM);
+// Every other format character is stripped and counted as `format`; tag characters ("ASCII smuggling": invisible
+// text a model still reads) also count as tampering.
+const OTHER_FORMAT = /\p{Cf}/u;
+const TAG = /[\u{E0000}-\u{E007F}]/u;
 
 const HIDDEN_STYLE = new RegExp(
   [
@@ -81,10 +85,11 @@ const fold = (text: string) =>
 function cleanText(text: string) {
   const invisible = { zero_width: 0, bidi: 0, format: 0, bom: 0 };
   for (const [key, chars] of INVISIBLE_SETS) for (const c of text) if (chars.includes(c)) invisible[key]++;
+  for (const c of text) if (!INVISIBLE.has(c) && OTHER_FORMAT.test(c)) invisible.format++;
   let flagged = 0;
   const chars = Array.from(text);
   chars.forEach((ch, i) => {
-    if (BIDI_TAMPER.includes(ch)) flagged++;
+    if (BIDI_TAMPER.includes(ch) || TAG.test(ch)) flagged++;
     else if (ZERO_WIDTH.includes(ch) || ch === BOM) {
       // inside a word: a split meant to dodge a scan. A BOM at offset 0 is encoding noise.
       if (/\p{L}/u.test(chars[i - 1] ?? '') && /\p{L}/u.test(chars[i + 1] ?? '')) flagged++;
@@ -93,7 +98,7 @@ function cleanText(text: string) {
   return {
     text: fold(
       Array.from(text)
-        .filter((c) => !INVISIBLE.has(c))
+        .filter((c) => !INVISIBLE.has(c) && !OTHER_FORMAT.test(c))
         .join(''),
     ),
     invisible,
