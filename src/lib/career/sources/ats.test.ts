@@ -2,7 +2,7 @@ import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { ATS_MAX_BYTES, atsPostings, detectAts, watched } from './ats';
-import { getJson, getText, SourceError } from './http';
+import { getJson, getText, setLookupForTests, SourceError } from './http';
 import { SOURCES, type SourceContext } from './index';
 import { parsePrefs } from '../settings';
 
@@ -19,7 +19,14 @@ function serve(routes: Record<string, unknown>) {
   return urls;
 }
 
-test.afterEach(() => mock.restoreAll());
+// No test resolves real DNS; every name is public unless a test says otherwise.
+const publicLookup = async () => [{ address: '93.184.215.14', family: 4 }];
+setLookupForTests(publicLookup);
+
+test.afterEach(() => {
+  mock.restoreAll();
+  setLookupForTests(publicLookup);
+});
 
 test('detectAts recognizes each board URL form', () => {
   const cases: [string, ReturnType<typeof detectAts>][] = [
@@ -204,4 +211,58 @@ test('a cross-origin redirect drops caller headers', async () => {
   );
   assert.equal(seen[1].headers['Authorization-Key'], 'secret', 'a same-origin redirect keeps it');
   assert.deepEqual(Object.keys(seen[2].headers).sort(), ['Accept', 'User-Agent']);
+});
+
+test('a public name resolving to a private address is refused before fetching', async () => {
+  const fetchMock = mock.method(globalThis, 'fetch', async () => new Response('ok'));
+  for (const addresses of [
+    [{ address: '127.0.0.1', family: 4 }],
+    [
+      { address: '93.184.215.14', family: 4 },
+      { address: '10.0.0.5', family: 4 },
+    ],
+    [{ address: '::1', family: 6 }],
+  ]) {
+    setLookupForTests(async () => addresses);
+    await assert.rejects(getText('https://127.0.0.1.nip.io/'), /private/);
+  }
+  setLookupForTests(async () => {
+    throw new Error('getaddrinfo ENOTFOUND nowhere.example');
+  });
+  await assert.rejects(getText('https://nowhere.example/'), SourceError);
+  assert.equal(fetchMock.mock.callCount(), 0);
+});
+
+test('each redirect hop is resolved and checked', async () => {
+  const looked: string[] = [];
+  setLookupForTests(async (host) => {
+    looked.push(host);
+    return [{ address: host === 'inside.example' ? '192.168.1.1' : '93.184.215.14', family: 4 }];
+  });
+  const fetchMock = mock.method(globalThis, 'fetch', async () => Response.redirect('https://inside.example/x', 302));
+  await assert.rejects(getText('https://outside.example/a'), /private/);
+  assert.deepEqual(looked, ['outside.example', 'inside.example']);
+  assert.equal(fetchMock.mock.callCount(), 1);
+});
+
+test('a non-2xx SourceError carries the status', async () => {
+  mock.method(globalThis, 'fetch', async () => new Response('nope', { status: 403 }));
+  await assert.rejects(getText('https://x.example/a'), (e) => e instanceof SourceError && e.status === 403);
+});
+
+test('http.ts error messages never quote the query string', async () => {
+  mock.method(globalThis, 'fetch', async () => new Response('<html>not json</html>'));
+  await assert.rejects(getJson('https://x.example/a?api_key=SECRET'), (e: Error) => {
+    assert.ok(e instanceof SourceError);
+    assert.match(e.message, /x\.example\/a/);
+    assert.doesNotMatch(e.message, /SECRET/);
+    return true;
+  });
+  mock.restoreAll();
+  mock.method(
+    globalThis,
+    'fetch',
+    async () => new Response(null, { status: 302, headers: { location: '/again?api_key=SECRET' } }),
+  );
+  await assert.rejects(getText('https://x.example/loop?api_key=SECRET'), (e: Error) => !/SECRET/.test(e.message));
 });

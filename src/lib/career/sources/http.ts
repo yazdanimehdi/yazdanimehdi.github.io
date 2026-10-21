@@ -1,6 +1,15 @@
+import { promises as dns } from 'node:dns';
 import { BlockList, isIP } from 'node:net';
 
-export class SourceError extends Error {}
+export class SourceError extends Error {
+  /** The HTTP status, when the error is a non-2xx answer. */
+  constructor(
+    message: string,
+    readonly status?: number,
+  ) {
+    super(message);
+  }
+}
 
 export interface FetchInit {
   headers?: Record<string, string>;
@@ -30,20 +39,40 @@ PRIVATE.addSubnet('64:ff9b::', 96, 'ipv6');
 PRIVATE.addSubnet('fc00::', 7, 'ipv6');
 PRIVATE.addSubnet('fe80::', 10, 'ipv6');
 
-/** Throws unless `url` is http(s) on a public host. DNS names are not resolved (accepted gap). */
-function assertPublic(url: URL) {
+type Lookup = (host: string) => Promise<{ address: string; family: number }[]>;
+const dnsLookup: Lookup = (host) => dns.lookup(host, { all: true, verbatim: true });
+let lookup = dnsLookup;
+
+/** Tests resolve names through `fn`, never real DNS; null restores it. */
+export function setLookupForTests(fn: Lookup | null): void {
+  lookup = fn ?? dnsLookup;
+}
+
+const isPrivate = (address: string, family: number) => PRIVATE.check(address, family === 6 ? 'ipv6' : 'ipv4');
+
+/** Where a URL points, for messages: host and path, never the query (it can hold keys). */
+const where = (url: URL) => url.host + url.pathname;
+
+/** Throws unless `url` is http(s) on a public host; a DNS name must resolve only to public addresses. */
+async function assertPublic(url: URL) {
   if (url.protocol !== 'http:' && url.protocol !== 'https:') throw new SourceError(`Refused ${url.protocol} URL`);
   const host = url.hostname.replace(/^\[|\]$/g, '').replace(/\.+$/, '');
   const ip = isIP(host);
-  if (host === 'localhost' || host.endsWith('.localhost') || (ip && PRIVATE.check(host, ip === 6 ? 'ipv6' : 'ipv4')))
-    throw new SourceError(`Refused private host ${url.hostname}`);
+  const refused = new SourceError(`Refused private host ${url.hostname}`);
+  if (host === 'localhost' || host.endsWith('.localhost') || (ip && isPrivate(host, ip))) throw refused;
+  if (ip) return;
+  // ponytail: fetch resolves the name again, so a rebinding DNS server can still answer differently in between; pin the address with an undici dispatcher if that matters.
+  const addresses = await lookup(host).catch((e: Error) => {
+    throw new SourceError(`${url.host}: ${e.message}`);
+  });
+  if (addresses.some((a) => isPrivate(a.address, a.family))) throw refused;
 }
 
 function toUrl(href: string, base?: URL): URL {
   try {
     return new URL(href, base);
   } catch {
-    throw new SourceError(`Not a URL: ${href}`);
+    throw new SourceError(`Not a URL: ${href.split('?')[0]}`);
   }
 }
 
@@ -76,7 +105,7 @@ export async function getText(url: string, init: FetchInit = {}): Promise<string
   let current = toUrl(url);
   const origin = current.origin;
   for (let hop = 0; ; hop++) {
-    assertPublic(current);
+    await assertPublic(current);
     // Off the original origin, caller headers (keys, tokens) are dropped for this hop and every later one.
     if (current.origin !== origin)
       headers = Object.fromEntries(
@@ -86,13 +115,13 @@ export async function getText(url: string, init: FetchInit = {}): Promise<string
     const location = res.headers.get('location');
     if (res.status >= 300 && res.status < 400 && location) {
       discard(res);
-      if (hop >= MAX_REDIRECTS) throw new SourceError(`${url}: more than ${MAX_REDIRECTS} redirects`);
+      if (hop >= MAX_REDIRECTS) throw new SourceError(`${where(current)}: more than ${MAX_REDIRECTS} redirects`);
       current = toUrl(location, current);
       continue;
     }
     if (!res.ok) {
       discard(res);
-      throw new SourceError(`${current.host} answered ${res.status}`);
+      throw new SourceError(`${current.host} answered ${res.status}`, res.status);
     }
     return readCapped(res, current.host, init.maxBytes ?? MAX_BYTES).catch(fail(current));
   }
@@ -103,6 +132,6 @@ export async function getJson(url: string, init: FetchInit = {}): Promise<unknow
   try {
     return JSON.parse(text);
   } catch {
-    throw new SourceError(`${url} did not answer JSON`);
+    throw new SourceError(`${where(toUrl(url))} did not answer JSON`);
   }
 }

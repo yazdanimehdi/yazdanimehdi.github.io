@@ -5,7 +5,9 @@ import type { RawPosting } from '../types';
 import { adzuna } from './adzuna';
 import { watched } from './ats';
 import { arbeitnow } from './arbeitnow';
+import { careersPage } from './careers-page';
 import { googleJobs } from './google-jobs';
+import { linkedin } from './linkedin';
 import { remoteok } from './remoteok';
 import { remotive } from './remotive';
 import { rss } from './rss';
@@ -32,6 +34,7 @@ export interface Source {
 /** Adding a source means one file plus one line here. */
 export const SOURCES: Record<string, Source> = {
   watched,
+  'careers-page': careersPage,
   remotive,
   remoteok,
   arbeitnow,
@@ -39,4 +42,5 @@ export const SOURCES: Record<string, Source> = {
   usajobs,
   'google-jobs': googleJobs,
   rss,
+  linkedin,
 };

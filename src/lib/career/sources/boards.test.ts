@@ -1,7 +1,7 @@
 import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { SourceError } from './http';
+import { setLookupForTests, SourceError } from './http';
 import { SOURCES, type SourceContext } from './index';
 import { SUGGESTED_FEEDS } from './rss';
 import { parsePrefs } from '../settings';
@@ -32,6 +32,9 @@ function ctx(prefs: Record<string, unknown> = {}, keys: Partial<Record<SecretNam
     ai: async () => '',
   };
 }
+
+// No test resolves real DNS.
+setLookupForTests(async () => [{ address: '93.184.215.14', family: 4 }]);
 
 test.afterEach(() => mock.restoreAll());
 
