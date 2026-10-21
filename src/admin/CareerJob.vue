@@ -230,6 +230,8 @@ function saveAnswer(i: number) {
   const a = answers.value[i];
   const saved = (posting.value?.answers as FormAnswer[] | null)?.[i];
   if (!saved || a.value === saved.value) return;
+  // The note held the old option id (or the model's remark); it no longer describes this value.
+  delete a.note;
   if (a.source === 'handoff' || a.source === 'ai') a.source = a.value.trim() ? 'answers' : 'handoff';
   patch({ answers: answers.value });
 }
@@ -471,7 +473,7 @@ onMounted(async () => {
                 <span v-if="a.source === 'file'" class="adm-muted">Uploaded with the application (later)</span>
                 <template v-else>
                   <select
-                    v-if="a.options"
+                    v-if="a.options && a.type !== 'multi_value_multi_select'"
                     v-model="a.value"
                     :disabled="drafting"
                     :aria-label="visible(a.question)"

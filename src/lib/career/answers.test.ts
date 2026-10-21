@@ -162,3 +162,38 @@ test('the prompt fences the questions and never carries EEO, phone, address or e
     assert.ok(!(p.system + p.prompt).includes(secret), secret);
   assert.ok(!p.prompt.includes(evil.label), 'labels are capped at 300 chars');
 });
+
+test('ambiguous labels are not filled with the owner’s address, name or links', () => {
+  const mk = (label: string): GhQuestion => ({
+    label,
+    description: '',
+    required: false,
+    field: 'question_1',
+    type: 'input_text',
+    options: [],
+    eeo: false,
+  });
+  const a = parseAnswers({
+    address: '1 Home St',
+    salaryExpectation: '90k',
+    links: [{ label: 'GitHub', url: 'https://github.com/jane' }],
+  });
+  const labels = [
+    'Website address',
+    'Email address',
+    'Web address',
+    'IP address',
+    'Company name',
+    'Referrer name',
+    'Phone screen availability',
+    'Current salary',
+    'How did you hear about us? LinkedIn?',
+    'Company website',
+  ];
+  const { answers, rest } = splitQuestions(labels.map(mk), CV, a);
+  const out = answers.filter((x) => x.value).map((x) => `${x.question}: ${x.value}`);
+  assert.deepEqual(out, [], 'nothing deterministic is filled');
+  assert.ok(answers.every((x) => x.source === 'handoff') && answers.length + rest.length === labels.length);
+  assert.deepEqual(knownAnswers([mk('Home address')], CV, a)[0].value, '1 Home St');
+  assert.equal(knownAnswers([mk('Desired salary')], CV, a)[0].value, '90k');
+});

@@ -335,7 +335,8 @@ export async function reviewStep(id: number, part: DraftPart): Promise<{ ok: boo
   if (!pairs.length && !letter) return { ok: true, issues: [] };
   return parseReview(await generateText(store, ai, reviewPrompt(base, pairs, letter)));
 }
-// The AI-call ceiling per draft is 6: two drafts of at most two replies each, and two reviews. No step retries them.
+// The AI-call ceiling per draft is 7: two drafts of at most two replies each, two reviews, and (a Greenhouse `all`
+// draft) one answers call. No step retries them.
 draftStep.maxRetries = 0;
 reviewStep.maxRetries = 0;
 

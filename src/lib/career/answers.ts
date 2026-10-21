@@ -236,31 +236,44 @@ function known(q: GhQuestion, cv: CvConfig, a: ApplicationAnswers): FormAnswer |
       return a.address.trim() ? fill(q, a.address, 'answers') : fromCv(cv.cv.location?.trim());
   }
   if (q.type === 'input_file' || q.type === 'input_hidden') return null;
-  if (/sponsor/.test(label)) return a.sponsorship ? fillYesNo(q, a.sponsorship === 'yes', 'answers') : handoff(q);
+  if (/sponsorship/.test(label)) return a.sponsorship ? fillYesNo(q, a.sponsorship === 'yes', 'answers') : handoff(q);
   if (/authori[sz]ed to work|work authori[sz]ation|right to work/.test(label)) {
     const w = a.workAuthorization.trim();
     if (isSelect(q) && /^(yes|no)\b/i.test(w)) return fillYesNo(q, /^yes/i.test(w), 'answers');
     return fill(q, w, 'answers');
   }
   if (/notice period/.test(label)) return fill(q, a.noticePeriod, 'answers');
-  if (/earliest.*start|start date|available to start|when .*start/.test(label))
+  if (/earliest.*start|start date|available to start|when (?:can|could|would) you (?:start|begin)/.test(label))
     return fill(q, a.earliestStart, 'answers');
-  if (/salary|compensation expectation|pay expectation/.test(label)) return fill(q, a.salaryExpectation, 'answers');
-  if (/\baddress\b/.test(label)) return fill(q, a.address, 'answers');
-  if (/linkedin/.test(label))
+  // An ambiguous label is left to the AI (which hands off), never filled with the wrong fact.
+  if (
+    /salary|compensation|\bpay\b/.test(label) &&
+    /expect|desir|target/.test(label) &&
+    !/current|previous|last|prior/.test(label)
+  )
+    return fill(q, a.salaryExpectation, 'answers');
+  if (
+    /\baddress\b/.test(label) &&
+    !/web|website|url|e-?mail|\bip\b|company|employer|office|reference|referr/.test(label)
+  )
+    return fill(q, a.address, 'answers');
+  const channel = /hear|how did|referr|source|connection|friend/.test(label);
+  if (/linkedin/.test(label) && !channel)
     return fill(
       q,
       link(cv, a, /linkedin/i, 'linkedin'),
       a.links.some((l) => /linkedin/i.test(l.label + l.url)) ? 'answers' : 'cv',
     );
-  if (/github/.test(label))
+  if (/github/.test(label) && !channel)
     return fill(
       q,
       link(cv, a, /github/i, 'github'),
       a.links.some((l) => /github/i.test(l.label + l.url)) ? 'answers' : 'cv',
     );
-  if (/website|portfolio/.test(label))
-    return a.links.length ? fill(q, a.links[0].url, 'answers') : fromCv(cv.cv.website?.trim());
+  if (/website|portfolio/.test(label) && !/company|employer|organi[sz]ation/.test(label)) {
+    const own = a.links.find((l) => /website|portfolio|personal|homepage/i.test(l.label));
+    return own ? fill(q, own.url, 'answers') : fromCv(cv.cv.website?.trim());
+  }
   return null;
 }
 
