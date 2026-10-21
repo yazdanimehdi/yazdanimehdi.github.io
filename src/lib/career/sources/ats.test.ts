@@ -136,6 +136,10 @@ test('getText refuses non-http and private hosts', async () => {
     'http://x.localhost./',
     'http://[::127.0.0.1]/',
     'http://[64:ff9b::7f00:1]/',
+    'http://100.64.0.1/',
+    'http://198.19.255.1/',
+    'http://224.0.0.1/',
+    'http://255.255.255.255/',
   ]) {
     await assert.rejects(getText(url), SourceError, url);
   }

@@ -31,6 +31,10 @@ for (const [net, bits] of [
   ['192.168.0.0', 16],
   ['169.254.0.0', 16],
   ['0.0.0.0', 8],
+  ['100.64.0.0', 10], // carrier-grade NAT
+  ['198.18.0.0', 15], // benchmarking
+  ['224.0.0.0', 4], // multicast
+  ['240.0.0.0', 4], // reserved, and broadcast
 ] as const)
   PRIVATE.addSubnet(net, bits, 'ipv4');
 // ::/96 holds ::, ::1, and IPv4-compatible addresses; 64:ff9b::/96 is NAT64.

@@ -23,6 +23,7 @@ import { parseScore, scorePrompt, totalScore, type ScoreDetail } from './score';
 import { parseAnswers, parsePrefs } from './settings';
 import { SOURCES, type SourceContext } from './sources';
 import { SourceError } from './sources/http';
+import { clearRobotsCache } from './sources/robots';
 import {
   assembleCv,
   baseCv,
@@ -75,6 +76,8 @@ export async function enabledSources(): Promise<{ sources: { id: string; skipped
  */
 export async function gatherSource(id: string): Promise<{ id: string; found: number; added: number; error?: string }> {
   'use step';
+  // A robots.txt answer (or failure) is good for this run only, not for the warm instance's life.
+  clearRobotsCache();
   const source = SOURCES[id];
   let found = 0;
   let error: string | undefined;
@@ -127,6 +130,10 @@ export async function gatherSource(id: string): Promise<{ id: string; found: num
     return { id, found, added: 0, error: sourceMessage(id, e) };
   }
 }
+
+// It never throws, so a retry would only follow a function timeout, and would repeat the careers pages' AI calls; the
+// workflow reports the failure.
+gatherSource.maxRetries = 0;
 
 /** Unscored, ungated postings that haven't failed scoring, newest first: up to `limit` ids, and how many wait past it. */
 export async function pendingScores(limit: number): Promise<{ ids: number[]; deferred: number }> {

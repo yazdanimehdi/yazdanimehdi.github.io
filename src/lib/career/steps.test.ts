@@ -240,6 +240,19 @@ test('a malformed item is dropped alone; a "Remote" location counts as remote', 
   assert.equal(byTitle['Partner 4'].postedAt, '2026-10-19T00:00:00.000Z');
 });
 
+test('a robots.txt failure lasts one run, not the warm instance', async () => {
+  let robots = 0;
+  mock.method(globalThis, 'fetch', async (input: string | URL) => {
+    if (String(input) === 'https://acme.example/robots.txt') robots++;
+    return new Response('down', { status: 503 });
+  });
+  await setPrefs({ watched: ['https://acme.example/careers'] });
+  for (let night = 1; night <= 2; night++) {
+    assert.match((await gatherSource('careers-page')).error ?? '', /robots\.txt unconfirmed/);
+    assert.equal(robots, night);
+  }
+});
+
 test('a source missing its key is skipped, not failed; a source off in prefs is not listed', async () => {
   const saved = process.env.SERPAPI_KEY;
   delete process.env.SERPAPI_KEY;
