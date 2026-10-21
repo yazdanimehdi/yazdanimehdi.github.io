@@ -334,6 +334,33 @@ test('the review covers only the part that was redrafted', async () => {
   assert.doesNotMatch(reviewed[2], /Led a five-person team/);
 });
 
+test("a one-part redraft replaces only that part's issues", async () => {
+  const cvIssue = { part: 'cv', where: 'Acme', claim: 'led ten', why: 'the CV says five' };
+  const letterIssue = { part: 'letter', where: 'letter', claim: 'ten years', why: 'the CV shows six' };
+  reviewReply = () => JSON.stringify({ ok: false, issues: [cvIssue, letterIssue] });
+  await careerDraft(id, 'all', '');
+  assert.deepEqual((await getPosting(sql, id))!.draftIssues, [cvIssue, letterIssue]);
+
+  reviewReply = () => JSON.stringify({ ok: true, issues: [] });
+  await careerDraft(id, 'letter', '');
+  let p = (await getPosting(sql, id))!;
+  assert.deepEqual([p.draftState, p.draftIssues], ['needs-review', [cvIssue]], 'the unreviewed CV keeps its issue');
+
+  // A one-part review tags its issues with that part, whatever the model said.
+  reviewReply = () => JSON.stringify({ ok: false, issues: [{ ...letterIssue, part: 'cv' }] });
+  await careerDraft(id, 'letter', '');
+  p = (await getPosting(sql, id))!;
+  assert.deepEqual(p.draftIssues, [cvIssue, letterIssue]);
+
+  reviewReply = () => JSON.stringify({ ok: true, issues: [] });
+  await careerDraft(id, 'cv', '');
+  p = (await getPosting(sql, id))!;
+  assert.deepEqual([p.draftState, p.draftIssues], ['needs-review', [letterIssue]]);
+  await careerDraft(id, 'letter', '');
+  p = (await getPosting(sql, id))!;
+  assert.deepEqual([p.draftState, p.draftIssues], ['done', null]);
+});
+
 test('no AI key fails the draft cleanly without calling the AI', async () => {
   delete process.env.ANTHROPIC_API_KEY;
   await careerDraft(id, 'all', '');
@@ -556,7 +583,7 @@ test('part answers re-runs only the answers, with the instruction', async () => 
   assert.equal(calls.draft + calls.review, 0, 'no CV or letter work');
   assert.match(answerPrompts[0], /The candidate asks: be brief/);
   const p = (await getPosting(sql, id))!;
-  assert.equal(p.draftState, 'done');
+  assert.equal(p.draftState, 'none', 'no CV or letter was drafted, so no review is claimed');
   assert.equal(p.cv, null);
   assert.ok(Array.isArray(p.answers));
 });

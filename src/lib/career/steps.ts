@@ -323,7 +323,8 @@ export async function noteAnswersFailed(id: number, message: string): Promise<vo
 
 /**
  * The reviewer's verdict on what this draft wrote: the saved plan's reworded lines (unless `part` is `letter`) and the
- * saved letter (unless `part` is `cv`). Nothing to review is ok without an AI call.
+ * saved letter (unless `part` is `cv`). A one-part review tags every issue with that part. Nothing to review is ok
+ * without an AI call.
  */
 export async function reviewStep(id: number, part: DraftPart): Promise<{ ok: boolean; issues: ReviewIssue[] }> {
   'use step';
@@ -333,7 +334,10 @@ export async function reviewStep(id: number, part: DraftPart): Promise<{ ok: boo
   const pairs = part !== 'letter' && plan?.sections && base.cv?.sections ? rewordedPairs(base, plan) : [];
   const letter = part === 'cv' ? '' : (p?.letter ?? '');
   if (!pairs.length && !letter) return { ok: true, issues: [] };
-  return parseReview(await generateText(store, ai, reviewPrompt(base, pairs, letter)));
+  const review = parseReview(await generateText(store, ai, reviewPrompt(base, pairs, letter)));
+  return part === 'cv' || part === 'letter'
+    ? { ...review, issues: review.issues.map((i) => ({ ...i, part })) }
+    : review;
 }
 // The AI-call ceiling per draft is 7: two drafts of at most two replies each, two reviews, and (a Greenhouse `all`
 // draft) one answers call. No step retries them.
@@ -385,16 +389,31 @@ export async function renderStep(id: number): Promise<string | null> {
 renderStep.maxRetries = 1;
 
 /**
- * `needs-review` with the issues when the last review still found some, else `done`; `found` moves to `drafted`. With
- * no review (a re-render of the owner's edits) the earlier issues stand: only a review clears them.
+ * `needs-review` with the issues when any part still has some, else `done`; `found` moves to `drafted`. A `cv` or
+ * `letter` review replaces only that part's issues; with no review (a re-render of the owner's edits, or form answers)
+ * the earlier issues stand: only a review of their part clears them. Form answers alone on a posting with no CV or
+ * letter leave the draft `none`.
  */
-export async function finishDraft(id: number, review: { ok: boolean; issues: ReviewIssue[] } | null): Promise<void> {
+export async function finishDraft(
+  id: number,
+  review: { ok: boolean; issues: ReviewIssue[] } | null,
+  part: DraftPart = 'all',
+): Promise<void> {
   'use step';
   const sql = getSql();
   const p = await getPosting(sql, id);
-  const issues = review ? (review.ok ? [] : review.issues) : ((p?.draftIssues as ReviewIssue[] | null) ?? []);
-  const flagged = review ? !review.ok : issues.length > 0;
-  await updatePosting(sql, id, { draftState: flagged ? 'needs-review' : 'done', draftIssues: flagged ? issues : null });
+  const before = (p?.draftIssues as ReviewIssue[] | null) ?? [];
+  const issues = !review
+    ? before
+    : part === 'cv' || part === 'letter'
+      ? [...before.filter((i) => i.part !== part), ...review.issues]
+      : review.issues;
+  const flagged = issues.length > 0 || (review !== null && !review.ok);
+  const drafted = p?.cv != null || p?.letter != null;
+  await updatePosting(sql, id, {
+    draftState: flagged ? 'needs-review' : drafted ? 'done' : 'none',
+    draftIssues: flagged ? issues : null,
+  });
   const moved =
     await sql`update career_postings set status = 'drafted' where id = ${id} and status = 'found' returning id`;
   if (moved.length) await addEvent(sql, id, 'status', 'found → drafted');

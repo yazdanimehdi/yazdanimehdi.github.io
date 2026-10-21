@@ -33,7 +33,7 @@ export async function careerDraft(id: number, part: DraftPart, instruction: stri
     if (part === 'answers') {
       const failed = (await scoreReady()) ?? (await answersStep(id, instruction));
       if (failed) return await failDraft(id, failed);
-      return await finishDraft(id, null);
+      return await finishDraft(id, null, part);
     }
     let review: { ok: boolean; issues: ReviewIssue[] } | null = null;
     if (part !== 'render') {
@@ -59,7 +59,7 @@ export async function careerDraft(id: number, part: DraftPart, instruction: stri
         await noteAnswersFailed(id, reasonOf(e));
       }
     }
-    await finishDraft(id, review);
+    await finishDraft(id, review, part);
   } catch (e) {
     await failDraft(id, reasonOf(e));
   }

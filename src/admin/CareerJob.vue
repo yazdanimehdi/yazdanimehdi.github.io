@@ -351,6 +351,7 @@ onMounted(async () => {
             <strong>Check these before sending:</strong> the reviewer still found claims the CV may not support.
             <ul>
               <li v-for="(i, n) in issues" :key="n">
+                <template v-if="i.part">{{ i.part === 'cv' ? 'CV' : 'Letter' }} · </template>
                 {{ visible(i.where) }}: “{{ visible(i.claim) }}”, {{ visible(i.why) }}
               </li>
             </ul>
