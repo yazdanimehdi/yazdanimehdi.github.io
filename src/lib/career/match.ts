@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type { CareerPrefs } from './settings';
+import { visible } from './text';
 import type { RawPosting } from './types';
 
 /** NFKD, accents stripped, lowercase, runs of non-alphanumerics collapsed to one space, trimmed. */
@@ -36,6 +37,35 @@ export const postingKey = (p: Pick<RawPosting, 'company' | 'title' | 'url'> & { 
     .update(`${fold(p.company)}|${p.source === 'careers-page' ? '' : fold(p.title)}|${normalizeUrl(p.url)}`)
     .digest('hex')
     .slice(0, 32);
+
+const str = (v: unknown) => (typeof v === 'string' ? v : '');
+const REMOTE = /\bremote\b/i;
+
+/**
+ * A source's posting made safe to key and store, or null when it can't be one (no title or URL): one malformed item
+ * must not fail its whole source. Bidi and zero-width characters in a title would reorder the admin UI and split one
+ * posting into two keys; a date Postgres can't read is dropped; a "Remote" location with no remote flag is remote.
+ */
+export function tidyPosting(r: RawPosting): RawPosting | null {
+  const title = visible(str(r.title)).trim();
+  const url = str(r.url).trim();
+  if (!title || !url) return null;
+  const location = typeof r.location === 'string' ? visible(r.location) : undefined;
+  const posted = typeof r.postedAt === 'string' ? Date.parse(r.postedAt) : NaN;
+  const remote = typeof r.remote === 'boolean' ? r.remote : location && REMOTE.test(location) ? true : undefined;
+  const { location: _l, postedAt: _p, remote: _r, ...rest } = r;
+  return {
+    ...rest,
+    externalId: str(r.externalId) || url,
+    company: visible(str(r.company)),
+    title,
+    url,
+    description: str(r.description),
+    ...(location === undefined ? {} : { location }),
+    ...(Number.isNaN(posted) ? {} : { postedAt: new Date(posted).toISOString() }),
+    ...(remote === undefined ? {} : { remote }),
+  };
+}
 
 const hasPhrase = (haystack: string, phrase: string): boolean =>
   new RegExp(`(?<![\\p{L}\\p{N}])${phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\p{L}\\p{N}])`, 'iu').test(

@@ -213,6 +213,33 @@ test('gated postings are never sent to the AI', async () => {
   assert.equal((await lastRun()).scored, 1);
 });
 
+test('a malformed item is dropped alone; a "Remote" location counts as remote', async () => {
+  const item = (n: number, extra: Partial<RawPosting> = {}): RawPosting => ({
+    source: 'arbeitnow',
+    externalId: String(n),
+    company: 'Acme',
+    title: `Partner ${n}`,
+    url: `https://a.test/${n}`,
+    description: 'A sales partner role.',
+    format: 'text',
+    ...extra,
+  });
+  mock.method(SOURCES.arbeitnow, 'search', async () => [
+    item(1, { title: null as never }),
+    item(2, { url: undefined as never, company: undefined as never }),
+    item(3, { company: null as never, postedAt: 'whenever', location: 'Remote - US' }),
+    item(4, { postedAt: '2026-10-19', location: 'Berlin' }),
+  ]);
+  await setPrefs({ locations: ['Berlin'] });
+  assert.deepEqual(await gatherSource('arbeitnow'), { id: 'arbeitnow', found: 4, added: 2 });
+  const rows = await Promise.all((await listPostings(sql, {})).map((r) => getPosting(sql, r.id)));
+  const byTitle = Object.fromEntries(rows.map((p) => [p!.title, p!]));
+  assert.deepEqual(Object.keys(byTitle).sort(), ['Partner 3', 'Partner 4']);
+  assert.deepEqual([byTitle['Partner 3'].company, byTitle['Partner 3'].postedAt], ['', null]);
+  assert.deepEqual([byTitle['Partner 3'].remote, byTitle['Partner 3'].gate], [true, null], 'not gated on location');
+  assert.equal(byTitle['Partner 4'].postedAt, '2026-10-19T00:00:00.000Z');
+});
+
 test('a source missing its key is skipped, not failed; a source off in prefs is not listed', async () => {
   const saved = process.env.SERPAPI_KEY;
   delete process.env.SERPAPI_KEY;

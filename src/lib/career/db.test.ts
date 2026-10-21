@@ -1,4 +1,4 @@
-import test, { beforeEach } from 'node:test';
+import test, { beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { migrate } from '../db-migrate';
 import type { Sql } from '../db';
@@ -55,6 +55,14 @@ test("re-finding a posting keeps the owner's status and notes", async () => {
   assert.equal(again!.status, 'skipped');
   assert.equal(again!.notes, 'no');
   assert.ok(again!.lastSeenAt > first!.lastSeenAt);
+});
+
+test('a row that fails to store is skipped and the rest still go in', async () => {
+  const quiet = mock.method(console, 'error', () => {});
+  assert.equal(await upsertPostings(sql, [row('A'), { ...row('B'), postedAt: 'not a date' }, row('C')]), 2);
+  assert.equal(quiet.mock.callCount(), 1, 'the skipped row is logged');
+  quiet.mock.restore();
+  assert.equal((await listPostings(sql, {})).length, 2);
 });
 
 test('updatePosting stamps scored_at on score, leaves untouched fields, and clears with null', async () => {

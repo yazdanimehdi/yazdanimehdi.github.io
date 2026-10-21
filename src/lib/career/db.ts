@@ -17,7 +17,8 @@ const iso = (v: unknown) => (v == null ? null : new Date(v as string | Date).toI
 
 /**
  * Inserts postings it has not seen (by `key`), with their hard-gate reason; a posting seen again only gets
- * `last_seen_at` bumped. Returns the new rows.
+ * `last_seen_at` bumped. Returns how many were inserted. A row that fails to store is skipped (and logged), not the
+ * rest of the batch.
  */
 export async function upsertPostings(
   sql: Sql,
@@ -25,7 +26,9 @@ export async function upsertPostings(
 ): Promise<number> {
   let added = 0;
   for (const r of rows) {
-    const out = await sql<{ inserted: boolean }>`
+    let out;
+    try {
+      out = await sql<{ inserted: boolean }>`
       insert into career_postings (key, source, external_id, company, title, location, remote, url, apply_url,
         description, flags, salary, ats, posted_at, gate)
       values (${r.key}, ${r.source}, ${r.externalId}, ${r.company}, ${r.title}, ${r.location ?? null}, ${r.remote ?? null},
@@ -34,6 +37,11 @@ export async function upsertPostings(
         ${r.postedAt ?? null}, ${r.gate ?? null})
       on conflict (key) do update set last_seen_at = clock_timestamp()
       returning (xmax = 0) as inserted`;
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error(`[career] could not store a ${r.source} posting`, (e as Error).message);
+      continue;
+    }
     if (out[0]?.inserted) added++;
   }
   return added;
