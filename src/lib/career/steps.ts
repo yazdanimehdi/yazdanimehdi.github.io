@@ -145,9 +145,9 @@ const REPLIES = 3;
 
 /**
  * Scores one posting against the CV and prefs; a no-op once scored. A model that answers three times without the JSON
- * asked for gives the reason back (the run records it). Provider and network errors throw: the Workflow retries the
- * step, and if that fails too the posting stays pending for the next night. The reason travels as a return value
- * because a thrown error reaches the workflow as message, stack and cause only, not as its class.
+ * asked for gives the reason back (the run records it). Provider and network errors throw, and the posting stays
+ * pending for the next night. The reason travels as a return value because a thrown error reaches the workflow as
+ * message, stack and cause only, not as its class.
  */
 export async function scorePosting(id: number): Promise<string | null> {
   'use step';
@@ -171,8 +171,9 @@ export async function scorePosting(id: number): Promise<string | null> {
     return null;
   }
 }
-// Provider and network errors: three attempts in all, then the posting waits for tomorrow.
-scorePosting.maxRetries = 2;
+// No step retries: a provider or network error leaves the posting for tomorrow, so one posting costs at most 3 AI
+// calls a night (the bad-reply loop above).
+scorePosting.maxRetries = 0;
 
 /** A posting scored in the meantime keeps its score. */
 export async function markScoreFailed(id: number, error: string): Promise<void> {

@@ -30,7 +30,7 @@ export async function careerNightly(): Promise<RunSummary> {
   let scored = 0;
   let failed = 0;
   // A setup problem would fail every posting the same way: score nothing and say why.
-  const scoreSkipped = pending.ids.length ? await scoreReady() : null;
+  const scoreSkipped = pending.ids.length ? await scoreReady().catch(() => 'scoring check failed') : null;
   if (scoreSkipped) deferred += pending.ids.length;
   else {
     for (let i = 0; i < pending.ids.length; i += BATCH) {
