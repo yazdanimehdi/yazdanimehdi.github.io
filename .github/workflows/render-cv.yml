@@ -6,7 +6,11 @@ on:
     paths:
       - 'config/cv.yml'
       - 'config/cv-upload.yml'
+      - 'config/cv-styles.yml'
+      - 'config/site.yml'
       - 'cv/*.yml'
+      - 'cv/themes/**'
+      - 'services/cv-render/**'
       - 'src/content/publications/**'
   workflow_dispatch:
 
@@ -32,11 +36,6 @@ jobs:
           python-version: '3.12'
           cache: pip
           cache-dependency-path: scripts/requirements.txt
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y texlive-latex-extra texlive-fonts-recommended latexmk
 
       - name: Install Python dependencies
         run: pip install -r scripts/requirements.txt

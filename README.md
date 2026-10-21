@@ -372,16 +372,16 @@ cv:
         details: 'Python, TypeScript, C++'
 ```
 
-- **PDF generation** -- automated PDF rendering via GitHub Actions using RenderCV
-- **Multiple themes** -- classic, modern, and more
+- **PDF generation** -- RenderCV renders the PDF in every mode (GitHub Actions, or the admin on Vercel)
+- **Styles** -- nine built-in themes, three densities and your own themes (see [CV styles](#cv-styles))
 - **Download button** -- visitors can download your CV as PDF
 
 Any CV text can carry inline formatting: `**bold**`, `*italic*`, `[a link](https://…)` (or `mailto:`), and a font
 for part of a line with `[text]{.serif}`, `[text]{.sans}` or `[text]{.mono}`. Write `\*` for a literal asterisk, as in
 `'**Jane Smith**\*'` for equal contribution. In the admin's CV editor, select text in an entry field and use the
-formatting bar (B, I, Link, Font) or Cmd/Ctrl+B, I and K; the preview below the fields shows the result. The site and
-the built-in PDF render all of it. RenderCV renders bold, italic and links but not fonts, so a font span prints as
-plain text there.
+formatting bar (B, I, Link, Font) or Cmd/Ctrl+B, I and K; the preview below the fields shows the result. The site
+renders all of it; the PDF renders bold, italic and links. Font spans are website-only: RenderCV has no fonts to
+switch to, so they print as plain text in the PDF.
 
 ### Research Areas
 
@@ -612,7 +612,7 @@ content to the `content-backup` branch.
    leaves documents that exist only in the database).
 3. The dashboard's Site status now has a **Backup copy** row and **Run daily jobs**.
 
-Notes: MDX posts are shown with a notice (MDX needs a build). The CV PDF is rendered on Vercel (see _CV PDF in Postgres mode_).
+Notes: MDX posts are shown with a notice (MDX needs a build). The CV PDF is rendered on Vercel (see [CV styles](#cv-styles)).
 Editing `adminUsers` takes effect after a redeploy. The feeds, Google Scholar and SEO workflows
 (`sync-feeds.yml`, `sync-scholar.yml`, `generate-seo.yml`) commit to git and have no effect on a Postgres-mode site;
 the daily job syncs feeds, and **Check now** syncs them at once.
@@ -752,19 +752,45 @@ commits it so the site redeploys.
   and the publish routes answer 403. Publishers see "Site changes waiting for review" on the Dashboard's Next up,
   read from a tag on the sandbox (one lookup that never wakes it), so it shows while the session is paused too.
 
-### CV PDF in Postgres mode
+### CV styles
 
-The CV PDF is rendered on Vercel whenever you publish the CV or a publication (and with **Generate PDF**), stored in
-Vercel Blob, and linked from the CV page. It uses fixed fonts (Source Serif 4 and IBM Plex Sans) and its own layout,
-so it looks different from the RenderCV PDF that git mode builds on GitHub Actions. Paper size:
+RenderCV renders the CV PDF everywhere: on GitHub Actions in git mode and on static hosting, and on Vercel (both
+admin modes) in a private Python service deployed beside Astro. A style is a RenderCV theme (`classic`, `sb2nov`,
+`engineeringresumes`, `moderncv`, `engineeringclassic`, `harvard`, `ink`, `opal` or `ember`), a density (`compact`,
+`normal` or `airy`) and optional `design` overrides in RenderCV's own keys. Styles live in `config/cv-styles.yml`, and
+`public` names the one used for the public PDF. Without the file you get a compact style built from the design in
+your `cv.yml`.
+
+```yaml
+# config/cv-styles.yml
+public: compact
+styles:
+  - id: compact
+    name: Compact
+    theme: classic
+    density: compact
+    design: {}
+```
+
+On Vercel, **CV → Styles** in the admin edits the list with a live preview; the preview and **Generate PDF** render
+through the service. A design RenderCV rejects (a bad margin, say) shows its error and leaves the public PDF alone. A
+raw YAML upload that carries its own `design` keeps it. On Sveltia the same file is under **CV (Styles)**, without
+the preview.
+
+Custom themes are RenderCV theme folders under `cv/themes/<name>/` (`*.j2.typ` and `*.typ` files, names `a-z0-9`, at
+most 40 files and 512 KB). Upload them in **CV → Styles**; only publishers can upload or delete a theme, because a
+theme template is code that runs in the renderer. Per-person lab CVs (`cv/*.yml`) keep their own `design` and are
+rendered on GitHub Actions only.
+
+To render locally run `pip install -r scripts/requirements.txt`. `astro dev` previews through
+`services/cv-render/cli.py` and needs `pip install -r services/cv-render/requirements.txt`. The paper size is
+`pdf.pageSize` in `cv.yml`, used for the default style when there is no `cv-styles.yml` (otherwise set `design.page.size`):
 
 ```yaml
 # config/cv.yml
 pdf:
   pageSize: A4 # or LETTER (default)
 ```
-
-Per-person lab CVs (`cv/*.yml`) are rendered in git mode only.
 
 ### Cookie Consent (GDPR)
 
@@ -1069,10 +1095,13 @@ ScholarOS/
 ├── config/ # All configuration (YAML)
 │ ├── site.yml # Main site config
 │ ├── cv.yml # CV / resume data
+│ ├── cv-styles.yml # CV PDF styles (optional)
 │ ├── research.yml # Research areas
 │ ├── feeds.yml # External RSS feed sources
 │ ├── scholar.yml # Google Scholar sync config
 │ └── cms.yml # CMS panel config
+├── cv/themes/ # Custom CV themes (optional)
+├── services/cv-render/ # Private RenderCV service (Vercel Services) and shared renderer
 ├── public/ # Static assets (served as-is)
 ├── scripts/ # Automation scripts
 │ ├── migrate-al-folio.ts # al-folio migration

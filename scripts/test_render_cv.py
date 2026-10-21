@@ -56,4 +56,32 @@ assert strip("a**** b \\**** c") == "a b \\**** c", "empty bold goes; an escaped
 assert strip("**bold** *it* \\*") == "**bold** *it* \\*"
 fonts = {"cv": {"name": "N", "sections": {"skills": [{"label": "[Rust]{.serif}", "details": "[x]{.sans}"}]}}}
 assert cr.build_rendercv_input(fonts)["cv"]["sections"]["skills"] == [{"label": "Rust", "details": "x"}]
+# main_input builds the public style's input from a root: harvard + compact; custom themes are read from disk.
+import yaml  # noqa: E402
+
+with tempfile.TemporaryDirectory() as d:
+    root = Path(d)
+    (root / "config").mkdir()
+    (root / "src" / "content" / "publications").mkdir(parents=True)
+    (root / "config" / "cv.yml").write_text("cv:\n  name: N\n  sections: {}\n")
+    (root / "config" / "site.yml").write_text("author: 'N'\n")
+    (root / "config" / "cv-styles.yml").write_text(
+        "public: h\nstyles:\n  - {id: h, name: H, theme: harvard, density: compact, design: {}}\n"
+    )
+    text, theme_files = rc.main_input(root)
+    design = yaml.safe_load(text)["design"]
+    assert design["theme"] == "harvard" and design["page"]["top_margin"] == "1.2cm", design
+    assert theme_files == {}, theme_files
+    # A missing public id falls back to the first style; a custom theme's files come from cv/themes/<theme>/.
+    (root / "cv" / "themes" / "mine").mkdir(parents=True)
+    (root / "cv" / "themes" / "mine" / "Preamble.j2.typ").write_text("x")
+    (root / "cv" / "themes" / "mine" / "notes.txt").write_text("skip")
+    (root / "config" / "cv-styles.yml").write_text(
+        "public: gone\nstyles:\n  - {id: m, name: M, theme: mine, density: normal, design: {}}\n"
+    )
+    text, theme_files = rc.main_input(root)
+    assert yaml.safe_load(text)["design"]["theme"] == "mine" and theme_files == {"Preamble.j2.typ": "x"}, theme_files
+    # Garbled styles file: defaults.
+    (root / "config" / "cv-styles.yml").write_text(": [\n")
+    assert yaml.safe_load(rc.main_input(root)[0])["design"]["theme"] == "classic"
 print("render-cv self-check passed")

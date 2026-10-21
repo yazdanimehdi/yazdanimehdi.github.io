@@ -22,7 +22,7 @@ import yaml
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "services" / "cv-render"))
 
-from cvrender import build_rendercv_input, render_pdf, strip_site_markup  # noqa: E402
+from cvrender import build_input, build_rendercv_input, default_styles, render_pdf  # noqa: E402
 CONFIG_PATH = ROOT / "config" / "cv.yml"
 UPLOAD_PATH = ROOT / "config" / "cv-upload.yml"
 OUTPUT_PDF = ROOT / "public" / "cv.pdf"
@@ -34,15 +34,15 @@ PUBLICATIONS_DIR = ROOT / "src" / "content" / "publications"
 MAX_PDF_SIZE = 10 * 1024 * 1024  # 10 MB limit
 
 
-def load_upload() -> tuple[str, dict] | None:
+def load_upload(path: Path = UPLOAD_PATH) -> tuple[str, dict] | None:
     """Load raw YAML upload if enabled and non-empty.
 
     Returns (raw_content_string, parsed_dict) so the renderer can write
     the original YAML verbatim (preserving section order and all entries).
     """
-    if not UPLOAD_PATH.exists():
+    if not path.exists():
         return None
-    with open(UPLOAD_PATH, "r") as f:
+    with open(path, "r") as f:
         data = yaml.safe_load(f)
     if not data or not data.get("enabled"):
         return None
@@ -120,7 +120,7 @@ def collection_publications(directory: Path = PUBLICATIONS_DIR) -> list:
     return [data for data in front_matters if data.get("title")]
 
 
-def render_cv(rendercv_input: dict | str) -> Path:
+def render_cv(rendercv_input: dict | str, theme_files: dict | None = None, theme: str | None = None) -> Path:
     """Run RenderCV and return path to the generated PDF.
 
     rendercv_input can be a dict (YAML-dumped) or a raw YAML string
@@ -130,7 +130,7 @@ def render_cv(rendercv_input: dict | str) -> Path:
         rendercv_input = yaml.dump(rendercv_input, default_flow_style=False, allow_unicode=True, sort_keys=False)
     print("Running rendercv render...")
     stable_path = Path(tempfile.mktemp(suffix=".pdf"))
-    stable_path.write_bytes(render_pdf(rendercv_input))
+    stable_path.write_bytes(render_pdf(rendercv_input, theme_files, theme))
     return stable_path
 
 
@@ -229,34 +229,65 @@ def render_person_cvs() -> None:
         print(f"WARNING: Failed to render CVs for: {', '.join(errors)}")
 
 
+def read_yaml(path: Path):
+    try:
+        return yaml.safe_load(path.read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError):
+        return None
+
+
+def public_style(root: Path, cv_config: dict) -> dict:
+    """The public style from config/cv-styles.yml; defaults when it is missing or garbled, the first style for an unknown id."""
+    data = read_yaml(root / "config" / "cv-styles.yml")
+    styles = [s for s in (data.get("styles") if isinstance(data, dict) else None) or [] if isinstance(s, dict) and s.get("theme")]
+    if not styles:
+        return default_styles(cv_config)["styles"][0]
+    style = next((s for s in styles if s.get("id") == data.get("public")), styles[0])
+    if isinstance(style.get("design"), str):  # Sveltia's code field saves YAML text
+        style = {**style, "design": yaml.safe_load(style["design"]) or {}}
+    return style
+
+
+def main_input(root: Path) -> tuple[str, dict]:
+    """(RenderCV YAML, custom theme files) for the public CV under `root`."""
+    config_path = root / "config" / "cv.yml"
+    if not config_path.exists():
+        raise ValueError(f"CV config not found at {config_path}")
+    config = read_yaml(config_path)
+    if not config or not config.get("cv"):
+        raise ValueError("CV config is empty or missing 'cv' section")
+    style = public_style(root, config)
+    upload = load_upload(root / "config" / "cv-upload.yml")
+    site = read_yaml(root / "config" / "site.yml")
+    text = build_input({
+        "cv": config,
+        "upload": {"enabled": True, "content": upload[0]} if upload else None,
+        "publications": collection_publications(root / "src" / "content" / "publications"),
+        "author": site.get("author") if isinstance(site, dict) else "",
+        "style": style,
+    })
+    theme = yaml.safe_load(text).get("design", {}).get("theme")  # a raw upload may bring its own
+    theme_dir = root / "cv" / "themes" / str(theme)
+    theme_files = {
+        str(p.relative_to(theme_dir)): p.read_text(encoding="utf-8")
+        for p in sorted(theme_dir.rglob("*.typ")) if p.is_file()
+    } if theme_dir.is_dir() else {}
+    return text, theme_files
+
+
 def main():
-    # Check for raw YAML upload first (takes priority)
     upload_result = load_upload()
-
+    try:
+        rendercv_input, theme_files = main_input(ROOT)
+    except ValueError as e:
+        print(f"ERROR: {e}")
+        sys.exit(1)
     if upload_result:
-        raw_content, uploaded = upload_result
-        # Sync upload to structured config and disable upload
-        sync_upload_to_structured(uploaded)
-        # Use the raw YAML string directly to preserve section order and all entries
-        rendercv_input = strip_site_markup(raw_content)
-    else:
-        if not CONFIG_PATH.exists():
-            print(f"ERROR: CV config not found at {CONFIG_PATH}")
-            sys.exit(1)
-
-        print(f"Loading CV config from {CONFIG_PATH}...")
-        config = load_config()
-
-        if not config or not config.get("cv"):
-            print("ERROR: CV config is empty or missing 'cv' section")
-            sys.exit(1)
-
-        # Build RenderCV input from structured config
-        rendercv_input = build_rendercv_input(config, collection_publications())
+        sync_upload_to_structured(upload_result[1])
 
     # Render PDF
     try:
-        pdf_path = render_cv(rendercv_input)
+        pdf_path = render_cv(rendercv_input, theme_files, yaml.safe_load(rendercv_input)["design"]["theme"] if theme_files else None)
     except subprocess.TimeoutExpired:
         print("ERROR: RenderCV timed out after 120 seconds")
         sys.exit(1)

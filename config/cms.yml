@@ -1178,6 +1178,47 @@ collections:
             required: false
             hint: 'Paste your complete RenderCV YAML here. See https://docs.rendercv.com for the format.'
 
+      - name: 'cv-styles'
+        label: 'CV (Styles)'
+        file: 'config/cv-styles.yml'
+        fields:
+          - { label: 'Public style id', name: 'public', widget: 'string', hint: 'The style used for the public PDF' }
+          - label: 'Styles'
+            name: 'styles'
+            widget: 'list'
+            fields:
+              - { label: 'Id', name: 'id', widget: 'string', hint: 'Lowercase letters, digits and dashes' }
+              - { label: 'Name', name: 'name', widget: 'string' }
+              - label: 'Theme'
+                name: 'theme'
+                widget: 'select'
+                options:
+                  [
+                    'classic',
+                    'sb2nov',
+                    'engineeringresumes',
+                    'moderncv',
+                    'engineeringclassic',
+                    'harvard',
+                    'ink',
+                    'opal',
+                    'ember',
+                  ]
+              - {
+                  label: 'Density',
+                  name: 'density',
+                  widget: 'select',
+                  options: ['compact', 'normal', 'airy'],
+                  default: 'normal',
+                }
+              - label: 'Design overrides'
+                name: 'design'
+                widget: 'code'
+                default_language: 'yaml'
+                allow_language_selection: false
+                required: false
+                hint: 'RenderCV design keys in YAML, e.g. page: { top_margin: 1.2cm }'
+
       - name: 'cv'
         label: 'CV (Structured)'
         file: 'config/cv.yml'
