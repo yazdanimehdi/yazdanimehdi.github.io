@@ -6,6 +6,7 @@ import sitemap from '@astrojs/sitemap';
 import vercel from '@astrojs/vercel';
 import ffmpegPath from 'ffmpeg-static';
 import tailwindcss from '@tailwindcss/vite';
+import { workflow } from 'workflow/astro';
 import { markdownOptions } from './src/lib/markdown';
 import admin from './src/integrations/admin';
 import { isPageOn } from './src/lib/config';
@@ -49,6 +50,8 @@ export default defineConfig({
     mdx(),
     ...(mode === 'postgres' ? [] : [sitemap({ filter: (page) => isPageOn(new URL(page).pathname) })]),
     admin(),
+    // Durable background jobs (src/workflows) only run in Postgres mode.
+    ...(mode === 'postgres' ? [workflow()] : []),
   ],
   markdown: markdownOptions,
   vite: {

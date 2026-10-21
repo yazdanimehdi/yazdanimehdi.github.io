@@ -42,3 +42,7 @@ dist-*/
 test-results/
 playwright-report/
 __pycache__/
+
+# Workflow SDK: local run data and its compiler cache (Postgres-mode builds)
+.workflow-data/
+/.swc
