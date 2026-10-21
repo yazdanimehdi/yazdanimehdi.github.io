@@ -42,8 +42,12 @@ export interface RunSummary {
   at: string;
   sources: { id: string; found: number; added: number; error?: string; skipped?: string }[];
   scored: number;
+  /** Postings the model answered badly three times; they carry `score_error` and aren't retried. */
   failed: number;
+  /** Pending postings left for a later night: past the cap, scoring not ready, or the provider failed. */
   deferred: number;
+  /** Why scoring was not attempted tonight (no AI key, no CV). */
+  scoreSkipped?: string;
 }
 
 export interface PostingSummary {

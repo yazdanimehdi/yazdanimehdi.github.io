@@ -8,40 +8,53 @@ import {
   markScoreFailed,
   pendingScores,
   scorePosting,
+  scoreReady,
 } from '../lib/career/steps';
 import type { RunSummary } from '../lib/career/types';
 
 const BATCH = 5;
-
-/** The step's own message: a step out of retries rejects with the SDK's wrapper, the original as `cause`. */
-function messageOf(reason: unknown): string {
-  const e = (reason as { cause?: unknown } | null)?.cause ?? reason;
-  const message = (e as { message?: unknown } | null)?.message;
-  return typeof message === 'string' ? message : String(e);
-}
 
 /** Gather every enabled source in parallel, then score what's new, five at a time, up to the nightly cap. */
 export async function careerNightly(): Promise<RunSummary> {
   'use workflow';
   const { sources, maxScores } = await enabledSources();
   const gathered = await Promise.all(
-    sources.map((s) => (s.skipped ? { id: s.id, found: 0, added: 0, skipped: s.skipped } : gatherSource(s.id))),
+    sources.map((s) =>
+      s.skipped
+        ? { id: s.id, found: 0, added: 0, skipped: s.skipped }
+        : gatherSource(s.id).catch(() => ({ id: s.id, found: 0, added: 0, error: 'unexpected error' })),
+    ),
   );
-  const { ids, deferred } = await pendingScores(maxScores);
+  const pending = await pendingScores(maxScores);
+  let deferred = pending.deferred;
   let scored = 0;
   let failed = 0;
-  for (let i = 0; i < ids.length; i += BATCH) {
-    const batch = ids.slice(i, i + BATCH);
-    const results = await Promise.allSettled(batch.map((id) => scorePosting(id)));
-    for (const [j, r] of results.entries()) {
-      if (r.status === 'fulfilled') scored++;
-      else {
-        failed++;
-        await markScoreFailed(batch[j], messageOf(r.reason));
+  // A setup problem would fail every posting the same way: score nothing and say why.
+  const scoreSkipped = pending.ids.length ? await scoreReady() : null;
+  if (scoreSkipped) deferred += pending.ids.length;
+  else {
+    for (let i = 0; i < pending.ids.length; i += BATCH) {
+      const batch = pending.ids.slice(i, i + BATCH);
+      const results = await Promise.allSettled(batch.map((id) => scorePosting(id)));
+      for (const [j, r] of results.entries()) {
+        // Rejected: the provider or the network failed. The posting stays pending and is tried again tomorrow.
+        if (r.status === 'rejected') deferred++;
+        else if (r.value === null) scored++;
+        else {
+          failed++;
+          await markScoreFailed(batch[j], r.value);
+        }
       }
     }
   }
-  const summary: RunSummary = { at: new Date().toISOString(), sources: gathered, scored, failed, deferred };
+  const summary: RunSummary = {
+    at: new Date().toISOString(),
+    sources: gathered,
+    scored,
+    failed,
+    deferred,
+    ...(scoreSkipped ? { scoreSkipped } : {}),
+  };
   await finishRun(summary);
   return summary;
 }
@@ -55,11 +68,17 @@ export interface Runs {
   start(): Promise<{ runId: string }>;
 }
 const workflowRuns: Runs = { get: getRun, start: () => start(careerNightly) };
+let testRuns: Runs | null = null;
+
+/** Tests swap the Workflow API; production code never calls this. */
+export function setRunsForTests(runs: Runs | null): void {
+  testRuns = runs;
+}
 
 /** Starts the nightly run unless the last one is still pending or running; one stuck that way for 6 hours is cancelled. */
 export async function startNightly(
   sql: Sql,
-  runs: Runs = workflowRuns,
+  runs: Runs = testRuns ?? workflowRuns,
   now = Date.now(),
 ): Promise<{ runId: string } | { running: string }> {
   const { runId } = await readCareer(sql);
@@ -68,7 +87,8 @@ export async function startNightly(
     // A run the world no longer knows (expired, or local data cleared) is not running.
     const status = await run.status.catch(() => null);
     if (status === 'running' || status === 'pending') {
-      if (now - (await run.createdAt).getTime() < STALE_MS) return { running: runId };
+      // A run of unknown age counts as stale.
+      if (now - (await run.createdAt.catch(() => new Date(0))).getTime() < STALE_MS) return { running: runId };
       // A failed cancel must not block every later night: the new run starts anyway.
       // eslint-disable-next-line no-console
       await run.cancel().catch((e) => console.error('[career] cancelling a stale run', e));

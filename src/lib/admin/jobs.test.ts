@@ -10,6 +10,7 @@ import { PostgresStore } from './postgres-store';
 import { JOBS_JSON } from './paths';
 import { JOBS, dailySteps, parseJobs, releaseScheduled, releaseSince, runJobs, type Steps } from './jobs';
 import { writeCareer } from '../career/db';
+import { setRunsForTests } from '../../workflows/career-nightly';
 import { GET as cron } from '../../admin/routes/api/cron/daily';
 import { POST as runNow } from '../../admin/routes/api/jobs/run';
 
@@ -351,4 +352,37 @@ test('career runs after github and before backup; an empty search is skipped', a
     (e: Error) => e.message === 'failed' && /secret detail/.test((e.cause as Error).message),
     'jobs.json gets "failed"; the real error only reaches the log, as the cause',
   );
+});
+
+test('Run now starts the job search for the owner only', async () => {
+  const restore = env({ GITHUB_TOKEN: undefined, SERPAPI_KEY: undefined });
+  let starts = 0;
+  setRunsForTests({
+    get: () => ({
+      status: Promise.resolve('completed'),
+      createdAt: Promise.resolve(new Date()),
+      cancel: async () => {},
+    }),
+    start: async () => (starts++, { runId: 'wrun_owner' }),
+  });
+  const call = (login: string) =>
+    runNow({
+      request: new Request('https://site.test/api/admin/jobs/run', { method: 'POST' }),
+      url: new URL('https://site.test/api/admin/jobs/run'),
+      params: {},
+      locals: { user: { login, name: login, avatar: '', provider: 'github' } },
+    } as never);
+  try {
+    await sql`insert into documents (path, content) values ('config/feeds.yml', ${'feeds: []\n'})`;
+    await writeCareer(sql, { prefs: { roles: ['data scientist'] } }, 'test');
+    const other = await (await call('someone-else')).json();
+    assert.equal(starts, 0, "another admin's Run now never starts the owner's search");
+    assert.deepEqual(other.career.detail, 'done');
+    const owner = await (await call('janesmith')).json();
+    assert.equal(starts, 1);
+    assert.deepEqual(owner.career.detail, 'done');
+  } finally {
+    setRunsForTests(null);
+    restore();
+  }
 });

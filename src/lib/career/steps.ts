@@ -4,7 +4,9 @@ import { generateText, readAiConfig } from '../admin/ai';
 import { readConfig } from '../admin/content';
 import { getStore } from '../admin/get-store';
 import { postgresOnly } from '../admin/http';
-import { getSecret } from '../admin/secrets';
+import type { PostgresStore } from '../admin/postgres-store';
+import { getSecret, missingKey } from '../admin/secrets';
+import { TEXT_PROVIDERS } from '../ai/providers';
 import { resolveCvConfig } from '../cv';
 import { getSql } from '../db';
 import type { CvConfig } from '../types';
@@ -12,7 +14,7 @@ import { getPosting, readCareer, updatePosting, upsertPostings, writeCareer } fr
 import { guardPosting } from './guard';
 import { hardGate, postingKey } from './match';
 import { cvText, prefsText } from './profile';
-import { parseScore, scorePrompt, totalScore } from './score';
+import { parseScore, scorePrompt, totalScore, type ScoreDetail } from './score';
 import { parseAnswers, parsePrefs } from './settings';
 import { SOURCES, type SourceContext } from './sources';
 import { SourceError } from './sources/http';
@@ -48,10 +50,10 @@ export async function enabledSources(): Promise<{ sources: { id: string; skipped
 }
 
 /**
- * Searches one source, fetches the detail of new postings that came without a description (at most 30), then guards,
- * keys, gates and stores each. Never throws: a failure is the result's `error`. A posting the guard can't scan, or
- * whose detail fetch fails, is counted in `found` and skipped (a later night tries it again); the first failed fetch
- * is the result's `error`, next to what was added.
+ * Searches one source, fetches the detail of new postings that came without a description (at most 30; new ones past
+ * that wait, unstored, for a later night), then guards, keys, gates and stores each. Never throws: a failure is the
+ * result's `error`. A posting the guard can't scan, or whose detail fetch fails, is counted in `found` and skipped (a
+ * later night tries it again); the first failed fetch is the result's `error`, next to what was added.
  */
 export async function gatherSource(id: string): Promise<{ id: string; found: number; added: number; error?: string }> {
   'use step';
@@ -82,7 +84,8 @@ export async function gatherSource(id: string): Promise<{ id: string; found: num
     const rows = [];
     for (const { raw, key } of keyed) {
       let p = raw;
-      if (source.detail && !p.description.trim() && !known.has(key) && details < MAX_DETAILS) {
+      if (source.detail && !p.description.trim() && !known.has(key)) {
+        if (details === MAX_DETAILS) continue; // the rest wait for a later night
         details++;
         try {
           p = { ...p, ...(await source.detail(p, ctx)) };
@@ -118,35 +121,64 @@ export async function pendingScores(limit: number): Promise<{ ids: number[]; def
   return { ids, deferred: rows.length ? Number(rows[0].total) - ids.length : 0 };
 }
 
-/** Scores one posting against the CV and prefs; a no-op once scored. Throws on a bad reply, so the Workflow retries. */
-export async function scorePosting(id: number): Promise<void> {
-  'use step';
-  const sql = getSql();
-  const store = careerStore();
-  const p = await getPosting(sql, id);
-  if (!p || p.score !== null) return;
-  const [cv, upload, career, ai] = await Promise.all([
-    readConfig(store, 'cv'),
-    readConfig(store, 'cv-upload'),
-    readCareer(sql),
-    readAiConfig(store),
-  ]);
+/** The CV as prompt text, read through the store as cv-render does; '' when there is none. */
+async function cvTextOf(store: PostgresStore): Promise<string> {
+  const [cv, upload] = await Promise.all([readConfig(store, 'cv'), readConfig(store, 'cv-upload')]);
   const resolved = resolveCvConfig(
     upload.data as { enabled?: boolean; content?: string },
     () => cv.data as unknown as CvConfig,
   );
-  if (!resolved?.cv) throw new Error('There is no CV to score against');
-  const prompt = scorePrompt(p, cvText(resolved), prefsText(parsePrefs(career.prefs), parseAnswers(career.answers)));
-  const detail = parseScore(await generateText(store, ai, prompt));
-  const { score, gate } = totalScore(detail);
-  await updatePosting(sql, id, { score, scoreDetail: detail, gate });
+  return resolved?.cv ? cvText(resolved).trim() : '';
 }
-// Three attempts in all: a reply that isn't the JSON asked for rarely improves after that, and each one costs a call.
+
+/** Why nothing can be scored tonight (no key for the configured text provider, or no CV), or null when ready. */
+export async function scoreReady(): Promise<string | null> {
+  'use step';
+  const store = careerStore();
+  const ai = await readAiConfig(store);
+  for (const name of TEXT_PROVIDERS[ai.text.provider].keys)
+    if (!(await getSecret(getSql(), name))) return missingKey(name).message;
+  return (await cvTextOf(store)) ? null : 'There is no CV to score against: add one on the CV screen';
+}
+
+const REPLIES = 3;
+
+/**
+ * Scores one posting against the CV and prefs; a no-op once scored. A model that answers three times without the JSON
+ * asked for gives the reason back (the run records it). Provider and network errors throw: the Workflow retries the
+ * step, and if that fails too the posting stays pending for the next night. The reason travels as a return value
+ * because a thrown error reaches the workflow as message, stack and cause only, not as its class.
+ */
+export async function scorePosting(id: number): Promise<string | null> {
+  'use step';
+  const sql = getSql();
+  const store = careerStore();
+  const p = await getPosting(sql, id);
+  if (!p || p.score !== null) return null;
+  const [cv, career, ai] = await Promise.all([cvTextOf(store), readCareer(sql), readAiConfig(store)]);
+  const prompt = scorePrompt(p, cv, prefsText(parsePrefs(career.prefs), parseAnswers(career.answers)));
+  for (let reply = 1; ; reply++) {
+    const text = await generateText(store, ai, prompt);
+    let detail: ScoreDetail;
+    try {
+      detail = parseScore(text);
+    } catch (e) {
+      if (reply === REPLIES) return (e as Error).message;
+      continue;
+    }
+    const { score, gate } = totalScore(detail);
+    await updatePosting(sql, id, { score, scoreDetail: detail, gate });
+    return null;
+  }
+}
+// Provider and network errors: three attempts in all, then the posting waits for tomorrow.
 scorePosting.maxRetries = 2;
 
+/** A posting scored in the meantime keeps its score. */
 export async function markScoreFailed(id: number, error: string): Promise<void> {
   'use step';
-  await updatePosting(getSql(), id, { scoreError: error.slice(0, 500) });
+  await getSql()`update career_postings set score_error = ${error.slice(0, 500)}, scored_at = now()
+    where id = ${id} and score is null`;
 }
 
 export async function finishRun(summary: RunSummary): Promise<void> {
