@@ -342,7 +342,10 @@ test('career runs after github and before backup; an empty search is skipped', a
   const ran = await run(started);
   const busy = await run(async () => ({ running: 'wrun_1' }));
   assert.equal(starts, 2);
-  // jobs.json is backed up to git: it must not tell whether the owner is job hunting.
+  await writeCareer(sql, { prefs: { feeds: ['https://jobs.test/feed.xml'] } }, 'test');
+  await run(started);
+  assert.equal(starts, 3, 'feeds alone are a search');
+  // Every admin reads jobs.json: it must not tell whether the owner is job hunting.
   for (const r of [skipped, blank, ran, busy]) assert.deepEqual(r, { detail: 'done' });
 
   await assert.rejects(

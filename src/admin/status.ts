@@ -335,7 +335,7 @@ function backup(d: DashboardData): StatusRow {
   return { ...row, state: 'Backed up to GitHub', tone: 'ok', at: run.at, detail: run.detail, link: viewOn(run.url) };
 }
 
-/** The daily career step. Its detail is neutral on purpose (jobs.json is backed up), so the row reads only `ok`. */
+/** The daily career step. Its detail is neutral on purpose (every admin reads jobs.json): the row reads only `ok`. */
 function career(d: DashboardData): StatusRow[] {
   const run = d.runs.career;
   if (!run) return [];

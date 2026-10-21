@@ -167,13 +167,13 @@ export function dailySteps(store: PostgresStore, nightly = () => startNightly(ge
       const r = await syncGitHubFile(store, username);
       return { detail: `${r.changed ? 'updated' : 'unchanged'} · ${r.repos} repositories` };
     },
-    // jobs.json reaches the git backup, which may be public: the detail never says whether a search is set up or ran.
+    // Every admin sees jobs.json (the dashboard, db:export): the detail never says whether a search is set up or ran.
     // The real state is the owner-only career_settings (last_run, run_id).
     career: async () => {
       try {
         const prefs = parsePrefs((await readCareer(getSql())).prefs);
         const terms = [...prefs.roles, ...prefs.keywords].filter((t) => t.trim());
-        if (terms.length || prefs.watched.length) await nightly();
+        if (terms.length || prefs.watched.length || prefs.feeds.length) await nightly();
       } catch (e) {
         // runJobs logs the cause and records only the message.
         throw new Error('failed', { cause: e });
