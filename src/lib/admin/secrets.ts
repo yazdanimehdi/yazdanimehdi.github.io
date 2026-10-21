@@ -12,8 +12,14 @@ export const SECRETS = {
   HIGGSFIELD_API_KEY: 'Higgsfield API key',
   HIGGSFIELD_API_SECRET: 'Higgsfield API secret',
   SERPAPI_KEY: 'SerpApi (Google Scholar)',
+  ADZUNA_APP_ID: 'Adzuna app id',
+  ADZUNA_APP_KEY: 'Adzuna app key',
+  USAJOBS_API_KEY: 'USAJobs API key',
 } as const;
 export type SecretName = keyof typeof SECRETS;
+
+/** Job-source keys: listed and set only through the owner-only career route, never `ai/keys`. */
+export const CAREER_SECRETS: SecretName[] = ['ADZUNA_APP_ID', 'ADZUNA_APP_KEY', 'USAJOBS_API_KEY'];
 
 export interface SecretStatus {
   name: SecretName;
@@ -89,10 +95,10 @@ export async function requireSecret(sql: Sql | null, name: SecretName): Promise<
 }
 
 /** Where each key comes from. Never includes a value beyond its last four characters. */
-export async function listSecrets(sql: Sql | null): Promise<SecretStatus[]> {
+export async function listSecrets(sql: Sql | null, names?: SecretName[]): Promise<SecretStatus[]> {
   const rows = await storedRows(sql);
   return Promise.all(
-    (Object.keys(SECRETS) as SecretName[]).map(async (name) => {
+    (names ?? (Object.keys(SECRETS) as SecretName[])).map(async (name) => {
       const sealed = rows.get(name);
       const value = sealed ? await openSecret(sealed) : null;
       const base = { name, label: SECRETS[name] };
