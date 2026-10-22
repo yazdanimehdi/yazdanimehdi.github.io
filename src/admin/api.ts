@@ -44,8 +44,11 @@ export function toastError(text: string, action?: ToastAction): void {
   toasts.push({ id: ++lastToast, text, action, error: true });
 }
 
-/** Set by AdminShell from the page context; `outage` is the persistent "database unreachable" banner. */
-export const session = reactive({ mode: 'git' as AdminCtx['mode'], outage: '' });
+/**
+ * Set by AdminShell from the page context and `me`; `outage` is the persistent "database unreachable" banner,
+ * `careerReady` the job-search owner's count of postings waiting for approval (null: not the owner, or not known yet).
+ */
+export const session = reactive({ mode: 'git' as AdminCtx['mode'], outage: '', careerReady: null as number | null });
 
 export function committed(result: Pick<CommitResult, 'url' | 'warning' | 'tags' | 'detail'>): void {
   if (result.warning === 'cache-purge-failed') {

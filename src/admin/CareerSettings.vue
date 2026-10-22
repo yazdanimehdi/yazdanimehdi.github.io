@@ -4,12 +4,14 @@ import AdminSections from './AdminSections.vue';
 import AdminShell from './AdminShell.vue';
 import AdminTabLinks from './AdminTabLinks.vue';
 import FormFields from './FormFields.vue';
-import { ApiError, api, report, toast } from './api';
+import { ApiError, api, report, session, toast } from './api';
 import { text, type FieldDef } from './fields';
+import { LIMIT_FIELDS, STAGES, WORKER_KEYS, WORKERS, type WorkerChoice } from './career';
 import { detectAts } from '../lib/career/sources/detect';
 import type { ApplicationAnswers, CareerPrefs } from '../lib/career/settings';
 import type { AdminCtx } from './types';
-import type { CvStylesConfig } from '../lib/types';
+import type { CvConfig, CvStylesConfig } from '../lib/types';
+import type { SecretName, SecretStatus } from '../lib/admin/secrets';
 
 interface SourceInfo {
   id: string;
@@ -124,7 +126,33 @@ const SECTIONS = [
   { id: 'sources', label: 'Sources', fields: ['sources', 'watched', 'feeds'] },
   { id: 'cv', label: 'Tailored CV', fields: ['cvStyle'] },
   { id: 'answers', label: 'Application answers', fields: ANSWER_FIELDS.map((f) => f.key) },
+  { id: 'automation', label: 'Automation', fields: ['nightly'] },
+  { id: 'notifications', label: 'Notifications', fields: ['digest'] },
+  { id: 'worker', label: 'Drafting worker', fields: ['worker'] },
 ];
+
+/** The drafting worker as one choice; picking an agent CLI keeps the sign-in chosen before (Gemini: a key only). */
+function workerOf(p: CareerPrefs): WorkerChoice {
+  return p.worker.kind === 'cli' ? p.worker.agent : 'api';
+}
+function setWorker(v: WorkerChoice) {
+  const was = prefs.value!.worker;
+  prefs.value!.worker =
+    v === 'api'
+      ? { kind: 'api' }
+      : { kind: 'cli', agent: v, auth: v === 'gemini' ? 'key' : was.kind === 'cli' ? was.auth : 'subscription' };
+}
+const keys = ref<SecretStatus[] | null>(null);
+const keyOf = (name: SecretName) => keys.value?.find((k) => k.name === name);
+function keySet(name: SecretName) {
+  return !!keyOf(name)?.source && !keyOf(name)?.undecryptable;
+}
+/** The key the chosen agent CLI signs in with, if it is one. */
+function needed(): SecretName | null {
+  const w = prefs.value?.worker;
+  return w?.kind === 'cli' ? WORKER_KEYS[w.agent][w.auth] : null;
+}
+const cvEmail = ref('');
 
 const isOn = (s: SourceInfo) => prefs.value?.sources[s.id]?.on ?? s.defaultOn;
 function setOn(s: SourceInfo, on: boolean) {
@@ -239,6 +267,14 @@ onMounted(async () => {
     suggested.value = s.value.suggestedFeeds;
   } else report(s.reason);
   if (c.status === 'fulfilled') styles.value = c.value.data.styles.map(({ id, name }) => ({ id, name }));
+  // Only for the Notifications and Drafting worker notes: a failure leaves those notes out, not the form.
+  const [career, ai, cv] = await Promise.allSettled([
+    api<SecretStatus[]>('career/keys'),
+    api<SecretStatus[]>('ai/keys'),
+    api<{ data: CvConfig }>('config/cv'),
+  ]);
+  keys.value = [career, ai].flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
+  if (cv.status === 'fulfilled') cvEmail.value = cv.value.data.cv?.email ?? '';
 });
 </script>
 
@@ -251,7 +287,7 @@ onMounted(async () => {
       label="Job search"
       :tabs="[
         { href: `${base}/career`, label: 'Postings' },
-        { href: `${base}/career?status=ready`, label: 'Ready for approval' },
+        { href: `${base}/career?status=ready`, label: 'Ready for approval', count: session.careerReady ?? undefined },
         { href: `${base}/career/settings`, label: 'Settings', current: true },
       ]"
     />
@@ -345,6 +381,117 @@ onMounted(async () => {
             Used to fill application forms. Anything left empty is handed back to you, never guessed.
           </p>
           <FormFields :fields="ANSWER_FIELDS" :model="answers" :errors="errors" />
+        </template>
+
+        <template #automation>
+          <div class="adm-form adm-fields">
+            <fieldset class="adm-choices">
+              <legend>How far the nightly run goes</legend>
+              <label v-for="[n, label, line] in STAGES" :key="n" class="adm-check">
+                <input v-model="prefs.nightly.stage" type="radio" name="stage" :value="n" />
+                <span
+                  >{{ label }}<span class="adm-row-detail">{{ line }}</span></span
+                >
+              </label>
+            </fieldset>
+            <p class="adm-muted">Submission always waits for your approval.</p>
+          </div>
+          <h2 class="adm-subhead">Limits</h2>
+          <FormFields :fields="LIMIT_FIELDS" :model="prefs" :errors="errors" />
+        </template>
+
+        <template #notifications>
+          <p class="adm-muted">
+            The dashboard and the sidebar always show what waits for approval, and so does the Ready for approval tab.
+          </p>
+          <h2 class="adm-subhead">Email digest</h2>
+          <p v-if="keys && !keySet('RESEND_API_KEY')" class="adm-banner" role="note">
+            <span
+              >The digest is sent through Resend, and there is no Resend key yet.
+              <a :href="`${base}/ai#keys`">Add it on Integrations → Keys</a>.</span
+            >
+          </p>
+          <div class="adm-form adm-fields">
+            <label class="adm-check">
+              <input v-model="prefs.digest.on" type="checkbox" />
+              Email me a digest after each nightly run
+            </label>
+            <label class="adm-field">
+              <span>To</span>
+              <input
+                v-model="prefs.digest.to"
+                type="email"
+                autocomplete="email"
+                :placeholder="cvEmail || 'you@example.org'"
+                v-bind="errors['digest.to'] ? { 'aria-invalid': 'true' } : {}"
+              />
+              <span v-if="errors['digest.to']" class="adm-err">{{ errors['digest.to'] }}</span>
+            </label>
+            <label class="adm-field">
+              <span>From</span>
+              <input v-model="prefs.digest.from" type="text" placeholder="ScholarOS <onboarding@resend.dev>" />
+              <small
+                >onboarding@resend.dev only delivers to your Resend account’s email until you verify a domain.</small
+              >
+              <span v-if="errors['digest.from']" class="adm-err">{{ errors['digest.from'] }}</span>
+            </label>
+          </div>
+        </template>
+
+        <template #worker>
+          <div class="adm-form adm-fields">
+            <fieldset class="adm-choices">
+              <legend>Drafts, their review and form answers are written by</legend>
+              <label v-for="[id, label, line] in WORKERS" :key="id" class="adm-check">
+                <input
+                  type="radio"
+                  name="worker"
+                  :value="id"
+                  :checked="workerOf(prefs) === id"
+                  @change="setWorker(id)"
+                />
+                <span
+                  >{{ label }}<span class="adm-row-detail">{{ line }}</span></span
+                >
+              </label>
+            </fieldset>
+            <p v-if="workerOf(prefs) === 'gemini'" class="adm-muted">
+              Antigravity has no sign-in that works unattended yet, so this slot runs Gemini CLI with your Gemini API
+              key.
+            </p>
+            <fieldset v-if="prefs.worker.kind === 'cli' && prefs.worker.agent !== 'gemini'" class="adm-choices">
+              <legend>Sign in with</legend>
+              <label class="adm-check">
+                <input v-model="prefs.worker.auth" type="radio" name="auth" value="subscription" />
+                <span
+                  >Subscription<span class="adm-row-detail">{{
+                    prefs.worker.agent === 'claude'
+                      ? 'Your Claude plan, through a Claude Code token.'
+                      : 'Your ChatGPT plan, through Codex’s sign-in file.'
+                  }}</span></span
+                >
+              </label>
+              <label class="adm-check">
+                <input v-model="prefs.worker.auth" type="radio" name="auth" value="key" />
+                <span
+                  >Key<span class="adm-row-detail">{{
+                    prefs.worker.agent === 'claude'
+                      ? 'Your Anthropic API key, billed per use.'
+                      : 'Your OpenAI API key, billed per use.'
+                  }}</span></span
+                >
+              </label>
+            </fieldset>
+            <p v-if="needed()" class="adm-muted">
+              Uses {{ keyOf(needed()!)?.label ?? needed() }} (<code>{{ needed() }}</code
+              >)<template v-if="keys && !keySet(needed()!)">, which isn’t set yet</template>:
+              <a :href="`${base}/ai#keys`">Integrations → Keys</a>.
+            </p>
+            <p v-if="prefs.worker.kind === 'cli'" class="adm-muted">
+              When a subscription runs out of quota, the run stops and says so. It never falls back to paid API use.
+            </p>
+            <p class="adm-muted">Scoring always uses the API provider.</p>
+          </div>
         </template>
       </AdminSections>
     </template>

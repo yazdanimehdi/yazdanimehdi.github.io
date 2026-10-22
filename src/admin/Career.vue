@@ -2,9 +2,10 @@
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import AdminTabLinks from './AdminTabLinks.vue';
 import AdminShell from './AdminShell.vue';
-import { api, report, toast } from './api';
-import { relativeTime } from './dates';
-import { visible, isRunning, type RunStatus } from './career';
+import { api, report, session, toast } from './api';
+import { formatDateTime, relativeTime } from './dates';
+import { vDialog } from './dialog';
+import { READY_STATE, visible, isRunning, type ReadyRow, type RunStatus } from './career';
 import type { AdminCtx } from './types';
 import type { CareerPrefs } from '../lib/career/settings';
 import type { Feed, PostingSummary } from '../lib/career/types';
@@ -45,20 +46,50 @@ let timer: ReturnType<typeof setInterval> | undefined;
 
 const running = computed(() => starting.value || isRunning(run.value.status));
 
-// Ready for approval is part of Open, so either view gives its count from what it loaded; other views keep the last.
-const ready = ref(0);
+const readyRows = ref<ReadyRow[]>([]);
 async function loadRows() {
   const status = filter.value;
   try {
+    if (status === 'ready') {
+      const { rows } = await api<{ rows: ReadyRow[] }>('career/ready');
+      if (status !== filter.value) return; // a later filter's answer wins
+      readyRows.value = rows;
+      session.careerReady = rows.length;
+      return;
+    }
     const feed = await api<Feed>(`career/postings${status === 'all' ? '' : `?status=${status}`}`);
-    if (status !== filter.value) return; // a later filter's answer wins
+    if (status !== filter.value) return;
     groups.value = feed;
-    // Exact only from the Ready view's group totals: other views cap the rows per group, so no count there.
-    if (status === 'ready') ready.value = Object.values(feed).reduce((n, g) => n + g.total, 0);
   } catch (e) {
     report(e);
   } finally {
     loading.value = false;
+  }
+}
+
+/** The ready postings that are waiting for approval, the ones Approve all ready approves. */
+function waiting() {
+  return readyRows.value.filter((r) => r.state === 'ready');
+}
+const confirmAll = ref(false);
+const approving = ref(false);
+async function approveAll() {
+  confirmAll.value = false;
+  approving.value = true;
+  try {
+    const { approved, skipped } = await api<{ approved: number[]; skipped: { id: number; reason: string }[] }>(
+      'career/approve-all',
+      { method: 'POST' },
+    );
+    const sent = approved.length
+      ? `Approved ${approved.length}: each is submitted in the next few minutes`
+      : 'Nothing was approved';
+    toast(skipped.length ? `${sent}. ${skipped.length} no longer waiting, left as they were.` : `${sent}.`);
+  } catch (e) {
+    report(e);
+  } finally {
+    approving.value = false;
+    await loadRows();
   }
 }
 
@@ -140,7 +171,12 @@ onBeforeUnmount(() => {
       label="Job search"
       :tabs="[
         { href: `${base}/career`, label: 'Postings', current: filter !== 'ready' },
-        { href: `${base}/career?status=ready`, label: 'Ready for approval', current: filter === 'ready', count: ready },
+        {
+          href: `${base}/career?status=ready`,
+          label: 'Ready for approval',
+          current: filter === 'ready',
+          count: session.careerReady ?? undefined,
+        },
         { href: `${base}/career/settings`, label: 'Settings' },
       ]"
     />
@@ -199,6 +235,49 @@ onBeforeUnmount(() => {
     </div>
 
     <p v-if="loading" class="adm-muted">Loading…</p>
+    <template v-else-if="filter === 'ready'">
+      <div class="adm-ready-head">
+        <p class="adm-muted">
+          Nothing is sent until you approve. Approving submits an application with the values on its page, usually
+          within a few minutes.
+        </p>
+        <button
+          type="button"
+          class="adm-btn adm-btn-primary"
+          :disabled="!waiting().length || approving"
+          @click="confirmAll = true"
+        >
+          {{ approving ? 'Approving…' : 'Approve all ready' }}
+        </button>
+      </div>
+      <p v-if="!readyRows.length" class="adm-muted">
+        Nothing is waiting for approval. A pre-filled application shows here until you approve, skip or finish it.
+      </p>
+      <ul v-else class="adm-rows">
+        <li v-for="r in readyRows" :key="r.id">
+          <strong class="adm-row-label" :aria-label="r.score === null ? 'Not scored' : `Score ${r.score}`">{{
+            r.score ?? '–'
+          }}</strong>
+          <span class="adm-row-main">
+            {{ r.title }}
+            <span class="adm-row-detail"
+              >{{ r.company }}<template v-if="r.fields"> · {{ r.fields }} fields</template
+              ><template v-if="r.state !== 'ready'"> · {{ READY_STATE[r.state ?? 'none'] }}</template></span
+            >
+          </span>
+          <span class="adm-row-date"
+            ><template v-if="r.prefilledAt"
+              >Pre-filled <time :datetime="r.prefilledAt">{{ formatDateTime(r.prefilledAt) }}</time></template
+            ></span
+          >
+          <span class="adm-row-action"
+            ><a :href="`${base}/career/${r.id}#job-apply`" :aria-label="`Review ${r.title} at ${r.company}`"
+              >Review <span aria-hidden="true">→</span></a
+            ></span
+          >
+        </li>
+      </ul>
+    </template>
     <template v-else>
       <h2 class="adm-h2">Matches ({{ groups.matches.total }})</h2>
       <p v-if="!groups.matches.total" class="adm-muted">Nothing at or above {{ threshold }} yet.</p>
@@ -248,5 +327,36 @@ onBeforeUnmount(() => {
         <p v-if="list.total > list.rows.length" class="adm-muted">Showing the first {{ list.rows.length }}.</p>
       </details>
     </template>
+
+    <div
+      v-if="confirmAll"
+      v-dialog
+      class="adm-modal"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="adm-approve-all"
+      @keydown.esc="confirmAll = false"
+    >
+      <div>
+        <h2 id="adm-approve-all" class="adm-h2">
+          Approve {{ waiting().length === 1 ? 'this application' : `these ${waiting().length} applications` }}?
+        </h2>
+        <p>
+          Each one is approved on its own, with the values it was pre-filled with, and submitted within a few minutes.
+          Any form that changed since is stopped and handed back to you.
+        </p>
+        <ul class="adm-rows">
+          <li v-for="r in waiting()" :key="r.id">
+            <span class="adm-row-main"
+              >{{ r.title }}<span class="adm-row-detail">{{ r.company }} · {{ r.fields }} fields</span></span
+            >
+          </li>
+        </ul>
+        <div class="adm-actions">
+          <button type="button" class="adm-btn" data-autofocus @click="confirmAll = false">Cancel</button>
+          <button type="button" class="adm-btn adm-btn-primary" @click="approveAll">Approve and submit all</button>
+        </div>
+      </div>
+    </div>
   </AdminShell>
 </template>

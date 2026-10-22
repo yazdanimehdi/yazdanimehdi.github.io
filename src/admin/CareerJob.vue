@@ -1,9 +1,23 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import AdminShell from './AdminShell.vue';
 import AdminTabLinks from './AdminTabLinks.vue';
-import { api, report, toast } from './api';
-import { coverageLine, coverageState, evidenceLabel, httpUrl, visible } from './career';
+import { ApiError, api, report, session, toast } from './api';
+import { formatDateTime } from './dates';
+import { vDialog } from './dialog';
+import {
+  applyLinks,
+  coverageLine,
+  coverageState,
+  evidenceLabel,
+  fieldSource,
+  httpUrl,
+  isApplying,
+  isChoice,
+  isTicked,
+  uploadFor,
+  visible,
+} from './career';
 import { PostingText } from './PostingText';
 import type { AdminCtx } from './types';
 import { entryText } from '../lib/career/profile';
@@ -132,6 +146,10 @@ interface JobView {
 }
 
 function take(res: JobView) {
+  const app = res.posting.application;
+  // Edited values survive other saves on the page; a new pre-fill brings its own.
+  if (app?.at !== posting.value?.application?.at)
+    values.value = Object.fromEntries((app?.fields ?? []).map((f) => [f.id, f.value]));
   posting.value = res.posting;
   cvSections.value = res.cvSections;
   events.value = res.events;
@@ -166,10 +184,11 @@ function stop() {
   clearInterval(timer);
   timer = undefined;
 }
+const working = (p: Posting) => p.draftState === 'running' || isApplying(p.application?.state);
 async function poll() {
   try {
     const res = await api<JobView>(`career/postings/${props.id}`);
-    if (res.posting.draftState !== 'running') {
+    if (!working(res.posting)) {
       stop();
       take(res);
     }
@@ -287,12 +306,70 @@ function downloadLetter() {
   setTimeout(() => URL.revokeObjectURL(url));
 }
 
+// The application form: pre-filled on the server, sent only after the owner approves exactly these values.
+const app = computed(() => posting.value?.application ?? null);
+/** Called from the template: the http(s) links of the application on screen. */
+function links() {
+  return app.value && applyLinks(app.value, posting.value!.cvPdfUrl);
+}
+const values = ref<Record<string, string>>({});
+const acting = ref(false);
+const confirming = ref(false);
+
+type ApplyBody =
+  | { action: 'prefill' | 'skip' | 'handoff' | 'confirm' | 'not-sent' }
+  | { action: 'approve'; at: string; fields: { id: string; value: string }[] };
+
+/** Every apply action answers once the server has moved the application; the page then shows where it is. */
+async function apply(body: ApplyBody) {
+  acting.value = true;
+  let conflict: ApiError | null = null;
+  try {
+    const res = await api<{ queued?: boolean }>(`career/postings/${props.id}/apply`, { body });
+    if (body.action === 'approve')
+      toast(
+        res.queued === false
+          ? 'Approved. It will be submitted with the next queue run.'
+          : 'Approved: it is submitted in the next few minutes',
+      );
+    if (body.action === 'skip') toast('Skipped');
+  } catch (e) {
+    // A 409 on approve is usually a pre-fill that ran again meanwhile: those values were never approved.
+    if (body.action === 'approve' && e instanceof ApiError && e.status === 409) conflict = e;
+    else report(e);
+  } finally {
+    acting.value = false;
+  }
+  try {
+    const res = await api<JobView>(`career/postings/${props.id}`);
+    take(res);
+    if (working(res.posting)) timer ??= setInterval(poll, 5000);
+    if (conflict && body.action === 'approve') {
+      if (res.posting.application?.at !== body.at)
+        toast('This application was pre-filled again; review the new version.');
+      else report(conflict);
+    }
+  } catch (e) {
+    report(e);
+  }
+}
+function approveNow() {
+  confirming.value = false;
+  const fields = app.value!.fields.map((f) => ({ id: f.id, value: values.value[f.id] ?? f.value }));
+  void apply({ action: 'approve', at: app.value!.at, fields });
+}
+function copy(text: string) {
+  navigator.clipboard.writeText(text).then(() => toast('Copied'), report);
+}
+
 onBeforeUnmount(stop);
 onMounted(async () => {
   try {
     const res = await api<JobView>(`career/postings/${props.id}`);
     take(res);
-    if (res.posting.draftState === 'running') timer ??= setInterval(poll, 5000);
+    if (working(res.posting)) timer ??= setInterval(poll, 5000);
+    // The Ready list's Review link points at the Application form, which exists only once the posting loaded.
+    if (location.hash) void nextTick(() => document.getElementById(location.hash.slice(1))?.scrollIntoView());
   } catch (e) {
     missing.value = true;
     report(e);
@@ -308,7 +385,12 @@ onMounted(async () => {
       label="Job search"
       :tabs="[
         { href: `${base}/career`, label: 'Postings', current: posting?.status !== 'ready' },
-        { href: `${base}/career?status=ready`, label: 'Ready for approval', current: posting?.status === 'ready' },
+        {
+          href: `${base}/career?status=ready`,
+          label: 'Ready for approval',
+          current: posting?.status === 'ready',
+          count: session.careerReady ?? undefined,
+        },
         { href: `${base}/career/settings`, label: 'Settings' },
       ]"
     />
@@ -369,6 +451,227 @@ onMounted(async () => {
         </label>
       </section>
 
+      <section class="adm-card" aria-labelledby="job-apply">
+        <h2 id="job-apply" class="adm-h2">Application form</h2>
+        <template v-if="!app">
+          <p class="adm-muted">
+            A browser on the server opens the application form, fills in every field from your CV and Application
+            answers, uploads the tailored CV and letter, and stops before Submit. Nothing is sent until you approve.
+          </p>
+          <p v-if="!posting.cvPdfUrl" class="adm-muted">Draft the CV first: the form gets the tailored PDF.</p>
+          <p class="adm-actions">
+            <button
+              type="button"
+              class="adm-btn"
+              :class="{ 'adm-btn-primary': posting.cvPdfUrl }"
+              :disabled="acting || drafting || !posting.cvPdfUrl"
+              @click="apply({ action: 'prefill' })"
+            >
+              Pre-fill the application
+            </button>
+            <button type="button" class="adm-btn" :disabled="acting" @click="apply({ action: 'handoff' })">
+              Finish it myself
+            </button>
+          </p>
+        </template>
+
+        <p v-else-if="isApplying(app.state)" class="adm-apply-working" role="status">
+          {{
+            app.state === 'prefilling'
+              ? `Filling in the form on ${links()!.host}… this takes a minute or two. Nothing is sent.`
+              : `Submitting to ${links()!.host}… this takes a minute or two.`
+          }}
+        </p>
+
+        <template v-else-if="app.state === 'ready'">
+          <p>
+            Check each value, then approve. Nothing is sent until you approve; after you approve, it may be submitted
+            within minutes, with exactly these values.
+          </p>
+          <ul v-if="links()!.shots.length" class="adm-apply-shots" aria-label="Screenshots of the filled form">
+            <li v-for="(src, i) in links()!.shots" :key="src">
+              <a :href="src" target="_blank" rel="noopener noreferrer"
+                ><img
+                  :src="src"
+                  :alt="`The filled form on ${links()!.host}, screenshot ${i + 1} of ${links()!.shots.length}`"
+                  loading="lazy"
+                /><span class="adm-visually-hidden"> (opens full size in a new tab)</span></a
+              >
+            </li>
+          </ul>
+          <p class="adm-muted">
+            {{ app.fields.length }} fields · <span aria-hidden="true">*</span> required · values marked AI were drafted
+            from the posting: check them.
+          </p>
+          <ul class="adm-rows adm-apply-fields">
+            <li v-for="f in app.fields" :key="f.id">
+              <div class="adm-row-main">
+                <span class="adm-apply-head">
+                  <label :for="`apply-${f.id}`" class="adm-apply-label"
+                    >{{ visible(f.label) }}<span v-if="f.required" aria-hidden="true"> *</span
+                    ><span v-if="f.required" class="adm-visually-hidden"> (required)</span></label
+                  >
+                  <span class="adm-status" :class="{ 'adm-status-draft': fieldSource(f, values[f.id]) === 'AI' }"
+                    ><span class="adm-visually-hidden">Source: </span>{{ fieldSource(f, values[f.id]) }}</span
+                  >
+                </span>
+                <output v-if="f.kind === 'file'" :id="`apply-${f.id}`">{{ uploadFor(f) }}</output>
+                <select v-else-if="isChoice(f)" :id="`apply-${f.id}`" v-model="values[f.id]">
+                  <option value="">(not answered)</option>
+                  <option v-for="o in f.options" :key="o" :value="o">{{ visible(o) }}</option>
+                </select>
+                <span v-else-if="f.kind === 'checkbox' && !f.options?.length" class="adm-check">
+                  <input
+                    :id="`apply-${f.id}`"
+                    type="checkbox"
+                    :checked="isTicked(values[f.id])"
+                    @change="values[f.id] = ($event.target as HTMLInputElement).checked ? 'true' : ''"
+                  />
+                  {{ isTicked(values[f.id]) ? 'Ticked' : 'Not ticked' }}
+                </span>
+                <textarea
+                  v-else-if="f.kind === 'textarea'"
+                  :id="`apply-${f.id}`"
+                  v-model="values[f.id]"
+                  rows="3"
+                  maxlength="20000"
+                />
+                <input v-else :id="`apply-${f.id}`" v-model="values[f.id]" type="text" maxlength="20000" />
+                <span v-if="f.note" class="adm-row-detail">{{ visible(f.note) }}</span>
+              </div>
+            </li>
+          </ul>
+          <p class="adm-actions">
+            <button type="button" class="adm-btn adm-btn-primary" :disabled="acting" @click="confirming = true">
+              Approve and submit
+            </button>
+            <button type="button" class="adm-btn" :disabled="acting" @click="apply({ action: 'skip' })">Skip</button>
+            <button type="button" class="adm-btn" :disabled="acting" @click="apply({ action: 'handoff' })">
+              Finish it myself
+            </button>
+          </p>
+        </template>
+
+        <template v-else-if="app.state === 'handoff'">
+          <h3 class="adm-subhead">Finish this one yourself</h3>
+          <p v-if="app.reason">{{ visible(app.reason) }}</p>
+          <p class="adm-actions">
+            <a
+              v-if="links()!.form"
+              class="adm-btn adm-btn-primary"
+              :href="links()!.form"
+              target="_blank"
+              rel="noopener noreferrer nofollow"
+              >Open the form <span aria-hidden="true">↗</span></a
+            >
+            <a v-if="links()!.cv" class="adm-btn" :href="links()!.cv" target="_blank" rel="noopener noreferrer"
+              >Tailored CV (PDF) <span aria-hidden="true">↗</span></a
+            >
+            <a v-if="links()!.letter" class="adm-btn" :href="links()!.letter" target="_blank" rel="noopener noreferrer"
+              >Cover letter (PDF) <span aria-hidden="true">↗</span></a
+            >
+            <button v-if="posting.letter" type="button" class="adm-btn" @click="copyLetter">Copy the letter</button>
+          </p>
+          <template v-if="app.fields.some((f) => f.kind !== 'file')">
+            <p class="adm-muted">The values prepared for the form, to paste in:</p>
+            <ul class="adm-rows">
+              <li v-for="f in app.fields.filter((x) => x.kind !== 'file')" :key="f.id">
+                <span class="adm-row-main"
+                  >{{ visible(f.label) }}<span v-if="f.required" aria-hidden="true"> *</span
+                  ><span v-if="f.required" class="adm-visually-hidden"> (required)</span>
+                  <span class="adm-row-detail adm-apply-value">{{
+                    f.value ? visible(f.value) : f.note ? visible(f.note) : 'No value prepared'
+                  }}</span></span
+                >
+                <button
+                  v-if="f.value"
+                  type="button"
+                  class="adm-btn adm-btn-small"
+                  :aria-label="`Copy ${visible(f.label)}`"
+                  @click="copy(f.value)"
+                >
+                  Copy
+                </button>
+              </li>
+            </ul>
+          </template>
+          <p class="adm-actions">
+            <button
+              type="button"
+              class="adm-btn adm-btn-small"
+              :disabled="acting || !posting.cvPdfUrl"
+              @click="apply({ action: 'prefill' })"
+            >
+              Pre-fill again
+            </button>
+          </p>
+        </template>
+
+        <template v-else-if="app.state === 'submitted'">
+          <p>
+            Submitted to {{ links()!.host }} on <time :datetime="app.at">{{ formatDateTime(app.at) }}</time
+            >.
+          </p>
+          <a
+            v-if="links()!.confirmation"
+            class="adm-apply-shot"
+            :href="links()!.confirmation"
+            target="_blank"
+            rel="noopener noreferrer"
+            ><img :src="links()!.confirmation" :alt="`The confirmation page on ${links()!.host}`" loading="lazy" /><span
+              class="adm-visually-hidden"
+            >
+              (opens full size in a new tab)</span
+            ></a
+          >
+        </template>
+
+        <template v-else-if="app.state === 'unconfirmed'">
+          <p>Submitted, but the site didn’t confirm it. Check your email or the employer’s portal.</p>
+          <p v-if="app.reason" class="adm-muted">{{ visible(app.reason) }}</p>
+          <a
+            v-if="links()!.confirmation"
+            class="adm-apply-shot"
+            :href="links()!.confirmation"
+            target="_blank"
+            rel="noopener noreferrer"
+            ><img
+              :src="links()!.confirmation"
+              :alt="`The page on ${links()!.host} after submitting`"
+              loading="lazy"
+            /><span class="adm-visually-hidden"> (opens full size in a new tab)</span></a
+          >
+          <p class="adm-actions">
+            <button type="button" class="adm-btn" :disabled="acting" @click="apply({ action: 'confirm' })">
+              Mark as submitted
+            </button>
+            <button type="button" class="adm-btn" :disabled="acting" @click="apply({ action: 'not-sent' })">
+              It wasn’t sent
+            </button>
+          </p>
+        </template>
+
+        <template v-else>
+          <p class="adm-err">
+            {{ app.state === 'changed' ? 'The form changed since it was pre-filled.' : 'This didn’t work.' }}
+            <template v-if="app.reason">{{ visible(app.reason) }}</template>
+          </p>
+          <p class="adm-actions">
+            <button
+              type="button"
+              class="adm-btn adm-btn-primary"
+              :disabled="acting || !posting.cvPdfUrl"
+              @click="apply({ action: 'prefill' })"
+            >
+              {{ app.state === 'changed' ? 'Pre-fill again' : 'Retry' }}
+            </button>
+            <button type="button" class="adm-btn" :disabled="acting" @click="apply({ action: 'handoff' })">
+              Finish it myself
+            </button>
+          </p>
+        </template>
+      </section>
+
       <section class="adm-card" aria-labelledby="job-draft">
         <h2 id="job-draft" class="adm-h2">Application draft</h2>
         <p aria-live="polite" class="adm-muted">
@@ -392,7 +695,12 @@ onMounted(async () => {
         </div>
         <label class="adm-field">
           <span>Instruction (optional)</span>
-          <input v-model="instruction.all" maxlength="500" placeholder="e.g. lead with the teaching experience" />
+          <input
+            v-model="instruction.all"
+            type="text"
+            maxlength="500"
+            placeholder="e.g. lead with the teaching experience"
+          />
         </label>
         <p class="adm-actions">
           <button class="adm-btn" :disabled="drafting" @click="draft('all')">
@@ -419,7 +727,7 @@ onMounted(async () => {
         <iframe v-if="embed" :src="embed" title="Tailored CV preview" class="adm-job-pdf" />
         <label class="adm-field">
           <span>Regenerate with an instruction</span>
-          <input v-model="instruction.cv" maxlength="500" placeholder="e.g. one page, drop the awards" />
+          <input v-model="instruction.cv" type="text" maxlength="500" placeholder="e.g. one page, drop the awards" />
         </label>
         <p class="adm-actions">
           <button class="adm-btn" :disabled="drafting" @click="draft('cv')">Regenerate CV</button>
@@ -453,7 +761,7 @@ onMounted(async () => {
                   <label v-if="e.text === undefined"><input v-model="e.on" type="checkbox" /> {{ e.label }}</label>
                   <label v-else class="adm-field">
                     <span><input v-model="e.on" type="checkbox" /> Line {{ e.ref + 1 }}</span>
-                    <input v-if="e.on" v-model="e.text" maxlength="2000" />
+                    <input v-if="e.on" v-model="e.text" type="text" maxlength="2000" />
                   </label>
                   <label v-if="e.on && e.highlights !== undefined" class="adm-field">
                     <span>Highlights (at most {{ e.max }})</span>
@@ -461,7 +769,7 @@ onMounted(async () => {
                   </label>
                   <label v-if="e.on && e.details !== undefined" class="adm-field">
                     <span>Items (reorder or remove; no new ones)</span>
-                    <input v-model="e.details" maxlength="2000" />
+                    <input v-model="e.details" type="text" maxlength="2000" />
                   </label>
                 </div>
               </template>
@@ -491,7 +799,12 @@ onMounted(async () => {
         </p>
         <label class="adm-field">
           <span>Regenerate with an instruction</span>
-          <input v-model="instruction.letter" maxlength="500" placeholder="e.g. warmer, mention remote work" />
+          <input
+            v-model="instruction.letter"
+            type="text"
+            maxlength="500"
+            placeholder="e.g. warmer, mention remote work"
+          />
         </label>
         <p class="adm-actions">
           <button class="adm-btn" :disabled="drafting" @click="draft('letter')">Regenerate letter</button>
@@ -552,7 +865,7 @@ onMounted(async () => {
         </p>
         <label class="adm-field">
           <span>Regenerate with an instruction</span>
-          <input v-model="instruction.answers" maxlength="500" placeholder="e.g. keep answers short" />
+          <input v-model="instruction.answers" type="text" maxlength="500" placeholder="e.g. keep answers short" />
         </label>
         <p class="adm-actions">
           <button class="adm-btn" :disabled="drafting" @click="draft('answers')">
@@ -585,6 +898,28 @@ onMounted(async () => {
           </li>
         </ul>
       </section>
+
+      <div
+        v-if="confirming && app"
+        v-dialog
+        class="adm-modal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="adm-apply-confirm"
+        @keydown.esc="confirming = false"
+      >
+        <div>
+          <h2 id="adm-apply-confirm" class="adm-h2">Submit this application?</h2>
+          <p>
+            This sends the form on {{ links()!.host }} with the {{ app.fields.length }} values you checked, usually
+            within a few minutes. It can’t be taken back once it is sent.
+          </p>
+          <div class="adm-actions">
+            <button type="button" class="adm-btn" data-autofocus @click="confirming = false">Cancel</button>
+            <button type="button" class="adm-btn adm-btn-primary" @click="approveNow">Approve and submit</button>
+          </div>
+        </div>
+      </div>
     </template>
   </AdminShell>
 </template>
