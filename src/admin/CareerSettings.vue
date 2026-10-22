@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import AdminSections from './AdminSections.vue';
 import AdminShell from './AdminShell.vue';
+import AdminTabLinks from './AdminTabLinks.vue';
 import FormFields from './FormFields.vue';
 import { ApiError, api, report, toast } from './api';
 import { text, type FieldDef } from './fields';
@@ -28,8 +30,13 @@ const suggested = ref<{ label: string; url: string }[]>([]);
 const styles = ref<{ id: string; name: string }[]>([]);
 const saving = ref(false);
 const errors = ref<Record<string, string>>({});
-// Which sections hold suggestions not yet saved; the banner shows while either does.
-const unsaved = ref({ prefs: false, answers: false });
+// Suggestions filled in and not yet saved: the banner shows until Save.
+const filled = ref(false);
+const section = ref('');
+// What was loaded or last saved, to tell whether the form has unsaved changes.
+const snapshot = () => JSON.stringify([prefs.value, answers.value, floor.value]);
+const saved = ref('');
+const dirty = computed(() => !!saved.value && snapshot() !== saved.value);
 const suggestError = ref('');
 const suggesting = ref(false);
 
@@ -111,6 +118,14 @@ const ANSWER_FIELDS: FieldDef[] = [
   text('eeo.disability', 'Disability status'),
 ];
 
+// `fields`: the error keys (prefs and answers paths, unprefixed) each section owns, for its error dot.
+const SECTIONS = [
+  { id: 'want', label: 'What I want', fields: [...WANT_FIELDS.map((f) => f.key), 'salaryFloor'] },
+  { id: 'sources', label: 'Sources', fields: ['sources', 'watched', 'feeds'] },
+  { id: 'cv', label: 'Tailored CV', fields: ['cvStyle'] },
+  { id: 'answers', label: 'Application answers', fields: ANSWER_FIELDS.map((f) => f.key) },
+];
+
 const isOn = (s: SourceInfo) => prefs.value?.sources[s.id]?.on ?? s.defaultOn;
 function setOn(s: SourceInfo, on: boolean) {
   const p = prefs.value!;
@@ -152,13 +167,13 @@ async function suggest(replace: boolean) {
     for (const k of SUGGESTED_PREFS)
       if ((replace && k !== 'locations') || !p[k].length) {
         (p as Record<string, unknown>)[k] = s.prefs[k];
-        unsaved.value.prefs = true;
+        filled.value = true;
       }
     const a = answers.value!;
     const fill = <K extends 'phone' | 'address' | 'links'>(k: K, empty: boolean) => {
       if (!empty || !s.answers[k].length) return;
       a[k] = s.answers[k];
-      unsaved.value.answers = true;
+      filled.value = true;
     };
     fill('phone', !a.phone.trim());
     fill('address', !a.address.trim());
@@ -177,6 +192,7 @@ async function load() {
     prefs.value = s.prefs;
     answers.value = s.answers;
     floor.value = { ...s.prefs.salaryFloor };
+    saved.value = snapshot();
     const p = s.prefs;
     if (![p.roles, p.keywords, p.fields, p.watched, p.feeds].some((l) => l.length)) void suggest(false);
   } catch (e) {
@@ -184,23 +200,23 @@ async function load() {
   }
 }
 
-async function save(body: { prefs: CareerPrefs } | { answers: ApplicationAnswers }) {
+/** Preferences and answers in one PUT; a field error opens the section that holds it. */
+async function save() {
+  const f = floor.value;
+  const salaryFloor =
+    f.amount === undefined ? null : { amount: f.amount, currency: f.currency ?? '', period: f.period ?? 'year' };
   saving.value = true;
   errors.value = {};
   try {
     const s = await api<{ prefs: CareerPrefs; answers: ApplicationAnswers }>('career/settings', {
       method: 'PUT',
-      body,
+      body: { prefs: { ...prefs.value!, salaryFloor }, answers: answers.value },
     });
-    // Only the part sent is replaced, so the other section keeps its unsaved edits and suggestions.
-    if ('prefs' in body) {
-      prefs.value = s.prefs;
-      floor.value = { ...s.prefs.salaryFloor };
-      unsaved.value.prefs = false;
-    } else {
-      answers.value = s.answers;
-      unsaved.value.answers = false;
-    }
+    prefs.value = s.prefs;
+    answers.value = s.answers;
+    floor.value = { ...s.prefs.salaryFloor };
+    saved.value = snapshot();
+    filled.value = false;
     suggestError.value = '';
     toast('Saved');
   } catch (e) {
@@ -210,13 +226,6 @@ async function save(body: { prefs: CareerPrefs } | { answers: ApplicationAnswers
   } finally {
     saving.value = false;
   }
-}
-
-function savePrefs() {
-  const f = floor.value;
-  const salaryFloor =
-    f.amount === undefined ? null : { amount: f.amount, currency: f.currency ?? '', period: f.period ?? 'year' };
-  return save({ prefs: { ...prefs.value!, salaryFloor } as CareerPrefs });
 }
 
 onMounted(async () => {
@@ -234,117 +243,110 @@ onMounted(async () => {
 </script>
 
 <template>
-  <AdminShell :ctx="ctx" active="career" title="Job search settings">
-    <p><a :href="`${base}/career`">← Back to the feed</a></p>
-    <p class="adm-muted">Keys for job sources are on <a :href="`${base}/ai#keys`">Integrations → Keys</a>.</p>
+  <AdminShell :ctx="ctx" active="career" title="Job search settings" :dirty="dirty">
+    <template #actions>
+      <button type="button" class="adm-btn adm-btn-primary" :disabled="saving || !prefs" @click="save">Save</button>
+    </template>
+    <AdminTabLinks
+      label="Job search"
+      :tabs="[
+        { href: `${base}/career`, label: 'Postings' },
+        { href: `${base}/career?status=ready`, label: 'Ready for approval' },
+        { href: `${base}/career/settings`, label: 'Settings', current: true },
+      ]"
+    />
 
     <template v-if="prefs && answers">
       <p v-if="suggestError" class="adm-banner adm-banner-error" role="alert">
         {{ suggestError }}
         <a v-if="/ is not set/.test(suggestError)" :href="`${base}/ai#keys`">Add the key</a>
       </p>
-      <p v-else-if="unsaved.prefs || unsaved.answers" class="adm-banner" role="status">
+      <p v-else-if="filled" class="adm-banner" role="status">
         Suggested from your CV and publications. Review, then Save.
       </p>
-      <fieldset class="adm-group">
-        <legend>What I want</legend>
-        <div class="adm-actions">
-          <button type="button" class="adm-btn adm-btn-small" :disabled="suggesting" @click="suggest(true)">
-            {{ suggesting ? 'Suggesting…' : 'Suggest from my site' }}
-          </button>
-        </div>
-        <FormFields :fields="WANT_FIELDS" :model="prefs" :errors="errors" />
-        <FormFields :fields="FLOOR_FIELDS" :model="floor" />
-      </fieldset>
-
-      <fieldset class="adm-group">
-        <legend>Sources</legend>
-        <div class="adm-form">
-          <div v-for="s in sources" :key="s.id" class="adm-field">
-            <label class="adm-check">
-              <input
-                type="checkbox"
-                :checked="isOn(s)"
-                @change="setOn(s, ($event.target as HTMLInputElement).checked)"
-              />
-              {{ s.label }}
-            </label>
-            <small v-if="s.needs.length"
-              >Needs {{ s.needs.join(', ') }} (<a :href="`${base}/ai#keys`">Integrations → Keys</a>).</small
-            >
-            <small v-if="s.warning" class="adm-err" role="note">{{ s.warning }}</small>
-            <label v-for="o in SOURCE_OPTIONS[s.id] ?? []" :key="o.key" class="adm-field">
-              <span>{{ s.label }}: {{ o.label }}</span>
-              <input
-                type="text"
-                :value="option(s.id, o.key)"
-                :placeholder="o.placeholder"
-                @input="setOption(s, o.key, ($event.target as HTMLInputElement).value)"
-              />
-            </label>
-          </div>
-        </div>
-      </fieldset>
-
-      <fieldset class="adm-group">
-        <legend>Watched companies</legend>
-        <FormFields :fields="WATCHED_FIELDS" :model="prefs" :errors="errors" />
-        <ul v-if="prefs.watched.length" class="adm-rows">
-          <li v-for="(url, i) in prefs.watched" :key="i">
-            <span class="adm-row-main">{{ url }}</span>
-            <span class="adm-row-date">{{ boardLabel(url) }}</span>
-          </li>
-        </ul>
-      </fieldset>
-
-      <fieldset class="adm-group">
-        <legend>Feeds</legend>
-        <FormFields :fields="FEED_FIELDS" :model="prefs" :errors="errors" />
-        <template v-if="suggested.some((f) => !prefs!.feeds.includes(f.url))">
-          <p class="adm-muted">Suggested academic feeds:</p>
+      <AdminSections v-model="section" :sections="SECTIONS" :errors="errors">
+        <template #want>
           <div class="adm-actions">
-            <button
-              v-for="f in suggested.filter((f) => !prefs!.feeds.includes(f.url))"
-              :key="f.url"
-              type="button"
-              class="adm-btn adm-btn-small"
-              @click="addFeed(f.url)"
-            >
-              + {{ f.label }}
+            <button type="button" class="adm-btn adm-btn-small" :disabled="suggesting" @click="suggest(true)">
+              {{ suggesting ? 'Suggesting…' : 'Suggest from my site' }}
             </button>
           </div>
+          <FormFields :fields="WANT_FIELDS" :model="prefs" :errors="errors" />
+          <FormFields :fields="FLOOR_FIELDS" :model="floor" />
         </template>
-      </fieldset>
 
-      <fieldset class="adm-group">
-        <legend>CV style for tailored CVs</legend>
-        <label class="adm-field">
-          <span>Style</span>
-          <select v-model="prefs.cvStyle">
-            <option value="">Public style</option>
-            <option v-for="s in styles" :key="s.id" :value="s.id">{{ s.name }}</option>
-          </select>
-        </label>
-      </fieldset>
+        <template #sources>
+          <p class="adm-muted">Keys for job sources are on <a :href="`${base}/ai#keys`">Integrations → Keys</a>.</p>
+          <div class="adm-form">
+            <div v-for="s in sources" :key="s.id" class="adm-field">
+              <label class="adm-check">
+                <input
+                  type="checkbox"
+                  :checked="isOn(s)"
+                  @change="setOn(s, ($event.target as HTMLInputElement).checked)"
+                />
+                {{ s.label }}
+              </label>
+              <small v-if="s.needs.length"
+                >Needs {{ s.needs.join(', ') }} (<a :href="`${base}/ai#keys`">Integrations → Keys</a>).</small
+              >
+              <small v-if="s.warning" class="adm-err" role="note">{{ s.warning }}</small>
+              <label v-for="o in SOURCE_OPTIONS[s.id] ?? []" :key="o.key" class="adm-field">
+                <span>{{ s.label }}: {{ o.label }}</span>
+                <input
+                  type="text"
+                  :value="option(s.id, o.key)"
+                  :placeholder="o.placeholder"
+                  @input="setOption(s, o.key, ($event.target as HTMLInputElement).value)"
+                />
+              </label>
+            </div>
+          </div>
 
-      <div class="adm-actions">
-        <button type="button" class="adm-btn adm-btn-primary" :disabled="saving" @click="savePrefs">
-          Save preferences
-        </button>
-      </div>
+          <h2 class="adm-subhead">Watched companies</h2>
+          <FormFields :fields="WATCHED_FIELDS" :model="prefs" :errors="errors" />
+          <ul v-if="prefs.watched.length" class="adm-rows">
+            <li v-for="(url, i) in prefs.watched" :key="i">
+              <span class="adm-row-main">{{ url }}</span>
+              <span class="adm-row-date">{{ boardLabel(url) }}</span>
+            </li>
+          </ul>
 
-      <fieldset class="adm-group">
-        <legend>Application answers</legend>
-        <p class="adm-muted">
-          Used to fill application forms. Anything left empty is handed back to you, never guessed.
-        </p>
-        <FormFields :fields="ANSWER_FIELDS" :model="answers" :errors="errors" />
-        <div class="adm-actions">
-          <button type="button" class="adm-btn adm-btn-primary" :disabled="saving" @click="save({ answers: answers! })">
-            Save answers
-          </button>
-        </div>
-      </fieldset>
+          <h2 class="adm-subhead">Feeds</h2>
+          <FormFields :fields="FEED_FIELDS" :model="prefs" :errors="errors" />
+          <template v-if="suggested.some((f) => !prefs!.feeds.includes(f.url))">
+            <p class="adm-muted">Suggested academic feeds:</p>
+            <div class="adm-actions">
+              <button
+                v-for="f in suggested.filter((f) => !prefs!.feeds.includes(f.url))"
+                :key="f.url"
+                type="button"
+                class="adm-btn adm-btn-small"
+                @click="addFeed(f.url)"
+              >
+                + {{ f.label }}
+              </button>
+            </div>
+          </template>
+        </template>
+
+        <template #cv>
+          <label class="adm-field">
+            <span>CV style for tailored CVs</span>
+            <select v-model="prefs.cvStyle">
+              <option value="">Public style</option>
+              <option v-for="s in styles" :key="s.id" :value="s.id">{{ s.name }}</option>
+            </select>
+          </label>
+        </template>
+
+        <template #answers>
+          <p class="adm-muted">
+            Used to fill application forms. Anything left empty is handed back to you, never guessed.
+          </p>
+          <FormFields :fields="ANSWER_FIELDS" :model="answers" :errors="errors" />
+        </template>
+      </AdminSections>
     </template>
   </AdminShell>
 </template>
