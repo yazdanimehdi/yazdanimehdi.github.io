@@ -11,6 +11,18 @@ const emptyToUndefined = z
 /** Same but with .url() validation after stripping empties. */
 const optionalUrl = emptyToUndefined.pipe(z.string().url().optional());
 
+/** An absolute http(s) URL, or a same-site path (`/images/x.pdf`, what a git-mode upload yields); not `//host` or a scheme. */
+const urlOrSitePath = emptyToUndefined.pipe(
+  z
+    .string()
+    .refine((v) =>
+      v.startsWith('/')
+        ? !v.startsWith('//') && !v.includes('\\')
+        : /^https?:\/\//i.test(v) && z.string().url().safeParse(v).success,
+    )
+    .optional(),
+);
+
 /** Same but with .email() validation after stripping empties. */
 const optionalEmail = emptyToUndefined.pipe(z.string().email().optional());
 
@@ -110,7 +122,7 @@ export const publicationsSchema = <I extends z.ZodTypeAny>(image: ImageFn<I>) =>
     year: z.number(),
     doi: emptyToUndefined,
     url: optionalUrl,
-    pdf: optionalUrl,
+    pdf: urlOrSitePath,
     bibtex: z.string().optional(),
     type: z.enum(['journal', 'conference', 'preprint', 'workshop', 'thesis', 'book-chapter']),
     featured: z.boolean().default(false),

@@ -707,6 +707,8 @@ Google Scholar papers into draft posts, using your own provider keys.
   value you have are unticked, each value shows its source, and a change you decline is not offered again. The
   sources are free and need no key, and their rate limits are respected. Your own fields are never touched: nothing
   is replaced unless you tick it.
+- **Upload PDF.** Next to a paper's PDF field, **Upload PDF** stores the file with the site's media (4 MB max) and
+  fills in its link; uploaded PDFs aren't listed on the Media screen.
 - **Git mode.** The weekly Scholar GitHub Action (`sync-scholar.yml`) only adds new papers and fills empty fields; it
   no longer overwrites a title, authors, venue or year you already have.
 - **Cost.** Each paper post is one writing call and one image call on your provider accounts. Scholar is read
