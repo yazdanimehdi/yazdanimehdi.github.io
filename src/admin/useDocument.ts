@@ -84,7 +84,7 @@ export function useDocument<T extends object>() {
     conflict: false,
     saving: false,
     /** The open value differs from what was loaded or last saved. */
-    dirty: computed(() => !doc.readonly && !!doc.current && JSON.stringify(doc.current) !== baseline.value),
+    dirty: computed((): boolean => !doc.readonly && !!doc.current && JSON.stringify(doc.current) !== baseline.value),
     async open(key: string, load: Loader<T>) {
       doc.key = key;
       loader = load;
