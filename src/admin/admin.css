@@ -508,7 +508,8 @@
   font-size: 15px;
   cursor: pointer;
 }
-.adm-filter button[aria-pressed='true'] {
+.adm-filter button[aria-pressed='true'],
+.adm-filter button[aria-selected='true'] {
   border-block-end-color: var(--adm-ink);
   color: var(--adm-ink);
   font-weight: 500;
@@ -561,6 +562,283 @@
 .adm-run > p {
   margin: 0;
   font-variant-numeric: tabular-nums;
+}
+/* The reading room: the paper (own scroll) beside Summary · Chat · Notes from 1024px; one column of tabs below. */
+.adm-room-head {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.adm-room-head > p {
+  margin: 0;
+}
+.adm-room-head > p a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--adm-touch);
+}
+.adm-room-panel .adm-subhead + .adm-rows {
+  border-block-start: 0;
+}
+.adm-room-head .adm-btn,
+.adm-room-head select,
+.adm-room-head input {
+  min-height: var(--adm-touch);
+}
+.adm .adm-room-add {
+  inline-size: auto;
+  max-inline-size: 100%;
+}
+.adm .adm-room-ref {
+  flex: 1;
+  inline-size: auto;
+  min-width: 12rem;
+  max-inline-size: 28rem;
+}
+.adm-room-title {
+  max-inline-size: 640px;
+}
+.adm-room {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.adm-room-paper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.adm-room-side,
+.adm-room-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+@media (min-width: 1024px) {
+  .adm-room {
+    display: grid;
+    grid-template-columns: minmax(0, 68ch) minmax(300px, 1fr);
+    gap: 40px;
+    align-items: start;
+  }
+  .adm-room-paper,
+  .adm-room-side {
+    position: sticky;
+    inset-block-start: calc(var(--adm-head-h, 64px) + 12px);
+    max-block-size: calc(100dvh - var(--adm-head-h, 64px) - 24px);
+    overflow-y: auto;
+    padding-inline-end: 8px;
+  }
+}
+.adm-room-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+.adm-room-label > p {
+  margin: 0;
+  flex: 1 1 20rem;
+}
+.adm-room-upload {
+  position: relative;
+  min-height: var(--adm-touch);
+}
+.adm-room-upload input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.adm-room-upload:focus-within {
+  outline: 2px solid var(--adm-accent);
+  outline-offset: 2px;
+}
+.adm-paper-text {
+  max-inline-size: 68ch;
+  font-family: var(--font-serif);
+  font-size: 17px;
+  line-height: 1.6;
+  overflow-wrap: break-word;
+}
+.adm-paper-text p,
+.adm-paper-text figure {
+  margin: 0 0 1em;
+}
+.adm-paper-text h3,
+.adm-paper-text h4,
+.adm-paper-text h5 {
+  margin: 1.4em 0 0.5em;
+  font-family: var(--font-sans);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+.adm-paper-text h3 {
+  font-size: 18px;
+}
+.adm-paper-text figcaption {
+  font-size: 15px;
+}
+.adm-paper-text figure a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--adm-touch);
+  font-family: var(--font-sans);
+  font-size: 14px;
+}
+.adm-paper-text [tabindex='-1'] {
+  border-radius: 4px;
+  transition: background-color 0.6s;
+}
+.adm-paper-text [tabindex='-1']:focus {
+  outline: none;
+}
+.adm-paper-text mark {
+  background: color-mix(in srgb, var(--adm-warn-rule) 45%, transparent);
+  box-shadow: inset 0 -2px var(--adm-warn-rule);
+  color: inherit;
+  cursor: pointer;
+}
+/* A cited passage, for 2 s after its citation was followed. */
+.adm-paper-text .is-flash {
+  background: var(--ed-selection, #dce3f5);
+  transition: none;
+}
+.adm-room-tool {
+  position: absolute;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px;
+  inline-size: max-content;
+  max-inline-size: min(280px, 100%);
+  padding: 6px;
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+  background: var(--adm-paper);
+  box-shadow: var(--adm-float);
+  font-size: 14px;
+}
+.adm-room-tool p {
+  margin: 4px 6px;
+}
+.adm-room-tool textarea {
+  flex: 1 0 100%;
+}
+.adm-room-tool .adm-btn,
+.adm-room-ask .adm-btn,
+.adm-room-chat .adm-btn,
+.adm-room-panel .adm-actions .adm-btn,
+.adm-room-panel .adm-run .adm-btn {
+  min-height: var(--adm-touch);
+}
+/* Cites read as small links in the text; their hit area grows to 44px without moving the line. */
+.adm-cite {
+  position: relative;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--adm-accent);
+  font: inherit;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* (.adm qualifies it past the phone rule that grows every button to 44px: the ::after carries the target) */
+.adm button.adm-cite {
+  min-height: 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+button.adm-cite::after {
+  content: '';
+  position: absolute;
+  inset: -13px -4px;
+}
+button.adm-cite:disabled {
+  color: var(--adm-muted);
+  text-decoration: none;
+  cursor: default;
+}
+span.adm-cite {
+  color: var(--adm-muted);
+}
+.adm-claims section + section {
+  margin-block-start: 8px;
+}
+.adm-claims h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.adm-claims ul {
+  margin: 0;
+  padding-inline-start: 1.2em;
+  display: grid;
+  gap: 8px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+.adm-answer {
+  font-size: 15px;
+  line-height: 1.5;
+}
+.adm-answer > :first-child {
+  margin-block-start: 0;
+}
+.adm-answer h4 {
+  margin: 1em 0 0.4em;
+  font-size: 15px;
+}
+.adm-answer code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+.adm-room-chat {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.adm-room-chat > li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.adm-room-chat .is-question p {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--adm-tint);
+  font-weight: 500;
+  white-space: pre-wrap;
+}
+.adm-room-ask {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+.adm-room-panel > p {
+  margin: 0;
+}
+.adm-room-quote {
+  min-height: var(--adm-touch);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--adm-accent);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
 }
 /* Reading: Save and Dismiss at each paper row's end, 44px targets at every width. */
 .adm-reading-actions {
