@@ -22,7 +22,7 @@ const daysBefore = (d: string, n: number) =>
   new Date(Date.parse(`${d}T00:00:00Z`) - n * 86_400_000).toISOString().slice(0, 10);
 const sixtyDaysBefore = (d: string) => daysBefore(d, 60);
 /** OpenAlex types that are papers: no datasets, dissertations, paratext (journal records) or software. */
-const PAPER_TYPES = 'article|preprint|review';
+const PAPER_TYPES = 'article|preprint|review|conference-paper';
 
 /** An arXiv paper with one source's signals. */
 function arxivPaper(

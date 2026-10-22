@@ -91,7 +91,7 @@ const SELECT =
 
 test('fetchTraction openalex adds api_key only when given', async () => {
   const prefs = openalexPrefs([{ id: 'subfields/1702', name: 'Artificial Intelligence' }]);
-  const url = `https://api.openalex.org/works?filter=primary_topic.subfield.id:1702,from_publication_date:2026-08-23,type:article|preprint|review,is_paratext:false&sort=cited_by_count:desc&per_page=50&${SELECT}`;
+  const url = `https://api.openalex.org/works?filter=primary_topic.subfield.id:1702,from_publication_date:2026-08-23,type:article|preprint|review|conference-paper,is_paratext:false&sort=cited_by_count:desc&per_page=50&${SELECT}`;
   const without = fake([['api.openalex.org/works', works]]);
   const papers = await fetchTraction('openalex', prefs, without.get, '2026-10-22');
   assert.deepEqual(without.urls, [url]);
@@ -113,8 +113,8 @@ test('fetchTraction openalex queries fields and subfields separately', async () 
   assert.deepEqual(
     urls.map((u) => new URL(u).searchParams.get('filter')),
     [
-      'primary_topic.field.id:17,from_publication_date:2026-08-23,type:article|preprint|review,is_paratext:false',
-      'primary_topic.subfield.id:1702|2805,from_publication_date:2026-08-23,type:article|preprint|review,is_paratext:false',
+      'primary_topic.field.id:17,from_publication_date:2026-08-23,type:article|preprint|review|conference-paper,is_paratext:false',
+      'primary_topic.subfield.id:1702|2805,from_publication_date:2026-08-23,type:article|preprint|review|conference-paper,is_paratext:false',
     ],
   );
   // The same works from both requests: one paper per key.
@@ -161,7 +161,7 @@ test('fetchTraction keeps Hugging Face papers from the last 7 days only', async 
   );
 });
 
-test('fetchTraction drops OpenAlex works that are not papers or are older than 60 days', async () => {
+test('fetchTraction keeps OpenAlex papers (conference papers too) from the last 60 days only', async () => {
   const [dataset, preprint, article] = json('reading/openalex-works.json').results;
   const old = {
     ...article,
@@ -176,14 +176,24 @@ test('fetchTraction drops OpenAlex works that are not papers or are older than 6
     publication_date: null,
   };
   const paratext = { ...article, id: 'https://openalex.org/W3', doi: 'https://doi.org/10.1/journal', type: 'paratext' };
+  const conference = {
+    ...article,
+    id: 'https://openalex.org/W4',
+    doi: 'https://doi.org/10.1/conf',
+    type: 'conference-paper',
+    publication_date: '2026-10-01',
+  };
   const { get } = fake([
-    ['api.openalex.org/works', () => JSON.stringify({ results: [dataset, preprint, article, old, undated, paratext] })],
+    [
+      'api.openalex.org/works',
+      () => JSON.stringify({ results: [dataset, preprint, article, old, undated, paratext, conference] }),
+    ],
   ]);
   const prefs = openalexPrefs([{ id: 'subfields/1702', name: 'Artificial Intelligence' }]);
   const papers = await fetchTraction('openalex', prefs, get, '2026-10-22');
   assert.deepEqual(
     papers.map((p) => p.publishedAt),
-    [preprint.publication_date, article.publication_date],
+    [preprint.publication_date, article.publication_date, '2026-10-01'],
   );
 });
 

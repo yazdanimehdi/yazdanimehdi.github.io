@@ -204,10 +204,12 @@ Project 1 shipped as planned in `docs/superpowers/plans/2026-10-22-paper-digest.
   missed 6 of the week's 10 most upvoted. `week=` lists a week by upvotes too, but its API rejects ISO week 53
   (2026-W53 is this December). The line counts days from the paper's submission to Daily Papers.
 - **OpenAlex:** `cited_by_count` within the last 60 days, sorted by citations, filtered to real papers with
-  `type:article|preprint|review,is_paratext:false` (checked live). A work of another type, or with no publication date
-  or one before the 60-day window, is dropped in code too. Without the filter, subfield 1702's list on 2026-10-22 was
-  led by a dataset with 463 citations, a journal-level record and old conference papers OpenAlex dates as recent.
-  `counts_by_year` is not used: it counts by calendar year, so it shows no velocity inside a 60-day window.
+  `type:article|preprint|review|conference-paper,is_paratext:false` (checked live); conference papers count because
+  CS publishes at conferences. A work of another type, or with no publication date or one before the 60-day window, is
+  dropped in code too. Without the filter, subfield 1702's list on 2026-10-22 was led by a dataset with 463 citations
+  and a journal-level record. Two old conference papers OpenAlex dates September 2026 still pass and led that list
+  with 122 and 115 citations: OpenAlex's own date is trusted. `counts_by_year` is not used: it counts by calendar
+  year, so it shows no velocity inside a 60-day window.
 - **bioRxiv and medRxiv categories:** the regex (lowercase words, `_` for spaces) was checked against the live API
   and not widened. Every real category fits; medRxiv's "HIV/AIDS" is `hiv_aids`, and a slash makes the API ignore the
   category and return every paper.
