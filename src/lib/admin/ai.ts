@@ -13,7 +13,8 @@ import {
 } from '../ai/providers';
 import { readConfig } from './content';
 import { prepareUpload } from './media';
-import { requireSecret, secretsDb, type SecretName } from './secrets';
+import type { Sql } from '../db';
+import { getSecret, missingKey, requireSecret, secretsDb, type SecretName } from './secrets';
 import type { ContentStore, UploadResult } from './store';
 
 export async function readAiConfig(store: ContentStore): Promise<AiConfig> {
@@ -24,6 +25,13 @@ export async function readAiConfig(store: ContentStore): Promise<AiConfig> {
 async function providerKey(store: ContentStore, keys: SecretName[]): Promise<string> {
   const sql = secretsDb(store);
   return (await Promise.all(keys.map((name) => requireSecret(sql, name)))).join(':');
+}
+
+/** Why the AI can't run (no key for the configured text provider), or null. Checked before `useAiCall`. */
+export async function missingAiKey(sql: Sql, ai: AiConfig): Promise<string | null> {
+  for (const name of TEXT_PROVIDERS[ai.text.provider].keys)
+    if (!(await getSecret(sql, name))) return missingKey(name).message;
+  return null;
 }
 
 /** Runs the configured text provider. */

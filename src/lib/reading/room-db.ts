@@ -1,5 +1,3 @@
-import { getSecret, missingKey } from '../admin/secrets';
-import { TEXT_PROVIDERS, type AiConfig } from '../ai/providers';
 import type { Sql } from '../db';
 import { j, type Row } from './db';
 import type {
@@ -109,13 +107,6 @@ export async function useAiCall(sql: Sql, day: string, cap: number): Promise<boo
 export async function aiUse(sql: Sql, day: string): Promise<number> {
   const [r] = await sql<{ calls: number }>`select calls from reading_ai_use where day = ${day}::date`;
   return r?.calls ?? 0;
-}
-
-/** Why the AI can't run (no key for the configured text provider), or null. Checked before `useAiCall`. */
-export async function missingAiKey(sql: Sql, ai: AiConfig): Promise<string | null> {
-  for (const name of TEXT_PROVIDERS[ai.text.provider].keys)
-    if (!(await getSecret(sql, name))) return missingKey(name).message;
-  return null;
 }
 
 export async function getOutputs(

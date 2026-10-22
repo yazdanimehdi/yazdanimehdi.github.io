@@ -1,6 +1,6 @@
 // The nightly paper digest's steps. Each takes and returns ids and plain JSON (the workflow log stores both); pure
 // helpers live in match.ts, rank.ts and prompts.ts, since a 'use step' module exports only steps.
-import { generateText, readAiConfig } from '../admin/ai';
+import { generateText, missingAiKey, readAiConfig } from '../admin/ai';
 import { getStore } from '../admin/get-store';
 import { postgresOnly } from '../admin/http';
 import { paperLookupFor } from '../admin/papers';
@@ -20,7 +20,6 @@ import {
   writeReading,
 } from './db';
 import { sendReadingDigest } from './digest';
-import { missingAiKey } from './room-db';
 import { overlap, topByOverlap } from './match';
 import { areaPrompt, parseArea, parseScores, scorePrompt } from './prompts';
 import { profileText, readProfile } from './profile';

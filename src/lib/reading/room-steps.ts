@@ -1,12 +1,12 @@
 // The reading room's steps. Each has maxRetries = 0, so a retry never skips arXiv's crawl delay or repeats an AI call.
-import { generateText, readAiConfig } from '../admin/ai';
+import { generateText, missingAiKey, readAiConfig } from '../admin/ai';
 import { getStore } from '../admin/get-store';
 import { postgresOnly } from '../admin/http';
 import { getSql } from '../db';
 import type { Row } from './db';
 import { fetchArxivText, textNeedFor, type TextStep } from './fetch-text';
 import { allowedCites, loadGrounding } from './ground';
-import { getNotebook, missingAiKey, reserveArxivSlot, setOutput, useAiCall } from './room-db';
+import { getNotebook, reserveArxivSlot, setOutput, useAiCall } from './room-db';
 import { outputPrompt, parseOutput, pickPassages } from './room-prompts';
 import type { OutputBody, OutputKind } from './types';
 

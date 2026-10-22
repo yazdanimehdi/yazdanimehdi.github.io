@@ -1,12 +1,12 @@
 // Chat in the request: one AI call over the paper's (or notebook's) passages, the owner's profile and the earlier
 // turns. It counts against the reading room's daily cap; a failed turn stores nothing and is just asked again.
-import { generateText, readAiConfig } from '../admin/ai';
+import { generateText, missingAiKey, readAiConfig } from '../admin/ai';
 import { HttpError } from '../admin/http';
 import type { PostgresStore } from '../admin/postgres-store';
 import type { Sql } from '../db';
 import { errorText } from '../../workflows/runs';
 import { allowedCites, loadGrounding } from './ground';
-import { addChat, getNotebook, listChat, missingAiKey, searchPassages, useAiCall } from './room-db';
+import { addChat, getNotebook, listChat, searchPassages, useAiCall } from './room-db';
 import { CONTEXT_CHARS, HISTORY, chatPrompt, orQuery, parseAnswer, pickPassages } from './room-prompts';
 import type { ChatMessage, Target } from './types';
 
