@@ -247,6 +247,29 @@ test('an OpenAlex-only conference paper gets venue and abstract', async () => {
   assert.match(String(f.bibtex), /^@inproceedings\{.*booktitle = \{International Conference/s);
 });
 
+test('a built BibTeX keeps the venue and type you have, not a proposed replacement', async () => {
+  const [w] = JSON.parse(fixture('openalex.json')).results;
+  const work = {
+    ...w,
+    doi: null,
+    type: 'article',
+    primary_location: { source: { display_name: 'Journal of Something Else', type: 'journal' } },
+  };
+  const look = fake({ 'https://api.openalex.org/works?search=': JSON.stringify({ results: [work] }) });
+  const found = await findPaper(
+    { title: 'HELM: hierarchical encoding for mRNA language modeling', authors: ['M Yazdani-Jahromi'] },
+    look,
+  );
+  const { fields: f } = await completedFields(
+    found!,
+    { venue: 'PhD Dissertation, University of Central Florida', type: 'thesis' },
+    look,
+  );
+  assert.equal(f.venue, 'Journal of Something Else', 'still offered, unticked, as a replacement');
+  assert.match(String(f.bibtex), /^@misc\{.*howpublished = \{PhD Dissertation, University of Central Florida\}/s);
+  assert.doesNotMatch(String(f.bibtex), /Something Else/);
+});
+
 test('an OpenAlex work in a repository (Zenodo) is no proof of publication', async () => {
   const [w] = JSON.parse(fixture('openalex.json')).results;
   const work = {

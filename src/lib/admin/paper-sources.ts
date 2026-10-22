@@ -134,7 +134,9 @@ export function parseCrossrefWorks(json: unknown): PaperRecord[] {
         title: text(title),
         authors,
         year: Number(issued) || 0,
-        abstract: str(w.abstract) ? text(w.abstract as string) : undefined,
+        abstract: str(w.abstract)
+          ? text((w.abstract as string).replace(/<jats:title>[\s\S]*?<\/jats:title>/g, ''))
+          : undefined,
         doi: str(w.DOI),
         venue: str(list(w['container-title'])[0]),
         type: CROSSREF_TYPES[String(w.type)],

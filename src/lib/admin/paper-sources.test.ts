@@ -91,7 +91,7 @@ test('parseCrossrefWorks strips JATS from abstracts', () => {
           title: ['T'],
           DOI: '10.1/a',
           type: 'posted-content',
-          abstract: '<jats:p>Hi <jats:italic>there</jats:italic></jats:p>',
+          abstract: '<jats:title>Abstract</jats:title><jats:p>Hi <jats:italic>there</jats:italic></jats:p>',
           author: [{ family: 'Solo' }],
           issued: { 'date-parts': [[2022]] },
         },

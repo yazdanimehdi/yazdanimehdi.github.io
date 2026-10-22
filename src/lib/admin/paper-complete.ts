@@ -312,8 +312,9 @@ export async function completedFields(
       builtBibtex(key, {
         ...fields,
         year,
-        venue: fields.venue ?? current.venue,
-        type: fields.type ?? current.type,
+        // Your venue and type when you have them: a proposed replacement of either is still unticked.
+        venue: current.venue || fields.venue,
+        type: current.type || fields.type,
       }),
       own[0],
     );
