@@ -228,10 +228,10 @@ def merge_with_existing(new_pubs: list[dict], existing: list[dict]) -> list[dict
         existing_pub = existing_by_id.get(pub["id"]) or existing_by_title.get(norm_title)
 
         if existing_pub:
-            # Update existing entry, but preserve non-empty fields from existing
+            # Existing entries keep every non-empty field; Scholar only fills empty ones
             merged_pub = {**existing_pub}
             for key, value in pub.items():
-                if value and (not merged_pub.get(key) or key in ("title", "authors", "venue", "year")):
+                if value and not merged_pub.get(key):
                     merged_pub[key] = value
             merged.append(merged_pub)
         else:

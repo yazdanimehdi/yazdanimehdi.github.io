@@ -700,6 +700,15 @@ Google Scholar papers into draft posts, using your own provider keys.
   on the profile (no posts), so turning this on doesn't write a post for every old paper. Each check writes at most
   **Posts per run** posts (default three); the rest wait for the next one. A publication you delete is not imported
   again.
+- **Completing papers.** A paper that arrives from Scholar has little more than a title, so new ones are completed
+  automatically (up to 10 per run; the rest wait for the **Complete papers** button) from arXiv, bioRxiv/medRxiv,
+  Crossref/DOI, PubMed and OpenAlex: the abstract, DOI, authors, venue and year they can confirm. **Complete papers**
+  on the Publications screen reviews the same for papers you already have: empty fields are ticked, replacements of a
+  value you have are unticked, each value shows its source, and a change you decline is not offered again. The
+  sources are free and need no key, and their rate limits are respected. Your own fields are never touched: nothing
+  is replaced unless you tick it.
+- **Git mode.** The weekly Scholar GitHub Action (`sync-scholar.yml`) only adds new papers and fills empty fields; it
+  no longer overwrites a title, authors, venue or year you already have.
 - **Cost.** Each paper post is one writing call and one image call on your provider accounts. Scholar is read
   through [SerpApi](https://serpapi.com/google-scholar-author-api): one search per author per check plus one per
   paper post. The free tier (about 250 searches a month) covers one author daily plus a few new papers.
