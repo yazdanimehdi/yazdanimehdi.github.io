@@ -566,7 +566,8 @@
   flex-direction: column;
   gap: 4px;
 }
-.adm-field > span:first-child {
+.adm-field > span:first-child,
+.adm-field > label:first-child {
   font-size: 13px;
   font-weight: 500;
 }
@@ -637,8 +638,58 @@
   margin: 0;
   min-width: 0;
 }
+/* Fields sit at a reading measure; short values get short inputs. */
+.adm-fields {
+  max-inline-size: 640px;
+}
+.adm-form > .adm-field > input[type='number'] {
+  inline-size: calc(10ch + 22px);
+}
 .adm-color-row {
-  align-items: flex-end;
+  align-items: center;
+}
+.adm-color-row > input[type='text'] {
+  flex: 0 0 calc(12ch + 22px);
+}
+/* Inline repeater: one row of inputs per item under a column header. */
+.adm-rep {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.adm-rep > legend {
+  padding: 0;
+  margin-block-end: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.adm-rep-cols {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+.adm-rep .adm-list-row {
+  align-items: center;
+}
+.adm-rep-head {
+  color: var(--adm-muted);
+  font-size: 13px;
+}
+.adm-rep-head .adm-btn {
+  visibility: hidden;
+}
+.adm-rep-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 .adm-group {
   border: 1px solid var(--adm-rule);
@@ -657,6 +708,101 @@
 .adm-group > .adm-list > .adm-list-row + .adm-list-row {
   padding-block-start: 12px;
   border-block-start: 1px solid var(--adm-rule);
+}
+/* Sectioned screens: a sideways-scrolling tab row; at 1100px and wider, a sticky list beside the open section. */
+.adm-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.adm-tabs {
+  display: flex;
+  gap: 4px 20px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  border-block-end: 1px solid var(--adm-rule);
+}
+.adm-tabs button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--adm-touch);
+  padding: 0;
+  border: 0;
+  border-block-end: 2px solid transparent;
+  background: none;
+  color: var(--adm-muted);
+  font: inherit;
+  font-size: 15px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.adm-tabs button[aria-selected='true'] {
+  border-block-end-color: var(--adm-ink);
+  color: var(--adm-ink);
+  font-weight: 500;
+}
+.adm-tab-error {
+  inline-size: 7px;
+  block-size: 7px;
+  border-radius: 50%;
+  background: var(--adm-danger);
+}
+.adm-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  max-inline-size: 640px;
+}
+.adm-keys .adm-row-label {
+  flex-basis: 12rem;
+}
+.adm-keys form {
+  flex-wrap: nowrap;
+  margin-block-start: 6px;
+}
+.adm-keys input {
+  flex: 1;
+  min-width: 0;
+}
+/* A sub-group inside a section: a heading over a Rule, not a box. */
+.adm-subhead {
+  margin: 8px 0 0;
+  padding-block-end: 6px;
+  border-block-end: 1px solid var(--adm-rule);
+  font-size: 15px;
+  font-weight: 600;
+}
+@media (min-width: 1100px) {
+  .adm-sections {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 40px;
+    align-items: start;
+  }
+  .adm-tabs {
+    position: sticky;
+    inset-block-start: calc(var(--adm-head-h, 64px) + 12px);
+    flex-direction: column;
+    gap: 2px;
+    border: 0;
+  }
+  .adm-tabs button {
+    min-height: 0;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 6px;
+    color: var(--adm-ink);
+    justify-content: space-between;
+  }
+  .adm-tabs button:hover {
+    background: var(--adm-hover);
+  }
+  .adm-tabs button[aria-selected='true'] {
+    background: var(--adm-selected);
+  }
 }
 .adm-split {
   display: grid;
@@ -1104,6 +1250,26 @@
   .adm input:not([type='checkbox'], [type='radio']),
   .adm select {
     min-height: var(--adm-touch);
+  }
+  /* Inline repeater rows stack, each input under its own label. */
+  .adm-rep-cols {
+    grid-auto-flow: row;
+  }
+  .adm-rep-head {
+    display: none;
+  }
+  .adm-rep .adm-rep-label {
+    position: static;
+    width: auto;
+    height: auto;
+    clip: auto;
+    font-size: 13px;
+    font-weight: 500;
+  }
+  .adm-rep .adm-list-row {
+    align-items: flex-end;
+    padding-block-end: 10px;
+    border-block-end: 1px solid var(--adm-rule);
   }
   /* iOS Safari zooms into focused fields under 16px. */
   .adm input:not([type='checkbox'], [type='radio']),
