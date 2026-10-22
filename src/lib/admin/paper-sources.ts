@@ -23,9 +23,11 @@ export interface PaperRecord {
 const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
 
 function decode(s: string): string {
-  return s.replace(/&(?:#(\d+)|#x([0-9a-f]+)|(amp|lt|gt|quot|apos));/gi, (_, dec, hex, name) =>
-    name ? ENTITIES[name.toLowerCase()] : String.fromCodePoint(dec ? Number(dec) : parseInt(hex, 16)),
-  );
+  return s.replace(/&(?:#(\d+)|#x([0-9a-f]+)|(amp|lt|gt|quot|apos));/gi, (_, dec, hex, name) => {
+    if (name) return ENTITIES[name.toLowerCase()];
+    const cp = dec ? Number(dec) : parseInt(hex, 16);
+    return cp === 0 || cp > 0x10ffff || (cp >= 0xd800 && cp < 0xe000) ? '' : String.fromCodePoint(cp);
+  });
 }
 
 const collapse = (s: string) => s.replace(/\s+/g, ' ').trim();

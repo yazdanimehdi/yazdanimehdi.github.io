@@ -117,3 +117,10 @@ test('parseOpenAlex rebuilds the abstract and maps fields', () => {
   assert.equal(r.year, 2024);
   assert.match(r.pdf ?? '', /^https:\/\/arxiv\.org\/pdf\//);
 });
+
+test('parseArxivFeed drops invalid numeric character references', () => {
+  const [e] = parseArxivFeed(
+    '<feed><entry><id>http://arxiv.org/abs/1234.5678v1</id><title>a&#99999999;b&#xD800;c&#0;d</title><published>2020-01-02T00:00:00Z</published></entry></feed>',
+  );
+  assert.equal(e.title, 'abcd');
+});
