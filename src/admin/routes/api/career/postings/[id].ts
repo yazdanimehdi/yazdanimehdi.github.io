@@ -2,6 +2,7 @@ import { z } from 'astro/zod';
 import { HttpError, json, readBody } from '../../../../../lib/admin/http';
 import { addEvent, getPosting, listEvents, updatePosting } from '../../../../../lib/career/db';
 import { careerRoute } from '../../../../../lib/career/route';
+import { withdrawApproval } from '../../../../../workflows/career-apply';
 import { baseCv, FabricationError, type TailorPlan, withCoverage } from '../../../../../lib/career/tailor';
 import type { ContentStore } from '../../../../../lib/admin/store';
 import type { PostingStatus } from '../../../../../lib/career/types';
@@ -103,7 +104,8 @@ const bare = (cv: Pick<TailorPlan, 'sections' | 'requirements'>) =>
  * `{ status?, notes?, cv?, letter?, answers? }`: each change that differs from the stored value is saved and logged as an event.
  * The owner may reword `cv` freely, but it still goes through assembleCv: only the CV's own sections and entries, and
  * no more highlights than an entry has, and no skills item it lacks. A `cv` without `requirements` keeps the stored
- * ones; their coverage is recomputed for the new sections.
+ * ones; their coverage is recomputed for the new sections. A status change away from `ready` withdraws an approval the
+ * submit queue hasn't claimed yet.
  */
 export const PATCH = careerRoute(async (ctx, store) => {
   const posting = await load(ctx.params.id);
@@ -139,6 +141,10 @@ export const PATCH = careerRoute(async (ctx, store) => {
     await addEvent(sql, posting.id, 'answers edited');
   }
   if (body.status !== undefined && body.status !== posting.status) {
+    // Moving on from `ready` takes back an approval the queue hasn't claimed; one that may have gone out stays as is.
+    if (body.status !== 'ready' && posting.application?.state === 'approved') {
+      await withdrawApproval(sql, posting.id, posting.application);
+    }
     await updatePosting(sql, posting.id, { status: body.status });
     await addEvent(sql, posting.id, 'status', `${posting.status} → ${body.status}`);
   }

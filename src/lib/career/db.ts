@@ -1,4 +1,5 @@
 import type { Sql } from '../db';
+import type { Application, ApplyState } from './apply/types';
 import type {
   DraftState,
   Feed,
@@ -9,6 +10,9 @@ import type {
   RawPosting,
   RunSummary,
 } from './types';
+
+/** A run id while `start()` is in flight (or a nightly run holds the posting), so a second click sees it starting. */
+export const CLAIM = 'starting:';
 
 // JSON goes in as `${text}::text::jsonb`: with a bare `::jsonb`, postgres.js sees a jsonb parameter and encodes the
 // string again, storing a jsonb string instead of the object (PGlite doesn't, so only a real Postgres shows it).
@@ -150,6 +154,8 @@ export async function getPosting(sql: Sql, id: number): Promise<Posting | null> 
     draftState: r.draft_state as DraftState,
     draftIssues: r.draft_issues,
     draftRunId: r.draft_run_id as string | null,
+    application: r.application as Application | null,
+    applyRunId: r.apply_run_id as string | null,
   };
 }
 
@@ -171,6 +177,8 @@ type Patch = Partial<
     | 'scoreDetail'
     | 'scoreError'
     | 'description'
+    | 'application'
+    | 'applyRunId'
   >
 >;
 
@@ -195,8 +203,146 @@ export async function updatePosting(sql: Sql, id: number, patch: Patch): Promise
       score_detail = case when ${has('scoreDetail')} then ${j('scoreDetail')}::text::jsonb else score_detail end,
       score_error = case when ${has('scoreError')} then ${patch.scoreError ?? null}::text else score_error end,
       description = case when ${has('description')} then ${patch.description ?? null}::text else description end,
+      application = case when ${has('application')} then ${j('application')}::text::jsonb else application end,
+      apply_run_id = case when ${has('applyRunId')} then ${patch.applyRunId ?? null}::text else apply_run_id end,
       scored_at = case when ${has('score') || has('scoreError')} then now() else scored_at end
     where id = ${id}`;
+}
+
+/** Postings with status ready, the latest pre-fill first; `waiting`: only those whose application awaits approval. */
+export async function readyPostings(sql: Sql, waiting = false): Promise<PostingSummary[]> {
+  const rows = await sql<Row>`
+    select id, company, title, location, remote, score, gate, status, found_at, flags, draft_state
+    from career_postings where status = 'ready' and (not ${waiting} or application->>'state' = 'ready')
+    order by application->>'at' desc nulls last, found_at desc`;
+  return rows.map(summary);
+}
+
+/** How many applications wait for the owner's approval: the badge, the tab count and the dashboard. */
+export async function readyCount(sql: Sql): Promise<number> {
+  const [r] = await sql<{ n: number }>`select count(*)::int as n from career_postings
+    where status = 'ready' and application->>'state' = 'ready'`;
+  return Number(r.n);
+}
+
+/** Ids of approved applications in the order they were approved, for the submit queue. */
+export async function approvedPostings(sql: Sql): Promise<number[]> {
+  const rows = await sql<Row>`
+    select id from career_postings where application->>'state' = 'approved'
+    order by application->'approved'->>'at' asc nulls last, id`;
+  return rows.map((r) => Number(r.id));
+}
+
+/**
+ * Replaces the application only if it is still in state `from` (and, given `at`, from that very pre-fill): the one
+ * guard every apply transition goes through, so two actors can't both move it. `status` moves the posting too, but only
+ * from `found`, `drafted` or `ready`: a status the owner set meanwhile (skipped, interview…) stands. Returns the
+ * posting's status before and after the move, or null when the application had already moved on.
+ */
+export async function moveApplication(
+  sql: Sql,
+  id: number,
+  from: { state: ApplyState | null; at?: string },
+  app: Application,
+  status?: PostingStatus,
+): Promise<{ was: PostingStatus; now: PostingStatus } | null> {
+  const [r] = await sql<{ was: PostingStatus; now: PostingStatus }>`
+    update career_postings p set application = ${JSON.stringify(app)}::text::jsonb,
+      status = case when p.status in ('found', 'drafted', 'ready') then coalesce(${status ?? null}::text, p.status)
+        else p.status end
+    from (select id, status as old from career_postings where id = ${id}) o
+    where p.id = o.id and p.application->>'state' is not distinct from ${from.state}
+      and (${from.at ?? null}::text is null or p.application->>'at' = ${from.at ?? null})
+    returning o.old as was, p.status as now`;
+  return r ?? null;
+}
+
+/** Who holds the apply sandbox: the posting and the `at` of the application it claimed. */
+export interface ApplyLock {
+  postingId: number;
+  kind: 'prefill' | 'submit';
+  at: string;
+}
+
+/** A lock older than this is stale: its run died without letting go (one takes a few minutes, a step at most 5). */
+const LOCK_STALE = '15 minutes';
+
+/** Thrown inside a claim's transaction to roll the lock back when the posting had moved on. */
+class Unclaimed extends Error {}
+
+/**
+ * Takes the apply lock and runs `claim` (the posting's own conditional UPDATE) in one transaction, so both happen or
+ * neither. The lock is free when empty, stale, or already this posting's (one posting has one actor at a time: its
+ * claim says so). Returns `busy` while another run holds it, what `claim` returned, or null when the posting had moved
+ * on (the lock is then left as it was).
+ */
+export async function claimWithLock<T>(
+  sql: Sql,
+  lock: ApplyLock,
+  claim: (tx: Sql) => Promise<T | undefined>,
+): Promise<T | 'busy' | null> {
+  await sql`insert into career_settings (id) values (1) on conflict (id) do nothing`;
+  try {
+    return await sql.begin(async (tx) => {
+      const [held] = await tx`update career_settings set apply_lock = ${JSON.stringify(lock)}::text::jsonb
+        where id = 1 and (apply_lock is null
+          or (apply_lock->>'at')::timestamptz < now() - ${LOCK_STALE}::interval
+          or apply_lock->>'postingId' = ${String(lock.postingId)})
+        returning id`;
+      if (!held) return 'busy' as const;
+      const out = await claim(tx);
+      if (out === undefined) throw new Unclaimed();
+      return out;
+    });
+  } catch (e) {
+    if (e instanceof Unclaimed) return null;
+    throw e;
+  }
+}
+
+/**
+ * Lets go of the apply lock if this run (`postingId`, `at`) still holds it, running `then` (stopping the VM) before
+ * anyone else can take it. A run whose stale lock was taken over lets go of nothing and leaves the VM to the new
+ * holder.
+ */
+export async function releaseApplyLock(
+  sql: Sql,
+  postingId: number,
+  at: string,
+  then: () => Promise<void>,
+): Promise<boolean> {
+  return sql.begin(async (tx) => {
+    const [held] = await tx`update career_settings set apply_lock = null
+      where id = 1 and apply_lock->>'postingId' = ${String(postingId)} and apply_lock->>'at' = ${at}
+      returning id`;
+    if (held) await then();
+    return !!held;
+  });
+}
+
+/** Whether a run for another posting holds the apply sandbox (one apply run at a time). */
+export async function applyBusy(sql: Sql, exceptId: number | null = null): Promise<boolean> {
+  const [r] = await sql`
+    select 1 from career_settings
+    where id = 1 and apply_lock is not null
+      and (apply_lock->>'at')::timestamptz >= now() - ${LOCK_STALE}::interval
+      and apply_lock->>'postingId' is distinct from ${exceptId === null ? null : String(exceptId)}::text`;
+  return !!r;
+}
+
+/**
+ * Applications to `company` (case-insensitive, trimmed) that count against the per-company limit: drafted or further
+ * along, and found or moved to a status on or after `sinceIso`.
+ */
+export async function companyApplications(sql: Sql, company: string, sinceIso: string): Promise<number> {
+  const [r] = await sql<{ n: number }>`
+    select count(*)::int as n from career_postings p
+    where lower(trim(p.company)) = lower(trim(${company}))
+      and p.status in ('drafted', 'ready', 'submitted', 'interview', 'offer')
+      and (p.found_at >= ${sinceIso}::timestamptz or exists (
+        select 1 from career_events e
+        where e.posting_id = p.id and e.kind = 'status' and e.at >= ${sinceIso}::timestamptz))`;
+  return r.n;
 }
 
 export async function addEvent(sql: Sql, postingId: number, kind: string, detail?: string): Promise<void> {
@@ -212,34 +358,49 @@ export async function listEvents(
   return rows.map((r) => ({ at: iso(r.at)!, kind: r.kind as string, detail: r.detail as string | null }));
 }
 
-export async function readCareer(
-  sql: Sql,
-): Promise<{ prefs: unknown; answers: unknown; lastRun: RunSummary | null; runId: string | null }> {
-  const [r] = await sql<Row>`select prefs, answers, last_run, run_id from career_settings where id = 1`;
+export async function readCareer(sql: Sql): Promise<{
+  prefs: unknown;
+  answers: unknown;
+  lastRun: RunSummary | null;
+  runId: string | null;
+  applyQueueRunId: string | null;
+}> {
+  const [r] =
+    await sql<Row>`select prefs, answers, last_run, run_id, apply_queue_run_id from career_settings where id = 1`;
   return {
     prefs: r?.prefs ?? {},
     answers: r?.answers ?? {},
     lastRun: (r?.last_run as RunSummary | null) ?? null,
     runId: (r?.run_id as string | null) ?? null,
+    applyQueueRunId: (r?.apply_queue_run_id as string | null) ?? null,
   };
 }
 
 /** Upserts the single settings row; only the given fields change. */
 export async function writeCareer(
   sql: Sql,
-  patch: Partial<{ prefs: unknown; answers: unknown; lastRun: RunSummary; runId: string | null }>,
+  patch: Partial<{
+    prefs: unknown;
+    answers: unknown;
+    lastRun: RunSummary;
+    runId: string | null;
+    applyQueueRunId: string | null;
+  }>,
   by: string,
 ): Promise<void> {
   const has = (k: keyof typeof patch) => k in patch;
   const j = (v: unknown) => JSON.stringify(v);
   await sql`
-    insert into career_settings (id, prefs, answers, last_run, run_id, updated_by)
+    insert into career_settings (id, prefs, answers, last_run, run_id, apply_queue_run_id, updated_by)
     values (1, ${j(patch.prefs ?? {})}::text::jsonb, ${j(patch.answers ?? {})}::text::jsonb,
-      ${patch.lastRun ? j(patch.lastRun) : null}::text::jsonb, ${patch.runId ?? null}, ${by})
+      ${patch.lastRun ? j(patch.lastRun) : null}::text::jsonb, ${patch.runId ?? null},
+      ${patch.applyQueueRunId ?? null}, ${by})
     on conflict (id) do update set
       prefs = case when ${has('prefs')} then excluded.prefs else career_settings.prefs end,
       answers = case when ${has('answers')} then excluded.answers else career_settings.answers end,
       last_run = case when ${has('lastRun')} then excluded.last_run else career_settings.last_run end,
       run_id = case when ${has('runId')} then excluded.run_id else career_settings.run_id end,
+      apply_queue_run_id = case when ${has('applyQueueRunId')} then excluded.apply_queue_run_id
+        else career_settings.apply_queue_run_id end,
       updated_at = now(), updated_by = ${by}`;
 }

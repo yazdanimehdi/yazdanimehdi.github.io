@@ -148,6 +148,70 @@
 .adm-nav-more ul {
   padding-inline-start: 10px;
 }
+.adm-jump-btn {
+  justify-content: space-between;
+  color: var(--adm-muted);
+}
+.adm-jump-btn kbd,
+.adm-editor-kbd kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--adm-rule);
+  border-radius: 4px;
+  background: var(--adm-tint);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.adm-badge {
+  margin-inline-start: 8px;
+  padding: 0 5px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px var(--adm-rule);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+.adm-jump {
+  inline-size: min(480px, calc(100% - 32px));
+  margin-block-start: 12vh;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--adm-paper);
+  color: var(--adm-ink);
+  box-shadow: var(--adm-float);
+}
+.adm-jump::backdrop {
+  background: var(--adm-scrim);
+}
+.adm-jump > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+.adm-jump ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-block-size: 50vh;
+  overflow-y: auto;
+}
+.adm-jump li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 15px;
+  cursor: pointer;
+}
+.adm-jump li[aria-selected='true'] {
+  background: var(--adm-selected);
+}
+.adm-jump p {
+  margin: 0;
+  padding: 8px 10px;
+}
 .adm-side-foot {
   margin-block-start: auto;
   display: flex;
@@ -170,12 +234,22 @@
 .adm-main.is-narrow > :not(.adm-modal) {
   max-inline-size: 880px;
 }
+/* The header stays in reach while the page scrolls; the Rule under it shows only once it is stuck. */
 .adm-head {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 20;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
+  padding-block: 12px;
+  margin-block: -12px;
+  background: var(--adm-paper);
+}
+.adm-head.is-stuck {
+  box-shadow: 0 1px 0 var(--adm-rule);
 }
 .adm-head h1 {
   margin: 0;
@@ -439,6 +513,69 @@
   color: var(--adm-ink);
   font-weight: 500;
 }
+/* Links between sibling screens under a page title (Job search, CV): Body text; the current one Ink, 2px Accent rule. */
+.adm-tablinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 24px;
+  border-block-end: 1px solid var(--adm-rule);
+}
+.adm .adm-tablinks a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--adm-touch);
+  border-block-end: 2px solid transparent;
+  margin-block-end: -1px;
+  color: var(--ed-body-2, #3d4357);
+  font-size: 15px;
+  text-decoration: none;
+}
+.adm .adm-tablinks a:hover {
+  color: var(--adm-ink);
+}
+.adm .adm-tablinks a[aria-current='page'] {
+  border-block-end-color: var(--adm-accent);
+  color: var(--adm-ink);
+  font-weight: 500;
+}
+.adm-tablinks .adm-count {
+  font-variant-numeric: tabular-nums;
+}
+/* The job feed's run strip: the verdict line with Run now at its end; then status tabs and the other-status select. */
+.adm-run {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding-block: 6px;
+}
+.adm-run-notes {
+  display: grid;
+  gap: 4px;
+}
+.adm-run-notes > p {
+  margin: 0;
+}
+.adm-run > p {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.adm-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 20px;
+  border-block-end: 1px solid var(--adm-rule);
+}
+.adm-filter-row > .adm-filter {
+  border: 0;
+}
+.adm .adm-filter-row > select {
+  inline-size: auto;
+  margin-block-end: 6px;
+}
 .adm-count {
   color: var(--adm-muted);
   font-size: 12px;
@@ -492,7 +629,8 @@
   flex-direction: column;
   gap: 4px;
 }
-.adm-field > span:first-child {
+.adm-field > span:first-child,
+.adm-field > label:first-child {
   font-size: 13px;
   font-weight: 500;
 }
@@ -507,6 +645,7 @@
   font-size: 13px;
 }
 .adm input[type='text'],
+.adm input[type='email'],
 .adm input[type='date'],
 .adm input[type='number'],
 .adm input[type='search'],
@@ -563,8 +702,58 @@
   margin: 0;
   min-width: 0;
 }
+/* Fields sit at a reading measure; short values get short inputs. */
+.adm-fields {
+  max-inline-size: 640px;
+}
+.adm-form > .adm-field > input[type='number'] {
+  inline-size: calc(10ch + 22px);
+}
 .adm-color-row {
-  align-items: flex-end;
+  align-items: center;
+}
+.adm-color-row > input[type='text'] {
+  flex: 0 0 calc(12ch + 22px);
+}
+/* Inline repeater: one row of inputs per item under a column header. */
+.adm-rep {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.adm-rep > legend {
+  padding: 0;
+  margin-block-end: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.adm-rep-cols {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+.adm-rep .adm-list-row {
+  align-items: center;
+}
+.adm-rep-head {
+  color: var(--adm-muted);
+  font-size: 13px;
+}
+.adm-rep-head .adm-btn {
+  visibility: hidden;
+}
+.adm-rep-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
 }
 .adm-group {
   border: 1px solid var(--adm-rule);
@@ -583,6 +772,125 @@
 .adm-group > .adm-list > .adm-list-row + .adm-list-row {
   padding-block-start: 12px;
   border-block-start: 1px solid var(--adm-rule);
+}
+/* Sectioned screens: a sideways-scrolling tab row; at 1100px and wider, a sticky list beside the open section. */
+.adm-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.adm-tabs {
+  display: flex;
+  gap: 4px 20px;
+  overflow-x: auto;
+  scroll-padding-inline: 16px;
+  scrollbar-width: none;
+  border-block-end: 1px solid var(--adm-rule);
+}
+.adm-tabs button {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--adm-touch);
+  padding: 0;
+  border: 0;
+  border-block-end: 2px solid transparent;
+  background: none;
+  color: var(--adm-muted);
+  font: inherit;
+  font-size: 15px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.adm-tabs button[aria-selected='true'] {
+  border-block-end-color: var(--adm-ink);
+  color: var(--adm-ink);
+  font-weight: 500;
+}
+.adm-tab-error {
+  inline-size: 7px;
+  block-size: 7px;
+  border-radius: 50%;
+  background: var(--adm-danger);
+}
+.adm-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  max-inline-size: 640px;
+}
+.adm-keys .adm-row-label {
+  flex-basis: 12rem;
+}
+.adm-keys form {
+  flex-wrap: nowrap;
+  margin-block-start: 6px;
+}
+.adm-keys input,
+.adm-keys textarea {
+  flex: 1;
+  min-width: 0;
+}
+.adm-keys form:has(textarea) {
+  align-items: flex-start;
+}
+/* A radio group: a 13px/500 legend over one choice per line, each with its Caption line. */
+.adm-choices {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.adm-choices > legend {
+  padding: 0;
+  margin-block-end: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.adm-choices .adm-check {
+  align-items: baseline;
+}
+/* A sub-group inside a section: a heading over a Rule, not a box. */
+.adm-subhead {
+  margin: 8px 0 0;
+  padding-block-end: 6px;
+  border-block-end: 1px solid var(--adm-rule);
+  font-size: 15px;
+  font-weight: 600;
+}
+@media (min-width: 1100px) {
+  .adm-sections {
+    display: grid;
+    grid-template-columns: 200px minmax(0, 1fr);
+    gap: 40px;
+    align-items: start;
+  }
+  .adm-tabs {
+    position: sticky;
+    inset-block-start: calc(var(--adm-head-h, 64px) + 12px);
+    flex-direction: column;
+    gap: 2px;
+    border: 0;
+  }
+  .adm-tabs button {
+    min-height: 0;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 6px;
+    color: var(--adm-ink);
+    justify-content: space-between;
+  }
+  .adm-tabs button:hover {
+    background: var(--adm-hover);
+  }
+  .adm-tabs button[aria-selected='true'] {
+    background: var(--adm-selected);
+  }
 }
 .adm-split {
   display: grid;
@@ -992,6 +1300,11 @@
   .adm-main {
     padding: 20px 16px 40px;
   }
+  /* Section tabs bleed to the screen edges, so a tab scrolled past is cut by the screen, not inside the gutter. */
+  .adm-sections > .adm-tabs {
+    margin-inline: -16px;
+    padding-inline: 16px;
+  }
   .adm-split,
   .adm-split-wide,
   .adm-cols3 {
@@ -1012,6 +1325,9 @@
     text-align: start;
   }
   /* Status rows: the action shares the label's line instead of taking one of its own. */
+  .adm-check {
+    min-height: var(--adm-touch);
+  }
   .adm-status-rows > li {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -1030,6 +1346,34 @@
   .adm input:not([type='checkbox'], [type='radio']),
   .adm select {
     min-height: var(--adm-touch);
+  }
+  /* Inline repeaters: two columns stay side by side under their header, the row's buttons on a line of their own. */
+  .adm-rep .adm-list > .adm-list-row {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    padding-block-end: 10px;
+    border-block-end: 1px solid var(--adm-rule);
+  }
+  .adm-rep .adm-list > .adm-list-row > :first-child {
+    flex-basis: 100%;
+  }
+  .adm-rep-head .adm-btn {
+    display: none;
+  }
+  /* Three or more columns stack, each input under its own label. */
+  .adm-rep-cols:has(> :nth-child(3)) {
+    grid-auto-flow: row;
+  }
+  .adm-rep:has(.adm-rep-cols > :nth-child(3)) .adm-rep-head {
+    display: none;
+  }
+  .adm-rep-cols:has(> :nth-child(3)) .adm-rep-label {
+    position: static;
+    width: auto;
+    height: auto;
+    clip: auto;
+    font-size: 13px;
+    font-weight: 500;
   }
   /* iOS Safari zooms into focused fields under 16px. */
   .adm input:not([type='checkbox'], [type='radio']),
@@ -1261,14 +1605,6 @@ details.adm-editor-ask[open] > summary {
 .adm-editor-ask label {
   font-size: 13px;
   font-weight: 500;
-}
-.adm-editor-kbd kbd {
-  padding: 1px 6px;
-  border: 1px solid var(--adm-rule);
-  border-radius: 4px;
-  background: var(--adm-tint);
-  font-family: var(--font-mono);
-  font-size: 12px;
 }
 .adm-editor-elapsed {
   color: var(--adm-muted);
@@ -1520,6 +1856,7 @@ details.adm-editor-ask[open] > summary {
   }
 }
 @media (pointer: coarse), (max-width: 640px) {
+  .adm-jump-btn kbd,
   .adm-editor-kbd {
     display: none;
   }
@@ -1553,6 +1890,68 @@ details.adm-editor-ask[open] > summary {
   margin: 0;
 }
 
+/* Application form: screenshot thumbnails that open full size, then one ruled row per field. */
+.adm-apply-shots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.adm-apply-shots img,
+.adm-apply-shot img {
+  display: block;
+  inline-size: 220px;
+  max-inline-size: 100%;
+  block-size: 150px;
+  object-fit: cover;
+  object-position: top;
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+  background: var(--adm-tint);
+}
+.adm-apply-shot {
+  align-self: flex-start;
+}
+.adm-apply-fields .adm-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-inline-size: 640px;
+}
+.adm-apply-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.adm-apply-label {
+  font-weight: 500;
+}
+.adm-card > .adm-h2[id] {
+  scroll-margin-block-start: calc(var(--adm-head-h, 0px) + 16px);
+}
+.adm-fields > p {
+  margin: 0;
+}
+.adm-apply-value {
+  white-space: pre-wrap;
+}
+.adm-apply-working {
+  margin: 0;
+}
+.adm-ready-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.adm-ready-head > p {
+  margin: 0;
+  max-inline-size: 60ch;
+}
 .adm-job-handoff td {
   background: var(--adm-warn-bg);
 }

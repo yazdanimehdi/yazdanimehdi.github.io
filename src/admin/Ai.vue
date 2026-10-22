@@ -1,11 +1,13 @@
 <script setup lang="ts">
 /* eslint-disable @typescript-eslint/no-explicit-any -- config files are user data */
 import { computed, onMounted, ref } from 'vue';
+import AdminSections from './AdminSections.vue';
 import AdminShell from './AdminShell.vue';
 import DocBanners from './DocBanners.vue';
 import FormFields from './FormFields.vue';
 import { api, report, toast } from './api';
 import { text, type FieldDef } from './fields';
+import { CAREER_KEY_HELP } from './career';
 import { useDocument } from './useDocument';
 import type { AdminCtx, CommitResult } from './types';
 import { DEFAULT_MODELS, IMAGE_PROVIDERS, TEXT_PROVIDERS, resolveAiConfig, scheduleLabel } from '../lib/ai/providers';
@@ -16,10 +18,15 @@ type Config = Record<string, any>;
 const props = defineProps<{ ctx: AdminCtx }>();
 const base = `/${props.ctx.adminPath}`;
 const editable = props.ctx.mode === 'postgres';
+// Job-source keys are the owner's, and only exist where the job search does.
+const jobKeys = editable && props.ctx.isOwner;
 
 const keys = ref<SecretStatus[]>([]);
 const typed = ref<Record<string, string>>({});
 const savingKey = ref('');
+/** Each key's save endpoint: the job-source keys have their own, owner-only one. */
+const endpoint = new Map<string, string>();
+const section = ref('');
 const ai = useDocument<Config>();
 const scholar = useDocument<Config>();
 const checking = ref(false);
@@ -91,24 +98,43 @@ const SCHOLAR_FIELDS: FieldDef[] = [
   },
 ];
 
+const SECTIONS = computed(() => [
+  { id: 'keys', label: 'Keys' },
+  { id: 'writing', label: 'Writing & images', fields: AI_FIELDS.value.map((f) => f.key.split('.')[0]) },
+  { id: 'scholar', label: 'Google Scholar', fields: ['authors'] },
+]);
+const errors = computed(() => ({ ...ai.errors, ...scholar.errors }));
+
 function status(k: SecretStatus): string {
   if (k.source === 'admin') return `Set in admin · …${k.last4}`;
   if (k.source === 'env') return 'From environment';
   return 'Not set';
 }
 
+/** One list: the AI and Scholar keys, then the job-source ones (SerpApi, which both use, once). */
 async function loadKeys() {
-  try {
-    keys.value = await api<SecretStatus[]>('ai/keys');
-  } catch (e) {
-    report(e);
+  const [aiKeys, jobs] = await Promise.allSettled([
+    api<SecretStatus[]>('ai/keys'),
+    jobKeys ? api<SecretStatus[]>('career/keys') : Promise.resolve([]),
+  ]);
+  for (const [r, path] of [
+    [aiKeys, 'ai/keys'],
+    [jobs, 'career/keys'],
+  ] as const) {
+    if (r.status === 'rejected') report(r.reason);
+    else
+      for (const k of r.value.filter((k) => !endpoint.has(k.name))) {
+        endpoint.set(k.name, path);
+        keys.value.push(k);
+      }
   }
 }
 
 async function saveKey(name: string, value: string | null) {
   savingKey.value = name;
   try {
-    keys.value = await api<SecretStatus[]>('ai/keys', { method: 'PUT', body: { name, value } });
+    const fresh = await api<SecretStatus[]>(endpoint.get(name)!, { method: 'PUT', body: { name, value } });
+    keys.value = keys.value.map((k) => fresh.find((f) => f.name === k.name) ?? k);
     typed.value[name] = '';
     toast(value ? 'Key saved' : 'Key cleared');
   } catch (e) {
@@ -150,41 +176,62 @@ onMounted(() => {
 </script>
 
 <template>
-  <AdminShell :ctx="ctx" active="ai" title="Scholar & AI">
-    <section id="keys" class="adm-form" aria-labelledby="adm-keys">
-      <h2 id="adm-keys" class="adm-h2">API keys</h2>
-      <p class="adm-muted">
-        <template v-if="editable">
-          Keys typed here are stored encrypted in the database. Without one, the environment variable of the same name
-          is used.
-        </template>
-        <template v-else>
-          Git mode has no database: set each key as an environment variable in Vercel (Settings → Environment
-          Variables), then redeploy.
-        </template>
-      </p>
-      <table class="adm-table">
-        <thead>
-          <tr>
-            <th>Provider</th>
-            <th>Status</th>
-            <th v-if="editable"><span class="adm-visually-hidden">Change</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="k in keys" :key="k.name">
-            <td>
-              {{ k.label }}<br /><code class="adm-muted">{{ k.name }}</code>
-            </td>
-            <td>
+  <AdminShell :ctx="ctx" active="ai" title="Integrations" :dirty="ai.dirty || scholar.dirty">
+    <template #actions>
+      <button
+        v-if="section === 'writing'"
+        type="button"
+        class="adm-btn adm-btn-primary"
+        :disabled="ai.saving || !ai.current"
+        @click="publish(ai, 'ai')"
+      >
+        Publish AI settings
+      </button>
+      <button
+        v-if="section === 'scholar'"
+        type="button"
+        class="adm-btn adm-btn-primary"
+        :disabled="scholar.saving || !scholar.current"
+        @click="publish(scholar, 'scholar')"
+      >
+        Publish authors
+      </button>
+    </template>
+    <AdminSections v-model="section" :sections="SECTIONS" :errors="errors">
+      <template #keys>
+        <p class="adm-muted">
+          <template v-if="editable">
+            Keys typed here are stored encrypted in the database. Without one, the environment variable of the same name
+            is used.
+          </template>
+          <template v-else>
+            Git mode has no database: set each key as an environment variable in Vercel (Settings → Environment
+            Variables), then redeploy.
+          </template>
+        </p>
+        <ul class="adm-rows adm-keys">
+          <li v-for="k in keys" :key="k.name">
+            <span class="adm-row-label">
+              {{ k.label }}<code class="adm-row-detail">{{ k.name }}</code>
+            </span>
+            <div class="adm-row-main">
               {{ status(k) }}
+              <span v-if="CAREER_KEY_HELP[k.name]" class="adm-row-detail">{{ CAREER_KEY_HELP[k.name] }}</span>
               <span v-if="k.undecryptable" class="adm-err">
                 The stored key can’t be decrypted (SESSION_SECRET changed): enter it again.
               </span>
-            </td>
-            <td v-if="editable">
-              <form class="adm-actions" @submit.prevent="saveKey(k.name, typed[k.name] ?? '')">
+              <form v-if="editable" class="adm-actions" @submit.prevent="saveKey(k.name, typed[k.name] ?? '')">
+                <textarea
+                  v-if="k.name === 'CODEX_AUTH_JSON'"
+                  v-model="typed[k.name]"
+                  rows="3"
+                  autocomplete="off"
+                  spellcheck="false"
+                  :aria-label="`New ${k.label}`"
+                  placeholder="Paste the file’s contents"
+                />
                 <input
+                  v-else
                   v-model="typed[k.name]"
                   type="password"
                   autocomplete="off"
@@ -208,84 +255,73 @@ onMounted(() => {
                   Clear
                 </button>
               </form>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
-
-    <fieldset class="adm-group">
-      <legend>Writing and images</legend>
-      <DocBanners
-        :draft="!!ai.draft"
-        :path="'config/ai.yml'"
-        :version="ai.version"
-        :conflict="ai.conflict"
-        :stale="ai.draftStale ? ai.draftChanges : null"
-        @restore="ai.restore()"
-        @discard="ai.discard()"
-        @reload="ai.reload()"
-      />
-      <p class="adm-muted">
-        Write, Rewrite and Generate image in the post and news editors send the title, subtitle, summary, instruction
-        and body to the provider chosen here; for a publication, Generate image sends its title and abstract. Generate
-        GIF always uses Higgsfield. Saved to config/ai.yml.
-      </p>
-      <FormFields v-if="ai.current" :fields="AI_FIELDS" :model="ai.current" :errors="ai.errors" />
-      <div class="adm-actions">
-        <button type="button" class="adm-btn" :disabled="ai.saving || !ai.current" @click="publish(ai, 'ai')">
-          Publish AI settings
-        </button>
-      </div>
-    </fieldset>
-
-    <fieldset id="scholar" class="adm-group">
-      <legend>Papers from Google Scholar</legend>
-      <DocBanners
-        :draft="!!scholar.draft"
-        :path="'config/scholar.yml'"
-        :version="scholar.version"
-        :conflict="scholar.conflict"
-        :stale="scholar.draftStale ? scholar.draftChanges : null"
-        @restore="scholar.restore()"
-        @discard="scholar.discard()"
-        @reload="scholar.reload()"
-      />
-      <p class="adm-muted">
-        New papers on these profiles (through SerpApi) become publications and, per the settings above, draft posts to
-        review.
-        {{ editable ? `Checked ${schedule}, or now:` : `Check now, or let the GitHub Action sync them (${schedule}).` }}
-      </p>
-      <FormFields v-if="scholar.current" :fields="SCHOLAR_FIELDS" :model="scholar.current" :errors="scholar.errors" />
-      <div class="adm-actions">
-        <button
-          type="button"
-          class="adm-btn"
-          :disabled="scholar.saving || !scholar.current"
-          @click="publish(scholar, 'scholar')"
-        >
-          Publish authors
-        </button>
-        <button type="button" class="adm-btn adm-btn-primary" :disabled="checking" @click="checkNow">
-          {{ checking ? 'Checking…' : 'Check now' }}
-        </button>
-      </div>
-      <p class="adm-muted">Last new papers: {{ lastRun ? new Date(lastRun).toLocaleString() : 'none yet' }}</p>
-      <div v-if="checked && !checked.skipped" class="adm-card" role="status">
-        <p>
-          Imported {{ checked.imported.length }} · drafted {{ checked.posts.length }}
-          <template v-if="checked.deferred.length"> · {{ checked.deferred.length }} left for the next run</template>
-          <template v-if="checked.failed.length"> · {{ checked.failed.length }} failed</template>
-        </p>
-        <ul v-if="checked.posts.length">
-          <li v-for="slug in checked.posts" :key="slug">
-            <a :href="`${base}/posts/${slug}`">{{ slug }}</a> (draft)
+            </div>
           </li>
         </ul>
-        <ul v-if="checked.failed.length">
-          <li v-for="f in checked.failed" :key="f.item" class="adm-err">{{ f.item }}: {{ f.error }}</li>
-        </ul>
-      </div>
-    </fieldset>
+      </template>
+
+      <template #writing>
+        <DocBanners
+          :draft="!!ai.draft"
+          :path="'config/ai.yml'"
+          :version="ai.version"
+          :conflict="ai.conflict"
+          :stale="ai.draftStale ? ai.draftChanges : null"
+          @restore="ai.restore()"
+          @discard="ai.discard()"
+          @reload="ai.reload()"
+        />
+        <p class="adm-muted">
+          Write, Rewrite and Generate image in the post and news editors send the title, subtitle, summary, instruction
+          and body to the provider chosen here; for a publication, Generate image sends its title and abstract. Generate
+          GIF always uses Higgsfield. Saved to config/ai.yml.
+        </p>
+        <FormFields v-if="ai.current" :fields="AI_FIELDS" :model="ai.current" :errors="ai.errors" />
+      </template>
+
+      <template #scholar>
+        <DocBanners
+          :draft="!!scholar.draft"
+          :path="'config/scholar.yml'"
+          :version="scholar.version"
+          :conflict="scholar.conflict"
+          :stale="scholar.draftStale ? scholar.draftChanges : null"
+          @restore="scholar.restore()"
+          @discard="scholar.discard()"
+          @reload="scholar.reload()"
+        />
+        <p class="adm-muted">
+          New papers on these profiles (through SerpApi) become publications and, per Writing &amp; images, draft posts
+          to review.
+          {{
+            editable ? `Checked ${schedule}, or now:` : `Check now, or let the GitHub Action sync them (${schedule}).`
+          }}
+        </p>
+        <FormFields v-if="scholar.current" :fields="SCHOLAR_FIELDS" :model="scholar.current" :errors="scholar.errors" />
+        <div class="adm-actions">
+          <button type="button" class="adm-btn" :disabled="checking" @click="checkNow">
+            {{ checking ? 'Checking…' : 'Check now' }}
+          </button>
+          <span class="adm-muted"
+            >Last new papers: {{ lastRun ? new Date(lastRun).toLocaleString() : 'none yet' }}</span
+          >
+        </div>
+        <div v-if="checked && !checked.skipped" class="adm-card" role="status">
+          <p>
+            Imported {{ checked.imported.length }} · drafted {{ checked.posts.length }}
+            <template v-if="checked.deferred.length"> · {{ checked.deferred.length }} left for the next run</template>
+            <template v-if="checked.failed.length"> · {{ checked.failed.length }} failed</template>
+          </p>
+          <ul v-if="checked.posts.length">
+            <li v-for="slug in checked.posts" :key="slug">
+              <a :href="`${base}/posts/${slug}`">{{ slug }}</a> (draft)
+            </li>
+          </ul>
+          <ul v-if="checked.failed.length">
+            <li v-for="f in checked.failed" :key="f.item" class="adm-err">{{ f.item }}: {{ f.error }}</li>
+          </ul>
+        </div>
+      </template>
+    </AdminSections>
   </AdminShell>
 </template>

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 /* eslint-disable @typescript-eslint/no-explicit-any -- front matter is user data */
-import { computed, nextTick, onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
 import AdminShell from './AdminShell.vue';
 import AiAssist from './AiAssist.vue';
 import DocBanners from './DocBanners.vue';
@@ -77,8 +77,7 @@ async function sendToMedium() {
     });
     if (doc.current) doc.current.data.medium = result.medium;
     doc.version = result.versions[`src/content/posts/${target}.md`] ?? doc.version;
-    await nextTick();
-    doc.discard(); // the link is committed, not an unsaved edit
+    await doc.settle(); // the link is committed, not an unsaved edit
     toast('Sent to Medium as a draft', result.medium.url);
   } catch (e) {
     const url = e instanceof ApiError ? (e.details as { url?: string } | undefined)?.url : undefined;
@@ -130,8 +129,7 @@ async function save(draft: boolean) {
   );
   if (!result || !doc.current) return;
   doc.current.data.draft = draft; // only once saved: a failed save or a conflict leaves the flag as it was
-  await nextTick();
-  doc.discard(); // the flag change above is already committed, not an unsaved edit
+  await doc.settle(); // the flag change above is already committed, not an unsaved edit
   if (isNew.value) {
     isNew.value = false;
     slug.value = target;
@@ -151,7 +149,7 @@ function setSubtitle(e: Event) {
 </script>
 
 <template>
-  <AdminShell :ctx="ctx" active="posts" :title="isNew ? 'New post' : 'Edit post'">
+  <AdminShell :ctx="ctx" active="posts" :title="isNew ? 'New post' : 'Edit post'" :dirty="doc.dirty">
     <template #actions>
       <button type="button" class="adm-btn" :aria-pressed="preview" @click="preview = !preview">
         {{ preview ? 'Edit' : 'Preview' }}

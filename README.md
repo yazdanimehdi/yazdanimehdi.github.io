@@ -562,7 +562,9 @@ Built-in content management system at `/admin`:
 
 ### Deploy on Vercel (custom admin)
 
-On Vercel, ScholarOS replaces Sveltia with its own admin at `/<adminPath>` (default `/admin`). It has a dashboard, a post editor with math, a three-column CV editor with RenderCV import, and forms for every other kind of content. The dashboard opens with one line saying how the site is doing: the first problem by name ("Scholar sync failed and 2 more need attention"), "Nothing broken · 1 suggestion", or "Everything is up to date". Then comes **Site status**: one row each for publications, the CV PDF, feeds, scheduled posts, news, people and, in Postgres mode, the backup, with the fix on the row itself (**Retry**, **Sync all feeds**, **Regenerate PDF**, **Check now**). A failure says what went wrong in plain words and offers the action that fits: a link to the settings for a missing or refused key, nothing for a rate limit (the next daily run tries again), and **Retry** for a network error. In Postgres mode, **Run daily jobs** is the one control that runs the jobs: it releases due posts, syncs feeds, checks Google Scholar and backs up to GitHub, which they also do on their own once a day. News with no new item in 183 days is a suggestion, not a problem, and People says how many profiles weren't edited in over a year. **Next up** lists scheduled posts, soonest first, then drafts. Every publish is one commit to your repository; Vercel redeploys and the change is live in about a minute. Public pages stay static, and GitHub Pages and Netlify keep using Sveltia.
+On Vercel, ScholarOS replaces Sveltia with its own admin at `/<adminPath>` (default `/admin`). It has a dashboard, a post editor with math, a three-column CV editor with RenderCV import, and forms for every other kind of content. The dashboard opens with one line saying how the site is doing: the first problem by name ("Scholar sync failed and 2 more need attention"), "Nothing broken · 1 suggestion", or "Everything is up to date". Then comes **Site status**: one row each for publications, the CV PDF, feeds, scheduled posts, news, people and, in Postgres mode, the backup (and, for the owner, the job search: how many applications wait for approval), with the fix on the row itself (**Retry**, **Sync all feeds**, **Regenerate PDF**, **Check now**). A failure says what went wrong in plain words and offers the action that fits: a link to the settings for a missing or refused key, nothing for a rate limit (the next daily run tries again), and **Retry** for a network error. In Postgres mode, **Run daily jobs** is the one control that runs the jobs: it releases due posts, syncs feeds, checks Google Scholar and backs up to GitHub, which they also do on their own once a day. News with no new item in 183 days is a suggestion, not a problem, and People says how many profiles weren't edited in over a year. **Next up** lists scheduled posts, soonest first, then drafts. Every publish is one commit to your repository; Vercel redeploys and the change is live in about a minute. Public pages stay static, and GitHub Pages and Netlify keep using Sveltia.
+
+The sidebar groups the screens by how often you use them: **Content** (Blog posts, News, Publications, CV, People, and a disclosure for Projects, Talks and Positions), **Career** (Job search, for the owner in Postgres mode, with a count of applications waiting for approval), **Site** (Pages, Media, Site editor) and **Setup** (Settings, Integrations, and Users in Postgres mode). **Integrations** replaces the old Scholar & AI screen; its URL is still `ai`. CV styles are a tab on the CV screen (**Entries**, **Styles**). **Jump to…** at the top of the sidebar, or ⌘K (Ctrl+K on Windows and Linux), filters every screen and the create actions by name. Long settings screens (Settings, Integrations, Job search settings) show one section at a time, named in the URL. The page header stays in reach as you scroll and says **Unsaved changes** while an open document has edits you haven't saved.
 
 If your site already runs on Vercel, set the environment variables below before its next redeploy: from then on the custom admin replaces Sveltia at `/<adminPath>`, and without them nobody can sign in.
 
@@ -677,13 +679,13 @@ story in, the Writing page shows only the site's copy.
 The admin can draft and rewrite post and news bodies, generate cover images and publication figures, and turn new
 Google Scholar papers into draft posts, using your own provider keys.
 
-- **Keys.** Open **Scholar & AI** in the admin. In Postgres mode, paste a key and **Save**: it is stored encrypted in
+- **Keys.** Open **Integrations** in the admin. In Postgres mode, paste a key and **Save**: it is stored encrypted in
   the database (with a key derived from `SESSION_SECRET`; changing that secret means entering the keys again). In git
-  mode, set them as environment variables in Vercel; the Scholar & AI screen shows which are set. An environment
+  mode, set them as environment variables in Vercel; the Integrations screen shows which are set. An environment
   variable is the fallback in both modes. Keys: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`,
   `HIGGSFIELD_API_KEY` + `HIGGSFIELD_API_SECRET`, `SERPAPI_KEY`.
 - **Models.** Writing uses Anthropic, OpenAI or Google; images use OpenAI, Google or Higgsfield. Pick them on the
-  Scholar & AI screen (saved to `config/ai.yml`); an empty model uses the current default (`claude-sonnet-5-5`,
+  Integrations screen (saved to `config/ai.yml`); an empty model uses the current default (`claude-sonnet-5-5`,
   `gpt-6-astra`, `gemini-3.8-flash`; `gpt-image-2.5-flare`, `gemini-3.1-flash-image`, `higgsfield-ai/soul/standard`).
 - **What is sent.** **Write** and **Rewrite** send the title, subtitle, your instruction and the body to the writing
   provider. **Generate image** sends the title and summary to the image provider. Paper posts send the paper's
@@ -692,9 +694,9 @@ Google Scholar papers into draft posts, using your own provider keys.
 - **Publication figures and GIFs.** In the publication editor, **Generate image** draws a journal-style figure from
   the title and abstract. **Generate GIF** (posts, news and publications) asks Higgsfield for a still, animates it
   with Higgsfield image-to-video, and saves a looping animated WebP. It needs the Higgsfield keys whichever image
-  provider is chosen, and takes one to three minutes. Its **Animation model** setting on the Scholar & AI screen
+  provider is chosen, and takes one to three minutes. Its **Animation model** setting on the Integrations screen
   defaults to `bytedance/seedance-2.5/image-to-video`.
-- **Paper drafts.** Add the Scholar author id (the `user=` value of the profile URL) on the Scholar & AI screen. Both
+- **Paper drafts.** Add the Scholar author id (the `user=` value of the profile URL) on the Integrations screen. Both
   modes check Scholar every day by default; **Check for new papers** on the same screen (`papers.schedule` in
   `config/ai.yml`) picks every day, a weekday each week, a day each month (UTC), or never. **Check now** works in both
   modes, whatever the schedule. New papers become publications and, unless turned off, **draft** posts with a cover
@@ -725,9 +727,9 @@ the news section above publications"). A coding agent edits a private copy of th
 commits it so the site redeploys.
 
 - **Requirements.** The admin on Vercel (git or Postgres mode), `GITHUB_TOKEN` with Contents: read and write (the
-  token git mode and the backup already use), and a key for the writing provider chosen on the Scholar & AI screen.
+  token git mode and the backup already use), and a key for the writing provider chosen on the Integrations screen.
   The agent is that provider's own coding tool: Claude Code for Anthropic, Codex for OpenAI, Gemini CLI for Google,
-  with the writing model from the Scholar & AI screen. On Vercel the sandbox signs in automatically (OIDC). For local
+  with the writing model from the Integrations screen. On Vercel the sandbox signs in automatically (OIDC). For local
   development, run `vercel link` and `vercel env pull` to get `VERCEL_OIDC_TOKEN`.
 - **How it works.** **Start** creates one sandbox for the site (about a minute the first time: clone and install).
   Describe a change and **Run**; the agent's log shows while it works, and the preview reloads when it is done.
@@ -809,7 +811,7 @@ pdf:
 
 ### Job search (Postgres mode)
 
-A private job search inside the admin. Each night it gathers postings from the sources you turn on, scores them against your CV and preferences, and lists the best matches. On a posting, **Draft CV and letter** (later **Regenerate both**) writes a tailored CV (rendered to PDF in one of your [CV styles](#cv-styles)), a cover letter and, for Greenhouse forms, proposed answers. Nothing is ever submitted for you.
+A private job search inside the admin. Each night it gathers postings from the sources you turn on, scores them against your CV and preferences, and lists the best matches. On a posting, **Draft CV and letter** (later **Regenerate both**) writes a tailored CV (rendered to PDF in one of your [CV styles](#cv-styles)), a cover letter and, for Greenhouse forms, proposed answers. **Pre-fill the application** then fills in the real form and stops before Submit. Nothing is sent until you approve it.
 
 **Owner only, Postgres mode only.** Only the owner sees the screens, the data and the source keys. The owner is the `owner` entry in `config/site.yml`; when that is empty, it is the first `adminUsers` entry. An entry is a GitHub login or `password:<username>`, matched like `publishers`. Anyone else gets a 404, so they cannot tell the feature exists. In static and git mode every job-search screen and route answers 404 and the nav link is hidden (CV styles keep working in all modes).
 
@@ -830,7 +832,7 @@ A private job search inside the admin. Each night it gathers postings from the s
 
 **LinkedIn.** LinkedIn's terms forbid automated access and its `robots.txt` disallows everything, so this is the one source that does not check `robots.txt`; turning it on is your call, for personal use. It reads only the public guest search (2 pages per location, the honest ScholarOS User-Agent, no cookies), never your account, and stops at the first refusal. LinkedIn often blocks server IPs like Vercel's; when it refuses or finds nothing and `SERPAPI_KEY` is set, the source falls back to the Google Jobs results LinkedIn lists. Guest-search postings carry no description, so they are scored on title, company and location.
 
-**The nightly run.** The daily cron (03:00 UTC) starts it once preferences have a role, keyword, watched company or feed; **Run now** starts it any time, and a run that is still going is not started twice. It is a [Vercel Workflow](https://vercel.com/docs/workflows), so each run shows in the Workflow dashboard. It gathers every enabled source in parallel, fetches the detail of new postings that came without a description (at most 30 per source), then scores the new postings five at a time. Each run scores at most `maxScoresPerRun` postings (default 100), and each **Run now** is a run of its own; the rest wait for the next run and are counted as `deferred`. Scoring a posting takes one AI call, and up to three when the model's reply is not the JSON asked for. Company careers pages add up to one AI call per watched URL on every run, and that list has no cap. A provider or network error also leaves a posting deferred. A reply the model cannot get right after three tries marks that posting `failed`. If the AI key or the CV is missing, nothing is scored and the run says why (`scoreSkipped`). Posting text is untrusted: it is guarded before any AI call or storage, wrapped as data in every prompt, never rendered as HTML, and capped at 20,000 characters.
+**The nightly run.** The daily cron (03:00 UTC) starts it once preferences have a role, keyword, watched company or feed, and it goes as far as the stage you choose (see [How far the night goes](#how-far-the-night-goes)); **Run now** starts it any time, and a run that is still going is not started twice. It is a [Vercel Workflow](https://vercel.com/docs/workflows), so each run shows in the Workflow dashboard. It gathers every enabled source in parallel, fetches the detail of new postings that came without a description (at most 30 per source), then scores the new postings five at a time. Each run scores at most `maxScoresPerRun` postings (default 100), and each **Run now** is a run of its own; the rest wait for the next run and are counted as `deferred`. Scoring a posting takes one AI call, and up to three when the model's reply is not the JSON asked for. Company careers pages add up to one AI call per watched URL on every run, and that list has no cap. A provider or network error also leaves a posting deferred. A reply the model cannot get right after three tries marks that posting `failed`. If the AI key or the CV is missing, nothing is scored and the run says why (`scoreSkipped`). Posting text is untrusted: it is guarded before any AI call or storage, wrapped as data in every prompt, never rendered as HTML, and capped at 20,000 characters.
 
 **Drafts do not fabricate.** The AI may only select, reorder, condense and reword what is in your CV and Application answers. The tailored CV is assembled from that CV by `assembleCv`, so a claim that is not in it cannot enter, and a second AI pass (the reviewer) checks the result against the CV. If the reviewer finds issues, the draft is revised once; one that still has issues is saved as `needs-review` with the issues listed. A draft makes at most 6 AI calls (7 with Greenhouse answers). Form answers come from your CV and Application answers; EEO questions follow your setting and decline by default; a fact that is not there is left empty as a hand-off for you to fill in, never guessed. Answers are proposals only.
 
@@ -840,9 +842,55 @@ A private job search inside the admin. Each night it gathers postings from the s
 
 **Papers by relevance.** A draft can choose from every paper in the publications collection, pooled with the CV's own publication section, not only the papers the CV lists. The drafter picks the most relevant to the posting by title and abstract (5 to 8 for a research role, 2 to 4 otherwise). Abstracts are only for judging relevance; they are never quoted in the CV or the letter.
 
-**Where the data lives.** Preferences, Application answers, postings and events are in the Postgres tables `career_settings`, `career_postings` and `career_events` (migration `005_career.sql`), not in `documents`, so they never reach the git backup or the generic config API. The daily jobs record only a neutral `done` for this step. Tailored PDFs go to Vercel Blob under `career/` with a random suffix and no row in the media library. They are public URLs that cannot be guessed, but anyone with the link can open the PDF.
+**Where the data lives.** Preferences, Application answers, postings and events are in the Postgres tables `career_settings`, `career_postings` and `career_events` (migration `005_career.sql`; `006_apply.sql` adds each posting's application and the submit queue, `007_apply_lock.sql` the hold that keeps applying to one run at a time), not in `documents`, so they never reach the git backup or the generic config API. The daily jobs record only a neutral `done` for this step. Tailored PDFs, the application's screenshots and the letter PDF go to Vercel Blob under `career/` with a random suffix and no row in the media library. They are public URLs that cannot be guessed, but anyone with the link can open them.
 
-**Previews share production data.** A Vercel preview uses the same database and Blob store as production. Deploying one applies the migration to the live database, and a run on it writes real postings and spends your real AI and SerpAPI credits.
+**Previews share production data.** A Vercel preview uses the same database and Blob store as production. Deploying one applies the migration to the live database, and a run on it writes real postings and spends your real AI and SerpAPI credits. Approving an application on a preview submits it to the employer for real.
+
+#### Applying
+
+On a posting with a tailored CV, **Pre-fill the application** opens the posting's application form in a headless browser (Playwright in a [Vercel Sandbox](https://vercel.com/docs/vercel-sandbox)), fills every field, uploads the tailored CV and the cover letter as a PDF, takes screenshots and stops before Submit. It takes a minute or two.
+
+1. **Pre-fill.** The values come from your CV and Application answers first. The AI fills only what those don't cover, from the posting, and its values are marked **AI** so you check them. A value nobody is sure of is never guessed: the posting is handed to you instead.
+2. **Review.** The job page shows the screenshots and every field with its value and where it came from (CV, Answers, AI, File, or Not filled). Edit any value; an edited one is marked **You**.
+3. **Approve.** **Approve and submit** asks once more, naming the form's site and the number of fields. **Skip** and **Finish it myself** are beside it.
+4. **Submit.** Until the queue picks it up, **Withdraw approval** puts it back to waiting for your approval. When the queue couldn't start, the approval stands and it goes out with tonight's run at the latest. Within a few minutes the browser opens the form again and fills exactly the values you approved, nothing else. If the form changed since the pre-fill (a new or renamed field, a new required question, different options), it stops before typing anything and asks you to pre-fill again. After Submit it saves a screenshot of the confirmation page and sets the posting to submitted. When the site doesn't confirm it, the posting says so (**Mark as submitted** or **It wasn't sent**); it is never submitted a second time on its own.
+
+A pre-fill or submission moves the posting's status only while it is found, drafted or ready, so a status you set while it ran (Skipped, Interview…) stands.
+
+**Nothing is sent without your approval.** Submitting is never a nightly stage and can't be turned on. **Approve all ready** on the **Ready for approval** tab is a convenience: its confirm lists every posting waiting for approval, and it approves exactly those, each on its own with the pre-fill the list showed. One pre-filled again or no longer waiting by the time you confirm is left as it was, and the message says so.
+
+**Hand-offs.** A captcha, a sign-in or account creation (Workday and similar), a page with no application form, a form that asks more questions once filled, or a value the server isn't confident about stops the pre-fill. The posting then says **Finish this one yourself** with the reason, a link to the form, the tailored CV and letter PDFs, and each prepared value with a **Copy** button.
+
+**One application at a time.** One sandbox runs the browser, and one pre-fill or submission holds it at a time. **Pre-fill** while another is running answers "Another application is being filled in or sent: try again in a few minutes"; approved applications wait in a queue and go out one by one. A hold left by a run that died is released after 15 minutes. The browser is plain code that takes no instructions from the page; the sandbox holds no keys and can't reach private IPv4 addresses (cloud metadata included).
+
+#### How far the night goes
+
+Under **Job search → Settings → Automation**, choose where the nightly run stops. Each stage includes the ones before it.
+
+1. **Search only:** find new postings.
+2. **+ Score:** score each new posting.
+3. **+ Tailor CV and letter** (the default): draft a CV and cover letter for each match at or above your threshold, best score first.
+4. **+ Pre-fill applications for approval:** pre-fill each draft that passed its review cleanly and list it under **Ready for approval**.
+
+Limits under the same section: **Drafts per night** (default 5; the rest wait for the next night), **Applications per company** within **this many days** (default 2 in 30; postings at that company you drafted, sent or moved further in the window count), and **Pause all nightly job search**, which makes every run do nothing of its own. Applications you approved yourself are still submitted while it is paused. **Run now** follows the same settings. When a draft or a pre-fill fails (an exhausted quota, a provider error), the night stops there and the run records why (`stopped`) instead of reporting nothing drafted. **Job search** shows the last run in one line (found, scored, drafted, pre-filled, to finish yourself, held back by limits, or that it was paused), with why it stopped early and a digest that failed to send below it; the dashboard's Job search row also leads with **Stopped early**, and the digest says it too.
+
+The dashboard's Site status, the sidebar's Job search badge and the **Ready for approval** tab always show how many applications wait for you.
+
+#### Email digest
+
+**Job search → Settings → Notifications** can email you a digest after each nightly run: the counts, why the run stopped if it did, what is ready for approval and what was drafted, each linked to its page in the admin. It is off by default. It is sent through [Resend](https://resend.com): create an API key in your Resend account and save it as `RESEND_API_KEY` on **Integrations → Keys**. **To** defaults to the email on your CV. **From** defaults to `ScholarOS <onboarding@resend.dev>`, which Resend only delivers to your Resend account's own email until you verify a domain there. A night with nothing new sends nothing, and a digest that fails is recorded on the run, never failing it.
+
+#### Drafting worker
+
+**Job search → Settings → Drafting worker** picks what writes drafts, their review, form answers and the AI's application values. Scoring always uses the API provider.
+
+- **API keys** (the default): the writing provider and key on **Integrations → Writing & images**.
+- **Claude Code**, **Codex** or **Gemini CLI**: the agent CLI answers each call once, in a short-lived Vercel Sandbox.
+  - **Claude Code** signs in with your Claude subscription or an Anthropic key. For the subscription, run `claude setup-token` on your computer and save the token it prints as `CLAUDE_CODE_OAUTH_TOKEN` on **Integrations → Keys**. The token never enters the sandbox: the sandbox's firewall adds it to requests to Anthropic's API.
+  - **Codex** signs in with your ChatGPT subscription or an OpenAI key. For the subscription, sign in to Codex with ChatGPT on your computer and paste `~/.codex/auth.json` into `CODEX_AUTH_JSON` on **Integrations → Keys**. Codex reads and refreshes that file itself, so the firewall can't add it the way it adds a key: it is copied into the sandbox for each call and deleted when the call ends. The sandbox is kept between calls, so each call first deletes any sign-in a call that died left behind (any at all when the worker isn't Codex on your subscription). That sandbox reaches only OpenAI's hosts and the npm registry, to install Codex. A refreshed file replaces the saved one.
+  - **Gemini CLI** stands in for Antigravity, which has no sign-in that works unattended yet. It runs on your `GEMINI_API_KEY`.
+
+When a subscription runs out of quota, the run stops and says so. It never falls back to paid API use. Subscription tokens and keys are sealed in the `secrets` table like every other key, never in content or the git backup. Sandbox time for applying and for the CLI workers is billed to your Vercel account.
 
 #### Checking it on a preview
 

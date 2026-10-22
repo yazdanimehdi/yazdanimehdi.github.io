@@ -75,7 +75,7 @@ const strip = (s: unknown) =>
         .trim()
     : '';
 const text = (s: unknown) => (typeof s === 'string' ? visible(s).trim() : '');
-const DECLINE = /decline|prefer not|(?:do not|don['’]?t) wish/i;
+export const DECLINE = /decline|prefer not|(?:do not|don['’]?t) wish/i;
 
 /** Question blocks → GhQuestions; the first real field of a question is the one answered (`resume`, not `resume_text`). */
 function fromRaw(list: RawQuestion[] | undefined, eeo: boolean): GhQuestion[] {
@@ -158,15 +158,26 @@ function answer(q: GhQuestion, value: string, source: FormAnswer['source'], note
 }
 const handoff = (q: GhQuestion, note = HANDOFF_NOTE) => answer(q, '', 'handoff', note);
 
+/** The option each pick names, case-insensitively; null when any pick names none. */
+function matchOptions(q: GhQuestion, picks: string[]): GhOption[] | null {
+  const os = picks.map((p) => q.options.find((o) => o.label.toLowerCase() === p.trim().toLowerCase()));
+  return os.every((o) => o) ? (os as GhOption[]) : null;
+}
+const pickAnswer = (q: GhQuestion, os: GhOption[], source: FormAnswer['source'], note?: string) =>
+  answer(
+    q,
+    os.map((o) => o.label).join('; '),
+    source,
+    os.map(optionNote).filter(Boolean).join('; ') || note || undefined,
+  );
+
 /** A select takes the option whose label equals `want` (case-insensitively); a text field takes `want` as it is. */
 function fill(q: GhQuestion, want: string, source: FormAnswer['source']): FormAnswer {
   want = want.trim();
   if (!want) return handoff(q);
   if (!isSelect(q)) return answer(q, want, source);
-  const o = q.options.find((x) => x.label.toLowerCase() === want.toLowerCase());
-  return o
-    ? answer(q, o.label, source, optionNote(o))
-    : handoff(q, `"${want.slice(0, 100)}" is not one of the options`);
+  const os = matchOptions(q, [want]);
+  return os ? pickAnswer(q, os, source) : handoff(q, `"${want.slice(0, 100)}" is not one of the options`);
 }
 
 /** A yes/no answer for a select (the option that starts with Yes or No) or a text field. */
@@ -183,6 +194,10 @@ const EEO_FIELDS = [
   ['disability', /disab/i],
 ] as const;
 
+/** A label asking for a demographic (EEO) fact, for forms that don't mark those questions themselves. */
+export const isEeo = (label: string) =>
+  EEO_FIELDS.some(([, re]) => re.test(label)) || /hispanic|latin[oax]|sexual orientation|transgender/i.test(label);
+
 function eeoAnswer(q: GhQuestion, a: ApplicationAnswers): FormAnswer {
   if (a.eeo.mode === 'decline') {
     const picks = q.options.filter((o) => o.decline);
@@ -195,16 +210,10 @@ function eeoAnswer(q: GhQuestion, a: ApplicationAnswers): FormAnswer {
     .split('\n')
     .map((s) => s.trim())
     .filter(Boolean);
-  const found = parts.map((p) => q.options.find((o) => o.label.toLowerCase() === p.toLowerCase()));
-  if (!parts.length || found.some((o) => !o) || (parts.length > 1 && q.type !== 'multi_value_multi_select'))
+  const os = matchOptions(q, parts);
+  if (!parts.length || !os || (parts.length > 1 && q.type !== 'multi_value_multi_select'))
     return handoff(q, key ? `your ${key} answer is not one of the options` : 'not in your answers');
-  const os = found as GhOption[];
-  return answer(
-    q,
-    os.map((o) => o.label).join('; '),
-    'answers',
-    os.map(optionNote).filter(Boolean).join('; ') || undefined,
-  );
+  return pickAnswer(q, os, 'answers');
 }
 
 const PROFILE_URLS: Record<string, string> = {
@@ -239,6 +248,8 @@ function known(q: GhQuestion, cv: CvConfig, a: ApplicationAnswers): FormAnswer |
   const label = q.label.toLowerCase();
   const fromCv = (v: string | undefined) => fill(q, v ?? '', 'cv');
   switch (q.field) {
+    case 'name':
+      return fromCv(name);
     case 'first_name':
       return fromCv(first);
     case 'last_name':
@@ -295,6 +306,10 @@ function known(q: GhQuestion, cv: CvConfig, a: ApplicationAnswers): FormAnswer |
   return null;
 }
 
+/** The answer the owner's data settles for one question (EEO by the owner's setting); null when it's left for the AI. */
+export const knownAnswer = (q: GhQuestion, cv: CvConfig, a: ApplicationAnswers): FormAnswer | null =>
+  q.eeo ? eeoAnswer(q, a) : known(q, cv, a);
+
 /**
  * The answers the owner's data settles, and the questions left for the AI. An `ApplicationAnswers` value wins over the
  * CV; a fact in neither is a hand-off, never a guess. EEO questions never reach the AI, in either mode.
@@ -308,7 +323,7 @@ export function splitQuestions(
   const rest: GhQuestion[] = [];
   for (const q of qs) {
     if (q.type === 'input_hidden') continue;
-    const k = q.eeo ? eeoAnswer(q, a) : known(q, cv, a);
+    const k = knownAnswer(q, cv, a);
     if (k) answers.push(k);
     else rest.push(q);
   }
@@ -318,7 +333,35 @@ export function splitQuestions(
 export const knownAnswers = (qs: GhQuestion[], cv: CvConfig, a: ApplicationAnswers): FormAnswer[] =>
   splitQuestions(qs, cv, a).answers;
 
-const cap = (s: string, n = CAP) => s.slice(0, n);
+export const cap = (s: string, n = CAP) => s.slice(0, n);
+
+/** The posting fenced as untrusted, with the form's questions (also third-party text) inside the fence. */
+export function fencedPosting(p: Pick<Posting, 'company' | 'title' | 'location' | 'description'>, questions: unknown) {
+  const header = [
+    `Title: ${cap(p.title, 200)}`,
+    `Company: ${cap(p.company, 200)}`,
+    `Location: ${cap(p.location ?? '', 200)}`,
+    `Form questions (also third-party text):\n${JSON.stringify(questions, null, 1)}`,
+    '',
+    '',
+  ].join('\n');
+  return posting(p.description, header);
+}
+
+/** The Application answers the AI may use. Phone, address, email and EEO answers are filled elsewhere and never sent. */
+export const answerFacts = (a: ApplicationAnswers): string =>
+  [
+    ['Why the candidate is looking', a.whyLooking],
+    ['Work authorization', a.workAuthorization],
+    ['Needs visa sponsorship', a.sponsorship],
+    ['Notice period', a.noticePeriod],
+    ['Earliest start', a.earliestStart],
+    ['Salary expectation', a.salaryExpectation],
+    ['Links', a.links.map((l) => `${l.label}: ${l.url}`).join('; ')],
+  ]
+    .filter(([, v]) => v.trim())
+    .map(([k, v]) => `${k}: ${v.trim()}`)
+    .join('\n') || '(none)';
 
 /** Asks the AI to answer `rest` from the CV and the Application answers only; the questions are fenced as untrusted. */
 export function answersPrompt(
@@ -335,26 +378,6 @@ export function answersPrompt(
     required: q.required,
     ...(isSelect(q) ? { options: q.options.slice(0, 50).map((o) => cap(o.label)) } : {}),
   }));
-  const header = [
-    `Title: ${cap(p.title, 200)}`,
-    `Company: ${cap(p.company, 200)}`,
-    `Location: ${cap(p.location ?? '', 200)}`,
-    `Form questions (also third-party text):\n${JSON.stringify(questions, null, 1)}`,
-    '',
-    '',
-  ].join('\n');
-  // Phone, address, email and EEO answers are filled elsewhere and never sent.
-  const facts = [
-    ['Why the candidate is looking', a.whyLooking],
-    ['Work authorization', a.workAuthorization],
-    ['Needs visa sponsorship', a.sponsorship],
-    ['Notice period', a.noticePeriod],
-    ['Earliest start', a.earliestStart],
-    ['Salary expectation', a.salaryExpectation],
-    ['Links', a.links.map((l) => `${l.label}: ${l.url}`).join('; ')],
-  ]
-    .filter(([, v]) => v.trim())
-    .map(([k, v]) => `${k}: ${v.trim()}`);
   return {
     system: [
       'You answer job application form questions for a candidate.',
@@ -366,8 +389,8 @@ export function answersPrompt(
     ].join('\n'),
     prompt: [
       `Candidate CV:\n${cvText(cv)}`,
-      `Application answers:\n${facts.join('\n') || '(none)'}`,
-      posting(p.description, header),
+      `Application answers:\n${answerFacts(a)}`,
+      fencedPosting(p, questions),
     ].join('\n\n'),
     maxTokens: 4000,
   };
@@ -389,19 +412,14 @@ export function parseFormAnswers(reply: string, rest: GhQuestion[]): FormAnswer[
       note: typeof r.note === 'string' ? visible(r.note).trim().slice(0, 300) : '',
     });
   }
-  return rest.map((q) => {
-    const g = given.get(q.field);
-    if (!g) return handoff(q, 'the model gave no answer');
-    if (g.handoff || !g.value) return handoff(q, g.note || HANDOFF_NOTE);
-    if (!isSelect(q)) return answer(q, g.value, 'ai', g.note || undefined);
-    const picks = (q.type === 'multi_value_multi_select' ? g.value.split(';') : [g.value]).map((s) => s.trim());
-    const os = picks.map((p) => q.options.find((o) => o.label === p));
-    if (os.some((o) => !o)) return handoff(q, 'the model’s answer is not one of the options');
-    return answer(
-      q,
-      (os as GhOption[]).map((o) => o.label).join('; '),
-      'ai',
-      (os as GhOption[]).map(optionNote).filter(Boolean).join('; ') || g.note || undefined,
-    );
-  });
+  return rest.map((q) => aiAnswer(q, given.get(q.field)));
+}
+
+/** One AI answer checked against its question: skipped or handed off → hand-off; a select value must be an option. */
+export function aiAnswer(q: GhQuestion, g: { value: string; handoff: boolean; note: string } | undefined): FormAnswer {
+  if (!g) return handoff(q, 'the model gave no answer');
+  if (g.handoff || !g.value) return handoff(q, g.note || HANDOFF_NOTE);
+  if (!isSelect(q)) return answer(q, g.value, 'ai', g.note || undefined);
+  const os = matchOptions(q, q.type === 'multi_value_multi_select' ? g.value.split(';') : [g.value]);
+  return os ? pickAnswer(q, os, 'ai', g.note) : handoff(q, 'the model’s answer is not one of the options');
 }

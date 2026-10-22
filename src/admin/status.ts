@@ -1,3 +1,4 @@
+import { visible } from '../lib/career/text';
 import { postStatus } from '../lib/utils';
 import { formatDate } from './dates';
 import type { Entry } from './types';
@@ -30,6 +31,8 @@ export interface DashboardData {
   lastCommit: { at: string; url: string } | null;
   /** Publishers only: who asked for Site editor changes that wait for review (empty: none, or not a publisher). */
   review: string[];
+  /** The job-search owner in Postgres mode: postings waiting for approval, and why the last run stopped early. */
+  career?: { ready: number; stopped?: string };
 }
 
 /**
@@ -335,14 +338,39 @@ function backup(d: DashboardData): StatusRow {
   return { ...row, state: 'Backed up to GitHub', tone: 'ok', at: run.at, detail: run.detail, link: viewOn(run.url) };
 }
 
-/** The daily career step. Its detail is neutral on purpose (every admin reads jobs.json): the row reads only `ok`. */
+/**
+ * The job search: the owner sees what waits for approval; a run that failed to start, then a night that stopped early,
+ * come first. The run's detail stays unread on purpose (every admin reads jobs.json); `career` is only sent to the owner.
+ */
 function career(d: DashboardData): StatusRow[] {
   const run = d.runs.career;
-  if (!run) return [];
-  const row = { key: 'career', label: 'Job search', at: run.at };
-  if (run.ok === false)
-    return [{ ...row, state: 'Job search failed to start', tone: 'attention', detail: 'Next automatic try: tomorrow' }];
-  return [{ ...row, state: 'Checked with the daily jobs', tone: 'ok' }];
+  if (!run && !d.career) return [];
+  const row = { key: 'career', label: 'Job search', at: run?.at ?? null };
+  const ready = d.career?.ready ?? 0;
+  const review = ready ? { action: screen('Review', 'career?status=ready') } : {};
+  if (run?.ok === false)
+    return [
+      {
+        ...row,
+        state: 'Job search failed to start',
+        tone: 'attention',
+        detail: 'Next automatic try: tomorrow',
+        ...review,
+      },
+    ];
+  if (!d.career) return [{ ...row, state: 'Checked with the daily jobs', tone: 'ok' }];
+  if (d.career.stopped) {
+    return [
+      {
+        ...row,
+        state: `Stopped early: ${visible(d.career.stopped)}`,
+        tone: 'attention',
+        ...(ready ? { detail: `${ready} ready for approval`, ...review } : { action: screen('Open', 'career') }),
+      },
+    ];
+  }
+  const state = ready ? `${ready} ready for approval` : 'Nothing waiting';
+  return [{ ...row, state, tone: 'ok', ...(run ? { detail: 'Checked with the daily jobs' } : {}), ...review }];
 }
 
 /** Problems first, then suggestions, runs the token can't see, jobs never seen running, the healthy rows and, last, what is not set up. */

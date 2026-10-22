@@ -272,6 +272,26 @@ Three projects, built in this order. Each one is useful on its own.
 - **Posting text is untrusted data** everywhere it flows: AI prompts, the job page (escape it), and the browser
   agent.
 
+### Built (2026-10-22)
+
+Project 3 shipped as planned in `docs/superpowers/plans/2026-10-22-assisted-applying.md`. Decisions made while
+building it:
+
+- **Antigravity:** its CLI's headless sign-in is an interactive URL-and-code flow, so nothing signs it in unattended.
+  The slot runs Gemini CLI with the Gemini API key, and the admin says so.
+- **Codex subscription:** Codex reads and refreshes `auth.json` itself, so the firewall can't broker it the way it
+  brokers a header. The file enters the throwaway worker VM for one call and is deleted after it; that VM's egress is
+  limited to OpenAI's hosts (and npm, to install the CLI). A refreshed file is sealed again. This is the one exception
+  to "secrets enter Sandbox only through the network policy".
+- **IPv6 private ranges:** the apply sandbox denies private, loopback, link-local and CGNAT IPv4 ranges, but not
+  `fc00::/7` or `fe80::/10`: the Sandbox API (3.7.0) rejects IPv6 CIDRs as invalid.
+- **The browser runner is deterministic code.** `runner.mjs` reads, fills and submits; it takes no instructions from
+  the page. The server decides values (CV and Application answers first), and the AI only proposes values for the
+  rest. A value nobody is sure of is a hand-off.
+- **One apply sandbox at a time:** a lock on the `career_settings` row (`apply_lock`, `007_apply_lock.sql`), taken
+  in the same transaction as the posting's claim and stale after 15 minutes. Approved applications wait in a queue
+  that submits them one by one.
+
 ## Calls made by Claude (not explicitly decided by the owner)
 
 - Compact density is the new default style.

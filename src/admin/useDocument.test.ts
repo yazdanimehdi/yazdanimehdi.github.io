@@ -72,6 +72,17 @@ test('a successful save clears the draft and takes the new version', async () =>
   assert.equal(stored(), null);
 });
 
+test('settle() after a change made outside save() leaves nothing unsaved and no draft', async () => {
+  const doc = await opened({ title: 'server' });
+  await doc.save(async () => ({ id: 'c', versions: { p: 'v2' } }), 'p');
+  doc.current!.title = 'committed elsewhere';
+  assert.equal(doc.dirty, true);
+  await doc.settle();
+  assert.equal(doc.dirty, false);
+  await flush();
+  assert.equal(stored(), null);
+});
+
 test('retarget() makes reload() use the new loader and key', async () => {
   const doc = await opened({ title: 'new' });
   doc.retarget('k2', loader({ title: 'saved' }));
@@ -132,4 +143,25 @@ test('a read-only document never offers or writes drafts', async () => {
   doc.current!.title = 'edited';
   await flush();
   assert.equal(localStorage.length, 0);
+});
+
+test('dirty: set by an edit, cleared by a save or a reload, and back when the edit is undone', async () => {
+  const doc = await opened({ title: 'server' });
+  assert.equal(doc.dirty, false);
+  doc.current!.title = 'mine';
+  assert.equal(doc.dirty, true);
+  doc.current!.title = 'server';
+  assert.equal(doc.dirty, false, 'typing the loaded value back is not a change');
+  doc.current!.title = 'mine';
+  await doc.save(async () => ({ id: 'c', versions: { p: 'v2' } }), 'p');
+  assert.equal(doc.dirty, false, 'saved');
+  doc.current!.title = 'again';
+  await doc.save(async () => {
+    throw new ApiError(400, 'bad', { title: 'required' });
+  }, 'p');
+  assert.equal(doc.dirty, true, 'a failed save keeps the change');
+  await doc.reload();
+  assert.equal(doc.dirty, false, 'reloaded');
+  doc.current = null;
+  assert.equal(doc.dirty, false, 'nothing open (an entry just deleted)');
 });

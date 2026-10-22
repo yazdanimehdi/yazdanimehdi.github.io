@@ -30,7 +30,7 @@ ${README}`;
 const VERCEL_STEPS = `Site editor setup: the admin on Vercel
 1. Import the repository in Vercel and set the admin's environment variables (README, section “Deploy on Vercel (custom admin)”).
 2. Make sure GITHUB_TOKEN has Contents: Read and write.
-3. Add a key for the writing provider on the Scholar & AI screen.
+3. Add a key for the writing provider on the Integrations screen.
 ${README}`;
 
 const SANDBOX_SIGN_IN_STEPS = `Site editor setup: signing in to Vercel Sandbox
@@ -92,7 +92,7 @@ const NOTICES: { match: RegExp; notice: Omit<Notice, 'raw'> }[] = [
     match: /_API_KEY is not set/,
     notice: {
       title: 'Add a key for the AI provider',
-      body: 'The agent runs on the writing provider chosen on the Scholar & AI screen, and that provider has no key yet. Add it there, then come back.',
+      body: 'The agent runs on the writing provider chosen on the Integrations screen, and that provider has no key yet. Add it there, then come back.',
       action: 'ai',
     },
   },

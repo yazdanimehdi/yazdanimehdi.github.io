@@ -14,6 +14,11 @@ import { GET as revision } from '../../admin/routes/api/history/[id]';
 import { POST as restore } from '../../admin/routes/api/history/[id]/restore';
 import { POST as purge } from '../../admin/routes/api/cache/purge';
 import { GET as dashboard } from '../../admin/routes/api/dashboard';
+import { GET as me } from '../../admin/routes/api/me';
+import { GET as ready } from '../../admin/routes/api/career/ready';
+import { setSqlForTests } from '../db';
+import { listPostings, updatePosting, upsertPostings, writeCareer } from '../career/db';
+import { nonOwnerUser, ownerUser } from '../career/test-owner';
 
 const user = { login: 'jane', name: 'Jane', avatar: '' };
 let sql: Sql;
@@ -40,14 +45,16 @@ beforeEach(async () => {
 
 function call(
   handler: (ctx: never) => Response | Promise<Response>,
-  opts: { method?: string; params?: Record<string, string>; body?: unknown; query?: string } = {},
+  opts: { method?: string; params?: Record<string, string>; body?: unknown; query?: string; as?: object } = {},
 ): Promise<Response> {
   const url = new URL(`https://site.test/api/admin/test${opts.query ?? ''}`);
   const request = new Request(url, {
     method: opts.method ?? 'GET',
     body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
   });
-  return Promise.resolve(handler({ request, url, params: opts.params ?? {}, locals: { user } } as never));
+  return Promise.resolve(
+    handler({ request, url, params: opts.params ?? {}, locals: { user: opts.as ?? user } } as never),
+  );
 }
 
 const save = (title: string, version: string | null) =>
@@ -193,5 +200,69 @@ test('history: restoring a theme file needs a publisher; a normal path still res
     assert.equal(ok.status, 200);
   } finally {
     adminSettings().publishers = [];
+  }
+});
+
+test('the owner learns what waits for approval: me, the dashboard and the Ready list; nobody else does', async () => {
+  const flags = {
+    hiddenBlocks: [],
+    hiddenUrls: [],
+    invisible: { zero_width: 0, bidi: 0, format: 0, bom: 0 },
+    invisibleFlagged: 0,
+    instructionLines: [],
+    mixedScript: [],
+    warn: false,
+  };
+  const raw = (key: string) => ({
+    key,
+    source: 'greenhouse',
+    externalId: key,
+    company: 'Acme',
+    title: `Engineer ${key}`,
+    url: 'https://x.test/1',
+    description: '',
+    format: 'html' as const,
+    text: '',
+    flags,
+  });
+  await upsertPostings(sql, ['A', 'B', 'C'].map(raw));
+  const [a, b] = (await listPostings(sql, {})).map((r) => r.id).sort((x, y) => x - y);
+  const at = '2026-10-21T08:00:00.000Z';
+  const field = { id: 'q', label: 'Q', kind: 'text' as const, required: true, value: 'v', source: 'cv' as const };
+  await updatePosting(sql, a, {
+    status: 'ready',
+    application: { state: 'ready', at, url: 'https://x.test/apply', fields: [field, field], shots: [] },
+  });
+  await updatePosting(sql, b, { status: 'ready' }); // listed, but not waiting for approval: not counted
+  const stopped = 'Your Claude subscription is out of quota';
+  await writeCareer(sql, { lastRun: { at, sources: [], scored: 0, failed: 0, deferred: 0, stopped } }, 'test');
+  setSqlForTests(sql);
+  const saved = { VERCEL: process.env.VERCEL, DATABASE_URL: process.env.DATABASE_URL };
+  process.env.VERCEL = '1';
+  process.env.DATABASE_URL = 'postgres://test';
+  try {
+    assert.deepEqual((await (await call(me, { as: ownerUser() })).json()).career, { ready: 1 });
+    assert.equal((await (await call(me, { as: nonOwnerUser() })).json()).career, undefined);
+    assert.deepEqual((await (await call(dashboard, { as: ownerUser() })).json()).career, { ready: 1, stopped });
+    assert.equal((await (await call(dashboard, { as: nonOwnerUser() })).json()).career, undefined);
+    const rows = (await (await call(ready, { as: ownerUser() })).json()).rows;
+    assert.deepEqual(
+      rows.map((r: { id: number; prefilledAt: string | null; fields: number; state: string | null }) => [
+        r.id,
+        r.prefilledAt,
+        r.fields,
+        r.state,
+      ]),
+      [
+        [a, at, 2, 'ready'],
+        [b, null, 0, null],
+      ],
+    );
+    assert.equal((await call(ready, { as: nonOwnerUser() })).status, 404);
+  } finally {
+    setSqlForTests(null);
+    for (const [k, v] of Object.entries(saved))
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
   }
 });

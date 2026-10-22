@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>Country</title></head>
+<body>
+  <h1>Research Engineer</h1>
+  <form>
+    <label for="state">State</label>
+    <select id="state" name="state">
+      <option value="">Choose one</option>
+      <option>California</option>
+      <option>Ontario</option>
+    </select>
+    <label for="country">Country</label>
+    <select id="country" name="country">
+      <option value="">Choose one</option>
+      <option>United States</option>
+      <option>Canada</option>
+    </select>
+    <button type="submit">Submit Application</button>
+  </form>
+<script>
+  document.querySelector("#country").addEventListener("change", () => (document.querySelector("#state").value = ""));
+  document.querySelector("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await fetch("/submit", { method: "POST", body: new URLSearchParams(new FormData(e.target)) });
+    e.target.outerHTML = "<p>Thank you, your application was received</p>";
+  });
+</script>
+</body>
+</html>

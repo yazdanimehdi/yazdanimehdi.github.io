@@ -7,7 +7,9 @@ import { parseJobs } from '../../../lib/admin/jobs';
 import type { ContentStore } from '../../../lib/admin/store';
 import { adminSettings, canPublish, isOwner } from '../../../lib/admin/settings';
 import { CV_JSON, FEEDS_JSON, JOBS_JSON, SCHOLAR_JSON, collectionDir, configPath } from '../../../lib/admin/paths';
+import { readCareer, readyCount } from '../../../lib/career/db';
 import { readCvMeta } from '../../../lib/cv-pdf/generate';
+import { getSql } from '../../../lib/db';
 import { feedSources, type FeedsConfig } from '../../../lib/feeds';
 import { getMode, type Mode } from '../../../lib/mode';
 import { postStatus } from '../../../lib/utils';
@@ -78,9 +80,17 @@ async function peopleEdits(store: ContentStore, mode: Mode): Promise<DashboardDa
   return { count: files.length, edited: times.filter((t): t is string => !!t) };
 }
 
+/** The owner's job search: what waits for approval, and why the last night stopped early if it did. */
+async function ownerCareer(): Promise<NonNullable<DashboardData['career']>> {
+  const sql = getSql();
+  const [ready, { lastRun }] = await Promise.all([readyCount(sql), readCareer(sql)]);
+  return { ready, ...(lastRun?.stopped ? { stopped: lastRun.stopped } : {}) };
+}
+
 export const GET = route(async (_ctx, store, user) => {
   const mode = getMode();
   const gh = store instanceof GitHubStore ? store : null;
+  const owner = mode === 'postgres' && isOwner(user, adminSettings());
   const [
     posts,
     news,
@@ -97,6 +107,7 @@ export const GET = route(async (_ctx, store, user) => {
     runs,
     head,
     review,
+    ownCareer,
   ] = await Promise.all([
     listEntries(store, 'posts'),
     listEntries(store, 'announcements'),
@@ -114,6 +125,7 @@ export const GET = route(async (_ctx, store, user) => {
     gh ? gh.latestCommit().catch(() => null) : null,
     // A call to act, so publishers only.
     canPublish(user, adminSettings()) ? waitingForReview() : [],
+    owner ? ownerCareer() : null,
   ]);
   const items = jsonField(feedsJson?.content, 'length');
   const authors = Array.isArray(scholar.data.authors) ? scholar.data.authors : [];
@@ -137,10 +149,11 @@ export const GET = route(async (_ctx, store, user) => {
     },
     news: { count: news.length, latest: newestDate(news) },
     people,
-    runs: jobs ? { ...daily, ...(career && isOwner(user, adminSettings()) ? { career } : {}) } : runs.runs,
+    runs: jobs ? { ...daily, ...(career && owner ? { career } : {}) } : runs.runs,
     hiddenRuns: runs.hiddenRuns,
     lastCommit: head,
     review,
+    ...(ownCareer ? { career: ownCareer } : {}),
   };
   return json(data);
 });

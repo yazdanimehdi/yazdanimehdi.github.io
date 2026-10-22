@@ -39,7 +39,7 @@ test('posts: create, save a draft, then publish', async ({ page }) => {
   await page.getByRole('button', { name: 'Publish', exact: true }).click();
   await expect(page.getByText(COMMITTED)).toHaveCount(2);
   await page.goto(`${ADMIN}/posts`);
-  await expect(page.getByRole('row', { name: new RegExp(title) }).getByText('Published')).toBeVisible();
+  await expect(page.getByRole('listitem').filter({ hasText: title }).getByText('Published')).toBeVisible();
 });
 
 test('posts: a body with raw HTML opens as plain Markdown and is kept', async ({ page, baseURL }) => {
@@ -63,17 +63,19 @@ test('posts: a body with raw HTML opens as plain Markdown and is kept', async ({
   expect(saved.body).toContain('<iframe src="https://example.com/embed"></iframe>');
 });
 
-test('dashboard: hide and unhide an imported post', async ({ page }) => {
+test('posts: hide and unhide an imported post', async ({ page }) => {
   await signIn(page);
-  await page.goto(ADMIN);
-  const hide = page.getByRole('button', { name: 'Hide', exact: true });
-  const row = page.getByRole('row').filter({ has: hide }).first();
-  const title = (await row.getByRole('cell').first().innerText()).trim();
-  await row.getByRole('button', { name: 'Hide', exact: true }).click();
-  const same = page.getByRole('row').filter({ hasText: title });
-  await expect(same.getByText('Hidden')).toBeVisible();
-  await same.getByRole('button', { name: 'Unhide' }).click();
-  await expect(same.getByText('Published')).toBeVisible();
+  await page.goto(`${ADMIN}/posts?source=imported`);
+  const row = page
+    .getByRole('listitem')
+    .filter({ has: page.getByRole('button', { name: /^Hide ‘/ }) })
+    .first();
+  const title = (await row.getByRole('link').first().innerText()).trim();
+  await row.getByRole('button', { name: /^Hide ‘/ }).click();
+  const same = page.getByRole('listitem').filter({ hasText: title });
+  await expect(same.getByText('Hidden', { exact: true })).toBeVisible();
+  await same.getByRole('button', { name: /^Unhide ‘/ }).click();
+  await expect(same.getByText('Published', { exact: true })).toBeVisible();
 });
 
 test('publications: edit a field, regenerate BibTeX, publish', async ({ page }) => {

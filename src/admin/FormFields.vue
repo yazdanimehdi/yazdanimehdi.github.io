@@ -53,11 +53,15 @@ async function uploadPdf(key: string, e: Event) {
     else report(err);
   }
 }
+/** An `objects` field whose sub-fields are all one line: each item is one row of inputs under a column header. */
+const inline = (f: FieldDef) =>
+  !!f.fields?.length && f.fields.every((x) => ['text', 'number', 'select'].includes(x.type));
+const cellKey = (f: FieldDef, index: number, sub: FieldDef) => `${f.key}.${index}.${sub.key}`;
 const regenerate = (key: string) => set(key, bibtexFor({ ...(props.model as BibSource), bibtex: undefined }));
 </script>
 
 <template>
-  <div class="adm-form">
+  <div class="adm-form adm-fields">
     <template v-for="f in fields" :key="f.key">
       <label v-if="f.type === 'checkbox'" class="adm-check">
         <input
@@ -67,6 +71,60 @@ const regenerate = (key: string) => set(key, bibtexFor({ ...(props.model as BibS
         />
         {{ f.label }}
       </label>
+
+      <fieldset v-else-if="f.type === 'objects' && inline(f)" class="adm-rep">
+        <legend>{{ f.label }}</legend>
+        <div v-if="(value(f.key) ?? []).length" class="adm-list-row adm-rep-head" aria-hidden="true">
+          <div class="adm-rep-cols">
+            <span v-for="sub in f.fields" :key="sub.key">{{ sub.label }}</span>
+          </div>
+          <span v-for="n in f.fixed ? 2 : 3" :key="n" class="adm-btn adm-btn-small">↑</span>
+        </div>
+        <ListInput
+          :items="value(f.key) ?? []"
+          :blank="() => ({})"
+          :fixed="f.fixed"
+          add-label="Add item"
+          @update="set(f.key, $event)"
+        >
+          <template #default="{ index }">
+            <div class="adm-rep-cols">
+              <label v-for="sub in f.fields" :key="sub.key" class="adm-field">
+                <span class="adm-rep-label">{{ sub.label }}</span>
+                <select
+                  v-if="sub.type === 'select'"
+                  :value="value(cellKey(f, index, sub)) ?? ''"
+                  :aria-label="`${sub.label} ${index + 1}`"
+                  v-bind="invalid(cellKey(f, index, sub))"
+                  @change="set(cellKey(f, index, sub), text($event))"
+                >
+                  <option value="">—</option>
+                  <option v-for="o in options(sub)" :key="o.value" :value="o.value">{{ o.label }}</option>
+                  <option v-for="v in unlisted(sub, [value(cellKey(f, index, sub))])" :key="v" :value="v">
+                    {{ v }} (not in list)
+                  </option>
+                </select>
+                <input
+                  v-else
+                  :type="sub.type"
+                  :value="value(cellKey(f, index, sub)) ?? ''"
+                  :aria-label="`${sub.label} ${index + 1}`"
+                  v-bind="invalid(cellKey(f, index, sub))"
+                  @input="
+                    set(
+                      cellKey(f, index, sub),
+                      sub.type === 'number' && text($event) !== '' ? Number(text($event)) : text($event),
+                    )
+                  "
+                />
+                <span v-if="error(cellKey(f, index, sub))" :id="errorId(cellKey(f, index, sub))" class="adm-err">
+                  {{ error(cellKey(f, index, sub)) }}
+                </span>
+              </label>
+            </div>
+          </template>
+        </ListInput>
+      </fieldset>
 
       <fieldset v-else-if="f.type === 'objects'" class="adm-group">
         <legend>{{ f.label }}</legend>
@@ -126,11 +184,15 @@ const regenerate = (key: string) => set(key, bibtexFor({ ...(props.model as BibS
       </div>
 
       <div v-else-if="f.type === 'color'" class="adm-field">
+        <label :for="labelId(f.key)">{{ f.label }}</label>
         <div class="adm-list-row adm-color-row">
-          <label class="adm-field">
-            <span>{{ f.label }}</span>
-            <input type="text" :value="value(f.key) ?? ''" v-bind="invalid(f.key)" @input="set(f.key, text($event))" />
-          </label>
+          <input
+            :id="labelId(f.key)"
+            type="text"
+            :value="value(f.key) ?? ''"
+            v-bind="invalid(f.key)"
+            @input="set(f.key, text($event))"
+          />
           <input
             type="color"
             :value="value(f.key) || '#1f3c88'"

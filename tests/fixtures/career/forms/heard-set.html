@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>Heard</title></head>
+<body>
+  <h1>Research Engineer</h1>
+  <form>
+    <label for="name">Full name</label>
+    <input id="name" name="name" />
+    <label for="heard">How did you hear about us?</label>
+    <select id="heard" name="heard">
+      <option selected>LinkedIn</option>
+      <option>Referral</option>
+    </select>
+    <button type="submit">Submit Application</button>
+  </form>
+<script>
+  document.querySelector("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await fetch("/submit", { method: "POST", body: new URLSearchParams(new FormData(e.target)) });
+    e.target.outerHTML = "<p>Thank you, your application was received</p>";
+  });
+</script>
+</body>
+</html>

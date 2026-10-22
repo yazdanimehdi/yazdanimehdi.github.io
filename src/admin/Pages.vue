@@ -100,7 +100,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <AdminShell :ctx="ctx" active="pages" title="Pages">
+  <AdminShell :ctx="ctx" active="pages" title="Pages" :dirty="home.dirty || research.dirty">
     <div role="tablist" aria-label="Pages" class="adm-actions">
       <button
         type="button"

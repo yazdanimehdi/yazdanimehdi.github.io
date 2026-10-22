@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>Not sent</title></head>
+<body>
+  <h1>Research Engineer</h1>
+  <form>
+    <label for="name">Full name</label>
+    <input id="name" name="name" />
+    <button type="submit">Submit Application</button>
+  </form>
+<script>
+  document.querySelector("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await fetch("/submit", { method: "POST", body: new URLSearchParams(new FormData(e.target)) });
+    e.target.outerHTML = "<p>Sorry, your application could not be submitted.</p>";
+  });
+</script>
+</body>
+</html>

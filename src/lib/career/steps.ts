@@ -10,7 +10,19 @@ import { configPath, PathError, THEME_NAME } from '../admin/paths';
 import { CvRenderError, cvRenderRequest, renderCv } from '../cv-render';
 import { BUILT_IN_THEMES, parseStyles, readThemeFiles } from '../cv-styles';
 import { getSql } from '../db';
-import { addEvent, getPosting, readCareer, updatePosting, upsertPostings, writeCareer } from './db';
+import {
+  addEvent,
+  CLAIM,
+  companyApplications,
+  getPosting,
+  listPostings,
+  readCareer,
+  updatePosting,
+  upsertPostings,
+  writeCareer,
+} from './db';
+import { sendDigest } from './digest';
+import { companyKey, draftCandidates } from './nightly';
 import { cvTextOf } from './cv-text';
 import { pdfPages, putCareerPdf } from './files';
 import { answersPrompt, type FormAnswer, greenhouseQuestions, parseFormAnswers, splitQuestions } from './answers';
@@ -18,7 +30,8 @@ import { guardPosting } from './guard';
 import { hardGate, postingKey, tidyPosting } from './match';
 import { prefsText } from './profile';
 import { parseScore, scorePrompt, totalScore, type ScoreDetail } from './score';
-import { parseAnswers, parsePrefs } from './settings';
+import { parseAnswers, parsePrefs, type CareerPrefs } from './settings';
+import { workerMissing, workerText } from './worker';
 import { SOURCES, type SourceContext } from './sources';
 import { SourceError } from './sources/http';
 import { clearRobotsCache } from './sources/robots';
@@ -37,7 +50,7 @@ import {
   type TailorPlan,
   withCoverage,
 } from './tailor';
-import type { RunSummary } from './types';
+import type { DraftState, RunSummary } from './types';
 
 /** The same bot author as the daily cron; these steps only read content. */
 const BOT = { name: 'ScholarOS jobs', email: 'scholaros-jobs@users.noreply.github.com' };
@@ -54,7 +67,12 @@ function sourceMessage(id: string, e: unknown): string {
 }
 
 /** Sources on in prefs (`defaultOn` when prefs don't say); one missing a key it needs comes back `skipped`. */
-export async function enabledSources(): Promise<{ sources: { id: string; skipped?: string }[]; maxScores: number }> {
+export async function enabledSources(): Promise<{
+  sources: { id: string; skipped?: string }[];
+  maxScores: number;
+  stage: CareerPrefs['nightly']['stage'];
+  paused: boolean;
+}> {
   'use step';
   const sql = getSql();
   const prefs = parsePrefs((await readCareer(sql)).prefs);
@@ -65,7 +83,7 @@ export async function enabledSources(): Promise<{ sources: { id: string; skipped
     for (const name of source.needs ?? []) if (!missing && !(await getSecret(sql, name))) missing = name;
     sources.push(missing ? { id, skipped: `no ${missing}` } : { id });
   }
-  return { sources, maxScores: prefs.maxScoresPerRun };
+  return { sources, maxScores: prefs.maxScoresPerRun, stage: prefs.nightly.stage, paused: prefs.nightly.paused };
 }
 
 /**
@@ -154,9 +172,18 @@ export async function scoreReady(): Promise<string | null> {
   const ai = await readAiConfig(store);
   for (const name of TEXT_PROVIDERS[ai.text.provider].keys)
     if (!(await getSecret(getSql(), name))) return missingKey(name).message;
-  return (await cvTextOf(store)) ? null : 'There is no CV yet: add one on the CV screen';
+  return (await cvTextOf(store)) ? null : NO_CV_YET;
 }
 
+/** Why drafting can't run (the drafting worker's key or sign-in, or no CV), or null when ready. */
+export async function draftReady(): Promise<string | null> {
+  'use step';
+  const store = careerStore();
+  const prefs = parsePrefs((await readCareer(getSql())).prefs);
+  return (await workerMissing(store, prefs)) ?? ((await cvTextOf(store)) ? null : NO_CV_YET);
+}
+
+const NO_CV_YET = 'There is no CV yet: add one on the CV screen';
 const REPLIES = 3;
 
 /**
@@ -203,6 +230,49 @@ export async function finishRun(summary: RunSummary): Promise<void> {
   await writeCareer(getSql(), { lastRun: summary }, BOT.name);
 }
 
+/**
+ * Tonight's drafts (nightly.ts `draftCandidates`), each with whether it has a Greenhouse form to answer, and how many
+ * matches the limits held back. The company window counts applications found or moved in the last `perCompany.days`.
+ */
+export async function draftPlan(): Promise<{ drafts: { id: number; greenhouse: boolean }[]; limited: number }> {
+  'use step';
+  const sql = getSql();
+  const prefs = parsePrefs((await readCareer(sql)).prefs);
+  const matches = (await listPostings(sql, { status: 'found', scored: true, limit: 500 })).filter(
+    (m) => m.score! >= prefs.threshold,
+  );
+  const since = new Date(Date.now() - prefs.nightly.perCompany.days * 86_400_000).toISOString();
+  const counts = new Map<string, number>();
+  for (const key of new Set(matches.map((m) => companyKey(m.company)))) {
+    counts.set(key, await companyApplications(sql, key, since));
+  }
+  const { ids, limited } = draftCandidates(matches, prefs, counts);
+  const drafts = await Promise.all(
+    ids.map(async (id) => ({ id, greenhouse: (await getPosting(sql, id))?.ats?.kind === 'greenhouse' })),
+  );
+  return { drafts, limited };
+}
+
+/**
+ * Claims a posting for the nightly run's draft the way startDraftRun does (draft_run_id `starting:<ms>`), only while
+ * no draft has started: an owner's draft started in the meantime keeps it.
+ */
+export async function claimDraft(id: number): Promise<boolean> {
+  'use step';
+  const claimed =
+    await getSql()`update career_postings set draft_state = 'running', draft_run_id = ${CLAIM + Date.now()}
+    where id = ${id} and draft_state = 'none' returning id`;
+  return claimed.length > 0;
+}
+
+/** Sends the night's email digest (digest.ts); never throws. */
+export async function digestStep(summary: RunSummary, drafted: number[]): Promise<string> {
+  'use step';
+  return sendDigest(getSql(), summary, drafted);
+}
+// A retry could send the email twice.
+digestStep.maxRetries = 0;
+
 // ---- Drafting: a tailored CV and cover letter for one posting (careerDraft) ----
 
 const NO_CV = 'There is no CV to tailor: add one on the CV screen';
@@ -230,13 +300,13 @@ export async function draftStep(
   'use step';
   const sql = getSql();
   const store = careerStore();
-  const [p, base, abstracts, career, ai] = await Promise.all([
+  const [p, base, abstracts, career] = await Promise.all([
     getPosting(sql, id),
     baseCv(store),
     paperAbstracts(store),
     readCareer(sql),
-    readAiConfig(store),
   ]);
+  const prefs = parsePrefs(career.prefs);
   if (!p) return 'The posting no longer exists';
   if (!base.cv?.sections) return NO_CV;
   const prompt = draftPrompt(base, p, parseAnswers(career.answers), instruction, issues ?? undefined, abstracts);
@@ -244,7 +314,7 @@ export async function draftStep(
   let rejected = '';
   for (let attempt = 1; !plan; attempt++) {
     const again = `\n\nYour last reply was rejected: ${rejected}. Reply again with the corrected JSON.`;
-    const text = await generateText(store, ai, rejected ? { ...prompt, prompt: prompt.prompt + again } : prompt);
+    const text = await workerText(store, prefs, rejected ? { ...prompt, prompt: prompt.prompt + again } : prompt);
     try {
       plan = parseTailorPlan(text);
       if (part !== 'letter') assembleCv(base, plan);
@@ -275,7 +345,7 @@ export async function answersStep(id: number, instruction: string): Promise<stri
   const p = await getPosting(sql, id);
   if (!p) return 'The posting no longer exists';
   if (p.ats?.kind !== 'greenhouse') return 'Only Greenhouse postings have a form to answer';
-  const [base, career, ai] = await Promise.all([baseCv(store), readCareer(sql), readAiConfig(store)]);
+  const [base, career] = await Promise.all([baseCv(store), readCareer(sql)]);
   if (!base.cv?.sections) return NO_CV;
   const a = parseAnswers(career.answers);
   let qs: Awaited<ReturnType<typeof greenhouseQuestions>>;
@@ -289,9 +359,9 @@ export async function answersStep(id: number, instruction: string): Promise<stri
   let proposed: FormAnswer[] = [];
   if (known.rest.length) {
     const prompt = answersPrompt(known.rest, base, a, p);
-    const text = await generateText(
+    const text = await workerText(
       store,
-      ai,
+      parsePrefs(career.prefs),
       instruction.trim()
         ? { ...prompt, prompt: `${prompt.prompt}\n\nThe candidate asks: ${instruction.trim().slice(0, 500)}` }
         : prompt,
@@ -323,12 +393,12 @@ export async function noteAnswersFailed(id: number, message: string): Promise<vo
 export async function reviewStep(id: number, part: DraftPart): Promise<{ ok: boolean; issues: ReviewIssue[] }> {
   'use step';
   const store = careerStore();
-  const [p, base, ai] = await Promise.all([getPosting(getSql(), id), baseCv(store), readAiConfig(store)]);
+  const [p, base, career] = await Promise.all([getPosting(getSql(), id), baseCv(store), readCareer(getSql())]);
   const plan = p?.cv as TailorPlan | null;
   const pairs = part !== 'letter' && plan?.sections && base.cv?.sections ? rewordedPairs(base, plan) : [];
   const letter = part === 'cv' ? '' : (p?.letter ?? '');
   if (!pairs.length && !letter) return { ok: true, issues: [] };
-  const review = parseReview(await generateText(store, ai, reviewPrompt(base, pairs, letter)));
+  const review = parseReview(await workerText(store, parsePrefs(career.prefs), reviewPrompt(base, pairs, letter)));
   return part === 'cv' || part === 'letter'
     ? { ...review, issues: review.issues.map((i) => ({ ...i, part })) }
     : review;
@@ -395,7 +465,7 @@ export async function finishDraft(
   id: number,
   review: { ok: boolean; issues: ReviewIssue[] } | null,
   part: DraftPart = 'all',
-): Promise<void> {
+): Promise<DraftState> {
   'use step';
   const sql = getSql();
   const p = await getPosting(sql, id);
@@ -407,14 +477,13 @@ export async function finishDraft(
       : review.issues;
   const flagged = issues.length > 0 || (review !== null && !review.ok);
   const drafted = p?.cv != null || p?.letter != null;
-  await updatePosting(sql, id, {
-    draftState: flagged ? 'needs-review' : drafted ? 'done' : 'none',
-    draftIssues: flagged ? issues : null,
-  });
+  const draftState = flagged ? 'needs-review' : drafted ? 'done' : 'none';
+  await updatePosting(sql, id, { draftState, draftIssues: flagged ? issues : null });
   const moved =
     await sql`update career_postings set status = 'drafted' where id = ${id} and status = 'found' returning id`;
   if (moved.length) await addEvent(sql, id, 'status', 'found → drafted');
   await addEvent(sql, id, 'draft finished', flagged ? `needs review (${issues.length} issues)` : 'done');
+  return draftState;
 }
 
 export async function failDraft(id: number, message: string): Promise<void> {

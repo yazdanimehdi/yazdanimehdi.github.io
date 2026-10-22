@@ -11,6 +11,7 @@ import {
   type FunctionalComponent,
 } from 'vue';
 import AdminShell from './AdminShell.vue';
+import AdminTabLinks from './AdminTabLinks.vue';
 import DocBanners from './DocBanners.vue';
 import FormFields from './FormFields.vue';
 import { vDialog } from './dialog';
@@ -405,12 +406,11 @@ async function generatePdf() {
 </script>
 
 <template>
-  <AdminShell :ctx="ctx" active="cv" title="CV">
+  <AdminShell :ctx="ctx" active="cv" title="CV" :dirty="doc.dirty">
     <template #actions>
       <span v-if="pdf" class="adm-muted"
         >{{ pdfLabel }} · <a :href="pdf.url" target="_blank" rel="noopener">run</a></span
       >
-      <a v-if="ctx.mode !== 'static'" class="adm-btn" :href="`/${ctx.adminPath}/cv-styles`">Styles</a>
       <button type="button" class="adm-btn" @click="importing = true">Import YAML</button>
       <span v-if="pdfMeta" class="adm-muted"
         >PDF: {{ new Date(pdfMeta.lastGenerated).toLocaleString() }} ·
@@ -423,6 +423,14 @@ async function generatePdf() {
         Publish
       </button>
     </template>
+    <AdminTabLinks
+      v-if="ctx.mode !== 'static'"
+      label="CV"
+      :tabs="[
+        { href: `/${ctx.adminPath}/cv`, label: 'Entries', current: true },
+        { href: `/${ctx.adminPath}/cv-styles`, label: 'Styles' },
+      ]"
+    />
 
     <p v-if="upload.enabled && !turnOffUpload" class="adm-banner">
       A raw RenderCV upload (config/cv-upload.yml) is turned on and replaces this CV on the site. Importing YAML here

@@ -75,3 +75,28 @@ test('strict eeo rejects bad fields; lenient defaults them per field', () => {
   assert.deepEqual(parseAnswers(raw).eeo, { mode: 'answer', gender: '', race: '', veteran: '', disability: '' });
   assert.equal(validateAnswers({}).eeo.mode, 'decline');
 });
+
+test('parsePrefs fills the nightly defaults', () => {
+  const p = parsePrefs({ nightly: { stage: 9, maxDrafts: 3 } });
+  assert.deepEqual(parsePrefs({}).nightly, { stage: 3, maxDrafts: 5, perCompany: { max: 2, days: 30 }, paused: false });
+  assert.deepEqual(p.nightly, { stage: 3, maxDrafts: 3, perCompany: { max: 2, days: 30 }, paused: false });
+  assert.deepEqual(parsePrefs({}).digest, { on: false, to: '', from: '' });
+});
+
+test('validatePrefs rejects stage 5', () => {
+  assert.throws(
+    () => validatePrefs({ nightly: { stage: 5 } }),
+    (e) => e instanceof ZodError && e.issues[0].path.join('.') === 'nightly.stage',
+  );
+  assert.throws(() => validatePrefs({ nightly: { maxDrafts: 51 } }), ZodError);
+  assert.equal(validatePrefs({ nightly: { stage: 4 } }).nightly.stage, 4);
+});
+
+test('parsePrefs keeps worker api by default', () => {
+  assert.deepEqual(parsePrefs({}).worker, { kind: 'api' });
+  assert.deepEqual(parsePrefs({ worker: { kind: 'cli', agent: 'nope' } }).worker, { kind: 'api' });
+  const cli = { kind: 'cli', agent: 'codex', auth: 'subscription' } as const;
+  assert.deepEqual(parsePrefs({ worker: cli }).worker, cli);
+  assert.deepEqual(validatePrefs({ worker: cli }).worker, cli);
+  assert.throws(() => validatePrefs({ worker: { kind: 'cli', agent: 'claude' } }), ZodError);
+});

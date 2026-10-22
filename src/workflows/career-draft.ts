@@ -1,7 +1,7 @@
 import { getRun, start } from 'workflow/api';
 import { WorkflowRunNotFoundError } from 'workflow/errors';
 import type { Sql } from '../lib/db';
-import { updatePosting } from '../lib/career/db';
+import { CLAIM, updatePosting } from '../lib/career/db';
 import {
   answersStep,
   draftStep,
@@ -10,13 +10,14 @@ import {
   noteAnswersFailed,
   renderStep,
   reviewStep,
-  scoreReady,
+  draftReady,
   startDraft,
 } from '../lib/career/steps';
 import type { DraftPart, ReviewIssue } from '../lib/career/tailor';
+import type { DraftState } from '../lib/career/types';
 
 /** A step's own message: past its retries the SDK wraps the original error as `cause` (no classes cross over). */
-function reasonOf(e: unknown): string {
+export function reasonOf(e: unknown): string {
   const err = e as { message?: unknown; cause?: { message?: unknown } } | null;
   return String(err?.cause?.message ?? err?.message ?? 'unexpected error');
 }
@@ -24,31 +25,42 @@ function reasonOf(e: unknown): string {
 /**
  * A tailored CV and cover letter for one posting: draft, review, one revision when the review finds issues, then
  * render. `render` skips the AI (the owner edited the plan); `letter` doesn't re-render. `answers` proposes answers to the
- * Greenhouse form only; `all` adds them for a Greenhouse posting (`greenhouse`, set by startDraftRun from the row).
+ * Greenhouse form only; `all` adds them for a Greenhouse posting (`greenhouse`, set by the caller from the row).
+ * Returns the draft state it ended in. A failing step (the provider, the network, an exhausted quota) fails the draft
+ * with its reason and is rethrown, so the nightly run can stop. A plain function, not a workflow: careerDraft and
+ * careerNightly both call it inside their own run.
  */
-export async function careerDraft(id: number, part: DraftPart, instruction: string, greenhouse = false): Promise<void> {
-  'use workflow';
+export async function draftPosting(
+  id: number,
+  part: DraftPart,
+  instruction: string,
+  greenhouse = false,
+): Promise<DraftState> {
+  const fail = async (reason: string) => {
+    await failDraft(id, reason);
+    return 'failed' as const;
+  };
   try {
     await startDraft(id, part);
     if (part === 'answers') {
-      const failed = (await scoreReady()) ?? (await answersStep(id, instruction));
-      if (failed) return await failDraft(id, failed);
+      const failed = (await draftReady()) ?? (await answersStep(id, instruction));
+      if (failed) return await fail(failed);
       return await finishDraft(id, null, part);
     }
     let review: { ok: boolean; issues: ReviewIssue[] } | null = null;
     if (part !== 'render') {
-      const failed = (await scoreReady()) ?? (await draftStep(id, part, instruction, null));
-      if (failed) return await failDraft(id, failed);
+      const failed = (await draftReady()) ?? (await draftStep(id, part, instruction, null));
+      if (failed) return await fail(failed);
       review = await reviewStep(id, part);
       if (!review.ok) {
         const again = await draftStep(id, part, instruction, review.issues);
-        if (again) return await failDraft(id, again);
+        if (again) return await fail(again);
         review = await reviewStep(id, part);
       }
     }
     if (part !== 'letter') {
       const failed = await renderStep(id);
-      if (failed) return await failDraft(id, failed);
+      if (failed) return await fail(failed);
     }
     // Form answers never fail the CV draft: a problem is recorded and `answers` is left as it was.
     if (greenhouse && part === 'all') {
@@ -59,16 +71,21 @@ export async function careerDraft(id: number, part: DraftPart, instruction: stri
         await noteAnswersFailed(id, reasonOf(e));
       }
     }
-    await finishDraft(id, review, part);
+    return await finishDraft(id, review, part);
   } catch (e) {
     await failDraft(id, reasonOf(e));
+    throw e;
   }
+}
+
+/** One draft started from the job page; its outcome, a failure included, is recorded on the posting. */
+export async function careerDraft(id: number, part: DraftPart, instruction: string, greenhouse = false): Promise<void> {
+  'use workflow';
+  await draftPosting(id, part, instruction, greenhouse).catch(() => undefined);
 }
 
 /** A draft run older than this that still says pending or running is stuck (a draft takes minutes). */
 const STALE_MS = 60 * 60 * 1000;
-/** Set while `start()` is in flight, so a second click sees a draft starting, not a finished run. */
-const CLAIM = 'starting:';
 
 /** The slice of the Workflow API startDraftRun uses; tests pass their own. */
 export interface DraftRuns {
@@ -83,10 +100,18 @@ export function setDraftRunsForTests(runs: DraftRuns | null): void {
   testRuns = runs;
 }
 
-/** Whether a posting's `draft_run_id` (read from its row, never from a request) is no longer drafting. */
-async function finished(runId: string | null, runs: DraftRuns, now: number): Promise<boolean> {
+/**
+ * Whether a run id read from a row (never from a request) no longer runs: unknown, ended, or older than `staleMs` (a
+ * stale run is cancelled). A `starting:<ms>` claim counts as running until it is that old.
+ */
+export async function finished(
+  runId: string | null,
+  runs: Pick<DraftRuns, 'get'>,
+  now: number,
+  staleMs = STALE_MS,
+): Promise<boolean> {
   if (!runId) return true;
-  if (runId.startsWith(CLAIM)) return now - Number(runId.slice(CLAIM.length)) > STALE_MS;
+  if (runId.startsWith(CLAIM)) return now - Number(runId.slice(CLAIM.length)) > staleMs;
   const run = runs.get(runId);
   let status: string;
   try {
@@ -96,13 +121,13 @@ async function finished(runId: string | null, runs: DraftRuns, now: number): Pro
     return WorkflowRunNotFoundError.is(e);
   }
   if (status !== 'running' && status !== 'pending') return true;
-  if (now - (await run.createdAt.catch(() => new Date(0))).getTime() < STALE_MS) return false;
+  if (now - (await run.createdAt.catch(() => new Date(0))).getTime() < staleMs) return false;
   try {
     await run.cancel();
     return true;
   } catch (e) {
     // eslint-disable-next-line no-console
-    console.error('[career] cancelling a stale draft', e);
+    console.error('[career] cancelling a stale run', e);
     return false;
   }
 }

@@ -99,7 +99,7 @@ test('a failure offers the action that fits its diagnosis', () => {
   const retry = { kind: 'sync-papers', label: 'Retry' } as const;
   const keys = { kind: 'screen', label: 'API keys', path: 'ai#keys' } as const;
   const fix = (raw: string) => failure(raw, 'Google Scholar', { settings: keys, retry, then: '. Next: tomorrow' });
-  assert.deepEqual(fix('SERPAPI_KEY is not set: add it on the Scholar & AI screen').action, keys, 'missing key');
+  assert.deepEqual(fix('SERPAPI_KEY is not set: add it on the Integrations screen').action, keys, 'missing key');
   assert.equal(fix('SERPAPI_KEY is not set').detail, 'Google Scholar needs a key');
   assert.deepEqual(fix('HTTP 401 Unauthorized').action, keys, 'refused key');
   assert.equal(fix('429 Too Many Requests').action, undefined, 'a rate limit has no button');
@@ -247,6 +247,45 @@ test('the job search row shows only when the daily career step reported (owner, 
   const failed = base({ mode: 'postgres', runs: { career: { ok: false, at, detail: 'failed' } } });
   assert.equal(row(failed, 'career').tone, 'attention');
   assert.equal(row(failed, 'career').state, 'Job search failed to start');
+});
+
+test('the owner’s job search row counts what waits for approval and links to it', () => {
+  const at = '2026-10-18T03:00:00Z';
+  const none = row(base({ mode: 'postgres', career: { ready: 0 } }), 'career');
+  assert.equal(none.state, 'Nothing waiting');
+  assert.equal(none.action, undefined);
+  const three = row(base({ mode: 'postgres', career: { ready: 3 }, runs: { career: { ok: true, at } } }), 'career');
+  assert.equal(three.state, '3 ready for approval');
+  assert.equal(three.tone, 'ok');
+  assert.equal(three.at, at);
+  assert.deepEqual(three.action, { kind: 'screen', label: 'Review', path: 'career?status=ready' });
+  const failed = row(base({ mode: 'postgres', career: { ready: 2 }, runs: { career: { ok: false, at } } }), 'career');
+  assert.equal(failed.state, 'Job search failed to start', 'a failed run still leads');
+  assert.equal(failed.action?.label, 'Review');
+});
+
+test('a night that stopped early leads the owner’s job search row, ahead of the ready count', () => {
+  const at = '2026-10-18T03:00:00Z';
+  const stopped = row(
+    base({
+      mode: 'postgres',
+      career: { ready: 2, stopped: 'Your Claude subscription is out of quota\u202e' },
+      runs: { career: { ok: true, at } },
+    }),
+    'career',
+  );
+  assert.equal(stopped.state, 'Stopped early: Your Claude subscription is out of quota');
+  assert.equal(stopped.tone, 'attention');
+  assert.equal(stopped.detail, '2 ready for approval');
+  assert.deepEqual(stopped.action, { kind: 'screen', label: 'Review', path: 'career?status=ready' });
+  const alone = row(base({ mode: 'postgres', career: { ready: 0, stopped: 'quota' } }), 'career');
+  assert.equal(alone.detail, undefined);
+  assert.deepEqual(alone.action, { kind: 'screen', label: 'Open', path: 'career' });
+  const failed = row(
+    base({ mode: 'postgres', career: { ready: 0, stopped: 'quota' }, runs: { career: { ok: false, at } } }),
+    'career',
+  );
+  assert.equal(failed.state, 'Job search failed to start', 'a run that never started still leads');
 });
 
 test('scheduled posts with no release run: fine in git mode, unknown only where the job runner should have run it', () => {

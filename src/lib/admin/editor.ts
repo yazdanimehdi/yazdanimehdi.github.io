@@ -33,7 +33,7 @@ const MAX_SUMMARY_FILE = 8192;
 /** Postgres mode keeps every document (isDocumentPath) under these folders. */
 const DOC_DIRS = ['config', 'src/content', 'src/data'];
 /** The CLI must see a key to start; the sandbox firewall replaces the header carrying it with the real one. */
-const PLACEHOLDER = 'brokered-by-the-sandbox-firewall';
+export const PLACEHOLDER = 'brokered-by-the-sandbox-firewall';
 
 /** The session's only store: a file in the sandbox, so it works in git and Postgres mode alike. */
 export interface EditorSession {
@@ -96,6 +96,8 @@ export type EditorStatus =
 
 export interface NetworkPolicy {
   allow: Record<string, { transform: { headers: Record<string, string> }[] }[]>;
+  /** CIDRs; a deny wins over any allowed domain. */
+  subnets?: { deny?: string[] };
 }
 
 export interface CommandResult {
@@ -549,7 +551,7 @@ export async function startSession(ctx: EditorContext): Promise<EditorStatus> {
     if (ctx.docs) ({ baseSha, docVersions } = await exportDocuments(sb, ctx.docs, baseSha));
     await writeState(sb, { baseSha, docVersions, provider: ctx.agent.provider, model: ctx.agent.model, runs: [] });
   }
-  // Closes GitHub after a clone; also how a key changed on the Scholar & AI screen reaches a running session.
+  // Closes GitHub after a clone; also how a key changed on the Integrations screen reaches a running session.
   await sb.setNetworkPolicy(networkPolicy(ctx.agent));
   const install = AGENTS[ctx.agent.provider].install;
   if (install) await sh(sb, install, [], { timeoutMs: 120_000 });

@@ -96,7 +96,7 @@ test('no key for the configured provider: status names it, Start and Run are 400
   delete process.env.ANTHROPIC_API_KEY;
   const s = await call(status, 'GET');
   assert.equal(s.body.state, 'none');
-  assert.match(s.body.blocked, /ANTHROPIC_API_KEY is not set: add it on the Scholar & AI screen/);
+  assert.match(s.body.blocked, /ANTHROPIC_API_KEY is not set: add it on the Integrations screen/);
   for (const handler of [start, run, startOverRoute, undoRoute]) {
     const res = await call(handler, 'POST');
     assert.equal(res.status, 400);

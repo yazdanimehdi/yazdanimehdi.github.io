@@ -57,6 +57,41 @@ const prefsSchema = (l: boolean) =>
     feeds: list(l, httpUrl),
     /** A style id; '' means the public style. */
     cvStyle: field(l, z.string(), ''),
+    nightly: lenientOnly(
+      l,
+      z.object({
+        /** How far the nightly run goes: 1 search, 2 + score, 3 + tailor, 4 + pre-fill. Never submits. */
+        stage: field(l, z.literal([1, 2, 3, 4]), 3),
+        maxDrafts: field(l, z.number().int().min(0).max(50), 5),
+        perCompany: lenientOnly(
+          l,
+          z.object({
+            max: field(l, z.number().int().min(1).max(50), 2),
+            days: field(l, z.number().int().min(1).max(365), 30),
+          }),
+          () => ({ max: 2, days: 30 }),
+        ),
+        paused: field(l, z.boolean(), false),
+      }),
+      () => ({ stage: 3 as const, maxDrafts: 5, perCompany: { max: 2, days: 30 }, paused: false }),
+    ),
+    digest: lenientOnly(
+      l,
+      z.object({ on: field(l, z.boolean(), false), to: field(l, z.string(), ''), from: field(l, z.string(), '') }),
+      () => ({ on: false, to: '', from: '' }),
+    ),
+    worker: field(
+      l,
+      z.discriminatedUnion('kind', [
+        z.object({ kind: z.literal('api') }),
+        z.object({
+          kind: z.literal('cli'),
+          agent: z.enum(['claude', 'codex', 'gemini']),
+          auth: z.enum(['key', 'subscription']),
+        }),
+      ]),
+      { kind: 'api' },
+    ),
   });
 
 const answersSchema = (l: boolean) =>

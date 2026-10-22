@@ -1,14 +1,17 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import AdminSections from './AdminSections.vue';
 import AdminShell from './AdminShell.vue';
+import AdminTabLinks from './AdminTabLinks.vue';
 import FormFields from './FormFields.vue';
-import { ApiError, api, report, toast } from './api';
+import { ApiError, api, report, session, toast } from './api';
 import { text, type FieldDef } from './fields';
+import { LIMIT_FIELDS, STAGES, WORKER_KEYS, WORKERS, type WorkerChoice } from './career';
 import { detectAts } from '../lib/career/sources/detect';
 import type { ApplicationAnswers, CareerPrefs } from '../lib/career/settings';
-import type { SecretStatus } from '../lib/admin/secrets';
 import type { AdminCtx } from './types';
-import type { CvStylesConfig } from '../lib/types';
+import type { CvConfig, CvStylesConfig } from '../lib/types';
+import type { SecretName, SecretStatus } from '../lib/admin/secrets';
 
 interface SourceInfo {
   id: string;
@@ -27,13 +30,15 @@ const floor = ref<Floor>({});
 const sources = ref<SourceInfo[]>([]);
 const suggested = ref<{ label: string; url: string }[]>([]);
 const styles = ref<{ id: string; name: string }[]>([]);
-const keys = ref<SecretStatus[]>([]);
-const typed = ref<Record<string, string>>({});
-const savingKey = ref('');
 const saving = ref(false);
 const errors = ref<Record<string, string>>({});
-// Which sections hold suggestions not yet saved; the banner shows while either does.
-const unsaved = ref({ prefs: false, answers: false });
+// Suggestions filled in and not yet saved: the banner shows until Save.
+const filled = ref(false);
+const section = ref('');
+// What was loaded or last saved, to tell whether the form has unsaved changes.
+const snapshot = () => JSON.stringify([prefs.value, answers.value, floor.value]);
+const saved = ref('');
+const dirty = computed(() => !!saved.value && snapshot() !== saved.value);
 const suggestError = ref('');
 const suggesting = ref(false);
 
@@ -115,6 +120,40 @@ const ANSWER_FIELDS: FieldDef[] = [
   text('eeo.disability', 'Disability status'),
 ];
 
+// `fields`: the error keys (prefs and answers paths, unprefixed) each section owns, for its error dot.
+const SECTIONS = [
+  { id: 'want', label: 'What I want', fields: [...WANT_FIELDS.map((f) => f.key), 'salaryFloor'] },
+  { id: 'sources', label: 'Sources', fields: ['sources', 'watched', 'feeds'] },
+  { id: 'cv', label: 'Tailored CV', fields: ['cvStyle'] },
+  { id: 'answers', label: 'Application answers', fields: ANSWER_FIELDS.map((f) => f.key) },
+  { id: 'automation', label: 'Automation', fields: ['nightly'] },
+  { id: 'notifications', label: 'Notifications', fields: ['digest'] },
+  { id: 'worker', label: 'Drafting worker', fields: ['worker'] },
+];
+
+/** The drafting worker as one choice; picking an agent CLI keeps the sign-in chosen before (Gemini: a key only). */
+function workerOf(p: CareerPrefs): WorkerChoice {
+  return p.worker.kind === 'cli' ? p.worker.agent : 'api';
+}
+function setWorker(v: WorkerChoice) {
+  const was = prefs.value!.worker;
+  prefs.value!.worker =
+    v === 'api'
+      ? { kind: 'api' }
+      : { kind: 'cli', agent: v, auth: v === 'gemini' ? 'key' : was.kind === 'cli' ? was.auth : 'subscription' };
+}
+const keys = ref<SecretStatus[] | null>(null);
+const keyOf = (name: SecretName) => keys.value?.find((k) => k.name === name);
+function keySet(name: SecretName) {
+  return !!keyOf(name)?.source && !keyOf(name)?.undecryptable;
+}
+/** The key the chosen agent CLI signs in with, if it is one. */
+function needed(): SecretName | null {
+  const w = prefs.value?.worker;
+  return w?.kind === 'cli' ? WORKER_KEYS[w.agent][w.auth] : null;
+}
+const cvEmail = ref('');
+
 const isOn = (s: SourceInfo) => prefs.value?.sources[s.id]?.on ?? s.defaultOn;
 function setOn(s: SourceInfo, on: boolean) {
   const p = prefs.value!;
@@ -156,13 +195,13 @@ async function suggest(replace: boolean) {
     for (const k of SUGGESTED_PREFS)
       if ((replace && k !== 'locations') || !p[k].length) {
         (p as Record<string, unknown>)[k] = s.prefs[k];
-        unsaved.value.prefs = true;
+        filled.value = true;
       }
     const a = answers.value!;
     const fill = <K extends 'phone' | 'address' | 'links'>(k: K, empty: boolean) => {
       if (!empty || !s.answers[k].length) return;
       a[k] = s.answers[k];
-      unsaved.value.answers = true;
+      filled.value = true;
     };
     fill('phone', !a.phone.trim());
     fill('address', !a.address.trim());
@@ -181,6 +220,7 @@ async function load() {
     prefs.value = s.prefs;
     answers.value = s.answers;
     floor.value = { ...s.prefs.salaryFloor };
+    saved.value = snapshot();
     const p = s.prefs;
     if (![p.roles, p.keywords, p.fields, p.watched, p.feeds].some((l) => l.length)) void suggest(false);
   } catch (e) {
@@ -188,23 +228,23 @@ async function load() {
   }
 }
 
-async function save(body: { prefs: CareerPrefs } | { answers: ApplicationAnswers }) {
+/** Preferences and answers in one PUT; a field error opens the section that holds it. */
+async function save() {
+  const f = floor.value;
+  const salaryFloor =
+    f.amount === undefined ? null : { amount: f.amount, currency: f.currency ?? '', period: f.period ?? 'year' };
   saving.value = true;
   errors.value = {};
   try {
     const s = await api<{ prefs: CareerPrefs; answers: ApplicationAnswers }>('career/settings', {
       method: 'PUT',
-      body,
+      body: { prefs: { ...prefs.value!, salaryFloor }, answers: answers.value },
     });
-    // Only the part sent is replaced, so the other section keeps its unsaved edits and suggestions.
-    if ('prefs' in body) {
-      prefs.value = s.prefs;
-      floor.value = { ...s.prefs.salaryFloor };
-      unsaved.value.prefs = false;
-    } else {
-      answers.value = s.answers;
-      unsaved.value.answers = false;
-    }
+    prefs.value = s.prefs;
+    answers.value = s.answers;
+    floor.value = { ...s.prefs.salaryFloor };
+    saved.value = snapshot();
+    filled.value = false;
     suggestError.value = '';
     toast('Saved');
   } catch (e) {
@@ -216,209 +256,244 @@ async function save(body: { prefs: CareerPrefs } | { answers: ApplicationAnswers
   }
 }
 
-function savePrefs() {
-  const f = floor.value;
-  const salaryFloor =
-    f.amount === undefined ? null : { amount: f.amount, currency: f.currency ?? '', period: f.period ?? 'year' };
-  return save({ prefs: { ...prefs.value!, salaryFloor } as CareerPrefs });
-}
-
-const status = (k: SecretStatus) =>
-  k.source === 'admin' ? `Set in admin · …${k.last4}` : k.source === 'env' ? 'From environment' : 'Not set';
-
-async function saveKey(name: string, value: string | null) {
-  savingKey.value = name;
-  try {
-    keys.value = await api<SecretStatus[]>('career/keys', { method: 'PUT', body: { name, value } });
-    typed.value[name] = '';
-    toast(value ? 'Key saved' : 'Key cleared');
-  } catch (e) {
-    report(e);
-  } finally {
-    savingKey.value = '';
-  }
-}
-
 onMounted(async () => {
   void load();
-  const [k, s, c] = await Promise.allSettled([
-    api<SecretStatus[]>('career/keys'),
+  const [s, c] = await Promise.allSettled([
     api<{ sources: SourceInfo[]; suggestedFeeds: { label: string; url: string }[] }>('career/sources'),
     api<{ data: CvStylesConfig }>('cv/styles'),
   ]);
-  if (k.status === 'fulfilled') keys.value = k.value;
-  else report(k.reason);
   if (s.status === 'fulfilled') {
     sources.value = s.value.sources;
     suggested.value = s.value.suggestedFeeds;
   } else report(s.reason);
   if (c.status === 'fulfilled') styles.value = c.value.data.styles.map(({ id, name }) => ({ id, name }));
+  // Only for the Notifications and Drafting worker notes: a failure leaves those notes out, not the form.
+  const [career, ai, cv] = await Promise.allSettled([
+    api<SecretStatus[]>('career/keys'),
+    api<SecretStatus[]>('ai/keys'),
+    api<{ data: CvConfig }>('config/cv'),
+  ]);
+  keys.value = [career, ai].flatMap((r) => (r.status === 'fulfilled' ? r.value : []));
+  if (cv.status === 'fulfilled') cvEmail.value = cv.value.data.cv?.email ?? '';
 });
 </script>
 
 <template>
-  <AdminShell :ctx="ctx" active="career" title="Job search settings">
-    <p><a :href="`${base}/career`">← Back to the feed</a></p>
+  <AdminShell :ctx="ctx" active="career" title="Job search settings" :dirty="dirty">
+    <template #actions>
+      <button type="button" class="adm-btn adm-btn-primary" :disabled="saving || !prefs" @click="save">Save</button>
+    </template>
+    <AdminTabLinks
+      label="Job search"
+      :tabs="[
+        { href: `${base}/career`, label: 'Postings' },
+        { href: `${base}/career?status=ready`, label: 'Ready for approval', count: session.careerReady ?? undefined },
+        { href: `${base}/career/settings`, label: 'Settings', current: true },
+      ]"
+    />
 
     <template v-if="prefs && answers">
-      <p v-if="suggestError" class="adm-banner adm-banner-error" role="alert">{{ suggestError }}</p>
-      <p v-else-if="unsaved.prefs || unsaved.answers" class="adm-banner" role="status">
+      <p v-if="suggestError" class="adm-banner adm-banner-error" role="alert">
+        {{ suggestError }}
+        <a v-if="/ is not set/.test(suggestError)" :href="`${base}/ai#keys`">Add the key</a>
+      </p>
+      <p v-else-if="filled" class="adm-banner" role="status">
         Suggested from your CV and publications. Review, then Save.
       </p>
-      <fieldset class="adm-group">
-        <legend>What I want</legend>
-        <div class="adm-actions">
-          <button type="button" class="adm-btn adm-btn-small" :disabled="suggesting" @click="suggest(true)">
-            {{ suggesting ? 'Suggesting…' : 'Suggest from my site' }}
-          </button>
-        </div>
-        <FormFields :fields="WANT_FIELDS" :model="prefs" :errors="errors" />
-        <FormFields :fields="FLOOR_FIELDS" :model="floor" />
-      </fieldset>
-
-      <fieldset class="adm-group">
-        <legend>Sources</legend>
-        <div class="adm-form">
-          <div v-for="s in sources" :key="s.id" class="adm-field">
-            <label class="adm-check">
-              <input
-                type="checkbox"
-                :checked="isOn(s)"
-                @change="setOn(s, ($event.target as HTMLInputElement).checked)"
-              />
-              {{ s.label }}
-            </label>
-            <small v-if="s.needs.length">Needs {{ s.needs.join(', ') }} (see Keys below).</small>
-            <small v-if="s.warning" class="adm-err" role="note">{{ s.warning }}</small>
-            <label v-for="o in SOURCE_OPTIONS[s.id] ?? []" :key="o.key" class="adm-field">
-              <span>{{ s.label }}: {{ o.label }}</span>
-              <input
-                type="text"
-                :value="option(s.id, o.key)"
-                :placeholder="o.placeholder"
-                @input="setOption(s, o.key, ($event.target as HTMLInputElement).value)"
-              />
-            </label>
-          </div>
-        </div>
-      </fieldset>
-
-      <fieldset class="adm-group">
-        <legend>Watched companies</legend>
-        <FormFields :fields="WATCHED_FIELDS" :model="prefs" :errors="errors" />
-        <ul v-if="prefs.watched.length" class="adm-rows">
-          <li v-for="(url, i) in prefs.watched" :key="i">
-            <span class="adm-row-main">{{ url }}</span>
-            <span class="adm-row-date">{{ boardLabel(url) }}</span>
-          </li>
-        </ul>
-      </fieldset>
-
-      <fieldset class="adm-group">
-        <legend>Feeds</legend>
-        <FormFields :fields="FEED_FIELDS" :model="prefs" :errors="errors" />
-        <template v-if="suggested.some((f) => !prefs!.feeds.includes(f.url))">
-          <p class="adm-muted">Suggested academic feeds:</p>
+      <AdminSections v-model="section" :sections="SECTIONS" :errors="errors">
+        <template #want>
           <div class="adm-actions">
-            <button
-              v-for="f in suggested.filter((f) => !prefs!.feeds.includes(f.url))"
-              :key="f.url"
-              type="button"
-              class="adm-btn adm-btn-small"
-              @click="addFeed(f.url)"
-            >
-              + {{ f.label }}
+            <button type="button" class="adm-btn adm-btn-small" :disabled="suggesting" @click="suggest(true)">
+              {{ suggesting ? 'Suggesting…' : 'Suggest from my site' }}
             </button>
           </div>
+          <FormFields :fields="WANT_FIELDS" :model="prefs" :errors="errors" />
+          <FormFields :fields="FLOOR_FIELDS" :model="floor" />
         </template>
-      </fieldset>
 
-      <fieldset class="adm-group">
-        <legend>CV style for tailored CVs</legend>
-        <label class="adm-field">
-          <span>Style</span>
-          <select v-model="prefs.cvStyle">
-            <option value="">Public style</option>
-            <option v-for="s in styles" :key="s.id" :value="s.id">{{ s.name }}</option>
-          </select>
-        </label>
-      </fieldset>
-
-      <div class="adm-actions">
-        <button type="button" class="adm-btn adm-btn-primary" :disabled="saving" @click="savePrefs">
-          Save preferences
-        </button>
-      </div>
-
-      <fieldset class="adm-group">
-        <legend>Application answers</legend>
-        <p class="adm-muted">
-          Used to fill application forms. Anything left empty is handed back to you, never guessed.
-        </p>
-        <FormFields :fields="ANSWER_FIELDS" :model="answers" :errors="errors" />
-        <div class="adm-actions">
-          <button type="button" class="adm-btn adm-btn-primary" :disabled="saving" @click="save({ answers: answers! })">
-            Save answers
-          </button>
-        </div>
-      </fieldset>
-    </template>
-
-    <section id="keys" class="adm-form" aria-labelledby="adm-keys">
-      <h2 id="adm-keys" class="adm-h2">Keys</h2>
-      <p class="adm-muted">
-        Keys typed here are stored encrypted in the database. Without one, the environment variable of the same name is
-        used.
-      </p>
-      <table class="adm-table">
-        <thead>
-          <tr>
-            <th>Key</th>
-            <th>Status</th>
-            <th><span class="adm-visually-hidden">Change</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="k in keys" :key="k.name">
-            <td>
-              {{ k.label }}<br /><code class="adm-muted">{{ k.name }}</code>
-            </td>
-            <td>
-              {{ status(k) }}
-              <span v-if="k.undecryptable" class="adm-err">
-                The stored key can’t be decrypted (SESSION_SECRET changed): enter it again.
-              </span>
-            </td>
-            <td>
-              <form class="adm-actions" @submit.prevent="saveKey(k.name, typed[k.name] ?? '')">
+        <template #sources>
+          <p class="adm-muted">Keys for job sources are on <a :href="`${base}/ai#keys`">Integrations → Keys</a>.</p>
+          <div class="adm-form">
+            <div v-for="s in sources" :key="s.id" class="adm-field">
+              <label class="adm-check">
                 <input
-                  v-model="typed[k.name]"
-                  type="password"
-                  autocomplete="off"
-                  :aria-label="`New ${k.label} key`"
-                  placeholder="Paste a new key"
+                  type="checkbox"
+                  :checked="isOn(s)"
+                  @change="setOn(s, ($event.target as HTMLInputElement).checked)"
                 />
-                <button
-                  type="submit"
-                  class="adm-btn adm-btn-small adm-btn-primary"
-                  :disabled="savingKey === k.name || !typed[k.name]"
+                {{ s.label }}
+              </label>
+              <small v-if="s.needs.length"
+                >Needs {{ s.needs.join(', ') }} (<a :href="`${base}/ai#keys`">Integrations → Keys</a>).</small
+              >
+              <small v-if="s.warning" class="adm-err" role="note">{{ s.warning }}</small>
+              <label v-for="o in SOURCE_OPTIONS[s.id] ?? []" :key="o.key" class="adm-field">
+                <span>{{ s.label }}: {{ o.label }}</span>
+                <input
+                  type="text"
+                  :value="option(s.id, o.key)"
+                  :placeholder="o.placeholder"
+                  @input="setOption(s, o.key, ($event.target as HTMLInputElement).value)"
+                />
+              </label>
+            </div>
+          </div>
+
+          <h2 class="adm-subhead">Watched companies</h2>
+          <FormFields :fields="WATCHED_FIELDS" :model="prefs" :errors="errors" />
+          <ul v-if="prefs.watched.length" class="adm-rows">
+            <li v-for="(url, i) in prefs.watched" :key="i">
+              <span class="adm-row-main">{{ url }}</span>
+              <span class="adm-row-date">{{ boardLabel(url) }}</span>
+            </li>
+          </ul>
+
+          <h2 class="adm-subhead">Feeds</h2>
+          <FormFields :fields="FEED_FIELDS" :model="prefs" :errors="errors" />
+          <template v-if="suggested.some((f) => !prefs!.feeds.includes(f.url))">
+            <p class="adm-muted">Suggested academic feeds:</p>
+            <div class="adm-actions">
+              <button
+                v-for="f in suggested.filter((f) => !prefs!.feeds.includes(f.url))"
+                :key="f.url"
+                type="button"
+                class="adm-btn adm-btn-small"
+                @click="addFeed(f.url)"
+              >
+                + {{ f.label }}
+              </button>
+            </div>
+          </template>
+        </template>
+
+        <template #cv>
+          <label class="adm-field">
+            <span>CV style for tailored CVs</span>
+            <select v-model="prefs.cvStyle">
+              <option value="">Public style</option>
+              <option v-for="s in styles" :key="s.id" :value="s.id">{{ s.name }}</option>
+            </select>
+          </label>
+        </template>
+
+        <template #answers>
+          <p class="adm-muted">
+            Used to fill application forms. Anything left empty is handed back to you, never guessed.
+          </p>
+          <FormFields :fields="ANSWER_FIELDS" :model="answers" :errors="errors" />
+        </template>
+
+        <template #automation>
+          <div class="adm-form adm-fields">
+            <fieldset class="adm-choices">
+              <legend>How far the nightly run goes</legend>
+              <label v-for="[n, label, line] in STAGES" :key="n" class="adm-check">
+                <input v-model="prefs.nightly.stage" type="radio" name="stage" :value="n" />
+                <span
+                  >{{ label }}<span class="adm-row-detail">{{ line }}</span></span
                 >
-                  Save
-                </button>
-                <button
-                  v-if="k.source === 'admin' || k.undecryptable"
-                  type="button"
-                  class="adm-btn adm-btn-small"
-                  :disabled="savingKey === k.name"
-                  @click="saveKey(k.name, null)"
+              </label>
+            </fieldset>
+            <p class="adm-muted">Submission always waits for your approval.</p>
+          </div>
+          <h2 class="adm-subhead">Limits</h2>
+          <FormFields :fields="LIMIT_FIELDS" :model="prefs" :errors="errors" />
+        </template>
+
+        <template #notifications>
+          <p class="adm-muted">
+            The dashboard and the sidebar always show what waits for approval, and so does the Ready for approval tab.
+          </p>
+          <h2 class="adm-subhead">Email digest</h2>
+          <p v-if="keys && !keySet('RESEND_API_KEY')" class="adm-banner" role="note">
+            <span
+              >The digest is sent through Resend, and there is no Resend key yet.
+              <a :href="`${base}/ai#keys`">Add it on Integrations → Keys</a>.</span
+            >
+          </p>
+          <div class="adm-form adm-fields">
+            <label class="adm-check">
+              <input v-model="prefs.digest.on" type="checkbox" />
+              Email me a digest after each nightly run
+            </label>
+            <label class="adm-field">
+              <span>To</span>
+              <input
+                v-model="prefs.digest.to"
+                type="email"
+                autocomplete="email"
+                :placeholder="cvEmail || 'you@example.org'"
+                v-bind="errors['digest.to'] ? { 'aria-invalid': 'true' } : {}"
+              />
+              <span v-if="errors['digest.to']" class="adm-err">{{ errors['digest.to'] }}</span>
+            </label>
+            <label class="adm-field">
+              <span>From</span>
+              <input v-model="prefs.digest.from" type="text" placeholder="ScholarOS <onboarding@resend.dev>" />
+              <small
+                >onboarding@resend.dev only delivers to your Resend account’s email until you verify a domain.</small
+              >
+              <span v-if="errors['digest.from']" class="adm-err">{{ errors['digest.from'] }}</span>
+            </label>
+          </div>
+        </template>
+
+        <template #worker>
+          <div class="adm-form adm-fields">
+            <fieldset class="adm-choices">
+              <legend>Drafts, their review and form answers are written by</legend>
+              <label v-for="[id, label, line] in WORKERS" :key="id" class="adm-check">
+                <input
+                  type="radio"
+                  name="worker"
+                  :value="id"
+                  :checked="workerOf(prefs) === id"
+                  @change="setWorker(id)"
+                />
+                <span
+                  >{{ label }}<span class="adm-row-detail">{{ line }}</span></span
                 >
-                  Clear
-                </button>
-              </form>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
+              </label>
+            </fieldset>
+            <p v-if="workerOf(prefs) === 'gemini'" class="adm-muted">
+              Antigravity has no sign-in that works unattended yet, so this slot runs Gemini CLI with your Gemini API
+              key.
+            </p>
+            <fieldset v-if="prefs.worker.kind === 'cli' && prefs.worker.agent !== 'gemini'" class="adm-choices">
+              <legend>Sign in with</legend>
+              <label class="adm-check">
+                <input v-model="prefs.worker.auth" type="radio" name="auth" value="subscription" />
+                <span
+                  >Subscription<span class="adm-row-detail">{{
+                    prefs.worker.agent === 'claude'
+                      ? 'Your Claude plan, through a Claude Code token.'
+                      : 'Your ChatGPT plan, through Codex’s sign-in file.'
+                  }}</span></span
+                >
+              </label>
+              <label class="adm-check">
+                <input v-model="prefs.worker.auth" type="radio" name="auth" value="key" />
+                <span
+                  >Key<span class="adm-row-detail">{{
+                    prefs.worker.agent === 'claude'
+                      ? 'Your Anthropic API key, billed per use.'
+                      : 'Your OpenAI API key, billed per use.'
+                  }}</span></span
+                >
+              </label>
+            </fieldset>
+            <p v-if="needed()" class="adm-muted">
+              Uses {{ keyOf(needed()!)?.label ?? needed() }} (<code>{{ needed() }}</code
+              >)<template v-if="keys && !keySet(needed()!)">, which isn’t set yet</template>:
+              <a :href="`${base}/ai#keys`">Integrations → Keys</a>.
+            </p>
+            <p v-if="prefs.worker.kind === 'cli'" class="adm-muted">
+              When a subscription runs out of quota, the run stops and says so. It never falls back to paid API use.
+            </p>
+            <p class="adm-muted">Scoring always uses the API provider.</p>
+          </div>
+        </template>
+      </AdminSections>
+    </template>
   </AdminShell>
 </template>

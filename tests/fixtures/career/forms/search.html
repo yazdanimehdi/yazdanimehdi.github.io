@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>Search header</title></head>
+<body>
+  <h1>Research Engineer</h1>
+  <header>
+    <form method="post" action="/search">
+      <input name="q" aria-label="Search jobs" />
+      <button type="submit">Search</button>
+    </form>
+  </header>
+  <form>
+    <label for="name">Full name</label>
+    <input id="name" name="name" />
+    <button type="submit">Submit Application</button>
+  </form>
+<script>
+  document.forms[1].addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await fetch("/submit", { method: "POST", body: new URLSearchParams(new FormData(e.target)) });
+    e.target.outerHTML = "<p>Thank you, your application was received</p>";
+  });
+</script>
+</body>
+</html>
