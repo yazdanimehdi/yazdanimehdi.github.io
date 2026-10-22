@@ -62,9 +62,10 @@ function rssDay(s: string | undefined): string | undefined {
 }
 
 const yearOf = (s: unknown) => Number(String(s ?? '').match(/\d{4}/)?.[0] ?? 0);
-const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' ? (v as Record<string, unknown>) : {});
-const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
-const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+export const obj = (v: unknown): Record<string, unknown> =>
+  v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
+export const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+export const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
 /** Parse an arXiv Atom feed (export.arxiv.org/api/query) into records. */
 export function parseArxivFeed(xml: string): PaperRecord[] {

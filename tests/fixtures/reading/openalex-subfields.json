@@ -1,0 +1,21 @@
+{
+  "meta": {
+    "count": 3,
+    "page": 1,
+    "per_page": 25
+  },
+  "results": [
+    {
+      "id": "https://openalex.org/subfields/1707",
+      "display_name": "Computer Vision and Pattern Recognition"
+    },
+    {
+      "id": "https://openalex.org/subfields/1705",
+      "display_name": "Computer Networks and Communications"
+    },
+    {
+      "id": "https://openalex.org/subfields/1709",
+      "display_name": "Human-Computer Interaction"
+    }
+  ]
+}

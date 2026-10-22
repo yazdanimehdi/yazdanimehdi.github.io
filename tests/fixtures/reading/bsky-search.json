@@ -1,0 +1,47 @@
+{
+  "hitsTotal": 3,
+  "posts": [
+    {
+      "uri": "at://did:plc:d3p4jzrm5dpz2gdhzd5sxwwa/app.bsky.feed.post/3my7onx7gfj2y",
+      "cid": "bafyreigyuttx7bdnuvc6abwialf4fz6lki5n7xnbl6l5nyrr5zxmelyqkm",
+      "author": {
+        "did": "did:plc:d3p4jzrm5dpz2gdhzd5sxwwa",
+        "handle": "alexiskirke.bsky.social"
+      },
+      "record": {
+        "$type": "app.bsky.feed.post",
+        "createdAt": "2026-10-19T08:18:14.833323+00:00",
+        "text": "You might want to take a look at this excellent paper on recursive LLM agent harnessing for open-world tasks. See link below. #AI #LLMAgents\nhttps://arxiv.org/abs/2610.14224"
+      },
+      "indexedAt": "2026-10-19T08:18:16.453Z"
+    },
+    {
+      "uri": "at://did:plc:df4dbsajjtvbbjn5poliesvs/app.bsky.feed.post/3mxvhace5zn2z",
+      "cid": "bafyreie32beopd67t6sp2qb2tar456uec6bhtunusmlfkgcml7hdlhjnwm",
+      "author": {
+        "did": "did:plc:df4dbsajjtvbbjn5poliesvs",
+        "handle": "csai-bot.bsky.social"
+      },
+      "record": {
+        "$type": "app.bsky.feed.post",
+        "createdAt": "2026-10-15T06:38:43.234722+00:00",
+        "text": "Ruiyao Xu, Yanfei Chen, Zhongying CuiZhu, Bhavana Dalvi Mishra, Yifei Ming, Han Yu, Rujun Han, Chen-Yu Lee, Tomas Pfister: Harness^2: Recursive Agent Harnessing for an Open World https://arxiv.org/abs/2610.14224 https://arxiv.org/pdf/2610.14224 https://arxiv.org/html/2610.14224"
+      },
+      "indexedAt": "2026-10-15T06:38:43.753Z"
+    },
+    {
+      "uri": "at://did:plc:koei4pevo5ainvejnjbbiw2i/app.bsky.feed.post/3mxtm4zlqgf2v",
+      "cid": "bafyreif2yzebg3eb4bmrg7hsmrdkulv7k7yhflys6r5k3yydjrtjbbb5c4",
+      "author": {
+        "did": "did:plc:koei4pevo5ainvejnjbbiw2i",
+        "handle": "sfreedom-labs.bsky.social"
+      },
+      "record": {
+        "$type": "app.bsky.feed.post",
+        "createdAt": "2026-10-14T13:01:01.663Z",
+        "text": "Harness^2 is a recursive agent harnessing framework for open-world tasks. The paper reports gains of up to 11.5 points on WorkBuddy-Bench, 4.5 points on JobBench, and 11.8 percentage points on LAB. Builders should treat the harness as part of the system.\n\nhttps://arxiv.org/abs/2610.14224"
+      },
+      "indexedAt": "2026-10-14T13:01:03.257Z"
+    }
+  ]
+}

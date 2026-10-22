@@ -24,7 +24,7 @@ function toNew(r: PaperRecord, url: string, categories: string[]): NewPaper[] {
 }
 
 /** One paper per key: the contract later steps rely on (the last record for a key wins). */
-const unique = (papers: NewPaper[]) => [...new Map(papers.map((p) => [p.key, p])).values()];
+export const unique = (papers: NewPaper[]) => [...new Map(papers.map((p) => [p.key, p])).values()];
 
 export async function fetchNew(
   id: (typeof NEW_SOURCES)[number],

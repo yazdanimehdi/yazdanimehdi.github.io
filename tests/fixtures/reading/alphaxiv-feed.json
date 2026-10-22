@@ -1,0 +1,119 @@
+{
+  "page": 0,
+  "papers": [
+    {
+      "id": "01a15c79-28b8-7a1c-bbff-cae4e196a2cb",
+      "paper_group_id": "01a15c79-28b8-7a1c-bbff-cae4e196a2cb",
+      "universal_paper_id": "2610.28480",
+      "title": "SuperMimic: Scaling Humanoid Whole-Body Control with One Differentiable World Model",
+      "abstract": "Tracking large human-motion datasets has become the dominant route to general, expressive humanoid whole-body control, but scaling across many motions is expensive. Current pipelines use model-free reinforcement learning, either merging per-motion specialists through lossy distillation, or brute-forcing a single policy with cluster-scale compute. SuperMimic amortizes learning across all motions wi",
+      "authors": [
+        "Qiayuan Liao",
+        "Yiyang Shao",
+        "Junfeng Long",
+        "Kevin Zakka",
+        "Roberto Horowitz",
+        "Pieter Abbeel",
+        "Koushil Sreenath"
+      ],
+      "first_publication_date": "2026-10-20T16:29:30.000Z",
+      "publication_date": "2026-10-20T16:29:30.000Z",
+      "metrics": {
+        "visits_count": {
+          "all": 1617,
+          "last_7_days": 1617
+        },
+        "total_votes": 51,
+        "public_total_votes": 105
+      },
+      "topics": [
+        "Computer Science",
+        "cs.RO"
+      ]
+    },
+    {
+      "id": "01a16168-ae82-763c-906e-ffef746e6bea",
+      "paper_group_id": "01a16168-ae82-763c-906e-ffef746e6bea",
+      "universal_paper_id": "2610.30136",
+      "title": "Agentic World Action Models",
+      "abstract": "Recent world action models provide visual foresight and future prediction for robot manipulation, but lack explicit mechanisms for compositional skill reuse. Agentic robotics combines code-based planning and reasoning with reusable skills, but often lacks predictive grounding in physical dynamics. We introduce AW-0, an agentic world action model framework that integrates code-based planning with j",
+      "authors": [
+        "Zhuoyang Liu",
+        "Dantong Niu",
+        "Botong Zhang",
+        "Boning Shao",
+        "Jing Wang",
+        "Ruijie Zheng",
+        "Yuvan Sharma",
+        "Runyu Lu",
+        "Jiaming Liu",
+        "Renrui Zhang",
+        "Roei Herzig",
+        "Yutong Bai",
+        "Ken Goldberg",
+        "Danfei Xu",
+        "Yuke Zhu",
+        "Guanzhi Wang",
+        "Linxi \"Jim\" Fan",
+        "Trevor Darrell"
+      ],
+      "first_publication_date": "2026-10-21T17:59:56.000Z",
+      "publication_date": "2026-10-21T17:59:56.000Z",
+      "metrics": {
+        "visits_count": {
+          "all": 326,
+          "last_7_days": 326
+        },
+        "total_votes": 19,
+        "public_total_votes": 37
+      },
+      "topics": [
+        "Computer Science",
+        "cs.RO"
+      ]
+    },
+    {
+      "id": "01a15c7b-d1d7-7964-8818-4eb2094f25cc",
+      "paper_group_id": "01a15c7b-d1d7-7964-8818-4eb2094f25cc",
+      "universal_paper_id": "2610.28594",
+      "title": "Learning the 4D World through Point Trajectory Forecasting",
+      "abstract": "Reliable multi-view forecasting requires videos from different cameras to describe the same evolving 3D scene. To this end, we introduce Video-Point Model (VPM), a world model that conditions on multi-view video histories and a language instruction to jointly forecast future videos from arbitrary viewpoints and the 3D trajectories of persistent scene points. We extend a pretrained world model with",
+      "authors": [
+        "Byungwoo Jeon",
+        "Sunghwan Hong",
+        "Dohyeon Kim",
+        "Jonghoon Lee",
+        "Jungwoo Park",
+        "Inhee Lee",
+        "Doosan Baek",
+        "Jinil Kim",
+        "Taehyun Lim",
+        "Hanbyul Joo",
+        "Marc Pollefeys",
+        "Saining Xie",
+        "Jinwoo Shin"
+      ],
+      "first_publication_date": "2026-10-20T17:45:45.000Z",
+      "publication_date": "2026-10-20T17:45:45.000Z",
+      "metrics": {
+        "visits_count": {
+          "all": 366,
+          "last_7_days": 366
+        },
+        "total_votes": 8,
+        "public_total_votes": 33
+      },
+      "topics": [
+        "Computer Science",
+        "cs.CV",
+        "generative-models",
+        "multi-modal-learning",
+        "representation-learning",
+        "robotic-control",
+        "robotics-perception",
+        "sequence-modeling",
+        "video-understanding"
+      ]
+    }
+  ]
+}
