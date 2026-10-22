@@ -504,9 +504,8 @@ onBeforeUnmount(() => {
           The agent is
           <template v-if="ready">{{ agentLabel(ready.provider) }}</template
           ><template v-else>your writing provider’s coding tool</template>, set on the
-          <a :href="ai">Scholar &amp; AI screen</a>. Each run uses Vercel Sandbox time on your Vercel account and is
-          billed by {{ ready ? providerLabel(ready.provider) : 'your writing provider' }} like any use of its coding
-          tool.
+          <a :href="ai">Integrations screen</a>. Each run uses Vercel Sandbox time on your Vercel account and is billed
+          by {{ ready ? providerLabel(ready.provider) : 'your writing provider' }} like any use of its coding tool.
         </p>
         <p v-if="ready && !notice" class="adm-muted">
           Under Session, Pause keeps your unpublished changes for later and Start over throws them away.
@@ -542,7 +541,7 @@ onBeforeUnmount(() => {
         <button v-if="notice.action === 'copy'" type="button" class="adm-btn" @click="copySteps">
           Copy setup steps
         </button>
-        <a v-else-if="notice.action === 'ai'" class="adm-btn" :href="ai">Open the Scholar &amp; AI screen</a>
+        <a v-else-if="notice.action === 'ai'" class="adm-btn" :href="ai">Open the Integrations screen</a>
         <button v-else type="button" class="adm-btn" @click="load">Try again</button>
       </section>
 
