@@ -328,29 +328,47 @@ test('submit stops when a value is undone by the page after it was chosen', { sk
   assert.deepEqual(sent, [], 'not submitted');
 });
 
-test('read tells fields that share a name apart', { skip }, async () => {
-  const result = await run({ mode: 'read', url: `${base}/dupes.html`, out: await out() }, offline);
+const CHECKLIST = [
+  { id: 'question_x[]', value: 'true' },
+  { id: 'question_x[]#2', value: '' },
+  { id: 'question_x[]#3', value: 'true' },
+];
+
+test('a checkbox list sharing one name pre-fills and submits the approved boxes', { skip }, async () => {
+  const dir = await out();
+  const url = `${base}/checklist.html`;
+  const filled = await run({ mode: 'fill', url, values: CHECKLIST, out: dir }, offline);
+  assert.equal(filled.ok, true, filled.error);
   assert.deepEqual(
-    result.fields.map((f) => [f.id, f.label]),
+    filled.fields.map((f) => [f.id, f.label, f.value]),
     [
-      ['email', 'Email'],
-      ['email#2', 'Confirm email'],
+      ['question_x[]', 'Python', 'true'],
+      ['question_x[]#2', 'Rust', ''],
+      ['question_x[]#3', 'Go', 'true'],
     ],
   );
+  const sent = posts.length;
+  const result = await run({ mode: 'submit', url, values: CHECKLIST, expect: filled.fields, out: dir }, offline);
+  assert.equal(result.ok, true, result.error);
+  assert.equal(result.confirmed, true);
+  assert.deepEqual(posts.slice(sent), ['question_x%5B%5D=python&question_x%5B%5D=go']);
 });
 
-test('submit refuses a form whose fields share a name, typing nothing', { skip }, async () => {
-  const { result, sent } = await submit('dupes.html', [
-    { id: 'email', value: 'ada@example.com' },
-    { id: 'email#2', value: 'ada@example.com' },
-  ]);
+test('a same-name checkbox inserted before the approved ones is a change', { skip }, async () => {
+  const dir = await out();
+  const approved = await run({ mode: 'read', url: `${base}/checklist.html`, out: dir }, offline);
+  const sent = posts.length;
+  const result = await run(
+    { mode: 'submit', url: `${base}/checklist-more.html`, values: CHECKLIST, expect: approved.fields, out: dir },
+    offline,
+  );
   assert.equal(result.ok, false);
-  assert.deepEqual(result.changed, ['email']);
+  assert.deepEqual(result.changed, ['question_x[]', 'question_x[]#2', 'question_x[]#3', 'question_x[]#4']);
   assert.ok(
     result.fields.every((f) => f.value === ''),
-    'nothing typed',
+    'nothing ticked',
   );
-  assert.deepEqual(sent, [], 'not submitted');
+  assert.deepEqual(posts.slice(sent), [], 'not submitted');
 });
 
 test('an approved empty select is sent empty, not as the page default', { skip }, async () => {

@@ -1,13 +1,15 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8" /><title>Duplicate names</title></head>
+<head><meta charset="utf-8" /><title>Checklist</title></head>
 <body>
   <h1>Research Engineer</h1>
   <form>
-    <label for="email">Email</label>
-    <input type="email" id="email" name="email" />
-    <label for="email2">Confirm email</label>
-    <input type="email" id="email2" name="email" />
+    <fieldset>
+      <legend>Which languages do you use?</legend>
+      <label><input type="checkbox" name="question_x[]" value="python" /> Python</label>
+      <label><input type="checkbox" name="question_x[]" value="rust" /> Rust</label>
+      <label><input type="checkbox" name="question_x[]" value="go" /> Go</label>
+    </fieldset>
     <button type="submit">Submit Application</button>
   </form>
 <script>

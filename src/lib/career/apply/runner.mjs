@@ -31,8 +31,8 @@ const ERROR = /error|could not|couldn't|failed|invalid|required|try again/i;
 
 /**
  * Runs inside the page, so it must stay self-contained. Lists the form fields (stamping each control with
- * `data-apply-ix` so the runner can target it; a repeated id gets `#2`, `#3`… and is listed in `dupes`), spots
- * blockers, and stamps the Apply link and the submit controls of the fields' form.
+ * `data-apply-ix` so the runner can target it; a repeated id gets `#2`, `#3`… in page order), spots blockers, and
+ * stamps the Apply link and the submit controls of the fields' form.
  */
 function inspect() {
   const norm = (s) => (s ?? '').replace(/\s+/g, ' ').trim();
@@ -116,15 +116,13 @@ function inspect() {
     el.dataset.applyIx = String(fields.length);
     fields.push(field);
   }
+  // A checkbox list shares one name. Numbering in page order keeps each box its own field, and a box added or moved
+  // shifts the labels at those ids, which the approval diff sees.
   const count = new Map();
-  const dupes = new Set();
   for (const f of fields) {
     const n = (count.get(f.id) ?? 0) + 1;
     count.set(f.id, n);
-    if (n > 1) {
-      dupes.add(f.id);
-      f.id = `${f.id}#${n}`;
-    }
+    if (n > 1) f.id = `${f.id}#${n}`;
   }
 
   const any = (selector, test) => [...document.querySelectorAll(selector)].some(test);
@@ -153,7 +151,6 @@ function inspect() {
   submits.forEach((e) => e.setAttribute('data-apply-submit', ''));
   return {
     fields: fields.map((f) => ({ ...f, source: f.kind === 'file' ? 'file' : 'owner' })),
-    dupes: [...dupes],
     blocker,
     apply: apply ? (apply.href ?? '') : null,
     submits: submits.length,
@@ -201,11 +198,6 @@ function diff(live, expect) {
   const a = new Map(live.map((f) => [f.id, sig(f)]));
   const b = new Map(expect.map((f) => [f.id, sig(f)]));
   return [...new Set([...a.keys(), ...b.keys()])].filter((id) => a.get(id) !== b.get(id));
-}
-
-/** The ids that keep the live form from being the approved one: fields sharing a name, else any that differ. */
-function drift(seen, expect) {
-  return seen.dupes.length ? seen.dupes : diff(seen.fields, expect);
 }
 
 /** The upload a file field's value names: `cv` or `letter`. */
@@ -294,7 +286,7 @@ export async function run(input, chromium) {
     if (input.mode === 'read') return { ...result, ok: true };
     if (input.mode === 'submit') {
       if (!input.expect) return { ...result, error: 'submit needs the approved fields (expect)' };
-      const changed = drift(seen, input.expect);
+      const changed = diff(seen.fields, input.expect);
       if (changed.length) return { ...result, changed, error: 'the form changed since it was approved' };
     }
 
@@ -323,7 +315,7 @@ export async function run(input, chromium) {
       return { ...result, ok: !error, error };
     }
     // Filling can change the form itself, like a question that appears once another is answered.
-    const changed = drift(filled, input.expect);
+    const changed = diff(filled.fields, input.expect);
     if (changed.length) return { ...result, changed, error: 'filling it in changed the form from the approved one' };
     if (error) return { ...result, error };
     if (filled.submits !== 1) return { ...result, error: `expected one submit control, found ${filled.submits}` };
