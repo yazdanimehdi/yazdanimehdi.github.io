@@ -54,7 +54,7 @@ async function loadRows() {
       const { rows } = await api<{ rows: ReadyRow[] }>('career/ready');
       if (status !== filter.value) return; // a later filter's answer wins
       readyRows.value = rows;
-      session.careerReady = rows.length;
+      session.careerReady = rows.filter((r) => r.state === 'ready').length;
       return;
     }
     const feed = await api<Feed>(`career/postings${status === 'all' ? '' : `?status=${status}`}`);

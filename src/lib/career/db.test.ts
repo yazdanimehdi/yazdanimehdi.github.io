@@ -13,6 +13,7 @@ import {
   listEvents,
   listPostings,
   readCareer,
+  readyCount,
   readyPostings,
   updatePosting,
   upsertPostings,
@@ -191,6 +192,16 @@ test('readyPostings lists only status ready, newest pre-fill first', async () =>
     (await readyPostings(sql)).map((r) => r.id),
     [ids[2], ids[0]],
   );
+});
+
+test('readyCount counts only status ready postings whose application waits for approval', async () => {
+  await upsertPostings(sql, ['A', 'B', 'C', 'D'].map(row));
+  const ids = (await listPostings(sql, {})).map((r) => r.id).sort((a, b) => a - b);
+  await updatePosting(sql, ids[0], { status: 'ready', application: application({ state: 'ready' }) });
+  await updatePosting(sql, ids[1], { status: 'ready', application: application({ state: 'approved' }) });
+  await updatePosting(sql, ids[2], { status: 'ready' });
+  await updatePosting(sql, ids[3], { status: 'skipped', application: application({ state: 'ready' }) });
+  assert.equal(await readyCount(sql), 1);
 });
 
 test('approvedPostings lists application state approved, oldest approval first', async () => {

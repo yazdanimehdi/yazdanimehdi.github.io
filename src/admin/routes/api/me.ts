@@ -4,7 +4,7 @@ import { GitHubStore } from '../../../lib/admin/github-store';
 import { authorOf, json } from '../../../lib/admin/http';
 import { adminSettings, isOwner } from '../../../lib/admin/settings';
 import { UpstreamError } from '../../../lib/admin/store';
-import { readyPostings } from '../../../lib/career/db';
+import { readyCount } from '../../../lib/career/db';
 import { getSql } from '../../../lib/db';
 import { getMode } from '../../../lib/mode';
 
@@ -33,11 +33,6 @@ export const GET: APIRoute = async ({ locals }) => {
   }
   const owner = getMode() === 'postgres' && isOwner(locals.user, adminSettings());
   // A badge is never worth failing the request: an unreachable database leaves it out.
-  const ready = owner
-    ? await readyPostings(getSql()).then(
-        (r) => r.length,
-        () => null,
-      )
-    : null;
+  const ready = owner ? await readyCount(getSql()).catch(() => null) : null;
   return json({ user: locals.user, capabilities, ...(ready === null ? {} : { career: { ready } }) });
 };

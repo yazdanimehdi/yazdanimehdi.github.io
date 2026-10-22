@@ -7,7 +7,7 @@ import { parseJobs } from '../../../lib/admin/jobs';
 import type { ContentStore } from '../../../lib/admin/store';
 import { adminSettings, canPublish, isOwner } from '../../../lib/admin/settings';
 import { CV_JSON, FEEDS_JSON, JOBS_JSON, SCHOLAR_JSON, collectionDir, configPath } from '../../../lib/admin/paths';
-import { readyPostings } from '../../../lib/career/db';
+import { readyCount } from '../../../lib/career/db';
 import { readCvMeta } from '../../../lib/cv-pdf/generate';
 import { getSql } from '../../../lib/db';
 import { feedSources, type FeedsConfig } from '../../../lib/feeds';
@@ -118,7 +118,7 @@ export const GET = route(async (_ctx, store, user) => {
     gh ? gh.latestCommit().catch(() => null) : null,
     // A call to act, so publishers only.
     canPublish(user, adminSettings()) ? waitingForReview() : [],
-    owner ? readyPostings(getSql()) : null,
+    owner ? readyCount(getSql()) : null,
   ]);
   const items = jsonField(feedsJson?.content, 'length');
   const authors = Array.isArray(scholar.data.authors) ? scholar.data.authors : [];
@@ -146,7 +146,7 @@ export const GET = route(async (_ctx, store, user) => {
     hiddenRuns: runs.hiddenRuns,
     lastCommit: head,
     review,
-    ...(ready ? { career: { ready: ready.length } } : {}),
+    ...(ready === null ? {} : { career: { ready } }),
   };
   return json(data);
 });

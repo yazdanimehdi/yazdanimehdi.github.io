@@ -218,6 +218,13 @@ export async function readyPostings(sql: Sql): Promise<PostingSummary[]> {
   return rows.map(summary);
 }
 
+/** How many applications wait for the owner's approval: the badge, the tab count and the dashboard. */
+export async function readyCount(sql: Sql): Promise<number> {
+  const [r] = await sql<{ n: number }>`select count(*)::int as n from career_postings
+    where status = 'ready' and application->>'state' = 'ready'`;
+  return Number(r.n);
+}
+
 /** Ids of approved applications in the order they were approved, for the submit queue. */
 export async function approvedPostings(sql: Sql): Promise<number[]> {
   const rows = await sql<Row>`
