@@ -168,7 +168,7 @@ test('when a source fails, completion stops: the papers import as Scholar gave t
   const r = await syncPapers(store, deps({ lookup: failing }), NOW);
   assert.deepEqual(r.imported, ['smith2026sparse', 'smith2025dense', 'smith2024graph']);
   assert.deepEqual(r.notCompleted, r.imported);
-  assert.equal(attempts, 1, 'no lookups after the first failure');
+  assert.equal(attempts, 2, "the first paper's DataCite and arXiv lookups, then no more papers");
   assert.deepEqual(r.failed, [{ item: 'completing smith2026sparse', error: 'timeout' }]);
   const pub = (await readEntry(store, 'publications', 'smith2026sparse'))!.data;
   assert.equal(pub.url, articles[0].link);

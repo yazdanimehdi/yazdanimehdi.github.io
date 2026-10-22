@@ -72,6 +72,43 @@ export function parseArxivFeed(xml: string): PaperRecord[] {
   });
 }
 
+/** Parse a DataCite `/dois` response (one DOI or a search) for arXiv's 10.48550 DOIs into arXiv records. */
+export function parseDatacite(json: unknown): PaperRecord[] {
+  const data = obj(json).data;
+  return (Array.isArray(data) ? data : [data]).flatMap((raw) => {
+    const a = obj(obj(raw).attributes);
+    const id =
+      str(a.url)?.match(/arxiv\.org\/abs\/(.+?)(?:v\d+)?$/i)?.[1] ??
+      str(a.doi)?.match(/^10\.48550\/arxiv\.(.+)$/i)?.[1];
+    const title = str(obj(list(a.titles)[0]).title);
+    if (!id || !title) return [];
+    const descriptions = list(a.descriptions).map(obj);
+    const abstract = str(descriptions.find((d) => d.descriptionType === 'Abstract')?.description);
+    // ponytail: the first arXiv-scheme subject is taken as the primary category; DataCite lists them in arXiv's order.
+    const category = list(a.subjects)
+      .map(obj)
+      .find((s) => s.subjectScheme === 'arXiv');
+    const published = list(a.relatedIdentifiers)
+      .map(obj)
+      .find((r) => r.relationType === 'IsVersionOf' && r.relatedIdentifierType === 'DOI');
+    return [
+      {
+        source: 'arxiv' as const,
+        title: text(title),
+        authors: list(a.creators)
+          .map(obj)
+          .map((c) => [str(c.givenName), str(c.familyName)].filter(Boolean).join(' ') || str(c.name) || '')
+          .filter(Boolean),
+        year: yearOf(a.publicationYear),
+        abstract: abstract ? text(abstract) : undefined,
+        arxiv: id,
+        primaryClass: str(category?.subject)?.match(/\(([^()]+)\)$/)?.[1],
+        doi: str(published?.relatedIdentifier),
+      },
+    ];
+  });
+}
+
 const CROSSREF_TYPES: Record<string, PubType> = {
   'journal-article': 'journal',
   'proceedings-article': 'conference',

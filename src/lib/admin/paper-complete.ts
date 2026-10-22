@@ -9,6 +9,7 @@ import {
   parseArxivFeed,
   parseBiorxiv,
   parseCrossrefWorks,
+  parseDatacite,
   parseOpenAlex,
   parsePubmed,
   type PaperRecord,
@@ -68,6 +69,7 @@ function best(records: PaperRecord[], ref: Ref): PaperRecord | undefined {
 }
 
 const ARXIV = 'https://export.arxiv.org/api/query?';
+const DATACITE = 'https://api.datacite.org/dois';
 const CROSSREF = 'https://api.crossref.org/works';
 const EUTILS = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/';
 const OPENALEX = 'https://api.openalex.org/works';
@@ -121,10 +123,23 @@ export async function findPaper(
   // A typo'd or stale id or DOI resolves to another paper: with authors to compare, its record must share one.
   const ours = (r: PaperRecord | undefined) =>
     pub.authors.length && r && !sameAuthors(pub.authors, r.authors) ? undefined : r;
+  // arXiv's API throttles hard (429s, timeouts from cloud hosts); DataCite serves arXiv's records for its 10.48550
+  // DOIs, so it goes first and arXiv's API answers only when DataCite fails.
+  const arxivRecords = async (datacite: string, arxiv: string) => {
+    try {
+      return parseDatacite(json(await look.get(datacite)));
+    } catch {
+      return parseArxivFeed((await primary(arxiv)) ?? '');
+    }
+  };
   const found: Found = {};
   const id = arxivId(pub);
   if (id)
-    found.arxiv = ours(parseArxivFeed((await primary(`${ARXIV}id_list=${q(id)}`)) ?? '').find((r) => r.arxiv === id));
+    found.arxiv = ours(
+      (await arxivRecords(`${DATACITE}/${doiPath(`10.48550/arXiv.${id}`)}`, `${ARXIV}id_list=${q(id)}`)).find(
+        (r) => r.arxiv === id,
+      ),
+    );
   let doi = cleanDoi(pub.doi) ?? cleanDoi(found.arxiv?.doi);
   if (doi) {
     const record = await crossrefDoi(doi);
@@ -136,8 +151,13 @@ export async function findPaper(
       .replace(/[^\p{L}\p{N}\s]/gu, ' ')
       .replace(/\s+/g, ' ')
       .trim();
-    const feed = await primary(`${ARXIV}search_query=${q(`ti:"${phrase}"`)}&max_results=5`);
-    found.arxiv = best(parseArxivFeed(feed ?? ''), pub);
+    found.arxiv = best(
+      await arxivRecords(
+        `${DATACITE}?client-id=arxiv.content&page%5Bsize%5D=5&query=${q(`titles.title:"${phrase}"`)}`,
+        `${ARXIV}search_query=${q(`ti:"${phrase}"`)}&max_results=5`,
+      ),
+      pub,
+    );
   }
   // A published version of an arXiv paper, or the paper itself when arXiv didn't have it.
   if (!found.crossref) {

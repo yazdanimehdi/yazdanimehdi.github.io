@@ -6,6 +6,7 @@ import {
   parseArxivFeed,
   parseBiorxiv,
   parseCrossrefWorks,
+  parseDatacite,
   parseOpenAlex,
   parsePubmed,
 } from './paper-sources';
@@ -22,6 +23,41 @@ test('parseArxivFeed reads MIRAGE in full', () => {
   assert.ok(r.authors.includes('Mehdi Yazdani-Jahromi'));
   assert.ok((r.abstract ?? '').length > 300 && !/\n/.test(r.abstract!));
   assert.equal(r.year, 2026);
+});
+
+test("parseDatacite reads MIRAGE's arXiv DOI record in full", () => {
+  const [r] = parseDatacite(JSON.parse(fixture('datacite-mirage.json')));
+  assert.equal(r.source, 'arxiv');
+  assert.equal(r.arxiv, '2609.14491');
+  assert.equal(r.title, 'MIRAGE: Measuring Interpolation and Redundancy in Affinity GEneralization');
+  assert.deepEqual(r.authors, ['Mehdi Yazdani-Jahromi', 'Sanjay Padhi', 'Ivan Garibay']);
+  assert.ok((r.abstract ?? '').length > 300 && !/\n/.test(r.abstract!));
+  assert.equal(r.year, 2026);
+  assert.equal(r.primaryClass, 'q-bio.QM');
+  assert.equal(r.doi, undefined);
+  assert.equal(parseDatacite(JSON.parse(fixture('datacite-search.json')))[0].arxiv, '2609.14491');
+  assert.deepEqual(parseDatacite({ data: [] }), []);
+  assert.deepEqual(parseDatacite({}), []);
+});
+
+test('parseDatacite takes an old-style id from the url and the published DOI from IsVersionOf', () => {
+  const [r] = parseDatacite({
+    data: {
+      attributes: {
+        doi: '10.48550/arxiv.hep-th/9711200',
+        url: 'https://arxiv.org/abs/hep-th/9711200',
+        titles: [{ title: 'The Large N Limit' }],
+        creators: [{ name: 'Maldacena, Juan' }],
+        publicationYear: 1997,
+        relatedIdentifiers: [
+          { relationType: 'IsVersionOf', relatedIdentifierType: 'DOI', relatedIdentifier: '10.1023/a:1026654312961' },
+        ],
+      },
+    },
+  });
+  assert.equal(r.arxiv, 'hep-th/9711200');
+  assert.deepEqual(r.authors, ['Maldacena, Juan']);
+  assert.equal(r.doi, '10.1023/a:1026654312961');
 });
 
 test('parseArxivFeed handles several entries and entities', () => {

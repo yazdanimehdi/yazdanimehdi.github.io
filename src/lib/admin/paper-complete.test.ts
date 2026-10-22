@@ -69,6 +69,36 @@ test('an arXiv id is looked up directly and completes MIRAGE', async () => {
   assert.equal(look.calls.filter(([u]) => u.startsWith('https://export.arxiv.org/')).length, 1);
 });
 
+test("MIRAGE completes from DataCite's arXiv records without arXiv's API, by id and by title", async () => {
+  const byId = fake({
+    'https://api.datacite.org/dois/10.48550/arXiv.2609.14491': 'datacite-mirage.json',
+    'https://api.crossref.org/works?': '{"message":{"items":[]}}',
+  });
+  const found = await findPaper({ title: 'x', authors: ['M Yazdani-Jahromi'], arxiv: '2609.14491' }, byId);
+  const { fields: f, sources } = await completedFields(found!, {}, byId);
+  assert.equal(f.url, 'https://arxiv.org/abs/2609.14491');
+  assert.equal(f.pdf, 'https://arxiv.org/pdf/2609.14491');
+  assert.deepEqual(f.authors, ['Mehdi Yazdani-Jahromi', 'Sanjay Padhi', 'Ivan Garibay']);
+  assert.equal(f.type, 'preprint');
+  assert.match(String(f.bibtex), /^@misc\{[\s\S]*eprint = \{2609\.14491\}[\s\S]*primaryClass = \{q-bio\.QM\}/);
+  assert.equal(sources.abstract, 'arxiv');
+
+  const byTitle = fake({
+    'https://api.datacite.org/dois?client-id=arxiv.content&page%5Bsize%5D=5&query=titles.title%3A%22Mirage%20measuring':
+      'datacite-search.json',
+    'https://api.crossref.org/works?': '{"message":{"items":[]}}',
+  });
+  const hit = await findPaper(
+    {
+      title: 'Mirage: measuring interpolation and redundancy in affinity generalization',
+      authors: ['M Yazdani-Jahromi'],
+    },
+    byTitle,
+  );
+  assert.equal(hit?.arxiv?.arxiv, '2609.14491');
+  for (const look of [byId, byTitle]) assert.ok(!look.calls.some(([u]) => u.includes('export.arxiv.org')));
+});
+
 test('an arXiv URL in url or pdf counts as its id', async () => {
   const look = fake({ 'https://export.arxiv.org/api/query?id_list=2609.14491': 'arxiv-mirage.xml' });
   const found = await findPaper({ title: 'x', authors: [], pdf: 'https://arxiv.org/pdf/2609.14491v2.pdf' }, look);
