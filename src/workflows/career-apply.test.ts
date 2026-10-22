@@ -1,6 +1,6 @@
 import test, { afterEach, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
-import { getPosting, readCareer, updatePosting, writeCareer } from '../lib/career/db';
+import { getPosting, listEvents, readCareer, updatePosting, writeCareer } from '../lib/career/db';
 import { setApplySandboxForTests } from '../lib/career/apply/sandbox';
 import {
   approvedApp,
@@ -176,19 +176,63 @@ test('the apply sandbox stops only when the lock’s holder lets go', async () =
 });
 
 test('approve rejects values for ids the form does not have', async () => {
-  const id = await posting(kit.sql, readyApp());
+  const ready = readyApp();
+  const id = await posting(kit.sql, ready);
   const { runs, seen } = fakeRuns();
-  const fields = readyApp().fields.map(({ id: fid, value }) => ({ id: fid, value }));
+  const fields = ready.fields.map(({ id: fid, value }) => ({ id: fid, value }));
   const by = 'ada';
-  assert.equal(await approve(kit.sql, id, [...fields, { id: 'extra', value: 'x' }], by, runs), 'changed-values');
-  assert.equal(await approve(kit.sql, id, fields.slice(1), by, runs), 'changed-values', 'one missing');
-  assert.equal(await approve(kit.sql, id, [...fields.slice(1), fields[1]], by, runs), 'changed-values', 'a duplicate');
+  const at = ready.at;
+  assert.equal(await approve(kit.sql, id, [...fields, { id: 'extra', value: 'x' }], at, by, runs), 'changed-values');
+  assert.equal(await approve(kit.sql, id, fields.slice(1), at, by, runs), 'changed-values', 'one missing');
+  assert.equal(
+    await approve(kit.sql, id, [...fields.slice(1), fields[1]], at, by, runs),
+    'changed-values',
+    'a duplicate',
+  );
   assert.equal((await getPosting(kit.sql, id))!.application?.state, 'ready');
   assert.equal(seen.queue, 0);
 });
 
+test('approve refuses the values of a pre-fill other than the one the owner saw', async () => {
+  // The owner saw pre-fill 1; a re-fill finished since, with the same field ids but other values and screenshots.
+  const seen1 = readyApp({ at: minutesAgo(5) });
+  const refilled = readyApp({ shots: ['https://blob.test/career/1/filled-2.png'] });
+  const id = await posting(kit.sql, refilled);
+  const { runs, seen } = fakeRuns();
+  const fields = seen1.fields.map(({ id: fid, value }) => ({ id: fid, value }));
+  assert.equal(await approve(kit.sql, id, fields, seen1.at, 'ada', runs), 'changed-values');
+  assert.equal((await getPosting(kit.sql, id))!.application?.state, 'ready');
+  assert.equal(seen.queue, 0);
+  assert.deepEqual(await approve(kit.sql, id, fields, refilled.at, 'ada', runs), { queued: true });
+});
+
+test('an approval stands when the queue fails to start', async () => {
+  const ready = readyApp();
+  const id = await posting(kit.sql, ready);
+  const { runs } = fakeRuns();
+  runs.queue = async () => {
+    throw new Error('workflow down');
+  };
+  const fields = ready.fields.map(({ id: fid, value }) => ({ id: fid, value }));
+  assert.deepEqual(await approve(kit.sql, id, fields, ready.at, 'ada', runs), { queued: false });
+  assert.equal((await getPosting(kit.sql, id))!.application?.state, 'approved');
+  assert.equal((await readCareer(kit.sql)).applyQueueRunId, null, 'no half-started queue left behind');
+});
+
+test('a submit stuck in submitting for 15 minutes becomes unconfirmed, never approved again', async () => {
+  const stuck = await posting(kit.sql, approvedApp({ state: 'submitting', at: minutesAgo(16) }));
+  const fresh = await posting(kit.sql, approvedApp({ state: 'submitting', at: minutesAgo(1) }));
+  assert.equal(await nextSubmit(), null);
+  const app = (await getPosting(kit.sql, stuck))!.application!;
+  assert.equal(app.state, 'unconfirmed');
+  assert.match(app.reason ?? '', /may have been sent/);
+  assert.ok((await listEvents(kit.sql, stuck)).some((e) => e.detail?.startsWith('unconfirmed:')));
+  assert.equal((await getPosting(kit.sql, fresh))!.application?.state, 'submitting', 'a submit still in time');
+});
+
 test('approve stores the owner’s values over the server’s field shapes and starts the queue', async () => {
-  const id = await posting(kit.sql, readyApp());
+  const ready = readyApp();
+  const id = await posting(kit.sql, ready);
   const { runs, seen } = fakeRuns();
   const fields = readyApp().fields.map((f) => ({
     ...f,
@@ -196,7 +240,7 @@ test('approve stores the owner’s values over the server’s field shapes and s
     label: 'tampered',
     required: false,
   }));
-  assert.equal(await approve(kit.sql, id, fields, 'ada', runs), 'ok');
+  assert.deepEqual(await approve(kit.sql, id, fields, ready.at, 'ada', runs), { queued: true });
   const app = (await getPosting(kit.sql, id))!.application!;
   assert.equal(app.state, 'approved');
   assert.equal(app.approved?.by, 'ada');
@@ -211,7 +255,7 @@ test('approve stores the owner’s values over the server’s field shapes and s
   );
   assert.equal(seen.queue, 1);
   assert.equal((await readCareer(kit.sql)).applyQueueRunId, 'wrun_queue');
-  assert.equal(await approve(kit.sql, id, fields, 'ada', runs), 'not-ready', 'approving twice');
+  assert.equal(await approve(kit.sql, id, fields, ready.at, 'ada', runs), 'not-ready', 'approving twice');
 });
 
 test('approve-all approves each ready posting individually and reports the rest', async () => {
@@ -223,6 +267,7 @@ test('approve-all approves each ready posting individually and reports the rest'
   const out = await approveAll(kit.sql, 'ada', runs);
   assert.deepEqual(out.approved.sort(), [a, b].sort());
   assert.deepEqual(out.skipped, [{ id: c, reason: 'not-ready' }]);
+  assert.equal(out.queued, true);
   assert.equal((await getPosting(kit.sql, c))!.application?.state, 'unconfirmed', 'never re-approved');
   assert.equal(seen.queue, 1, 'one queue for all of them');
 });

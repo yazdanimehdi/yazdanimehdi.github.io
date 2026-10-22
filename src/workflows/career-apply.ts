@@ -5,6 +5,7 @@ import { failPrefill, nextSubmit, prefillStep, submitLost, submitStep } from '..
 import { MAY_BE_SENT, type Application, type ApplyField } from '../lib/career/apply/types';
 import {
   addEvent,
+  approvedPostings,
   claimWithLock,
   CLAIM,
   getPosting,
@@ -161,47 +162,116 @@ export async function ensureSubmitQueue(sql: Sql, runs: ApplyRuns = testRuns ?? 
   await writeCareer(sql, { applyQueueRunId: runId }, 'ScholarOS jobs');
 }
 
+/** Starts the queue if none runs. A failure is logged, not thrown: the approvals stand and the nightly run retries. */
+async function startQueue(sql: Sql, runs: ApplyRuns): Promise<boolean> {
+  try {
+    await ensureSubmitQueue(sql, runs);
+    return true;
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('[career] starting the submit queue', e);
+    return false;
+  }
+}
+
 /**
- * Approves a `ready` application with the owner's values: the ids must be exactly the form's (each once); the labels,
- * kinds and options stay the server's, and a value the owner changed becomes source `owner`. Then the queue submits.
+ * Approves the `ready` application from the pre-fill at `at` (the one the owner saw) with the owner's values: the ids
+ * must be exactly the form's (each once); the labels, kinds and options stay the server's, and a value the owner
+ * changed becomes source `owner`. One conditional update on that very pre-fill, so a re-fill in between is refused.
  */
-export async function approve(
+async function approveOne(
   sql: Sql,
   id: number,
   fields: Pick<ApplyField, 'id' | 'value'>[],
+  at: string,
   by: string,
-  runs: ApplyRuns = testRuns ?? workflowRuns,
 ): Promise<'ok' | 'not-ready' | 'changed-values'> {
   const app = (await getPosting(sql, id))?.application;
   if (app?.state !== 'ready') return 'not-ready';
+  if (app.at !== at) return 'changed-values';
   const given = new Map(fields.map((f) => [f.id, f.value]));
   if (given.size !== fields.length || given.size !== app.fields.length || app.fields.some((f) => !given.has(f.id))) {
     return 'changed-values';
   }
-  const at = new Date().toISOString();
+  const now = new Date().toISOString();
   const approved = app.fields.map((f) => {
     const value = given.get(f.id)!;
     return value === f.value ? f : { ...f, value, source: 'owner' as const };
   });
-  // Matching `at` too: a re-fill that finished in between has other fields than the ones checked above.
-  const next: Application = { ...app, state: 'approved', at, approved: { at, by, fields: approved } };
-  if (!(await moveApplication(sql, id, { state: 'ready', at: app.at }, next))) return 'not-ready';
+  const next: Application = { ...app, state: 'approved', at: now, approved: { at: now, by, fields: approved } };
+  if (!(await moveApplication(sql, id, { state: 'ready', at }, next))) return 'changed-values';
   await addEvent(sql, id, 'apply', `approved by ${by}`);
-  await ensureSubmitQueue(sql, runs);
   return 'ok';
 }
 
-/** "Approve all ready": one approve() per `ready` posting with its pre-filled values, never a blanket permission. */
+/** approveOne, then the queue submits: `queued` false when it couldn't start (the approval stands). */
+export async function approve(
+  sql: Sql,
+  id: number,
+  fields: Pick<ApplyField, 'id' | 'value'>[],
+  at: string,
+  by: string,
+  runs: ApplyRuns = testRuns ?? workflowRuns,
+): Promise<{ queued: boolean } | 'not-ready' | 'changed-values'> {
+  const out = await approveOne(sql, id, fields, at, by);
+  return out === 'ok' ? { queued: await startQueue(sql, runs) } : out;
+}
+
+/** "Approve all ready": one approval per `ready` posting with the pre-fill it read, never a blanket permission. */
 export async function approveAll(sql: Sql, by: string, runs: ApplyRuns = testRuns ?? workflowRuns) {
   const approved: number[] = [];
   const skipped: { id: number; reason: string }[] = [];
   for (const { id } of await readyPostings(sql)) {
-    const fields = (await getPosting(sql, id))?.application?.fields ?? [];
-    const out = await approve(sql, id, fields, by, runs);
+    const app = (await getPosting(sql, id))?.application;
+    const out = app ? await approveOne(sql, id, app.fields, app.at, by) : 'not-ready';
     if (out === 'ok') approved.push(id);
     else skipped.push({ id, reason: out });
   }
-  return { approved, skipped };
+  return { approved, skipped, queued: approved.length > 0 && (await startQueue(sql, runs)) };
+}
+
+/** The nightly run's safety net: an approval whose queue never started gets one. Never throws. */
+export async function ensureQueueStep(): Promise<boolean> {
+  'use step';
+  const sql = getSql();
+  return (await approvedPostings(sql)).length > 0 && startQueue(sql, testRuns ?? workflowRuns);
+}
+
+/**
+ * Withdraws an approval the queue hasn't claimed: back to `ready`, without the approved values. False when the queue
+ * claimed it first (it may be going out).
+ */
+export async function withdrawApproval(sql: Sql, id: number, app: Application): Promise<boolean> {
+  const { approved: _, ...rest } = app;
+  if (!(await moveApplication(sql, id, { state: 'approved', at: app.at }, { ...rest, state: 'ready' }))) return false;
+  await addEvent(sql, id, 'apply', 'approval withdrawn');
+  return true;
+}
+
+/**
+ * The owner's word on an `unconfirmed` application: `sent` makes it submitted (status too); otherwise it failed and
+ * may be pre-filled again. `conflict` unless it is unconfirmed.
+ */
+export async function answerUnconfirmed(sql: Sql, id: number, sent: boolean): Promise<'ok' | 'conflict' | null> {
+  const p = await getPosting(sql, id);
+  if (!p) return null;
+  const app = p.application;
+  if (app?.state !== 'unconfirmed') return 'conflict';
+  const at = new Date().toISOString();
+  const next: Application = sent
+    ? { ...app, state: 'submitted', at, reason: undefined }
+    : { ...app, state: 'failed', at, reason: 'You said it wasn’t sent' };
+  const old = await moveApplication(
+    sql,
+    id,
+    { state: 'unconfirmed', at: app.at },
+    next,
+    sent ? 'submitted' : undefined,
+  );
+  if (!old) return 'conflict';
+  await addEvent(sql, id, 'apply', sent ? 'submitted: you confirmed it' : 'failed: you said it wasn’t sent');
+  if (sent && old !== 'submitted') await addEvent(sql, id, 'status', `${old} → submitted`);
+  return 'ok';
 }
 
 /**
@@ -213,14 +283,18 @@ async function withdraw(sql: Sql, id: number, action: 'skip' | 'handoff'): Promi
   if (!p) return null;
   const app = p.application;
   if (app && MAY_BE_SENT.includes(app.state)) return 'conflict';
-  if (app && (action === 'handoff' || app.state === 'approved')) {
+  if (app && action === 'skip' && app.state === 'approved') {
+    if (!(await withdrawApproval(sql, id, app))) return 'conflict';
+  } else if (app && action === 'handoff') {
     const { approved: _, ...rest } = app;
-    const next: Application =
-      action === 'handoff'
-        ? { ...rest, state: 'handoff', at: new Date().toISOString(), reason: 'You chose to finish this one yourself' }
-        : { ...rest, state: 'ready' };
+    const next: Application = {
+      ...rest,
+      state: 'handoff',
+      at: new Date().toISOString(),
+      reason: 'You chose to finish this one yourself',
+    };
     if (!(await moveApplication(sql, id, { state: app.state, at: app.at }, next))) return 'conflict';
-    await addEvent(sql, id, 'apply', action === 'handoff' ? 'handoff: you chose to finish it' : 'approval withdrawn');
+    await addEvent(sql, id, 'apply', 'handoff: you chose to finish it');
   } else if (!app && action === 'handoff') {
     const next: Application = {
       state: 'handoff',

@@ -259,12 +259,30 @@ export async function submitLost(id: number, reason: string): Promise<void> {
 }
 
 /**
+ * A submit still `submitting` after 15 minutes died before it could say how it ended (a step's limit is 5): it may
+ * have gone out, so it is `unconfirmed` for the owner to check, never approved again.
+ */
+async function expireSubmitting(sql: Sql): Promise<void> {
+  const reason =
+    'The submission stopped half-way and never reported back. It may have been sent: check before applying again';
+  const rows = await sql<{ id: number }>`
+    update career_postings
+    set application = application || jsonb_build_object('state', 'unconfirmed', 'at', ${new Date().toISOString()}::text,
+      'reason', ${reason}::text)
+    where application->>'state' = 'submitting'
+      and (application->>'at')::timestamptz < now() - interval '15 minutes'
+    returning id`;
+  for (const { id } of rows) await addEvent(sql, Number(id), 'apply', `unconfirmed: ${reason}`.slice(0, 500));
+}
+
+/**
  * The next approved posting to submit; `busy` while another run holds the sandbox; null once none is left, after
  * clearing the queue's run id (only while none is approved, so an approval in between keeps the queue going).
  */
 export async function nextSubmit(): Promise<number | 'busy' | null> {
   'use step';
   const sql = getSql();
+  await expireSubmitting(sql);
   const [next] = await approvedPostings(sql);
   if (next !== undefined) return (await applyBusy(sql, next)) ? 'busy' : next;
   const released = await sql`update career_settings set apply_queue_run_id = null

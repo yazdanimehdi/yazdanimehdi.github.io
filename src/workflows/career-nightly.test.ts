@@ -17,6 +17,7 @@ import { setLookupForTests } from '../lib/career/sources/http';
 import type { TailorPlan } from '../lib/career/tailor';
 import { setWorkerSandboxForTests } from '../lib/career/worker';
 import { careerNightly, errorText } from './career-nightly';
+import { setApplyRunsForTests } from './career-apply';
 
 test('errorText keeps the provider message and drops the step wrapper', () => {
   assert.equal(
@@ -157,7 +158,40 @@ afterEach(() => {
   setBlobForTests(null);
   setApplySandboxForTests(null);
   setWorkerSandboxForTests(null);
+  setApplyRunsForTests(null);
   process.env = { ...saved };
+});
+
+test('the night starts the submit queue for an approval left without one', async () => {
+  await setPrefs({ nightly: { stage: 1 } });
+  const queues: string[] = [];
+  setApplyRunsForTests({
+    get: () => ({
+      status: Promise.resolve('completed'),
+      createdAt: Promise.resolve(new Date()),
+      cancel: async () => {},
+    }),
+    prefill: async () => ({ runId: 'wrun_p' }),
+    queue: async () => (queues.push('started'), { runId: 'wrun_q' }),
+  });
+  await careerNightly();
+  assert.deepEqual(queues, [], 'nothing approved, no queue');
+
+  const id = await match('Acme');
+  const at = new Date().toISOString();
+  await updatePosting(sql, id, {
+    application: {
+      state: 'approved',
+      at,
+      url: 'https://x.test',
+      fields: [],
+      shots: [],
+      approved: { at, by: 'ada', fields: [] },
+    },
+  });
+  await careerNightly();
+  assert.deepEqual(queues, ['started']);
+  assert.equal((await readCareer(sql)).applyQueueRunId, 'wrun_q');
 });
 
 test('paused does nothing', async () => {

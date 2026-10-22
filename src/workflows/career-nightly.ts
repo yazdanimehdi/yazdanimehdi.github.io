@@ -17,7 +17,7 @@ import {
   scoreReady,
 } from '../lib/career/steps';
 import type { RunSummary } from '../lib/career/types';
-import { claimPrefillStep } from './career-apply';
+import { claimPrefillStep, ensureQueueStep } from './career-apply';
 import { draftPosting, reasonOf } from './career-draft';
 
 const BATCH = 5;
@@ -150,6 +150,8 @@ export async function careerNightly(): Promise<RunSummary> {
     limited,
     ...(stopped ? { stopped } : {}),
   };
+  // An approval whose queue never started (it failed to, or died) is picked up here.
+  await ensureQueueStep();
   summary.digest = await digestStep(summary, drafted);
   await finishRun(summary);
   return summary;
