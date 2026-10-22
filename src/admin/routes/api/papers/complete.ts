@@ -28,20 +28,18 @@ export const GET = route(async (ctx, store) => {
 });
 
 const isField = (f: unknown): f is Completable => (COMPLETABLE as readonly unknown[]).includes(f);
+const items = (v: unknown): v is { field: Completable; value: unknown; from?: unknown }[] =>
+  Array.isArray(v) && v.every((d) => d && typeof d === 'object' && isField(d.field));
+const blank = (v: unknown) => v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length);
+/** Deep-equal, with every empty value (missing, null, '', []) alike: JSON drops a `from` that was undefined. */
+const same = (a: unknown, b: unknown) => (blank(a) && blank(b)) || isDeepStrictEqual(a, b);
 
 /** "Apply selected" for one paper: re-proposes from fresh lookups, writes the approved fields and records the declined ones in one commit. */
 export const POST = route(async (ctx, store) => {
   const { slug, apply, decline } = await readBody<{ slug?: unknown; apply?: unknown; decline?: unknown }>(ctx);
-  if (
-    typeof slug !== 'string' ||
-    !Array.isArray(apply) ||
-    !apply.every(isField) ||
-    !Array.isArray(decline) ||
-    !decline.every((d) => d && typeof d === 'object' && isField(d.field))
-  )
-    throw new HttpError(400, '`slug`, `apply` (field names) and `decline` ({ field, value }) are required');
-  const declines = decline as { field: Completable; value: unknown }[];
-  const named = [...apply, ...declines.map((d) => d.field)];
+  if (typeof slug !== 'string' || !items(apply) || !items(decline))
+    throw new HttpError(400, '`slug`, `apply` ({ field, value, from }) and `decline` ({ field, value }) are required');
+  const named = [...apply, ...decline].map((d) => d.field);
   if (!named.length) throw new HttpError(400, 'Nothing to apply or decline');
   if (new Set(named).size !== named.length) throw new HttpError(400, 'A field is named twice');
 
@@ -55,23 +53,24 @@ export const POST = route(async (ctx, store) => {
   const proposal = await proposeFor(slug, entry.data, look, state.declined?.[slug]);
   if (proposal.error) throw new HttpError(502, proposal.error);
 
-  // Only values recomputed here are written or declined; the client's copy must still match them.
+  // Only values recomputed here are written or declined, and only when they are exactly what the owner reviewed:
+  // the same proposed value, and (for an apply) the same stored value it replaces.
   const offered = new Map(proposal.changes.map((c) => [c.field, c]));
-  const stale = () => new HttpError(409, 'This paper changed; reload the review');
-  if (!apply.every((f) => offered.has(f))) throw stale();
-  if (!declines.every((d) => offered.has(d.field) && isDeepStrictEqual(d.value, offered.get(d.field)!.to)))
-    throw stale();
+  const seen = (d: { field: Completable; value: unknown }) =>
+    offered.has(d.field) && isDeepStrictEqual(d.value, offered.get(d.field)!.to);
+  if (!apply.every((d) => seen(d) && same(d.from, entry.data[d.field])) || !decline.every(seen))
+    throw new HttpError(409, 'This paper changed; reload the review');
 
   const changes: Change[] = [];
   const base: Record<string, string | null> = {};
   if (apply.length) {
-    const picked = Object.fromEntries(apply.map((f) => [f, offered.get(f)!.to]));
+    const picked = Object.fromEntries(apply.map((d) => [d.field, offered.get(d.field)!.to]));
     changes.push(entryChange('publications', slug, { ...entry.data, ...picked }, entry.body));
     base[collectionPath('publications', slug)] = entry.version;
   }
-  if (declines.length) {
+  if (decline.length) {
     const mine = { ...state.declined?.[slug] };
-    for (const d of declines) mine[d.field] = JSON.stringify(offered.get(d.field)!.to);
+    for (const d of decline) mine[d.field] = JSON.stringify(offered.get(d.field)!.to);
     const next = { ...state, declined: { ...state.declined, [slug]: mine } };
     changes.push({ path: SCHOLAR_JSON, content: `${JSON.stringify(next, null, 2)}\n` });
     base[SCHOLAR_JSON] = stateFile?.version ?? null;

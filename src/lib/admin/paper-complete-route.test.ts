@@ -27,14 +27,7 @@ beforeEach(() => {
   );
   store = new MemoryStore(root);
   setStoreForTests(() => store);
-  const fixture = fs.readFileSync(new URL('../../../tests/fixtures/papers/arxiv-mirage.xml', import.meta.url), 'utf8');
-  const lookup: Lookup = {
-    async get(url) {
-      if (url.startsWith('https://export.arxiv.org/api/query?search_query=')) return fixture;
-      throw new SourceError(`${url} answered 404`, 404);
-    },
-  };
-  setPaperLookupForTests(lookup);
+  setPaperLookupForTests(arxivAnswers(FEED));
 });
 after(() => {
   setStoreForTests(null);
@@ -49,8 +42,24 @@ function call(handler: typeof GET, opts: { query?: string; body?: unknown } = {}
   return Promise.resolve(handler({ request, url, params: {}, locals } as never));
 }
 
+const FEED = fs.readFileSync(new URL('../../../tests/fixtures/papers/arxiv-mirage.xml', import.meta.url), 'utf8');
+
+/** arXiv's title search answers `feed`; everything else 404s. */
+const arxivAnswers = (feed: string): Lookup => ({
+  async get(url) {
+    if (url.startsWith('https://export.arxiv.org/api/query?search_query=')) return feed;
+    throw new SourceError(`${url} answered 404`, 404);
+  },
+});
+
 const SLUG = 'yazdanijahromi2026mirage';
 const fields = (p: PaperProposal) => p.changes.map((c) => c.field);
+
+/** The review as the owner saw it: GET's proposal, each field as { field, value, from }. */
+async function reviewed(): Promise<Record<string, { field: string; value: unknown; from: unknown }>> {
+  const [p] = (await (await call(GET)).json()).proposals as PaperProposal[];
+  return Object.fromEntries(p.changes.map((c) => [c.field, { field: c.field, value: c.to, from: c.from }]));
+}
 
 test('GET proposes completions for existing papers and writes nothing', async () => {
   const res = await call(GET, { query: '?offset=0&limit=50' });
@@ -73,12 +82,9 @@ test('GET proposes completions for existing papers and writes nothing', async ()
 });
 
 test('POST applies the approved fields and remembers the declined ones, in one commit', async () => {
+  const seen = await reviewed();
   const res = await call(POST, {
-    body: {
-      slug: SLUG,
-      apply: ['arxiv', 'authors'],
-      decline: [{ field: 'url', value: 'https://arxiv.org/abs/2609.14491' }],
-    },
+    body: { slug: SLUG, apply: [seen.arxiv, seen.authors], decline: [{ field: 'url', value: seen.url.value }] },
   });
   assert.equal(res.status, 200);
   const left = fields(await res.json());
@@ -104,12 +110,37 @@ test('POST applies the approved fields and remembers the declined ones, in one c
 });
 
 test('POST refuses fields not in the recomputed proposal, a changed value, and unknown slugs', async () => {
-  const stale = await call(POST, { body: { slug: SLUG, apply: ['doi'], decline: [] } });
+  const seen = await reviewed();
+  const stale = await call(POST, { body: { slug: SLUG, apply: [{ field: 'doi', value: '10.1/x' }], decline: [] } });
   assert.equal(stale.status, 409);
   assert.match((await stale.json()).error, /This paper changed; reload the review/);
   const otherValue = await call(POST, { body: { slug: SLUG, apply: [], decline: [{ field: 'url', value: 'x' }] } });
   assert.equal(otherValue.status, 409);
-  assert.equal((await call(POST, { body: { slug: 'nope2026x', apply: ['arxiv'], decline: [] } })).status, 404);
-  assert.equal((await call(POST, { body: { slug: SLUG, apply: ['topic'], decline: [] } })).status, 400);
+  const otherApply = await call(POST, {
+    body: { slug: SLUG, apply: [{ ...seen.arxiv, value: '9999.0001' }], decline: [] },
+  });
+  assert.equal(otherApply.status, 409, 'an applied value must be the one proposed');
+  assert.equal((await call(POST, { body: { slug: 'nope2026x', apply: [seen.arxiv], decline: [] } })).status, 404);
+  assert.equal((await call(POST, { body: { slug: SLUG, apply: ['arxiv'], decline: [] } })).status, 400, 'old shape');
+  assert.equal((await call(POST, { body: { slug: SLUG, apply: [{ field: 'topic' }], decline: [] } })).status, 400);
   assert.equal(store.log.length, 0);
+});
+
+test('POST writes nothing when the source answers differently than the review showed', async () => {
+  const seen = await reviewed();
+  setPaperLookupForTests(arxivAnswers(FEED.replace('Sanjay Padhi', 'Sanjay K Padhi')));
+  const res = await call(POST, { body: { slug: SLUG, apply: [seen.authors], decline: [] } });
+  assert.equal(res.status, 409);
+  assert.equal(store.log.length, 0);
+});
+
+test('POST writes nothing when the field was edited after the review', async () => {
+  const seen = await reviewed();
+  const file = (await store.read(`src/content/publications/${SLUG}.md`))!;
+  const edited = file.content.replace(SCHOLAR_URL, 'https://example.org/mirage');
+  await store.commit([{ path: file.path, content: edited }], 'owner edit', { [file.path]: file.version });
+  const res = await call(POST, { body: { slug: SLUG, apply: [seen.url], decline: [] } });
+  assert.equal(res.status, 409);
+  assert.equal((await readEntry(store, 'publications', SLUG))!.data.url, 'https://example.org/mirage');
+  assert.equal(store.log.length, 1, 'only the owner edit');
 });
