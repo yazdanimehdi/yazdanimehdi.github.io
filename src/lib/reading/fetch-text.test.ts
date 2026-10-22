@@ -15,7 +15,7 @@ import { minimalPdf } from './test-pdf';
 import type { NewPaper } from './types';
 
 let sql: Sql;
-let arxiv: Record<string, () => Response>;
+let arxiv: Record<string, () => Response | Promise<Response>>;
 let fetched: string[];
 let agents: string[];
 let sleeps: unknown[];
@@ -132,6 +132,35 @@ test('a 503 is stored as retryable and fetched again', async () => {
   assert.deepEqual(await fetchArxivText(sql, id, 'html'), { next: null, ok: true });
   assert.equal((await readText(sql, id)).error, null);
   assert.deepEqual(await missingTexts(sql, [id]), []);
+});
+
+test('an upload that lands while a retry is fetching is kept', async () => {
+  const [id, other] = await add(paper('arxiv:2610.4', { arxiv: '2610.4' }), paper('arxiv:2610.5', { arxiv: '2610.5' }));
+  const scan = minimalPdf([[[700, 'Fig. 1']]]);
+  for (const p of [id, other]) await saveText(sql, p, { source: 'arxiv-html', error: 'arxiv.org answered 503' });
+  // arXiv fails again, after the owner's scan was stored mid-fetch: the error is not stored over it.
+  arxiv['https://arxiv.org/html/2610.4'] = async () => {
+    await storeUpload(sql, id, scan);
+    return new Response('busy', { status: 503 });
+  };
+  assert.deepEqual(await fetchArxivText(sql, id, 'html'), { next: null, ok: true });
+  assert.deepEqual(await state(id), { source: 'scan', error: null, note: null, pages: 1 });
+  assert.deepEqual(new Uint8Array((await readText(sql, id)).pdf!), scan);
+
+  // arXiv answers this time, after an upload with a text layer: the upload's passages stay.
+  arxiv['https://arxiv.org/html/2610.5'] = async () => {
+    await storeUpload(sql, other, TEXT_PDF);
+    return new Response(HTML);
+  };
+  assert.deepEqual(await fetchArxivText(sql, other, 'html'), { next: null, ok: true });
+  assert.deepEqual(await state(other), { source: 'upload', error: null, note: null, pages: 1 });
+  assert.deepEqual(await pids(other), ['p1.1']);
+
+  // An upload before the fetch began: nothing is fetched.
+  fetched = [];
+  assert.deepEqual(await fetchArxivText(sql, id, 'pdf'), { next: null, ok: true });
+  assert.deepEqual(fetched, []);
+  assert.equal((await state(id)).source, 'scan');
 });
 
 test('a PDF that times out is retryable and keeps no passages', async () => {

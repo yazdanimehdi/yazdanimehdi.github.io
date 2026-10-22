@@ -10,6 +10,7 @@ import {
   getNotebook,
   getPassages,
   listHighlights,
+  NOTEBOOK_MAX,
   readText,
   updateNotebook,
 } from '../../../../../lib/reading/room-db';
@@ -18,6 +19,7 @@ import type { Passage, TextState } from '../../../../../lib/reading/types';
 
 export const prerender = false;
 
+const FULL = 'A notebook holds up to 20 papers';
 const Id = z.number().int().min(1).max(999_999_999);
 const Patch = z.strictObject({
   title: z.string().trim().min(1).max(200).optional(),
@@ -71,14 +73,19 @@ export const PATCH = careerRoute(async (ctx, store) => {
   const patch = Patch.parse(await readBody(ctx));
   const sql = getSql();
   let add: number | undefined;
-  if (typeof patch.add === 'string') add = (await addPaper(sql, store, patch.add)).id;
-  else if (patch.add !== undefined) {
+  if (typeof patch.add === 'string') {
+    // Before the lookup and the library save, which a missing or full notebook would waste.
+    const notebook = await getNotebook(sql, id);
+    if (!notebook) throw new HttpError(404, 'Not found');
+    if (notebook.paperIds.length >= NOTEBOOK_MAX) throw new HttpError(409, FULL);
+    add = (await addPaper(sql, store, patch.add)).id;
+  } else if (patch.add !== undefined) {
     if (!(await getPapers(sql, [patch.add])).length) throw new HttpError(404, 'Not found');
     add = patch.add;
   }
   const done = await updateNotebook(sql, id, { title: patch.title, add, remove: patch.remove });
   if (!done) throw new HttpError(404, 'Not found');
-  if (done === 'full') throw new HttpError(409, 'A notebook holds up to 20 papers');
+  if (done === 'full') throw new HttpError(409, FULL);
   if (add !== undefined) await fetchMissingTexts(sql, { paper: add }, [add]);
   return json({ ok: true });
 });

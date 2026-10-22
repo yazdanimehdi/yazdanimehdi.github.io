@@ -92,8 +92,11 @@ const call = (
           ? undefined
           : opts.body instanceof Uint8Array
             ? new Blob([opts.body as Uint8Array<ArrayBuffer>])
-            : JSON.stringify(opts.body),
-    }),
+            : opts.body instanceof ReadableStream
+              ? opts.body
+              : JSON.stringify(opts.body),
+      duplex: 'half',
+    } as RequestInit),
   } as never) as Promise<Response>;
 
 const HANDLERS: [string, Handler][] = [
@@ -398,6 +401,12 @@ test('an upload over 4 MB is refused', async () => {
   const bytes = new Uint8Array(4 * 1024 * 1024 + 1);
   bytes.set(new TextEncoder().encode('%PDF-'));
   assert.equal((await call(pdf.POST, { params, body: bytes })).status, 413, 'counted, not just the header');
+  let pulled = 0;
+  const endless = new ReadableStream({
+    pull: (c) => void (pulled++, c.enqueue(new Uint8Array(1024 * 1024))),
+  });
+  assert.equal((await call(pdf.POST, { params, body: endless })).status, 413);
+  assert.ok(pulled <= 6, `reading stops at the limit (${pulled} chunks pulled)`);
   assert.equal((await call(pdf.POST, { params, body: new TextEncoder().encode('hello') })).status, 400);
   assert.equal((await call(pdf.POST, { params: { id: '999' }, body: TEXT_PDF })).status, 404);
 });
@@ -450,6 +459,11 @@ test('a notebook refuses a 21st paper', async () => {
   assert.equal(full.status, 409);
   assert.deepEqual(await full.json(), { error: 'A notebook holds up to 20 papers' });
   assert.equal((await getNotebook(sql, id))!.paperIds.length, 20);
+  const looked: string[] = [];
+  setPaperLookupForTests({ get: async (url) => (looked.push(url), '{}') });
+  assert.equal((await call(notebook.PATCH, { params, body: { add: '2609.14491' } })).status, 409);
+  assert.equal((await call(notebook.PATCH, { params: { id: '999' }, body: { add: '2609.14491' } })).status, 404);
+  assert.deepEqual(looked, [], 'a full or missing notebook looks nothing up');
   assert.equal(starts.length, 0, 'papers without arXiv ids have nothing to fetch');
 
   await ok(await call(notebook.PATCH, { params, body: { remove: ids[0], title: 'Folding' } }));

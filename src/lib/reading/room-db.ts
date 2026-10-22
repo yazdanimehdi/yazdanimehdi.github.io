@@ -43,14 +43,17 @@ export async function readText(
 
 /** Replaces the paper's passages in one transaction; seq is the index (reading order). */
 export async function savePassages(sql: Sql, paperId: number, passages: Passage[]): Promise<void> {
-  await sql.begin(async (tx) => {
-    await tx`delete from reading_passages where paper_id = ${paperId}`;
-    await tx`
-      insert into reading_passages (paper_id, pid, seq, kind, body)
-      select ${paperId}, u.pid, (u.n - 1)::int, u.kind, u.body
-      from unnest(${passages.map((p) => p.pid)}::text[], ${passages.map((p) => p.kind)}::text[],
-        ${passages.map((p) => p.body)}::text[]) with ordinality as u(pid, kind, body, n)`;
-  });
+  await sql.begin((tx) => replacePassages(tx, paperId, passages));
+}
+
+/** savePassages inside the caller's transaction (postgres.js has no nested begin). */
+export async function replacePassages(tx: Sql, paperId: number, passages: Passage[]): Promise<void> {
+  await tx`delete from reading_passages where paper_id = ${paperId}`;
+  await tx`
+    insert into reading_passages (paper_id, pid, seq, kind, body)
+    select ${paperId}, u.pid, (u.n - 1)::int, u.kind, u.body
+    from unnest(${passages.map((p) => p.pid)}::text[], ${passages.map((p) => p.kind)}::text[],
+      ${passages.map((p) => p.body)}::text[]) with ordinality as u(pid, kind, body, n)`;
 }
 
 /** The passages of these papers, by `paperIds` order, then reading order. */
@@ -236,7 +239,7 @@ export async function getNotebook(
   return { id: Number(n.id), title: n.title as string, paperIds: papers.map((p) => Number(p.paper_id)) };
 }
 
-const NOTEBOOK_MAX = 20;
+export const NOTEBOOK_MAX = 20;
 
 /**
  * Renames, adds or removes a paper, and bumps updated_at. 'full' when adding a 21st paper; null when there is no
