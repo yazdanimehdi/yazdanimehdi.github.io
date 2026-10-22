@@ -19,6 +19,7 @@ import { GET as ready } from '../../admin/routes/api/career/ready';
 import { setSqlForTests } from '../db';
 import { listPostings, updatePosting, upsertPostings, writeCareer } from '../career/db';
 import { nonOwnerUser, ownerUser } from '../career/test-owner';
+import { saveDigest, upsertPapers, writeReading } from '../reading/db';
 
 const user = { login: 'jane', name: 'Jane', avatar: '' };
 let sql: Sql;
@@ -259,6 +260,49 @@ test('the owner learns what waits for approval: me, the dashboard and the Ready 
       ],
     );
     assert.equal((await call(ready, { as: nonOwnerUser() })).status, 404);
+  } finally {
+    setSqlForTests(null);
+    for (const [k, v] of Object.entries(saved))
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+  }
+});
+
+test('the dashboard tells the owner today’s reading count and run; nobody else learns of it', async () => {
+  const at = '2026-10-22T05:00:00.000Z';
+  const record = { reading: { ok: true, at }, backup: { ok: true, at } };
+  await new PostgresStore(sql, undefined, {
+    purge: async () => {},
+    put: async () => ({ url: '' }),
+    del: async () => {},
+  }).commit([{ path: 'src/data/jobs.json', content: JSON.stringify(record) }], 'r', {});
+  const [{ id }] = await upsertPapers(sql, [
+    { key: 'arxiv:1', source: 'arxiv', title: 'T', authors: [], url: 'https://arxiv.org/abs/1', categories: [] },
+  ]);
+  await saveDigest(sql, new Date().toISOString().slice(0, 10), [{ paperId: id, section: 'field', rank: 1, line: 'l' }]);
+  const stopped = 'The AI provider is out of credit';
+  await writeReading(
+    sql,
+    {
+      lastRun: {
+        ...{ at, day: '2026-10-22', sources: [], ranked: 0, unranked: 1, aiCalls: 1, talked: 0, inField: 1 },
+        texts: { fetched: 0, failed: 0 },
+        stopped,
+      },
+    },
+    'test',
+  );
+  setSqlForTests(sql);
+  const saved = { VERCEL: process.env.VERCEL, DATABASE_URL: process.env.DATABASE_URL };
+  process.env.VERCEL = '1';
+  process.env.DATABASE_URL = 'postgres://test';
+  try {
+    const owner = await (await call(dashboard, { as: ownerUser() })).json();
+    assert.deepEqual(owner.reading, { today: 1, stopped });
+    assert.deepEqual(owner.runs.reading, record.reading);
+    const other = await (await call(dashboard, { as: nonOwnerUser() })).json();
+    assert.equal(other.reading, undefined);
+    assert.deepEqual(other.runs, { backup: record.backup });
   } finally {
     setSqlForTests(null);
     for (const [k, v] of Object.entries(saved))

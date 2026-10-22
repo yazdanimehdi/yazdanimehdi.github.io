@@ -562,6 +562,14 @@
   margin: 0;
   font-variant-numeric: tabular-nums;
 }
+/* Reading: Save and Dismiss at each paper row's end, 44px targets at every width. */
+.adm-reading-actions {
+  display: flex;
+  gap: 8px;
+}
+.adm-reading-actions .adm-btn {
+  min-height: var(--adm-touch);
+}
 .adm-filter-row {
   display: flex;
   flex-wrap: wrap;

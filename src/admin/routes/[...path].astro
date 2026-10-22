@@ -3,6 +3,8 @@ import Ai from '../Ai.vue';
 import Career from '../Career.vue';
 import CareerJob from '../CareerJob.vue';
 import CareerSettings from '../CareerSettings.vue';
+import Reading from '../Reading.vue';
+import ReadingSettings from '../ReadingSettings.vue';
 import Collection from '../Collection.vue';
 import Cv from '../Cv.vue';
 import CvStyles from '../CvStyles.vue';
@@ -46,6 +48,7 @@ const SCREENS = new Set([
   'ai',
   'editor',
   'career',
+  'reading',
 ]);
 const CONTENT = ['announcements', 'people', 'projects', 'talks', 'positions'];
 if (!SCREENS.has(screen)) return new Response('Not found', { status: 404 });
@@ -57,6 +60,14 @@ if (
     !Astro.locals.user ||
     !isOwner(Astro.locals.user, adminSettings()) ||
     (arg && arg !== 'settings' && !/^\d+$/.test(arg)))
+)
+  return new Response('Not found', { status: 404 });
+if (
+  screen === 'reading' &&
+  (getMode() !== 'postgres' ||
+    !Astro.locals.user ||
+    !isOwner(Astro.locals.user, adminSettings()) ||
+    (arg && arg !== 'settings'))
 )
   return new Response('Not found', { status: 404 });
 if (screen === 'cv-styles' && getMode() === 'static') return new Response('Not found', { status: 404 });
@@ -139,6 +150,8 @@ if (screen === 'login' && error === 'denied') Astro.response.status = 403;
     {screen === 'career' && !arg && <Career client:only="vue" ctx={ctx} />}
     {screen === 'career' && arg === 'settings' && <CareerSettings client:only="vue" ctx={ctx} />}
     {screen === 'career' && /^\d+$/.test(arg) && <CareerJob client:only="vue" ctx={ctx} id={arg} />}
+    {screen === 'reading' && !arg && <Reading client:only="vue" ctx={ctx} />}
+    {screen === 'reading' && arg === 'settings' && <ReadingSettings client:only="vue" ctx={ctx} />}
     {screen === 'cv' && <Cv client:only="vue" ctx={ctx} />}
     {screen === 'cv-styles' && <CvStyles client:only="vue" ctx={ctx} />}
     {screen === '' && <Dashboard client:only="vue" ctx={ctx} />}

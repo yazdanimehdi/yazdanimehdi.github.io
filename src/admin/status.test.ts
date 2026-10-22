@@ -288,6 +288,32 @@ test('a night that stopped early leads the owner’s job search row, ahead of th
   assert.equal(failed.state, 'Job search failed to start', 'a run that never started still leads');
 });
 
+test('the reading row shows today’s count to the owner', () => {
+  const at = '2026-10-18T03:00:00Z';
+  const some = row(base({ mode: 'postgres', reading: { today: 13 }, runs: { reading: { ok: true, at } } }), 'reading');
+  assert.equal(some.label, 'Reading');
+  assert.equal(some.state, '13 papers today');
+  assert.equal(some.tone, 'ok');
+  assert.equal(some.at, at);
+  assert.deepEqual(some.action, { kind: 'screen', label: 'Open', path: 'reading' });
+  assert.equal(row(base({ mode: 'postgres', reading: { today: 0 } }), 'reading').state, 'No papers today');
+  const stopped = row(base({ mode: 'postgres', reading: { today: 4, stopped: 'Out of credit‮' } }), 'reading');
+  assert.equal(stopped.state, 'Ranking stopped: Out of credit');
+  assert.equal(stopped.tone, 'attention');
+  const failed = row(
+    base({ mode: 'postgres', reading: { today: 4, stopped: 'x' }, runs: { reading: { ok: false, at } } }),
+    'reading',
+  );
+  assert.equal(failed.state, 'Reading digest failed to start', 'a run that never started leads');
+  assert.equal(failed.tone, 'attention');
+});
+
+test('a non-owner sees no reading row', () => {
+  // The dashboard sends `reading`, and the daily step's run, to the owner only.
+  assert.equal(row(base({ mode: 'postgres' }), 'reading'), undefined);
+  assert.equal(row(base({ mode: 'git', reading: { today: 2 } }), 'reading'), undefined, 'Postgres mode only');
+});
+
 test('scheduled posts with no release run: fine in git mode, unknown only where the job runner should have run it', () => {
   const posts = [post('soon', { date: '2026-10-20' })];
   const git = base({ posts });

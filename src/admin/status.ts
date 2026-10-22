@@ -10,7 +10,7 @@ export interface Run {
   url?: string;
   detail?: string;
 }
-export type RunName = 'papers' | 'cv' | 'feeds' | 'scheduled' | 'career' | 'backup';
+export type RunName = 'papers' | 'cv' | 'feeds' | 'scheduled' | 'career' | 'reading' | 'backup';
 
 /** GET /api/admin/dashboard: what the server can honestly know about the site's automation and content. */
 export interface DashboardData {
@@ -33,6 +33,8 @@ export interface DashboardData {
   review: string[];
   /** The job-search owner in Postgres mode: postings waiting for approval, and why the last run stopped early. */
   career?: { ready: number; stopped?: string };
+  /** The reading owner in Postgres mode: how many papers today's digest holds, and why ranking stopped if it did. */
+  reading?: { today: number; stopped?: string };
 }
 
 /**
@@ -373,13 +375,25 @@ function career(d: DashboardData): StatusRow[] {
   return [{ ...row, state, tone: 'ok', ...(run ? { detail: 'Checked with the daily jobs' } : {}), ...review }];
 }
 
+/** The owner's paper digest: a run that failed to start, then a night whose ranking stopped, come first. */
+function reading(d: DashboardData): StatusRow[] {
+  if (!d.reading) return [];
+  const run = d.runs.reading;
+  const row = { key: 'reading', label: 'Reading', at: run?.at ?? null, action: screen('Open', 'reading') };
+  if (run?.ok === false) return [{ ...row, state: 'Reading digest failed to start', tone: 'attention' }];
+  if (d.reading.stopped)
+    return [{ ...row, state: `Ranking stopped: ${visible(d.reading.stopped)}`, tone: 'attention' }];
+  const n = d.reading.today;
+  return [{ ...row, state: n ? `${n} paper${n === 1 ? '' : 's'} today` : 'No papers today', tone: 'ok' }];
+}
+
 /** Problems first, then suggestions, runs the token can't see, jobs never seen running, the healthy rows and, last, what is not set up. */
 const RANK: Record<Tone, number> = { attention: 0, nudge: 1, unseen: 2, unknown: 3, ok: 4, off: 5 };
 
 /** One row per automated concern this deployment mode actually has, plus how current the content is. */
 export function siteStatus(d: DashboardData, now = new Date()): StatusRow[] {
   const rows = [papers(d), cv(d), feeds(d), scheduled(d, now), news(d, now), people(d, now)];
-  if (d.mode === 'postgres') rows.push(...career(d), backup(d));
+  if (d.mode === 'postgres') rows.push(...career(d), ...reading(d), backup(d));
   if (d.lastCommit) {
     rows.push({
       key: 'publish',
