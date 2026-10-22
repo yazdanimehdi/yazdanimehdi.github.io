@@ -258,8 +258,8 @@ export async function withdrawApproval(sql: Sql, id: number, app: Application): 
 }
 
 /**
- * The owner's word on an `unconfirmed` application: `sent` makes it submitted (status too); otherwise it failed and
- * may be pre-filled again. `conflict` unless it is unconfirmed.
+ * The owner's word on an `unconfirmed` application: `sent` makes it submitted (status too, unless the owner set
+ * another); otherwise it failed and may be pre-filled again. `conflict` unless it is unconfirmed.
  */
 export async function answerUnconfirmed(sql: Sql, id: number, sent: boolean): Promise<'ok' | 'conflict' | null> {
   const p = await getPosting(sql, id);
@@ -270,16 +270,16 @@ export async function answerUnconfirmed(sql: Sql, id: number, sent: boolean): Pr
   const next: Application = sent
     ? { ...app, state: 'submitted', at, reason: undefined }
     : { ...app, state: 'failed', at, reason: 'You said it wasn’t sent' };
-  const old = await moveApplication(
+  const moved = await moveApplication(
     sql,
     id,
     { state: 'unconfirmed', at: app.at },
     next,
     sent ? 'submitted' : undefined,
   );
-  if (!old) return 'conflict';
+  if (!moved) return 'conflict';
   await addEvent(sql, id, 'apply', sent ? 'submitted: you confirmed it' : 'failed: you said it wasn’t sent');
-  if (sent && old !== 'submitted') await addEvent(sql, id, 'status', `${old} → submitted`);
+  if (moved.was !== moved.now) await addEvent(sql, id, 'status', `${moved.was} → ${moved.now}`);
   return 'ok';
 }
 

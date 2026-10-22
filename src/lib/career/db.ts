@@ -228,8 +228,9 @@ export async function approvedPostings(sql: Sql): Promise<number[]> {
 
 /**
  * Replaces the application only if it is still in state `from` (and, given `at`, from that very pre-fill): the one
- * guard every apply transition goes through, so two actors can't both move it. `status` moves the posting too. Returns
- * the posting's status before the move, or null when the application had already moved on.
+ * guard every apply transition goes through, so two actors can't both move it. `status` moves the posting too, but only
+ * from `found`, `drafted` or `ready`: a status the owner set meanwhile (skipped, interview…) stands. Returns the
+ * posting's status before and after the move, or null when the application had already moved on.
  */
 export async function moveApplication(
   sql: Sql,
@@ -237,15 +238,16 @@ export async function moveApplication(
   from: { state: ApplyState | null; at?: string },
   app: Application,
   status?: PostingStatus,
-): Promise<PostingStatus | null> {
-  const [r] = await sql<{ old: PostingStatus }>`
+): Promise<{ was: PostingStatus; now: PostingStatus } | null> {
+  const [r] = await sql<{ was: PostingStatus; now: PostingStatus }>`
     update career_postings p set application = ${JSON.stringify(app)}::text::jsonb,
-      status = coalesce(${status ?? null}::text, p.status)
+      status = case when p.status in ('found', 'drafted', 'ready') then coalesce(${status ?? null}::text, p.status)
+        else p.status end
     from (select id, status as old from career_postings where id = ${id}) o
     where p.id = o.id and p.application->>'state' is not distinct from ${from.state}
       and (${from.at ?? null}::text is null or p.application->>'at' = ${from.at ?? null})
-    returning o.old`;
-  return r?.old ?? null;
+    returning o.old as was, p.status as now`;
+  return r ?? null;
 }
 
 /** Who holds the apply sandbox: the posting and the `at` of the application it claimed. */

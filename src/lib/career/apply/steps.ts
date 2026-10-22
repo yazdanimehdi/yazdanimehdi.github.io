@@ -61,13 +61,13 @@ async function settle(
   app: Application,
   status?: PostingStatus,
 ): Promise<Application | null> {
-  const old = await moveApplication(sql, id, from, app, status);
+  const moved = await moveApplication(sql, id, from, app, status);
   if (from.state === 'prefilling' || from.state === 'submitting') {
     await releaseApplyLock(sql, id, from.at, stopApplySandbox);
   }
-  if (!old) return (await getPosting(sql, id))?.application ?? null;
+  if (!moved) return (await getPosting(sql, id))?.application ?? null;
   await addEvent(sql, id, 'apply', (app.reason ? `${app.state}: ${app.reason}` : app.state).slice(0, 500));
-  if (status && old !== status) await addEvent(sql, id, 'status', `${old} → ${status}`);
+  if (moved.was !== moved.now) await addEvent(sql, id, 'status', `${moved.was} → ${moved.now}`);
   return app;
 }
 

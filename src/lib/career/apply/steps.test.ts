@@ -69,6 +69,19 @@ test('prefill moves a drafted posting to ready with fields and screenshots', asy
   assert.deepEqual(await events(id), ['drafted → ready', 'ready'], 'newest first');
 });
 
+test('a pre-fill finishing after the owner skipped the posting leaves status skipped', async () => {
+  const id = await posting(kit.sql, prefilling());
+  setApplySandboxForTests(fakeSandbox((input) => ok(input)).api);
+  await updatePosting(kit.sql, id, { status: 'skipped' }); // the owner, while it was pre-filling
+
+  assert.equal((await prefillStep(id))?.state, 'ready');
+
+  const p = (await getPosting(kit.sql, id))!;
+  assert.equal(p.status, 'skipped');
+  assert.equal(p.application?.state, 'ready', 'the application still settles');
+  assert.deepEqual(await events(id), ['ready'], 'no status event');
+});
+
 test('each runner call gets its own directory in the VM, removed after its result is read', async () => {
   const id = await posting(kit.sql, prefilling());
   const sb = fakeSandbox((input) => ok(input));
