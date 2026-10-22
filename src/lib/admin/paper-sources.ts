@@ -1,0 +1,208 @@
+// Pure parsers for the paper sources (arXiv, bioRxiv/medRxiv, Crossref, PubMed, OpenAlex); no network here.
+
+export type PubType = 'journal' | 'conference' | 'preprint' | 'workshop' | 'thesis' | 'book-chapter';
+
+export interface PaperRecord {
+  source: 'arxiv' | 'biorxiv' | 'medrxiv' | 'crossref' | 'pubmed' | 'openalex' | 'pdf';
+  title: string;
+  authors: string[];
+  year: number;
+  abstract?: string;
+  arxiv?: string;
+  primaryClass?: string;
+  doi?: string;
+  /** DOI of the published version, as reported by bioRxiv/medRxiv. */
+  publishedDoi?: string;
+  /** arXiv's arxiv:journal_ref. */
+  journalRef?: string;
+  venue?: string;
+  type?: PubType;
+  pdf?: string;
+}
+
+const ENTITIES: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+
+function decode(s: string): string {
+  return s.replace(/&(?:#(\d+)|#x([0-9a-f]+)|(amp|lt|gt|quot|apos));/gi, (_, dec, hex, name) =>
+    name ? ENTITIES[name.toLowerCase()] : String.fromCodePoint(dec ? Number(dec) : parseInt(hex, 16)),
+  );
+}
+
+const collapse = (s: string) => s.replace(/\s+/g, ' ').trim();
+const text = (s: string) => collapse(decode(s.replace(/<[^>]+>/g, '')));
+
+/** Inner text of the first `<tag …>…</tag>` in `xml`. */
+function tag(xml: string, name: string): string | undefined {
+  const m = xml.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)</${name}>`));
+  return m ? text(m[1]) : undefined;
+}
+
+function all(xml: string, name: string): string[] {
+  return [...xml.matchAll(new RegExp(`<${name}(?:\\s[^>]*)?>[\\s\\S]*?</${name}>`, 'g'))].map((m) => m[0]);
+}
+
+const yearOf = (s: unknown) => Number(String(s ?? '').match(/\d{4}/)?.[0] ?? 0);
+const obj = (v: unknown): Record<string, unknown> => (v && typeof v === 'object' ? (v as Record<string, unknown>) : {});
+const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+const list = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+
+/** Parse an arXiv Atom feed (export.arxiv.org/api/query) into records. */
+export function parseArxivFeed(xml: string): PaperRecord[] {
+  return all(xml, 'entry').flatMap((entry) => {
+    const id = tag(entry, 'id')?.match(/abs\/(.+?)(?:v\d+)?$/)?.[1];
+    const title = tag(entry, 'title');
+    if (!id || !title) return [];
+    return [
+      {
+        source: 'arxiv' as const,
+        title,
+        authors: all(entry, 'author')
+          .map((a) => tag(a, 'name') ?? '')
+          .filter(Boolean),
+        year: yearOf(tag(entry, 'published')),
+        abstract: tag(entry, 'summary'),
+        arxiv: id,
+        primaryClass: entry.match(/<arxiv:primary_category[^>]*\bterm="([^"]+)"/)?.[1],
+        doi: tag(entry, 'arxiv:doi'),
+        journalRef: tag(entry, 'arxiv:journal_ref'),
+      },
+    ];
+  });
+}
+
+const CROSSREF_TYPES: Record<string, PubType> = {
+  'journal-article': 'journal',
+  'proceedings-article': 'conference',
+  'posted-content': 'preprint',
+  'book-chapter': 'book-chapter',
+};
+
+/** Parse a Crossref `/works` response (a list or a single work) into records. */
+export function parseCrossrefWorks(json: unknown): PaperRecord[] {
+  const message = obj(obj(json).message);
+  const items = Array.isArray(message.items) ? message.items : message.DOI ? [message] : [];
+  return items.flatMap((raw) => {
+    const w = obj(raw);
+    const title = str(list(w.title)[0]);
+    if (!title) return [];
+    const authors = list(w.author)
+      .map((a) => [str(obj(a).given), str(obj(a).family)].filter(Boolean).join(' '))
+      .filter(Boolean);
+    const issued = list(list(obj(w.issued)['date-parts'])[0])[0];
+    return [
+      {
+        source: 'crossref' as const,
+        title: text(title),
+        authors,
+        year: Number(issued) || 0,
+        abstract: str(w.abstract) ? text(w.abstract as string) : undefined,
+        doi: str(w.DOI),
+        venue: str(list(w['container-title'])[0]),
+        type: CROSSREF_TYPES[String(w.type)],
+      },
+    ];
+  });
+}
+
+/** Parse a bioRxiv/medRxiv `details` response. Authors stay as "Last, F." strings. */
+export function parseBiorxiv(json: unknown, server: 'biorxiv' | 'medrxiv'): PaperRecord[] {
+  return list(obj(json).collection).flatMap((raw) => {
+    const c = obj(raw);
+    const title = str(c.title);
+    if (!title) return [];
+    const published = str(c.published);
+    return [
+      {
+        source: server,
+        title: text(title),
+        authors: (str(c.authors) ?? '')
+          .split(';')
+          .map((a) => a.trim())
+          .filter(Boolean),
+        year: yearOf(c.date),
+        abstract: str(c.abstract) ? collapse(c.abstract as string) : undefined,
+        doi: str(c.doi),
+        publishedDoi: published && published !== 'NA' ? published : undefined,
+        venue: server === 'biorxiv' ? 'bioRxiv' : 'medRxiv',
+        type: 'preprint' as const,
+      },
+    ];
+  });
+}
+
+/** Parse PubMed efetch XML into records. */
+export function parsePubmed(xml: string): PaperRecord[] {
+  return all(xml, 'PubmedArticle').flatMap((art) => {
+    const title = tag(art, 'ArticleTitle');
+    if (!title) return [];
+    const authors = all(art, 'Author')
+      .map((a) => [tag(a, 'ForeName'), tag(a, 'LastName')].filter(Boolean).join(' ') || tag(a, 'CollectiveName') || '')
+      .filter(Boolean);
+    const abstract = all(art, 'AbstractText')
+      .map((p) => text(p))
+      .filter(Boolean)
+      .join(' ');
+    const pubDate = tag(art, 'PubDate') ?? '';
+    const journal = art.match(/<Journal>([\s\S]*?)<\/Journal>/)?.[1] ?? '';
+    return [
+      {
+        source: 'pubmed' as const,
+        title: title.replace(/\.$/, ''),
+        authors,
+        year: yearOf(pubDate) || yearOf(tag(art, 'MedlineDate')),
+        abstract: abstract || undefined,
+        doi: art.match(/<ELocationID[^>]*EIdType="doi"[^>]*>([^<]+)</)?.[1]?.trim(),
+        venue: tag(journal, 'Title'),
+        type: 'journal' as const,
+      },
+    ];
+  });
+}
+
+const OPENALEX_TYPES: Record<string, PubType> = {
+  article: 'journal',
+  'proceedings-article': 'conference',
+  conference: 'conference',
+  preprint: 'preprint',
+};
+
+/** Parse an OpenAlex `/works` response into records. */
+export function parseOpenAlex(json: unknown): PaperRecord[] {
+  return list(obj(json).results).flatMap((raw) => {
+    const w = obj(raw);
+    const title = str(w.display_name) ?? str(w.title);
+    if (!title) return [];
+    const words: string[] = [];
+    for (const [word, at] of Object.entries(obj(w.abstract_inverted_index)))
+      for (const i of list(at)) words[Number(i)] = word;
+    return [
+      {
+        source: 'openalex' as const,
+        title,
+        authors: list(w.authorships)
+          .map((a) => str(obj(obj(a).author).display_name) ?? '')
+          .filter(Boolean),
+        year: Number(w.publication_year) || 0,
+        abstract: words.length ? collapse(words.filter(Boolean).join(' ')) : undefined,
+        doi: str(w.doi)?.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, ''),
+        venue: str(obj(obj(w.primary_location).source).display_name),
+        type: OPENALEX_TYPES[String(w.type)],
+        pdf: str(obj(w.best_oa_location).pdf_url),
+      },
+    ];
+  });
+}
+
+/** BibTeX in arXiv's own `@misc` format. */
+export function arxivBibtex(r: PaperRecord, key: string): string {
+  const fields = [
+    ['title', r.title],
+    ['author', r.authors.join(' and ')],
+    ['year', String(r.year)],
+    ['eprint', r.arxiv],
+    ['archivePrefix', 'arXiv'],
+    ['primaryClass', r.primaryClass],
+    ['url', `https://arxiv.org/abs/${r.arxiv}`],
+  ].filter(([, v]) => v);
+  return `@misc{${key},\n${fields.map(([k, v]) => `  ${k} = {${v}}`).join(',\n')}\n}`;
+}
