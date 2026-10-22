@@ -319,20 +319,20 @@ test('resolveAiConfig: defaults fill the gaps; an unknown provider falls back wi
     text: { provider: 'anthropic', model: 'claude-sonnet-5-5' },
     image: { provider: 'openai', model: 'gpt-image-2.5-flare' },
     video: { model: 'bytedance/seedance-2.5/image-to-video' },
-    papers: { autoPost: true, maxPostsPerRun: 3 },
+    papers: { autoPost: true, maxPostsPerRun: 3, schedule: { every: 'day' } },
   });
   assert.deepEqual(
     resolveAiConfig({
       text: { provider: 'google', model: '' },
       image: { provider: 'dall-e', model: 'x' },
       video: { model: '  ' },
-      papers: { autoPost: false, maxPostsPerRun: 0 },
+      papers: { autoPost: false, maxPostsPerRun: 0, schedule: { every: 'day' } },
     }),
     {
       text: { provider: 'google', model: 'gemini-3.8-flash' },
       image: { provider: 'openai', model: 'gpt-image-2.5-flare' },
       video: { model: 'bytedance/seedance-2.5/image-to-video' },
-      papers: { autoPost: false, maxPostsPerRun: 0 },
+      papers: { autoPost: false, maxPostsPerRun: 0, schedule: { every: 'day' } },
     },
   );
   assert.equal(resolveAiConfig({ papers: { maxPostsPerRun: -1 } }).papers.maxPostsPerRun, 3);

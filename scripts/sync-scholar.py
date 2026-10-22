@@ -12,6 +12,7 @@ import os
 import re
 import sys
 import time
+from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
 
@@ -36,6 +37,21 @@ FETCH_DELAY = 4  # seconds
 def load_config():
     with open(CONFIG_PATH, "r") as f:
         return yaml.safe_load(f)
+
+
+def papers_due(schedule, today) -> bool:
+    """Mirrors papersDue in src/lib/admin/papers.ts: today is a UTC date; weekday 0 is Sunday."""
+    s = schedule if isinstance(schedule, dict) else {}
+    every = s.get("every", "day")
+    if every == "off":
+        return False
+    if every == "week":
+        weekday = s.get("weekday")
+        return (today.isoweekday() % 7) == (weekday if isinstance(weekday, int) and 0 <= weekday <= 6 else 1)
+    if every == "month":
+        monthday = s.get("monthday")
+        return today.day == (monthday if isinstance(monthday, int) and 1 <= monthday <= 28 else 1)
+    return True
 
 
 def load_overrides():
@@ -290,6 +306,13 @@ def setup_proxy():
 
 
 def main():
+    if "--if-due" in sys.argv:
+        ai_path = ROOT / "config" / "ai.yml"
+        ai = (yaml.safe_load(ai_path.read_text()) or {}) if ai_path.exists() else {}
+        schedule = (ai.get("papers") or {}).get("schedule")
+        if not papers_due(schedule, datetime.now(timezone.utc).date()):
+            print("Not due today (config/ai.yml papers.schedule); nothing to do.")
+            return
     config = load_config()
     authors_config = config.get("authors", [])
     max_results = config.get("maxResults", 100)

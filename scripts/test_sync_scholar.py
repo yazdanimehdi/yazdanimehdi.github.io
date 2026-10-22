@@ -28,4 +28,13 @@ assert m["abstract"] == "full", m
 assert m["url"] == "https://scholar.google.com/x", "empty before: filled"
 assert merged["p2"]["title"] == "Brand new", "new papers are added"
 assert merged["cms"]["title"] == "Only in the CMS", "CMS-only papers are kept"
+from datetime import date
+
+mon, tue, sun, first = date(2026, 10, 19), date(2026, 10, 20), date(2026, 10, 18), date(2026, 11, 1)
+assert ss.papers_due(None, tue) and ss.papers_due({"every": "day"}, tue)
+assert not ss.papers_due({"every": "off"}, mon)
+assert ss.papers_due({"every": "week", "weekday": 1}, mon) and not ss.papers_due({"every": "week", "weekday": 1}, tue)
+assert ss.papers_due({"every": "week", "weekday": 0}, sun), "0 is Sunday"
+assert ss.papers_due({"every": "week"}, mon), "weekday defaults to Monday"
+assert ss.papers_due({"every": "month", "monthday": 1}, first) and not ss.papers_due({"every": "month", "monthday": 1}, tue)
 print("sync-scholar self-check passed")

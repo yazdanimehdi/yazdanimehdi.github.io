@@ -325,6 +325,21 @@ test('papers step: skips cleanly without SERPAPI_KEY, and with a key but no Scho
   }
 });
 
+test('papers step: not due on the wrong day, recorded ok, never reaching the sync', async () => {
+  const tue = new Date('2026-10-20T03:00:00Z');
+  await sql`insert into documents (path, content) values ('config/ai.yml', ${'papers:\n  schedule: { every: week, weekday: 1 }\n'}) on conflict (path) do update set content = excluded.content`;
+  const restore = env({ SERPAPI_KEY: 'k' });
+  try {
+    assert.deepEqual(await dailySteps(store()).papers({}, tue), { detail: 'not due (weekly on Monday)' });
+    assert.notEqual(
+      (await dailySteps(store()).papers({}, new Date('2026-10-19T03:00:00Z'))).detail?.slice(0, 7),
+      'not due',
+    );
+  } finally {
+    restore();
+  }
+});
+
 test('career runs after github and before backup; an empty search is skipped', async () => {
   assert.deepEqual(JOBS.slice(JOBS.indexOf('github')), ['github', 'career', 'backup']);
   let starts = 0;

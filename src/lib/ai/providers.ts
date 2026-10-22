@@ -282,12 +282,32 @@ export const IMAGE_PROVIDERS: Record<ImageProviderId, Provider<ImageInput, Image
 };
 export { higgsfieldImage, higgsfieldVideo };
 
+/** How often the papers sync runs; the daily cron and the GitHub Action both run daily and skip unless due. */
+export type PapersSchedule = { every: 'off' | 'day' | 'week' | 'month'; weekday?: number; monthday?: number };
+
+function resolveSchedule(raw: any): PapersSchedule {
+  const every = ['off', 'day', 'week', 'month'].includes(raw?.every) ? raw.every : 'day';
+  const weekday = Number.isInteger(raw?.weekday) && raw.weekday >= 0 && raw.weekday <= 6 ? raw.weekday : 1;
+  const monthday = Number.isInteger(raw?.monthday) && raw.monthday >= 1 && raw.monthday <= 28 ? raw.monthday : 1;
+  return every === 'week' ? { every, weekday } : every === 'month' ? { every, monthday } : { every };
+}
+
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** "weekly on Monday": the schedule in words (jobs detail, admin copy). */
+export function scheduleLabel(s: PapersSchedule): string {
+  if (s.every === 'off') return 'off';
+  if (s.every === 'week') return `weekly on ${DAYS[s.weekday ?? 1]}`;
+  if (s.every === 'month') return `monthly on day ${s.monthday ?? 1}`;
+  return 'daily';
+}
+
 export interface AiConfig {
   text: { provider: TextProviderId; model: string };
   image: { provider: ImageProviderId; model: string };
   /** Generate GIF always animates with Higgsfield. */
   video: { model: string };
-  papers: { autoPost: boolean; maxPostsPerRun: number };
+  papers: { autoPost: boolean; maxPostsPerRun: number; schedule: PapersSchedule };
 }
 
 /** config/ai.yml with every missing or unusable value replaced by its default. */
@@ -308,6 +328,7 @@ export function resolveAiConfig(raw: unknown): AiConfig {
     papers: {
       autoPost: r.papers?.autoPost !== false,
       maxPostsPerRun: Number.isInteger(max) && max >= 0 ? max : 3,
+      schedule: resolveSchedule(r.papers?.schedule),
     },
   };
 }

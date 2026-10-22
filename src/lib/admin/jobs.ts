@@ -9,7 +9,9 @@ import { BACKUP_BRANCH, backupToGit } from './backup';
 import { listEntries, readConfig } from './content';
 import { GitHubStore, githubConfig } from './github-store';
 import { HttpError, commitChanges } from './http';
-import { papersDeps, papersSummary, syncPapers } from './papers';
+import { readAiConfig } from './ai';
+import { papersDeps, papersDue, papersSummary, syncPapers } from './papers';
+import { scheduleLabel } from '../ai/providers';
 import { GITHUB_JSON, fetchGitHub, snapshotJson } from '../github';
 import { FEEDS_JSON, JOBS_JSON } from './paths';
 import type { PostgresStore } from './postgres-store';
@@ -157,6 +159,8 @@ export function dailySteps(store: PostgresStore, nightly = () => startNightly(ge
       return { detail: due.length ? `released ${due.join(', ')}` : 'nothing due' };
     },
     papers: async (_previous, now) => {
+      const schedule = (await readAiConfig(store)).papers.schedule;
+      if (!papersDue(schedule, now)) return { detail: `not due (${scheduleLabel(schedule)})` };
       const deps = await papersDeps(store);
       if (!deps) return { detail: 'skipped: no SERPAPI_KEY' };
       return { detail: papersSummary(await syncPapers(store, deps, now)) };

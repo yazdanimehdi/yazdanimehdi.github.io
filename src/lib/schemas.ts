@@ -287,7 +287,17 @@ export const aiConfigSchema = z
     text: z.object({ provider: z.string().optional(), model: z.string().optional() }).passthrough().optional(),
     image: z.object({ provider: z.string().optional(), model: z.string().optional() }).passthrough().optional(),
     papers: z
-      .object({ autoPost: z.boolean().optional(), maxPostsPerRun: z.number().int().min(0).optional() })
+      .object({
+        autoPost: z.boolean().optional(),
+        maxPostsPerRun: z.number().int().min(0).optional(),
+        schedule: z
+          .object({
+            every: z.enum(['off', 'day', 'week', 'month']),
+            weekday: z.number().int().min(0).max(6).optional(),
+            monthday: z.number().int().min(1).max(28).optional(),
+          })
+          .optional(),
+      })
       .passthrough()
       .optional(),
   })

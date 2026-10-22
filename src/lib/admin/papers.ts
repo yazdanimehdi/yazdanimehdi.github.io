@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- SerpApi responses are parsed defensively from unknown JSON */
 import type { ImageOutput, TextInput } from '../ai/providers';
-import { resolveAiConfig } from '../ai/providers';
+import { resolveAiConfig, type PapersSchedule } from '../ai/providers';
 import { imagePrompt, paperPostPrompt, parsePaperPost, type PaperInput, type PaperPost } from '../ai/prompts';
 import { suggestSlug } from '../utils';
 import { generateImage, generateText, readAiConfig, saveImage } from './ai';
@@ -21,6 +21,16 @@ export interface PapersDeps {
   lookup: Lookup;
   /** Milliseconds now, for the completion deadline; tests pass a fake. */
   clock?: () => number;
+}
+
+export type { PapersSchedule };
+
+/** Whether the daily run should sync today (UTC date). Missing weekday/monthday default to Monday / the 1st. */
+export function papersDue(s: PapersSchedule, now: Date): boolean {
+  if (s.every === 'off') return false;
+  if (s.every === 'week') return now.getUTCDay() === (s.weekday ?? 1);
+  if (s.every === 'month') return now.getUTCDate() === (s.monthday ?? 1);
+  return true;
 }
 
 /** New papers completed per run: about 30–60 s of paced arXiv calls; the rest wait for Complete papers. */
