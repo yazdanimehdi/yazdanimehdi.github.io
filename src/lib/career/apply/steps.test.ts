@@ -38,8 +38,8 @@ test('prefill moves a drafted posting to ready with fields and screenshots', asy
     { id: 'first_name', value: 'Ada' },
     { id: 'last_name', value: 'Lovelace' },
     { id: 'email', value: 'ada@example.com' },
-    { id: 'resume', value: '' },
-    { id: 'cover_letter', value: '' },
+    { id: 'resume', value: 'cv' },
+    { id: 'cover_letter', value: 'letter' },
     { id: 'why', value: 'The engines.' },
   ]);
   assert.equal(sb.written.get(fill.files!.cv!)?.toString(), '%PDF https://blob.test/career/cv.pdf', 'the tailored CV');
@@ -58,8 +58,8 @@ test('prefill moves a drafted posting to ready with fields and screenshots', asy
       ['first_name', 'Ada', 'cv'],
       ['last_name', 'Lovelace', 'cv'],
       ['email', 'ada@example.com', 'cv'],
-      ['resume', '', 'file'],
-      ['cover_letter', '', 'file'],
+      ['resume', 'cv', 'file'],
+      ['cover_letter', 'letter', 'file'],
       ['why', 'The engines.', 'ai'],
     ],
   );
@@ -68,6 +68,21 @@ test('prefill moves a drafted posting to ready with fields and screenshots', asy
   assert.match(app!.letterPdf!, /^https:\/\/blob\.test\/career\/\d+\/letter\.pdf$/);
   assert.equal(sb.stops, 2, 'the session stops after each run');
   assert.deepEqual(await events(id), ['drafted → ready', 'ready'], 'newest first');
+});
+
+test('prefill without a cover letter leaves the cover-letter upload empty', async () => {
+  const id = await posting(kit.sql, prefilling());
+  await updatePosting(kit.sql, id, { letter: '' });
+  const sb = fakeSandbox((input) => ok(input));
+  setApplySandboxForTests(sb.api);
+
+  const app = await prefillStep(id);
+
+  assert.equal(app?.state, 'ready', app?.reason);
+  assert.deepEqual(
+    sb.inputs[1].values?.find((v) => v.id === 'cover_letter'),
+    { id: 'cover_letter', value: '' },
+  );
 });
 
 test('prefill hands off on a captcha and keeps status drafted', async () => {

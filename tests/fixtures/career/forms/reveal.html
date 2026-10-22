@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>Reveal</title></head>
+<body>
+  <h1>Research Engineer</h1>
+  <form>
+    <label for="name">Full name</label>
+    <input id="name" name="name" />
+    <fieldset>
+      <legend>Were you referred?</legend>
+      <label><input type="radio" name="referred" value="yes" /> Yes</label>
+      <label><input type="radio" name="referred" value="no" /> No</label>
+    </fieldset>
+    <label id="share" hidden><input type="checkbox" name="share" checked /> Share my profile with partners</label>
+    <button type="submit">Submit Application</button>
+  </form>
+<script>
+  for (const r of document.querySelectorAll("[name=referred]")) {
+    r.addEventListener("change", () => (document.querySelector("#share").hidden = r.value !== "yes"));
+  }
+  document.querySelector("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await fetch("/submit", { method: "POST", body: new URLSearchParams(new FormData(e.target)) });
+    e.target.outerHTML = "<p>Thank you, your application was received</p>";
+  });
+</script>
+</body>
+</html>

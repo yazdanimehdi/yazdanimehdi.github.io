@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>Checklist</title></head>
+<body>
+  <h1>Research Engineer</h1>
+  <form>
+    <fieldset>
+      <legend>Which languages do you use?</legend>
+      <label><input type="checkbox" name="question_x[]" value="python" /> Python</label>
+      <label><input type="checkbox" name="question_x[]" value="rust" /> Rust</label>
+      <label><input type="checkbox" name="question_x[]" value="go" /> Go</label>
+    </fieldset>
+    <button type="submit">Submit Application</button>
+  </form>
+<script>
+  document.querySelector("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await fetch("/submit", { method: "POST", body: new URLSearchParams(new FormData(e.target)) });
+    e.target.outerHTML = "<p>Thank you, your application was received</p>";
+  });
+</script>
+</body>
+</html>

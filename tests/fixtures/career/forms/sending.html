@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>Sending</title></head>
+<body>
+  <h1>Research Engineer</h1>
+  <form>
+    <label for="name">Full name</label>
+    <input id="name" name="name" />
+    <button type="submit">Submit Application</button>
+  </form>
+  <p id="status"></p>
+<script>
+  const form = document.querySelector("form");
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = new URLSearchParams(new FormData(form));
+    // Like React's disabled={isSubmitting}: the inputs vanish from the form while it sends.
+    for (const el of form.elements) el.disabled = true;
+    await fetch("/submit", { method: "POST", body });
+    setTimeout(() => {
+      document.querySelector("#status").textContent = "Something went wrong. Please try again.";
+      for (const el of form.elements) el.disabled = false;
+    }, 800);
+  });
+</script>
+</body>
+</html>

@@ -76,10 +76,12 @@ const VALUES = [
   { id: 'last_name', value: 'Lovelace' },
   { id: 'email', value: 'ada@example.com' },
   { id: 'phone', value: '+1 555 0100' },
+  { id: 'resume', value: 'cv' },
   { id: 'question_auth', value: 'Yes' },
   { id: 'why', value: 'The engines.' },
   { id: 'sponsorship', value: 'No' },
 ];
+const WITH_LETTER = [...VALUES, { id: 'cover_letter', value: 'letter' }];
 
 async function cvFile(dir: string) {
   const cv = join(dir, 'ada-cv.pdf');
@@ -142,7 +144,7 @@ test('fill fills values, uploads files, writes a screenshot and never submits', 
   await writeFile(letter, '%PDF-1.4 letter');
   const sent = posts.length;
   const result = await run(
-    { mode: 'fill', url: `${base}/greenhouse.html`, values: VALUES, files: { cv, letter }, out: dir },
+    { mode: 'fill', url: `${base}/greenhouse.html`, values: WITH_LETTER, files: { cv, letter }, out: dir },
     offline,
   );
   assert.equal(result.ok, true, result.error);
@@ -169,7 +171,7 @@ test('fill renders letterHtml to letter.pdf and uploads it to the cover-letter f
     {
       mode: 'fill',
       url: `${base}/greenhouse.html`,
-      values: VALUES,
+      values: WITH_LETTER,
       files: { cv: await cvFile(dir) },
       letterHtml: `<h1>Dear team</h1><p>I would like to join.</p><img src="${base}/beacon.png">
         <script>fetch('${base}/beacon-js')</script>`,
@@ -270,4 +272,151 @@ test('the CLI prints one JSON line', { skip }, async () => {
     { id: 'resume', label: 'Resume', kind: 'file', required: true, options: undefined },
     { id: 'consent', label: 'I agree to the privacy policy', kind: 'checkbox', required: true, options: undefined },
   ]);
+});
+
+/** Reads `page` as the approval, then submits `values` against it; `sent` is what the server got. */
+async function submit(page: string, values: { id: string; value: string }[]) {
+  const dir = await out();
+  const approved = await run({ mode: 'read', url: `${base}/${page}`, out: dir }, offline);
+  assert.equal(approved.ok, true, approved.error);
+  const before = posts.length;
+  const result = await run(
+    { mode: 'submit', url: `${base}/${page}`, values, expect: approved.fields, out: dir },
+    offline,
+  );
+  return { result, sent: posts.slice(before) };
+}
+
+test('a form that disables its inputs while sending and then shows an error is not confirmed', { skip }, async () => {
+  const { result, sent } = await submit('sending.html', [{ id: 'name', value: 'Ada' }]);
+  assert.deepEqual(sent, ['name=Ada']);
+  assert.equal(result.ok, true, 'it may have been sent');
+  assert.equal(result.confirmed, false);
+});
+
+test('"your application could not be submitted" is not a confirmation', { skip }, async () => {
+  const { result, sent } = await submit('not-sent.html', [{ id: 'name', value: 'Ada' }]);
+  assert.deepEqual(sent, ['name=Ada']);
+  assert.equal(result.ok, true);
+  assert.equal(result.confirmed, false);
+});
+
+test('submit clicks the application form’s button, not a header search', { skip }, async () => {
+  const { result, sent } = await submit('search.html', [{ id: 'name', value: 'Ada' }]);
+  assert.equal(result.ok, true, result.error);
+  assert.deepEqual(sent, ['name=Ada'], 'the application, never the search');
+  assert.equal(result.confirmed, true);
+});
+
+test('submit stops when filling reveals a field that was not approved', { skip }, async () => {
+  const { result, sent } = await submit('reveal.html', [
+    { id: 'name', value: 'Ada' },
+    { id: 'referred', value: 'Yes' },
+  ]);
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.changed, ['share']);
+  assert.deepEqual(sent, [], 'not submitted');
+});
+
+test('submit stops when a value is undone by the page after it was chosen', { skip }, async () => {
+  const { result, sent } = await submit('country.html', [
+    { id: 'state', value: 'California' },
+    { id: 'country', value: 'United States' },
+  ]);
+  assert.equal(result.ok, false);
+  assert.match(result.error ?? '', /state/);
+  assert.deepEqual(sent, [], 'not submitted');
+});
+
+const CHECKLIST = [
+  { id: 'question_x[]', value: 'true' },
+  { id: 'question_x[]#2', value: '' },
+  { id: 'question_x[]#3', value: 'true' },
+];
+
+test('a checkbox list sharing one name pre-fills and submits the approved boxes', { skip }, async () => {
+  const dir = await out();
+  const url = `${base}/checklist.html`;
+  const filled = await run({ mode: 'fill', url, values: CHECKLIST, out: dir }, offline);
+  assert.equal(filled.ok, true, filled.error);
+  assert.deepEqual(
+    filled.fields.map((f) => [f.id, f.label, f.value]),
+    [
+      ['question_x[]', 'Python', 'true'],
+      ['question_x[]#2', 'Rust', ''],
+      ['question_x[]#3', 'Go', 'true'],
+    ],
+  );
+  const sent = posts.length;
+  const result = await run({ mode: 'submit', url, values: CHECKLIST, expect: filled.fields, out: dir }, offline);
+  assert.equal(result.ok, true, result.error);
+  assert.equal(result.confirmed, true);
+  assert.deepEqual(posts.slice(sent), ['question_x%5B%5D=python&question_x%5B%5D=go']);
+});
+
+test('a same-name checkbox inserted before the approved ones is a change', { skip }, async () => {
+  const dir = await out();
+  const approved = await run({ mode: 'read', url: `${base}/checklist.html`, out: dir }, offline);
+  const sent = posts.length;
+  const result = await run(
+    { mode: 'submit', url: `${base}/checklist-more.html`, values: CHECKLIST, expect: approved.fields, out: dir },
+    offline,
+  );
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.changed, ['question_x[]', 'question_x[]#2', 'question_x[]#3', 'question_x[]#4']);
+  assert.ok(
+    result.fields.every((f) => f.value === ''),
+    'nothing ticked',
+  );
+  assert.deepEqual(posts.slice(sent), [], 'not submitted');
+});
+
+test('an approved empty select is sent empty, not as the page default', { skip }, async () => {
+  const blank = await submit('heard-blank.html', [
+    { id: 'name', value: 'Ada' },
+    { id: 'heard', value: '' },
+  ]);
+  assert.equal(blank.result.ok, true, blank.result.error);
+  assert.deepEqual(blank.sent, ['name=Ada&heard=']);
+  const set = await submit('heard-set.html', [
+    { id: 'name', value: 'Ada' },
+    { id: 'heard', value: '' },
+  ]);
+  assert.equal(set.result.ok, false);
+  assert.match(set.result.error ?? '', /heard/);
+  assert.deepEqual(set.sent, [], 'a select with no empty option cannot be sent empty');
+});
+
+test('a file field gets exactly the file its value names', { skip }, async () => {
+  const dir = await out();
+  const files = { cv: await cvFile(dir) };
+  const url = `${base}/files.html`;
+  const filled = await run(
+    {
+      mode: 'fill',
+      url,
+      values: [
+        { id: 'resume', value: 'cv' },
+        { id: 'transcript', value: '' },
+      ],
+      files,
+      out: dir,
+    },
+    offline,
+  );
+  assert.equal(filled.ok, true, filled.error);
+  assert.deepEqual(
+    filled.fields.map((f) => [f.id, f.value]),
+    [
+      ['resume', 'ada-cv.pdf'],
+      ['transcript', ''],
+    ],
+    'never the CV in a field that is not for it',
+  );
+  const odd = await run(
+    { mode: 'fill', url, values: [{ id: 'transcript', value: 'diploma' }], files, out: dir },
+    offline,
+  );
+  assert.equal(odd.ok, false);
+  assert.match(odd.error ?? '', /transcript/);
 });
