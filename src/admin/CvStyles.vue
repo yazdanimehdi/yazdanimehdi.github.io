@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, toRaw, watch } from 'vue';
 import { parse, stringify } from 'yaml';
 import AdminShell from './AdminShell.vue';
+import AdminTabLinks from './AdminTabLinks.vue';
 import DesignForm from './DesignForm.vue';
 import DocBanners from './DocBanners.vue';
 import { api, committed, report, toast } from './api';
@@ -230,13 +231,19 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <AdminShell :ctx="ctx" active="cv-styles" title="CV styles" :dirty="doc.dirty">
+  <AdminShell :ctx="ctx" active="cv-styles" title="CV" :dirty="doc.dirty">
     <template #actions>
-      <a class="adm-btn" :href="`/${ctx.adminPath}/cv`">CV entries</a>
       <button type="button" class="adm-btn adm-btn-primary" :disabled="doc.saving || !doc.current" @click="save">
         Publish styles
       </button>
     </template>
+    <AdminTabLinks
+      label="CV"
+      :tabs="[
+        { href: `/${ctx.adminPath}/cv`, label: 'Entries' },
+        { href: `/${ctx.adminPath}/cv-styles`, label: 'Styles', current: true },
+      ]"
+    />
     <DocBanners
       :draft="!!doc.draft"
       :path="'config/cv-styles.yml'"

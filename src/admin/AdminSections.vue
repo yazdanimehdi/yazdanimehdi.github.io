@@ -2,9 +2,11 @@
 import { nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 /**
- * A long settings screen as tabs, one section shown at a time, the open one in the URL hash (unknown → the first).
- * `fields`: the error-key prefixes a section owns; a section with a save error shows a dot, and a failed save opens
- * the first such section. Each section's content is the slot named by its id.
+ * A long settings screen as tabs, one section shown at a time, the open one in the URL hash. On load an unknown hash
+ * opens the first section; later, a hash naming no section (the skip link's #adm-main) leaves the open one.
+ * `fields`: the error-key prefixes a section owns; a section with a save error shows a dot, and a new error key opens
+ * its section (a save or reload of another document replaces the errors but keeps older ones: no jump).
+ * Each section's content is the slot named by its id.
  */
 const props = defineProps<{
   sections: { id: string; label: string; fields?: string[] }[];
@@ -13,11 +15,14 @@ const props = defineProps<{
 const active = defineModel<string>({ default: '' });
 const list = ref<HTMLElement | null>(null);
 
-const hasError = (s: (typeof props.sections)[number]) =>
-  Object.keys(props.errors ?? {}).some((k) => s.fields?.some((p) => k.startsWith(p)));
+type Section = (typeof props.sections)[number];
+const owns = (s: Section, key: string) => !!s.fields?.some((p) => key.startsWith(p));
+function hasError(s: Section) {
+  return Object.keys(props.errors ?? {}).some((k) => owns(s, k));
+}
 const fromHash = () => {
   const id = decodeURIComponent(location.hash.slice(1));
-  active.value = props.sections.some((s) => s.id === id) ? id : props.sections[0].id;
+  if (props.sections.some((s) => s.id === id)) active.value = id;
 };
 function open(id: string, focus = false) {
   if (id !== active.value) location.hash = id; // a history entry, so Back returns to the previous section
@@ -35,11 +40,12 @@ function onKey(e: KeyboardEvent) {
 }
 
 watch(
-  () => props.errors,
-  () => {
+  () => Object.keys(props.errors ?? {}),
+  (keys, before) => {
+    const added = keys.filter((k) => !before.includes(k));
     const shown = props.sections.find((s) => s.id === active.value);
-    const first = props.sections.find(hasError);
-    if (first && !(shown && hasError(shown))) open(first.id);
+    const first = props.sections.find((s) => added.some((k) => owns(s, k)));
+    if (first && !(shown && added.some((k) => owns(shown, k)))) open(first.id);
   },
 );
 // On the narrow tab row, keep the open tab in view.
@@ -48,6 +54,7 @@ watch(active, (id) =>
 );
 onMounted(() => {
   fromHash();
+  active.value ||= props.sections[0].id;
   addEventListener('hashchange', fromHash);
 });
 onBeforeUnmount(() => removeEventListener('hashchange', fromHash));
