@@ -9,6 +9,7 @@ import { MemoryStore } from './memory-store';
 import { SourceError } from '../career/sources/http';
 import type { Lookup } from './paper-complete';
 import {
+  COMPLETE_FOR_MS,
   COMPLETE_PER_RUN,
   generateId,
   inferType,
@@ -60,12 +61,13 @@ after(() => setStoreForTests(null));
 const fixture = (name: string) =>
   fs.readFileSync(new URL(`../../../tests/fixtures/papers/${name}`, import.meta.url), 'utf8');
 
-/** Answers the first route whose key prefixes the URL with that fixture; anything else 404s (no match). */
+/** Answers the first route whose key prefixes the URL (a fixture name or a literal body); anything else 404s (no match). */
 const fakeLookup = (routes: Record<string, string> = {}): Lookup => ({
   async get(url) {
     const hit = Object.keys(routes).find((k) => url.startsWith(k));
     if (!hit) throw new SourceError(`${url} answered 404`, 404);
-    return fixture(routes[hit]);
+    const body = routes[hit];
+    return /\.(xml|json|bib)$/.test(body) ? fixture(body) : body;
   },
 });
 
@@ -150,20 +152,71 @@ test('a new Scholar paper is completed from arXiv, and its abstract feeds the po
   );
 });
 
-test('when the sources fail, the paper imports as Scholar gave it and the run says so', async () => {
-  articles = [article('a', 'Sparse Attention for Robots', '2026')];
+test('when a source fails, completion stops: the papers import as Scholar gave them and the run says so', async () => {
+  articles = [
+    article('a', 'Sparse Attention for Robots', '2026'),
+    article('b', 'Dense Rewards', '2025'),
+    article('c', 'Graph Planning at Scale', '2024'),
+  ];
+  let attempts = 0;
   const failing: Lookup = {
     get: async () => {
+      attempts++;
       throw new Error('timeout');
     },
   };
   const r = await syncPapers(store, deps({ lookup: failing }), NOW);
-  assert.deepEqual(r.imported, ['smith2026sparse']);
+  assert.deepEqual(r.imported, ['smith2026sparse', 'smith2025dense', 'smith2024graph']);
   assert.deepEqual(r.notCompleted, r.imported);
+  assert.equal(attempts, 1, 'no lookups after the first failure');
   assert.deepEqual(r.failed, [{ item: 'completing smith2026sparse', error: 'timeout' }]);
   const pub = (await readEntry(store, 'publications', 'smith2026sparse'))!.data;
   assert.equal(pub.url, articles[0].link);
-  assert.match(papersSummary(r), /1 not completed \(use Complete papers\)/);
+  assert.match(papersSummary(r), /3 not completed \(use Complete papers\)/);
+});
+
+test('no completion starts once COMPLETE_FOR_MS has passed', async () => {
+  articles = Array.from({ length: 3 }, (_, i) => article(`t${i}`, `Timed Paper ${'xyz'[i]}`, String(2026 - i)));
+  const { lookup, calls: looked } = countingLookup();
+  let t = 0;
+  const clock = () => (t += COMPLETE_FOR_MS * 0.6); // the 2nd paper is checked past the deadline
+  const r = await syncPapers(store, deps({ lookup, clock }), NOW);
+  assert.equal(looked.papers, 1);
+  assert.deepEqual(r.notCompleted, r.imported.slice(1));
+  assert.deepEqual(r.failed, []);
+});
+
+test('a completed field the schema refuses leaves that paper not completed, and the run goes on', async () => {
+  articles = [article('a', 'Sparse Attention for Robots', '2026'), article('b', 'Dense Rewards', '2025')];
+  const work = (title: string, pdf: string) => ({
+    display_name: title,
+    publication_year: 2026,
+    authorships: [{ author: { display_name: 'Jane Smith' } }],
+    best_oa_location: { pdf_url: pdf },
+  });
+  const openalex = (url: string) =>
+    JSON.stringify({
+      results: [
+        url.includes('Sparse')
+          ? work('Sparse Attention for Robots', 'http://[bad')
+          : work('Dense Rewards', 'https://oa.test/dense.pdf'),
+      ],
+    });
+  const lookup: Lookup = {
+    async get(url) {
+      if (url.startsWith('https://api.openalex.org/works?')) return openalex(decodeURIComponent(url));
+      throw new SourceError(`${url} answered 404`, 404);
+    },
+  };
+  const r = await syncPapers(store, deps({ lookup }), NOW);
+  assert.deepEqual(r.imported, ['smith2026sparse', 'smith2025dense']);
+  assert.deepEqual(r.notCompleted, ['smith2026sparse']);
+  assert.deepEqual(
+    r.failed.map((f) => f.item),
+    ['completing smith2026sparse'],
+  );
+  assert.equal((await readEntry(store, 'publications', 'smith2026sparse'))!.data.pdf, undefined);
+  assert.equal((await readEntry(store, 'publications', 'smith2025dense'))!.data.pdf, 'https://oa.test/dense.pdf');
 });
 
 test('only COMPLETE_PER_RUN papers are completed per run, newest first', async () => {

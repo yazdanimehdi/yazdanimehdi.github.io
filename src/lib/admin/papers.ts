@@ -19,10 +19,14 @@ export interface PapersDeps {
   image(prompt: string): Promise<ImageOutput>;
   /** The network for completing new papers from arXiv, Crossref and the rest. */
   lookup: Lookup;
+  /** Milliseconds now, for the completion deadline; tests pass a fake. */
+  clock?: () => number;
 }
 
 /** New papers completed per run: about 30–60 s of paced arXiv calls; the rest wait for Complete papers. */
 export const COMPLETE_PER_RUN = 10;
+/** No new completion starts this long after the first, so a slow source can't push the run past the function limit. */
+export const COMPLETE_FOR_MS = 90_000;
 
 export interface PapersResult {
   /** Publication slugs written this run. */
@@ -194,21 +198,33 @@ export async function syncPapers(store: ContentStore, deps: PapersDeps, now = ne
     ...(fields as Partial<PaperInput>),
   });
 
-  // Sequential: arXiv's pacing serialises its calls anyway, and the budget keeps the run inside the time limit.
+  // Sequential: arXiv's pacing serialises its calls anyway. The budget, the deadline and stopping at the first source
+  // failure (a down arXiv costs ~20–65 s a paper in timeouts and retries) keep the run inside the function limit.
+  const clock = deps.clock ?? Date.now;
+  const deadline = clock() + COMPLETE_FOR_MS;
+  let sourceFailed = false;
   const completed: (Completed | undefined)[] = [];
   for (const [i, { a, pubSlug }] of planned.entries()) {
-    if (i < COMPLETE_PER_RUN)
+    if (i < COMPLETE_PER_RUN && !sourceFailed && clock() < deadline) {
+      let fields: Completed | undefined;
       try {
         const found = await findPaper({ title: a.title, authors: a.authors, url: a.link }, deps.lookup);
-        if (found) {
-          const { fields } = await completedFields(found, { venue: a.venue, type: inferType(a.venue) }, deps.lookup);
-          entryChange('publications', pubSlug, pubOf(a, undefined, fields), ''); // a field the schema refuses fails this paper only
-          completed[i] = fields;
-          continue;
-        }
+        if (found)
+          fields = (await completedFields(found, { venue: a.venue, type: inferType(a.venue) }, deps.lookup)).fields;
       } catch (e) {
+        sourceFailed = true;
         result.failed.push({ item: `completing ${pubSlug}`, error: message(e) });
       }
+      // A field the schema refuses fails this paper only.
+      if (fields)
+        try {
+          entryChange('publications', pubSlug, pubOf(a, undefined, fields), '');
+          completed[i] = fields;
+          continue;
+        } catch (e) {
+          result.failed.push({ item: `completing ${pubSlug}`, error: message(e) });
+        }
+    }
     result.notCompleted.push(pubSlug);
   }
 
