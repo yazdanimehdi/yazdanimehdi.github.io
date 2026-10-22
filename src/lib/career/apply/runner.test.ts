@@ -9,6 +9,7 @@ import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { chromium, type LaunchOptions } from '@playwright/test';
 import { run } from './runner.mjs';
+import { RUNNER_SOURCE } from './runner-source';
 
 const FORMS = 'tests/fixtures/career/forms';
 const skip = existsSync(chromium.executablePath())
@@ -88,6 +89,10 @@ async function cvFile(dir: string) {
   await writeFile(cv, '%PDF-1.4 cv');
   return cv;
 }
+
+test('the sandbox ships the current runner (run `pnpm gen:runner` after editing runner.mjs)', async () => {
+  assert.equal(RUNNER_SOURCE, await readFile(new URL('./runner.mjs', import.meta.url), 'utf8'));
+});
 
 test('read lists greenhouse fields with labels, kinds, required and options', { skip }, async () => {
   const result = await run({ mode: 'read', url: `${base}/greenhouse.html`, out: await out() }, offline);

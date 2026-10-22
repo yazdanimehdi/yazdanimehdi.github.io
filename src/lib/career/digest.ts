@@ -93,7 +93,12 @@ export async function sendDigest(
     if (!to) return 'skipped';
     const drafted = (await Promise.all(draftedIds.map((id) => getPosting(sql, id)))).filter((p) => !!p);
     const siteUrl = String(site.data.siteUrl ?? '').replace(/\/+$/, '');
-    const mail = digestText(summary, await readyPostings(sql, true), drafted, `${siteUrl}/${adminSettings().adminPath}`);
+    const mail = digestText(
+      summary,
+      await readyPostings(sql, true),
+      drafted,
+      `${siteUrl}/${adminSettings().adminPath}`,
+    );
     if (!mail) return 'skipped';
     let res: Response;
     try {
