@@ -8,7 +8,7 @@ import { api, report, toast } from './api';
 import { text, type FieldDef } from './fields';
 import { useDocument } from './useDocument';
 import type { AdminCtx, CommitResult } from './types';
-import { DEFAULT_MODELS, IMAGE_PROVIDERS, TEXT_PROVIDERS, resolveAiConfig } from '../lib/ai/providers';
+import { DEFAULT_MODELS, IMAGE_PROVIDERS, TEXT_PROVIDERS, resolveAiConfig, scheduleLabel } from '../lib/ai/providers';
 import type { PapersResult } from '../lib/admin/papers';
 import type { SecretStatus } from '../lib/admin/secrets';
 
@@ -26,6 +26,10 @@ const checking = ref(false);
 const checked = ref<PapersResult | null>(null);
 const lastRun = ref<string | null>(null);
 
+const schedule = computed(() => {
+  const s = resolveAiConfig(ai.current).papers.schedule;
+  return s.every === 'off' ? 'never' : s.every === 'day' ? 'daily' : scheduleLabel(s);
+});
 const options = (providers: Record<string, { label: string }>) =>
   Object.entries(providers).map(([value, p]) => ({ value, label: p.label }));
 const AI_FIELDS = computed<FieldDef[]>(() => {
@@ -51,6 +55,24 @@ const AI_FIELDS = computed<FieldDef[]>(() => {
       type: 'text',
       hint: `Generate GIF animates a Higgsfield still with this image-to-video model. Empty uses ${DEFAULT_MODELS.video.higgsfield}.`,
     },
+    {
+      key: 'papers.schedule.every',
+      label: 'Check for new papers',
+      type: 'select',
+      options: [
+        { value: 'off', label: 'Never (Check now only)' },
+        { value: 'day', label: 'Every day' },
+        { value: 'week', label: 'Every week' },
+        { value: 'month', label: 'Every month' },
+      ],
+      hint: 'The daily run skips on other days. Empty means every day. UTC.',
+    },
+    ...(effective.papers.schedule.every === 'week'
+      ? [{ key: 'papers.schedule.weekday', label: 'Weekday (0 Sunday … 6 Saturday)', type: 'number' as const }]
+      : []),
+    ...(effective.papers.schedule.every === 'month'
+      ? [{ key: 'papers.schedule.monthday', label: 'Day of the month (1–28)', type: 'number' as const }]
+      : []),
     { key: 'papers.autoPost', label: 'Write a draft post for each new paper', type: 'checkbox', default: true },
     {
       key: 'papers.maxPostsPerRun',
@@ -231,7 +253,8 @@ onMounted(() => {
       />
       <p class="adm-muted">
         New papers on these profiles (through SerpApi) become publications and, per the settings above, draft posts to
-        review. {{ editable ? 'Checked daily, or now:' : 'Check now, or let the weekly GitHub Action sync them.' }}
+        review.
+        {{ editable ? `Checked ${schedule}, or now:` : `Check now, or let the GitHub Action sync them (${schedule}).` }}
       </p>
       <FormFields v-if="scholar.current" :fields="SCHOLAR_FIELDS" :model="scholar.current" :errors="scholar.errors" />
       <div class="adm-actions">

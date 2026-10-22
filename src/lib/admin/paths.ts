@@ -71,10 +71,10 @@ export const collectionPath = (name: CollectionName, slug: string, ext: 'md' | '
 export const configPath = (file: ConfigFile) => `config/${file}.yml`;
 
 /** An image file inside `dir` whose every segment is a plain name (no dot-files, so no `..`). */
-function isImageUnder(path: string, dir: string): boolean {
+function isImageUnder(path: string, dir: string, kind = IMAGE): boolean {
   return (
     path.startsWith(`${dir}/`) &&
-    IMAGE.test(path) &&
+    kind.test(path) &&
     path
       .slice(dir.length + 1)
       .split('/')
@@ -83,7 +83,11 @@ function isImageUnder(path: string, dir: string): boolean {
 }
 
 export function isMediaPath(path: string): boolean {
-  return isImageUnder(path, adminSettings().mediaFolder) || isImageUnder(path, SITE_MEDIA.dir);
+  // PDFs only under public/, where they have a URL; the build-processed media folder is images only.
+  return (
+    isImageUnder(path, adminSettings().mediaFolder) ||
+    isImageUnder(path, SITE_MEDIA.dir, /\.(png|jpe?g|webp|gif|avif|svg|ico|pdf)$/i)
+  );
 }
 
 export function assertMediaPath(path: unknown): string {

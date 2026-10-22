@@ -1556,3 +1556,20 @@ details.adm-editor-ask[open] > summary {
 .adm-job-handoff td {
   background: var(--adm-warn-bg);
 }
+.adm-review-changes {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.adm-review-pair {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+}
+.adm-review-long {
+  max-height: 160px;
+  overflow: auto;
+  margin: 0;
+}

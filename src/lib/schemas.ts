@@ -11,6 +11,21 @@ const emptyToUndefined = z
 /** Same but with .url() validation after stripping empties. */
 const optionalUrl = emptyToUndefined.pipe(z.string().url().optional());
 
+/** An absolute http(s) URL, or a same-site path (`/images/x.pdf`, what a git-mode upload yields); not `//host` or a scheme. */
+const urlOrSitePath = emptyToUndefined.pipe(
+  z
+    .string()
+    .refine(
+      (v) =>
+        v.startsWith('/')
+          ? // eslint-disable-next-line no-control-regex -- browsers strip tab/newline from an href: "/\t/host" is "//host"
+            !v.startsWith('//') && !/[\x00-\x20\\]/.test(v)
+          : /^https?:\/\//i.test(v) && z.string().url().safeParse(v).success,
+      'Use a full https:// link or a path on this site starting with /',
+    )
+    .optional(),
+);
+
 /** Same but with .email() validation after stripping empties. */
 const optionalEmail = emptyToUndefined.pipe(z.string().email().optional());
 
@@ -110,7 +125,7 @@ export const publicationsSchema = <I extends z.ZodTypeAny>(image: ImageFn<I>) =>
     year: z.number(),
     doi: emptyToUndefined,
     url: optionalUrl,
-    pdf: optionalUrl,
+    pdf: urlOrSitePath,
     bibtex: z.string().optional(),
     type: z.enum(['journal', 'conference', 'preprint', 'workshop', 'thesis', 'book-chapter']),
     featured: z.boolean().default(false),
@@ -287,7 +302,17 @@ export const aiConfigSchema = z
     text: z.object({ provider: z.string().optional(), model: z.string().optional() }).passthrough().optional(),
     image: z.object({ provider: z.string().optional(), model: z.string().optional() }).passthrough().optional(),
     papers: z
-      .object({ autoPost: z.boolean().optional(), maxPostsPerRun: z.number().int().min(0).optional() })
+      .object({
+        autoPost: z.boolean().optional(),
+        maxPostsPerRun: z.number().int().min(0).optional(),
+        schedule: z
+          .object({
+            every: z.enum(['off', 'day', 'week', 'month']).optional(), // the select's empty option removes the key: daily
+            weekday: z.number().int().min(0).max(6).optional(),
+            monthday: z.number().int().min(1).max(28).optional(),
+          })
+          .optional(),
+      })
       .passthrough()
       .optional(),
   })

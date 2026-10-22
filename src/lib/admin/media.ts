@@ -143,6 +143,7 @@ const CONTENT_TYPES: Record<string, string> = {
   avif: 'image/avif',
   svg: 'image/svg+xml',
   ico: 'image/x-icon',
+  pdf: 'application/pdf',
 };
 
 /** Validates an upload and names it `<slug>-<6 hex of sha256>.<ext>`. Throws MediaError (413 / 415). */
@@ -151,8 +152,9 @@ export function prepareUpload(
   bytes: Uint8Array,
 ): { filename: string; base64: string; contentType: string } {
   if (bytes.length > MAX_UPLOAD) throw new MediaError('Files must be 4 MB or smaller', 413);
-  const ext = sniffImage(bytes);
-  if (!ext) throw new MediaError('Only PNG, JPEG, WebP, GIF, AVIF, SVG and ICO images can be uploaded', 415);
+  // A PDF is a file, not an image: sniffImage never reports it, so listings and pickers stay image-only.
+  const ext = ascii(bytes, 0, 5) === '%PDF-' ? 'pdf' : sniffImage(bytes);
+  if (!ext) throw new MediaError('Only PDFs and PNG, JPEG, WebP, GIF, AVIF, SVG and ICO images can be uploaded', 415);
   if (ext === 'svg') {
     const text = svgText(bytes)!;
     const danger = SVG_DANGER.find(([re]) => re.test(text));
@@ -163,7 +165,7 @@ export function prepareUpload(
   const base =
     slugify(name.replace(/\.[^.]*$/, ''))
       .slice(0, 60)
-      .replace(/-+$/, '') || 'image';
+      .replace(/-+$/, '') || (ext === 'pdf' ? 'paper' : 'image');
   const hash = createHash('sha256').update(bytes).digest('hex').slice(0, 6);
   return {
     filename: `${base}-${hash}.${ext}`,

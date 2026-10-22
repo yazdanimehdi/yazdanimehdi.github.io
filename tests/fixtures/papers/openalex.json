@@ -1,0 +1,703 @@
+{
+ "meta": {
+  "notice": "No API key, so this request shares one free daily budget ($0.10) with everyone on your network's IP address. The mailto parameter doesn't raise this limit. Get a free key with its own $1/day at https://openalex.org/settings/api and add api_key=YOUR_KEY to your requests. An AI agent can get one for its user in one call: POST https://api.openalex.org/api-keys with {\"email\": \"<your user's email>\"}; we email them a link, and the key works once they click it. Docs for agents: https://help.openalex.org/llms.txt",
+  "count": 3037,
+  "db_response_time_ms": 185,
+  "page": 1,
+  "per_page": 2,
+  "groups_count": null,
+  "x_query": {
+   "oql": "get works where full text has (HELM Hierarchical Encoding mRNA)",
+   "x_new_oql": "get works with (HELM Hierarchical Encoding mRNA) in the full text",
+   "oqo": {
+    "get_rows": "works",
+    "filter_rows": [
+     {
+      "column_id": "fulltext.search",
+      "value": "HELM Hierarchical Encoding mRNA",
+      "operator": "has"
+     }
+    ]
+   },
+   "url": "/works?filter=fulltext.search:HELM Hierarchical Encoding mRNA&per_page=2"
+  },
+  "cost_usd": 0.001
+ },
+ "results": [
+  {
+   "id": "https://openalex.org/W4403578128",
+   "doi": "https://doi.org/10.48550/arxiv.2410.12459",
+   "title": "HELM: Hierarchical Encoding for mRNA Language Modeling",
+   "display_name": "HELM: Hierarchical Encoding for mRNA Language Modeling",
+   "relevance_score": 136.86368,
+   "publication_year": 2024,
+   "publication_date": "2024-10-16",
+   "ids": {
+    "openalex": "https://openalex.org/W4403578128",
+    "doi": "https://doi.org/10.48550/arxiv.2410.12459"
+   },
+   "language": "en",
+   "primary_location": {
+    "id": "pmh:oai:arXiv.org:2410.12459",
+    "doi": null,
+    "is_oa": true,
+    "landing_page_url": "http://arxiv.org/abs/2410.12459",
+    "pdf_url": "https://arxiv.org/pdf/2410.12459",
+    "source": {
+     "id": "https://openalex.org/S4306400194",
+     "display_name": "arXiv (Cornell University)",
+     "issn_l": "2331-8422",
+     "issn": [
+      "2331-8422"
+     ],
+     "is_oa": true,
+     "is_in_doaj": false,
+     "is_core": false,
+     "listed_in": [],
+     "host_organization": "https://openalex.org/I205783295",
+     "host_organization_name": "Cornell University",
+     "host_organization_lineage": [
+      "https://openalex.org/I205783295"
+     ],
+     "host_organization_lineage_names": [],
+     "type": "repository"
+    },
+    "license": "cc-by",
+    "license_id": "https://openalex.org/licenses/cc-by",
+    "version": "submittedVersion",
+    "is_accepted": false,
+    "is_published": false,
+    "raw_source_name": null,
+    "raw_type": "text"
+   },
+   "volume": null,
+   "type": "preprint",
+   "indexed_in": [
+    "arxiv",
+    "datacite"
+   ],
+   "open_access": {
+    "is_oa": true,
+    "oa_status": "green",
+    "oa_url": "https://arxiv.org/pdf/2410.12459",
+    "any_repository_has_fulltext": true
+   },
+   "authorships": [
+    {
+     "author_position": "first",
+     "author": {
+      "id": "https://openalex.org/A5043368211",
+      "display_name": "Mehdi Yazdani-Jahromi",
+      "orcid": "https://orcid.org/0000-0001-6658-6591",
+      "observed_orcids": [
+       "https://orcid.org/0000-0001-6658-6591"
+      ]
+     },
+     "is_corresponding": false,
+     "raw_author_name": "Yazdani-Jahromi, Mehdi",
+     "raw_affiliation_strings": [
+      "University of Central Florida"
+     ],
+     "raw_orcid": null
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5104184756",
+      "display_name": "Mangal Prakash",
+      "orcid": null,
+      "observed_orcids": []
+     },
+     "is_corresponding": false,
+     "raw_author_name": "Prakash, Mangal",
+     "raw_affiliation_strings": [
+      "University of Central Florida"
+     ],
+     "raw_orcid": null
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5077640348",
+      "display_name": "Tommaso Mansi",
+      "orcid": "https://orcid.org/0000-0002-8342-4110",
+      "observed_orcids": [
+       "https://orcid.org/0000-0002-8342-4110"
+      ]
+     },
+     "is_corresponding": false,
+     "raw_author_name": "Mansi, Tommaso",
+     "raw_affiliation_strings": [
+      "University of Central Florida"
+     ],
+     "raw_orcid": null
+    },
+    {
+     "author_position": "middle",
+     "author": {
+      "id": "https://openalex.org/A5077762278",
+      "display_name": "Artem Moskalev",
+      "orcid": null,
+      "observed_orcids": []
+     },
+     "is_corresponding": false,
+     "raw_author_name": "Moskalev, Artem",
+     "raw_affiliation_strings": [
+      "University of Central Florida"
+     ],
+     "raw_orcid": null
+    },
+    {
+     "author_position": "last",
+     "author": {
+      "id": "https://openalex.org/A5057068227",
+      "display_name": "Rui Liao",
+      "orcid": "https://orcid.org/0000-0002-0057-2792",
+      "observed_orcids": [
+       "https://orcid.org/0000-0002-0057-2792"
+      ]
+     },
+     "is_corresponding": false,
+     "raw_author_name": "Liao, Rui",
+     "raw_affiliation_strings": [
+      "University of Central Florida"
+     ],
+     "raw_orcid": null
+    }
+   ],
+   "institutions": [],
+   "countries_distinct_count": 1,
+   "institutions_distinct_count": 1,
+   "corresponding_author_ids": [],
+   "corresponding_institution_ids": [
+    "https://openalex.org/I106165777"
+   ],
+   "apc_list": null,
+   "apc_paid": null,
+   "fwci": null,
+   "has_fulltext": true,
+   "cited_by_count": 3,
+   "citation_normalized_percentile": null,
+   "cited_by_percentile_year": null,
+   "biblio": {
+    "volume": null,
+    "issue": null,
+    "first_page": null,
+    "last_page": null
+   },
+   "is_retracted": false,
+   "is_paratext": false,
+   "is_xpac": false,
+   "primary_topic": {
+    "id": "https://openalex.org/T12254",
+    "display_name": "Machine Learning in Bioinformatics",
+    "score": 0.8389000296592712,
+    "subfield": {
+     "id": "https://openalex.org/subfields/1312",
+     "display_name": "Molecular Biology"
+    },
+    "field": {
+     "id": "https://openalex.org/fields/13",
+     "display_name": "Biochemistry, Genetics and Molecular Biology"
+    },
+    "domain": {
+     "id": "https://openalex.org/domains/1",
+     "display_name": "Life Sciences"
+    }
+   },
+   "locations_count": 2,
+   "locations": [
+    {
+     "id": "pmh:oai:arXiv.org:2410.12459",
+     "doi": null,
+     "is_oa": true,
+     "landing_page_url": "http://arxiv.org/abs/2410.12459",
+     "pdf_url": "https://arxiv.org/pdf/2410.12459",
+     "source": {
+      "id": "https://openalex.org/S4306400194",
+      "display_name": "arXiv (Cornell University)",
+      "issn_l": "2331-8422",
+      "issn": [
+       "2331-8422"
+      ],
+      "is_oa": true,
+      "is_in_doaj": false,
+      "is_core": false,
+      "listed_in": [],
+      "host_organization": "https://openalex.org/I205783295",
+      "host_organization_name": "Cornell University",
+      "host_organization_lineage": [
+       "https://openalex.org/I205783295"
+      ],
+      "host_organization_lineage_names": [],
+      "type": "repository"
+     },
+     "license": "cc-by",
+     "license_id": "https://openalex.org/licenses/cc-by",
+     "version": "submittedVersion",
+     "is_accepted": false,
+     "is_published": false,
+     "raw_source_name": null,
+     "raw_type": "text"
+    },
+    {
+     "id": "doi:10.48550/arxiv.2410.12459",
+     "doi": "https://doi.org/10.48550/arxiv.2410.12459",
+     "is_oa": true,
+     "landing_page_url": "https://doi.org/10.48550/arxiv.2410.12459",
+     "pdf_url": null,
+     "source": {
+      "id": "https://openalex.org/S4306400194",
+      "display_name": "arXiv (Cornell University)",
+      "issn_l": "2331-8422",
+      "issn": [
+       "2331-8422"
+      ],
+      "is_oa": true,
+      "is_in_doaj": false,
+      "is_core": false,
+      "listed_in": [],
+      "host_organization": "https://openalex.org/I205783295",
+      "host_organization_name": "Cornell University",
+      "host_organization_lineage": [
+       "https://openalex.org/I205783295"
+      ],
+      "host_organization_lineage_names": [],
+      "type": "repository"
+     },
+     "license": "cc-by",
+     "license_id": "https://openalex.org/licenses/cc-by",
+     "version": null,
+     "is_accepted": false,
+     "is_published": null,
+     "raw_source_name": null,
+     "raw_type": "Preprint"
+    }
+   ],
+   "best_oa_location": {
+    "id": "pmh:oai:arXiv.org:2410.12459",
+    "doi": null,
+    "is_oa": true,
+    "landing_page_url": "http://arxiv.org/abs/2410.12459",
+    "pdf_url": "https://arxiv.org/pdf/2410.12459",
+    "source": {
+     "id": "https://openalex.org/S4306400194",
+     "display_name": "arXiv (Cornell University)",
+     "issn_l": "2331-8422",
+     "issn": [
+      "2331-8422"
+     ],
+     "is_oa": true,
+     "is_in_doaj": false,
+     "is_core": false,
+     "listed_in": [],
+     "host_organization": "https://openalex.org/I205783295",
+     "host_organization_name": "Cornell University",
+     "host_organization_lineage": [
+      "https://openalex.org/I205783295"
+     ],
+     "host_organization_lineage_names": [],
+     "type": "repository"
+    },
+    "license": "cc-by",
+    "license_id": "https://openalex.org/licenses/cc-by",
+    "version": "submittedVersion",
+    "is_accepted": false,
+    "is_published": false,
+    "raw_source_name": null,
+    "raw_type": "text"
+   },
+   "sustainable_development_goals_aurora": [],
+   "study_designs": [],
+   "awards": [],
+   "funders": [],
+   "has_content": {
+    "grobid_xml": true,
+    "pdf": true
+   },
+   "content_urls": {
+    "pdf": "https://content.openalex.org/works/W4403578128.pdf",
+    "grobid_xml": "https://content.openalex.org/works/W4403578128.grobid-xml"
+   },
+   "referenced_works_count": 0,
+   "abstract_inverted_index": {
+    "Messenger": [
+     0
+    ],
+    "RNA": [
+     1
+    ],
+    "(mRNA)": [
+     2
+    ],
+    "plays": [
+     3
+    ],
+    "a": [
+     4,
+     51
+    ],
+    "crucial": [
+     5
+    ],
+    "role": [
+     6
+    ],
+    "in": [
+     7,
+     25
+    ],
+    "protein": [
+     8
+    ],
+    "synthesis,": [
+     9
+    ],
+    "with": [
+     10,
+     78,
+     143
+    ],
+    "its": [
+     11
+    ],
+    "codon": [
+     12,
+     40,
+     71
+    ],
+    "structure": [
+     13,
+     59
+    ],
+    "directly": [
+     14
+    ],
+    "impacting": [
+     15
+    ],
+    "biological": [
+     16,
+     27,
+     80
+    ],
+    "properties.": [
+     17
+    ],
+    "While": [
+     18
+    ],
+    "Language": [
+     19,
+     48
+    ],
+    "Models": [
+     20
+    ],
+    "(LMs)": [
+     21
+    ],
+    "have": [
+     22
+    ],
+    "shown": [
+     23
+    ],
+    "promise": [
+     24
+    ],
+    "analyzing": [
+     26
+    ],
+    "sequences,": [
+     28
+    ],
+    "existing": [
+     29,
+     105
+    ],
+    "approaches": [
+     30
+    ],
+    "fail": [
+     31
+    ],
+    "to": [
+     32,
+     150
+    ],
+    "account": [
+     33
+    ],
+    "for": [
+     34,
+     46
+    ],
+    "the": [
+     35,
+     66,
+     74,
+     79,
+     130,
+     144
+    ],
+    "hierarchical": [
+     36,
+     58
+    ],
+    "nature": [
+     37
+    ],
+    "of": [
+     38,
+     82,
+     133
+    ],
+    "mRNA's": [
+     39
+    ],
+    "structure.": [
+     41
+    ],
+    "We": [
+     42,
+     85
+    ],
+    "introduce": [
+     43
+    ],
+    "Hierarchical": [
+     44
+    ],
+    "Encoding": [
+     45
+    ],
+    "mRNA": [
+     47,
+     83,
+     90,
+     138
+    ],
+    "Modeling": [
+     49
+    ],
+    "(HELM),": [
+     50
+    ],
+    "novel": [
+     52
+    ],
+    "pre-training": [
+     53,
+     101
+    ],
+    "strategy": [
+     54
+    ],
+    "that": [
+     55,
+     95,
+     140
+    ],
+    "incorporates": [
+     56
+    ],
+    "codon-level": [
+     57
+    ],
+    "into": [
+     60
+    ],
+    "language": [
+     61,
+     99,
+     134
+    ],
+    "model": [
+     62,
+     100,
+     107
+    ],
+    "training.": [
+     63
+    ],
+    "HELM": [
+     64,
+     87,
+     96,
+     128
+    ],
+    "modulates": [
+     65
+    ],
+    "loss": [
+     67
+    ],
+    "function": [
+     68
+    ],
+    "based": [
+     69
+    ],
+    "on": [
+     70,
+     88,
+     109,
+     122
+    ],
+    "synonymity,": [
+     72
+    ],
+    "aligning": [
+     73
+    ],
+    "model's": [
+     75
+    ],
+    "learning": [
+     76
+    ],
+    "process": [
+     77
+    ],
+    "reality": [
+     81
+    ],
+    "sequences.": [
+     84
+    ],
+    "evaluate": [
+     86
+    ],
+    "diverse": [
+     89,
+     111,
+     137
+    ],
+    "datasets": [
+     91
+    ],
+    "and": [
+     92,
+     116
+    ],
+    "tasks,": [
+     93
+    ],
+    "demonstrating": [
+     94
+    ],
+    "outperforms": [
+     97
+    ],
+    "standard": [
+     98
+    ],
+    "as": [
+     102,
+     104
+    ],
+    "well": [
+     103
+    ],
+    "foundation": [
+     106
+    ],
+    "baselines": [
+     108
+    ],
+    "seven": [
+     110
+    ],
+    "downstream": [
+     112
+    ],
+    "property": [
+     113
+    ],
+    "prediction": [
+     114
+    ],
+    "tasks": [
+     115,
+     121
+    ],
+    "an": [
+     117
+    ],
+    "antibody": [
+     118
+    ],
+    "region": [
+     119
+    ],
+    "annotation": [
+     120
+    ],
+    "average": [
+     123
+    ],
+    "by": [
+     124
+    ],
+    "around": [
+     125
+    ],
+    "8%.": [
+     126
+    ],
+    "Additionally,": [
+     127
+    ],
+    "enhances": [
+     129
+    ],
+    "generative": [
+     131
+    ],
+    "capabilities": [
+     132
+    ],
+    "model,": [
+     135
+    ],
+    "producing": [
+     136
+    ],
+    "sequences": [
+     139
+    ],
+    "better": [
+     141
+    ],
+    "align": [
+     142
+    ],
+    "underlying": [
+     145
+    ],
+    "true": [
+     146
+    ],
+    "data": [
+     147
+    ],
+    "distribution": [
+     148
+    ],
+    "compared": [
+     149
+    ],
+    "non-hierarchical": [
+     151
+    ],
+    "baselines.": [
+     152
+    ]
+   },
+   "updated_date": "2026-10-16T09:59:22.235173",
+   "created_date": "2025-10-10T00:00:00"
+  }
+ ],
+ "group_by": []
+}

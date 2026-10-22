@@ -10,6 +10,7 @@ export type FieldType =
   | 'select'
   | 'checkbox'
   | 'color'
+  | 'pdf'
   | 'list'
   | 'authors'
   | 'image'
@@ -109,7 +110,7 @@ export const COLLECTIONS: Record<string, CollectionConfig> = {
       text('doi', 'DOI'),
       text('arxiv', 'arXiv id'),
       text('url', 'URL'),
-      text('pdf', 'PDF URL'),
+      { key: 'pdf', label: 'PDF URL', type: 'pdf' },
       text('code', 'Code URL'),
       { key: 'featured', label: 'Featured', type: 'checkbox' },
       { key: 'abstract', label: 'Abstract', type: 'textarea' },

@@ -112,3 +112,29 @@ test('site: pages takes on/off per built-in page and refuses an unknown page', (
   assert.equal(configSchemas.site.safeParse({ ...site, pages: { talk: false } }).success, false);
   assert.equal(configSchemas.site.safeParse({ ...site, pages: { talks: 'no' } }).success, false);
 });
+
+test('publication pdf: an absolute URL or a same-site path', () => {
+  const pdf = (v: string) =>
+    adminCollections.publications.safeParse({
+      title: 'T',
+      authors: [],
+      venue: 'V',
+      year: 2024,
+      type: 'conference',
+      pdf: v,
+    });
+  for (const ok of ['/images/x.pdf', 'https://example.org/x.pdf']) assert.ok(pdf(ok).success, ok);
+  for (const bad of [
+    '//evil.test/x.pdf',
+    'javascript:alert(1)',
+    'x.pdf',
+    '/\\evil.test',
+    '/\t/evil.test/x.pdf',
+    '/\n/evil.test',
+    '/images/my paper.pdf',
+  ]) {
+    assert.ok(!pdf(bad).success, bad);
+  }
+  const empty = pdf('');
+  assert.ok(empty.success && empty.data.pdf === undefined);
+});

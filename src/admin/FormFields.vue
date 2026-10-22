@@ -4,6 +4,8 @@ import ImagePicker from './ImagePicker.vue';
 import ListInput from './ListInput.vue';
 import MarkdownEditor from './MarkdownEditor.vue';
 import { getIn, optionOf, replaceAt, setIn, type FieldDef, type Option } from './fields';
+import { api, ApiError, committed, report, toast, toastError } from './api';
+import type { CommitResult, MediaFile } from './types';
 import { bibtexFor, type BibSource } from '../lib/bibtex';
 import { isOwner } from '../lib/editorial';
 
@@ -32,6 +34,25 @@ const unlisted = (f: FieldDef, values: unknown[]) =>
     .filter((v) => v != null && v !== '')
     .map(String)
     .filter((v) => !options(f).some((o) => o.value === v));
+/** Uploads through the media API (the site folder: a PDF needs a public URL) and sets the field to its URL. */
+async function uploadPdf(key: string, e: Event) {
+  const input = e.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = ''; // choosing the same file again fires `change` again
+  if (!file) return;
+  const form = new FormData();
+  form.append('file', file);
+  form.append('folder', 'site');
+  try {
+    const up = await api<MediaFile & { commit: Pick<CommitResult, 'id' | 'url'> | null }>('media', { form });
+    if (up.commit) committed(up.commit);
+    else toast('That PDF is already uploaded');
+    set(key, up.url);
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 413) toastError('PDFs must be 4 MB or smaller');
+    else report(err);
+  }
+}
 const regenerate = (key: string) => set(key, bibtexFor({ ...(props.model as BibSource), bibtex: undefined }));
 </script>
 
@@ -118,6 +139,30 @@ const regenerate = (key: string) => set(key, bibtexFor({ ...(props.model as BibS
           />
         </div>
         <small v-if="f.hint">{{ f.hint }}</small>
+        <span v-if="error(f.key)" :id="errorId(f.key)" class="adm-err">{{ error(f.key) }}</span>
+      </div>
+
+      <div v-else-if="f.type === 'pdf'" class="adm-field">
+        <label :for="labelId(f.key)">{{ f.label }}</label>
+        <div class="adm-list-row">
+          <input
+            :id="labelId(f.key)"
+            type="text"
+            :value="value(f.key) ?? ''"
+            v-bind="invalid(f.key)"
+            @input="set(f.key, text($event))"
+          />
+          <label class="adm-btn adm-btn-small">
+            Upload PDF
+            <input
+              type="file"
+              accept="application/pdf,.pdf"
+              class="adm-visually-hidden"
+              aria-label="Upload PDF"
+              @change="uploadPdf(f.key, $event)"
+            />
+          </label>
+        </div>
         <span v-if="error(f.key)" :id="errorId(f.key)" class="adm-err">{{ error(f.key) }}</span>
       </div>
 

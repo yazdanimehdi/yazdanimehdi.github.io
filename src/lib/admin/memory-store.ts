@@ -1,6 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { deleteRepoMedia, listRepoMedia, putRepoMedia } from './git-media';
+import { deleteRepoMedia, listRepoMedia, putRepoMedia, sitePdfPath } from './git-media';
 import {
   ConflictError,
   blobVersions,
@@ -92,6 +92,19 @@ export class MemoryStore implements ContentStore {
 
   deleteMedia(path: string, version: string) {
     return deleteRepoMedia(this, path, version);
+  }
+
+  async isOwnPdf(url: string): Promise<boolean> {
+    return sitePdfPath(url) !== null;
+  }
+
+  async readPdf(url: string): Promise<Uint8Array | null> {
+    const p = sitePdfPath(url);
+    if (!p || this.version(p) === null) return null;
+    const file = this.overlay.get(p);
+    return file
+      ? Buffer.from(file.content, file.encoding === 'base64' ? 'base64' : 'utf8')
+      : fs.readFileSync(path.join(this.root, p));
   }
 }
 

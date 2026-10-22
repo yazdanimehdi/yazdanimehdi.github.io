@@ -2,10 +2,11 @@ import { promises as dns } from 'node:dns';
 import { BlockList, isIP } from 'node:net';
 
 export class SourceError extends Error {
-  /** The HTTP status, when the error is a non-2xx answer. */
+  /** The HTTP status, when the error is a non-2xx answer, and its Retry-After header when it sent one. */
   constructor(
     message: string,
     readonly status?: number,
+    readonly retryAfter?: string,
   ) {
     super(message);
   }
@@ -80,7 +81,7 @@ function toUrl(href: string, base?: URL): URL {
   }
 }
 
-async function readCapped(res: Response, host: string, maxBytes: number): Promise<string> {
+async function readCapped(res: Response, host: string, maxBytes: number): Promise<Buffer> {
   const chunks: Uint8Array[] = [];
   let size = 0;
   for await (const chunk of res.body ?? []) {
@@ -88,7 +89,7 @@ async function readCapped(res: Response, host: string, maxBytes: number): Promis
     if (size > maxBytes) throw new SourceError(`${host}: response is over ${maxBytes} bytes`);
     chunks.push(chunk);
   }
-  return Buffer.concat(chunks).toString('utf8');
+  return Buffer.concat(chunks);
 }
 
 /** Lets the connection go without reading the body. */
@@ -101,6 +102,11 @@ const fail = (url: URL) => (e: unknown) => {
 
 /** GET with the job-search User-Agent, a 15 s timeout, checked redirects, and a body cap (`init.maxBytes`, 5 MB by default). */
 export async function getText(url: string, init: FetchInit = {}): Promise<string> {
+  return (await getBytes(url, init)).toString('utf8');
+}
+
+/** getText's body as bytes (a PDF). */
+export async function getBytes(url: string, init: FetchInit = {}): Promise<Buffer> {
   const signal = AbortSignal.timeout(15_000);
   let headers: Record<string, string> = {
     'User-Agent': init.siteUrl ? `ScholarOS job search (+${init.siteUrl})` : 'ScholarOS job search',
@@ -125,7 +131,11 @@ export async function getText(url: string, init: FetchInit = {}): Promise<string
     }
     if (!res.ok) {
       discard(res);
-      throw new SourceError(`${current.host} answered ${res.status}`, res.status);
+      throw new SourceError(
+        `${current.host} answered ${res.status}`,
+        res.status,
+        res.headers.get('retry-after') ?? undefined,
+      );
     }
     return readCapped(res, current.host, init.maxBytes ?? MAX_BYTES).catch(fail(current));
   }
