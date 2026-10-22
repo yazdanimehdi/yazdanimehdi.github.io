@@ -1,4 +1,4 @@
-import { nextTick, reactive, watch } from 'vue';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
 import { ApiError, committed, report } from './api';
 import type { CommitResult } from './types';
 
@@ -68,6 +68,8 @@ type Loader<T> = () => Promise<{ value: T; version: string | null; readonly?: bo
 export function useDocument<T extends object>() {
   let loader: Loader<T> | null = null;
   let tracking = false;
+  /** The value as last loaded or saved, serialized: `dirty` compares against it. */
+  const baseline = ref('null');
   const doc = reactive({
     key: '',
     current: null as T | null,
@@ -81,6 +83,8 @@ export function useDocument<T extends object>() {
     errors: {} as Record<string, string>,
     conflict: false,
     saving: false,
+    /** The open value differs from what was loaded or last saved. */
+    dirty: computed(() => !doc.readonly && JSON.stringify(doc.current) !== baseline.value),
     async open(key: string, load: Loader<T>) {
       doc.key = key;
       loader = load;
@@ -102,6 +106,7 @@ export function useDocument<T extends object>() {
         doc.draftStale = !!offered && saved!.base !== undefined && saved!.base !== version;
         doc.draftChanges = offered ? changedKeys(offered, value) : [];
         doc.current = value as typeof doc.current;
+        baseline.value = JSON.stringify(value);
         doc.version = version;
         doc.readonly = readonly;
         doc.conflict = false;
@@ -126,8 +131,10 @@ export function useDocument<T extends object>() {
       if (!doc.current) return undefined;
       doc.saving = true;
       doc.errors = {};
+      const sent = JSON.stringify(doc.current);
       try {
         const result = await send(doc.current as T, doc.version);
+        baseline.value = sent;
         doc.version = result.versions[path] ?? null;
         doc.discard();
         committed(result);
