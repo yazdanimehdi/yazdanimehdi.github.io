@@ -19,7 +19,7 @@ export async function readingRoom(job: RoomJob): Promise<void> {
 }
 
 /** A reading-room run that still says running after this is stuck (it waits on arXiv, then one or two AI calls). */
-const STALE_MS = 15 * 60_000;
+export const STALE_MS = 15 * 60_000;
 
 /** The slice of the Workflow API startRoomRun uses; tests pass their own. */
 export interface RoomRuns {

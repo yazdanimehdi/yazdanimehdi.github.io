@@ -1,20 +1,54 @@
 import { HttpError, json, readBody } from '../../../../../lib/admin/http';
 import { careerRoute } from '../../../../../lib/career/route';
 import { getSql } from '../../../../../lib/db';
-import { setPaperState } from '../../../../../lib/reading/db';
+import { getPapers, readReading, setPaperState } from '../../../../../lib/reading/db';
+import { fetchMissingTexts, idParam, shownOutputs, useToday } from '../../../../../lib/reading/library';
+import { getNote, getPassages, listHighlights, notebooksOf, readText } from '../../../../../lib/reading/room-db';
+import { parseReadingPrefs } from '../../../../../lib/reading/settings';
 import type { PaperState } from '../../../../../lib/reading/types';
 
 export const prerender = false;
 
 const STATES = new Set<string>(['new', 'saved', 'dismissed'] satisfies PaperState[]);
 
-/** `{ state }`: save, dismiss or reset a paper → `{ state }`. */
+/** The reading room's data for one paper. A text whose fetch failed is fetched again, unless an output's run is on it. */
+export const GET = careerRoute(async (ctx) => {
+  const sql = getSql();
+  const id = idParam(ctx.params.id);
+  const target = { paper: id };
+  const [[paper], t, passages, outputs, highlights, note, notebooks, reading] = await Promise.all([
+    getPapers(sql, [id]),
+    readText(sql, id),
+    getPassages(sql, [id]),
+    shownOutputs(sql, target),
+    listHighlights(sql, [id]),
+    getNote(sql, target),
+    notebooksOf(sql, id),
+    readReading(sql),
+  ]);
+  if (!paper) throw new HttpError(404, 'Not found');
+  if (t.error && !Object.values(outputs).some((o) => o.status === 'running'))
+    await fetchMissingTexts(sql, target, [id]);
+  return json({
+    paper,
+    text: { source: t.source, error: t.error, note: t.note, pages: t.pages },
+    passages: passages.map(({ pid, kind, body }) => ({ pid, kind, body })),
+    outputs,
+    highlights,
+    note,
+    notebooks,
+    use: await useToday(sql, parseReadingPrefs(reading.prefs)),
+  });
+});
+
+/** `{ state }`: save, dismiss or reset a paper → `{ state }`. Saving starts fetching its text when it has none. */
 export const PATCH = careerRoute(async (ctx) => {
-  const id = Number(ctx.params.id);
+  const id = idParam(ctx.params.id);
   const { state } = await readBody<{ state?: unknown }>(ctx);
   if (typeof state !== 'string' || !STATES.has(state))
     throw new HttpError(400, '`state` must be new, saved or dismissed');
-  if (!Number.isSafeInteger(id) || id < 1 || !(await setPaperState(getSql(), id, state as PaperState)))
-    throw new HttpError(404, 'Not found');
+  const sql = getSql();
+  if (!(await setPaperState(sql, id, state as PaperState))) throw new HttpError(404, 'Not found');
+  if (state === 'saved') await fetchMissingTexts(sql, { paper: id }, [id]);
   return json({ state });
 });
