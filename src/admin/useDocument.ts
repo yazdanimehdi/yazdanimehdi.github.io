@@ -127,6 +127,12 @@ export function useDocument<T extends object>() {
       doc.draftStale = false;
       dropDraft(doc.key);
     },
+    /** Take the open value as saved, e.g. after a commit made outside save() changed it: not dirty, no draft. */
+    async settle() {
+      await nextTick(); // let the watcher record the change first, so the draft it writes is the one dropped
+      baseline.value = JSON.stringify(doc.current);
+      doc.discard();
+    },
     async save(send: (value: T, version: string | null) => Promise<CommitResult>, path: string) {
       if (!doc.current) return undefined;
       doc.saving = true;

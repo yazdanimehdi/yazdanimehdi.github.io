@@ -72,6 +72,17 @@ test('a successful save clears the draft and takes the new version', async () =>
   assert.equal(stored(), null);
 });
 
+test('settle() after a change made outside save() leaves nothing unsaved and no draft', async () => {
+  const doc = await opened({ title: 'server' });
+  await doc.save(async () => ({ id: 'c', versions: { p: 'v2' } }), 'p');
+  doc.current!.title = 'committed elsewhere';
+  assert.equal(doc.dirty, true);
+  await doc.settle();
+  assert.equal(doc.dirty, false);
+  await flush();
+  assert.equal(stored(), null);
+});
+
 test('retarget() makes reload() use the new loader and key', async () => {
   const doc = await opened({ title: 'new' });
   doc.retarget('k2', loader({ title: 'saved' }));
