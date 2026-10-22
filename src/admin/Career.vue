@@ -5,7 +5,7 @@ import AdminShell from './AdminShell.vue';
 import { api, report, session, toast } from './api';
 import { formatDateTime, relativeTime } from './dates';
 import { vDialog } from './dialog';
-import { READY_STATE, visible, isRunning, type ReadyRow, type RunStatus } from './career';
+import { READY_STATE, digestError, runLine, visible, isRunning, type ReadyRow, type RunStatus } from './career';
 import type { AdminCtx } from './types';
 import type { CareerPrefs } from '../lib/career/settings';
 import type { Feed, PostingSummary } from '../lib/career/types';
@@ -149,7 +149,6 @@ async function runNow() {
   }
 }
 
-const found = computed(() => run.value.lastRun?.sources.reduce((n, s) => n + s.found, 0) ?? 0);
 const where = (r: PostingSummary) => [r.location, r.remote ? 'remote' : ''].filter(Boolean).join(' · ');
 
 // The run status is unknown until `career/run` answers; until then the strip shows a placeholder, not "No run yet".
@@ -196,9 +195,7 @@ onBeforeUnmount(() => {
         <template v-if="run.status === 'failed'">The last run failed. </template>
         <template v-if="run.lastRun">
           {{ run.status === 'failed' ? 'Last finished run' : 'Last run' }} {{ relativeTime(run.lastRun.at) }} ·
-          {{ found }} found · {{ run.lastRun.scored }} scored
-          <template v-if="run.lastRun.deferred"> · {{ run.lastRun.deferred }} left for later</template>
-          <template v-if="run.lastRun.failed"> · {{ run.lastRun.failed }} failed to score</template>
+          {{ runLine(run.lastRun) }}
         </template>
         <template v-else-if="run.status !== 'failed'">No run yet. The search runs every night.</template>
       </p>
@@ -207,6 +204,10 @@ onBeforeUnmount(() => {
       </button>
     </div>
     <template v-if="run.lastRun">
+      <p v-if="run.lastRun.stopped" class="adm-err" role="status">Stopped early: {{ visible(run.lastRun.stopped) }}</p>
+      <p v-if="digestError(run.lastRun)" class="adm-err" role="status">
+        The digest email wasn’t sent: {{ visible(digestError(run.lastRun)!) }}
+      </p>
       <p v-if="run.lastRun.scoreSkipped" class="adm-err" role="status">
         Nothing was scored: {{ visible(run.lastRun.scoreSkipped) }}
       </p>

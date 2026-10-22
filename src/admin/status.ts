@@ -1,3 +1,4 @@
+import { visible } from '../lib/career/text';
 import { postStatus } from '../lib/utils';
 import { formatDate } from './dates';
 import type { Entry } from './types';
@@ -30,8 +31,8 @@ export interface DashboardData {
   lastCommit: { at: string; url: string } | null;
   /** Publishers only: who asked for Site editor changes that wait for review (empty: none, or not a publisher). */
   review: string[];
-  /** The job-search owner in Postgres mode: postings waiting for approval. */
-  career?: { ready: number };
+  /** The job-search owner in Postgres mode: postings waiting for approval, and why the last run stopped early. */
+  career?: { ready: number; stopped?: string };
 }
 
 /**
@@ -338,8 +339,8 @@ function backup(d: DashboardData): StatusRow {
 }
 
 /**
- * The job search: the owner sees what waits for approval; the run's failure still comes first. The run's detail stays
- * unread on purpose (every admin reads jobs.json); `career` is only sent to the owner.
+ * The job search: the owner sees what waits for approval; a run that failed to start, then a night that stopped early,
+ * come first. The run's detail stays unread on purpose (every admin reads jobs.json); `career` is only sent to the owner.
  */
 function career(d: DashboardData): StatusRow[] {
   const run = d.runs.career;
@@ -358,6 +359,16 @@ function career(d: DashboardData): StatusRow[] {
       },
     ];
   if (!d.career) return [{ ...row, state: 'Checked with the daily jobs', tone: 'ok' }];
+  if (d.career.stopped) {
+    return [
+      {
+        ...row,
+        state: `Stopped early: ${visible(d.career.stopped)}`,
+        tone: 'attention',
+        ...(ready ? { detail: `${ready} ready for approval`, ...review } : { action: screen('Open', 'career') }),
+      },
+    ];
+  }
   const state = ready ? `${ready} ready for approval` : 'Nothing waiting';
   return [{ ...row, state, tone: 'ok', ...(run ? { detail: 'Checked with the daily jobs' } : {}), ...review }];
 }

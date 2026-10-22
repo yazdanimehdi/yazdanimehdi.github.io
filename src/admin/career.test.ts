@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { coverageLine, coverageState, evidenceLabel, httpUrl, visible } from './career';
+import { coverageLine, coverageState, evidenceLabel, httpUrl, runLine, visible } from './career';
 
 test('visible strips format characters and turns line separators into spaces', () => {
   assert.equal(visible('a\u202eb\u200bc\u2028d\u2029e\ufefff'), 'abc d ef');
@@ -72,4 +72,25 @@ test('coverageState and coverageLine', () => {
   assert.deepEqual(reqs.map(coverageState), ['shown', 'cut', 'reworded', 'gap', 'gap']);
   assert.equal(coverageLine(reqs), 'Required: 1 of 4 shown · preferred: 0 of 1 · 2 not in your CV');
   assert.equal(coverageLine(reqs.slice(0, 1)), 'Required: 1 of 1 shown');
+});
+
+test('runLine counts the night, its non-zero outcomes included, or says it was paused', () => {
+  const run = {
+    at: '2026-10-22T03:00:00Z',
+    sources: [
+      { id: 'a', found: 5, added: 2 },
+      { id: 'b', found: 1, added: 0 },
+    ],
+    scored: 4,
+    failed: 0,
+    deferred: 0,
+  };
+  assert.equal(runLine(run), '6 found · 4 scored');
+  assert.equal(runLine({ ...run, drafted: 0, prefilled: 0, handedOff: 0, limited: 0 }), '6 found · 4 scored');
+  assert.equal(
+    runLine({ ...run, deferred: 2, failed: 1, drafted: 3, prefilled: 2, handedOff: 1, limited: 4 }),
+    '6 found · 4 scored · 2 left for later · 1 failed to score · 3 drafted · 2 pre-filled · 1 to finish yourself · ' +
+      '4 held back by limits',
+  );
+  assert.equal(runLine({ ...run, paused: true }), 'Paused: nothing ran');
 });

@@ -10,6 +10,27 @@ export interface RunStatus {
   lastRun: RunSummary | null;
 }
 
+/** The last run in one line: its counts and the night's non-zero outcomes, or that the pause switch stopped it. */
+export function runLine(r: RunSummary): string {
+  if (r.paused) return 'Paused: nothing ran';
+  const found = r.sources.reduce((n, s) => n + s.found, 0);
+  const counts: [number | undefined, string][] = [
+    [r.deferred, 'left for later'],
+    [r.failed, 'failed to score'],
+    [r.drafted, 'drafted'],
+    [r.prefilled, 'pre-filled'],
+    [r.handedOff, 'to finish yourself'],
+    [r.limited, 'held back by limits'],
+  ];
+  return [`${found} found`, `${r.scored} scored`, ...counts.filter(([n]) => n).map(([n, what]) => `${n} ${what}`)].join(
+    ' · ',
+  );
+}
+
+/** The digest's outcome when it is Resend's error rather than sent or skipped. */
+export const digestError = (r: RunSummary) =>
+  r.digest && r.digest !== 'sent' && r.digest !== 'skipped' ? r.digest : null;
+
 /** Still working: poll until it isn't. */
 export const isRunning = (status: string | null) => status === 'running' || status === 'pending';
 
