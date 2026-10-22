@@ -40,6 +40,7 @@ test('fetchNew arxiv drops replacements', async () => {
   assert.equal(p.url, 'https://arxiv.org/abs/2610.28673');
   assert.deepEqual(p.categories, ['cs.CL', 'cs.SD', 'eess.AS']);
   assert.ok((p.abstract ?? '').length > 100);
+  assert.equal(p.publishedAt, '2026-10-22');
 });
 
 test('fetchNew biorxiv pages until the total', async () => {
@@ -68,6 +69,36 @@ test('fetchNew biorxiv pages until the total', async () => {
   assert.equal(papers[0].url, 'https://doi.org/10.1101/0');
   assert.equal(papers[0].source, 'biorxiv');
   assert.deepEqual(papers[0].categories, ['neuroscience']);
+  assert.equal(papers[0].publishedAt, '2024-01-01');
+});
+
+test('fetchNew biorxiv keeps one paper per DOI, at its latest version', async () => {
+  const one = JSON.parse(fixture('papers/biorxiv.json')).collection[0];
+  const v = (version: string, title: string, date: string) => ({ ...one, doi: '10.1101/x', version, title, date });
+  // Version 2 on the first page, version 1 on the second: the order of pages must not decide.
+  const page = (collection: object[]) => JSON.stringify({ messages: [{ status: 'ok', total: '31' }], collection });
+  const { get } = fake([
+    [
+      '/0?',
+      () =>
+        page([
+          v('2', 'Second take', '2026-10-21'),
+          ...Array.from({ length: 29 }, (_, i) => ({ ...one, doi: `10.1101/${i}` })),
+        ]),
+    ],
+    ['/30?', () => page([v('1', 'First take', '2026-10-20')])],
+  ]);
+  const papers = await fetchNew(
+    'medrxiv',
+    prefs({ medrxiv: { on: true, categories: ['hiv_aids'] } }),
+    get,
+    '2026-10-22',
+  );
+  const x = papers.filter((p) => p.key === 'doi:10.1101/x');
+  assert.equal(papers.length, 30);
+  assert.equal(x.length, 1);
+  assert.equal(x[0].title, 'Second take');
+  assert.equal(x[0].publishedAt, '2026-10-21');
 });
 
 test('fetchNew pubmed fetches the ids esearch found', async () => {
@@ -88,6 +119,7 @@ test('fetchNew pubmed fetches the ids esearch found', async () => {
   assert.equal(papers[0].key, 'doi:10.1093/bib/bbad136');
   assert.equal(papers[0].pmid, '37096593');
   assert.equal(papers[0].url, 'https://pubmed.ncbi.nlm.nih.gov/37096593/');
+  assert.equal(papers[0].publishedAt, '2023-04-25');
 });
 
 test('fetchNew pubmed skips efetch when esearch finds nothing', async () => {

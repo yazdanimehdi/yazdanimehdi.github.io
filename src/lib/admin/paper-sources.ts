@@ -12,6 +12,8 @@ export interface PaperRecord {
   primaryClass?: string;
   doi?: string;
   pmid?: string;
+  /** YYYY-MM-DD: arXiv's announcement day, bioRxiv/medRxiv's posting day, PubMed's entry day. */
+  date?: string;
   /** DOI of the published version, as reported by bioRxiv/medRxiv. */
   publishedDoi?: string;
   /** arXiv's arxiv:journal_ref. */
@@ -42,6 +44,21 @@ function tag(xml: string, name: string): string | undefined {
 
 function all(xml: string, name: string): string[] {
   return [...xml.matchAll(new RegExp(`<${name}(?:\\s[^>]*)?>[\\s\\S]*?</${name}>`, 'g'))].map((m) => m[0]);
+}
+
+const MONTHS = 'JanFebMarAprMayJunJulAugSepOctNovDec';
+/** YYYY-MM-DD from numbers, or undefined unless it is a real calendar day. */
+function ymd(y: unknown, m: unknown, d: unknown): string | undefined {
+  const date = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+  const t = Date.parse(`${date}T00:00:00Z`);
+  return !Number.isNaN(t) && new Date(t).toISOString().startsWith(date) ? date : undefined;
+}
+
+/** The day of an RSS date ("Thu, 22 Oct 2026 00:00:00 -0400") as written, not shifted to UTC. */
+function rssDay(s: string | undefined): string | undefined {
+  const m = s?.match(/(\d{1,2}) ([A-Z][a-z]{2}) (\d{4})/);
+  const month = m ? MONTHS.indexOf(m[2]) : -1;
+  return m && month >= 0 && month % 3 === 0 ? ymd(m[3], month / 3 + 1, m[1]) : undefined;
 }
 
 const yearOf = (s: unknown) => Number(String(s ?? '').match(/\d{4}/)?.[0] ?? 0);
@@ -88,6 +105,7 @@ export function parseArxivRss(xml: string): (PaperRecord & { announce: string; c
           .map((a) => a.trim())
           .filter(Boolean),
         year: yearOf(tag(item, 'pubDate')),
+        date: rssDay(tag(item, 'pubDate')),
         abstract: tag(item, 'description')?.match(/Abstract:\s*([\s\S]+)/)?.[1],
         arxiv: id,
         announce: tag(item, 'arxiv:announce_type') ?? '',
@@ -186,6 +204,7 @@ export function parseBiorxiv(json: unknown, server: 'biorxiv' | 'medrxiv'): Pape
           .map((a) => a.trim())
           .filter(Boolean),
         year: yearOf(c.date),
+        date: str(c.date)?.match(/^\d{4}-\d{2}-\d{2}$/)?.[0],
         abstract: str(c.abstract) ? collapse(c.abstract as string) : undefined,
         doi: str(c.doi),
         publishedDoi: published && published !== 'NA' ? published : undefined,
@@ -210,6 +229,8 @@ export function parsePubmed(xml: string): PaperRecord[] {
       .join(' ');
     const pubDate = tag(art, 'PubDate') ?? '';
     const journal = art.match(/<Journal>([\s\S]*?)<\/Journal>/)?.[1] ?? '';
+    // The entry date: always a full day, and the date esearch's datetype=edat window filters on (PubDate is often partial).
+    const entrez = art.match(/<PubMedPubDate PubStatus="entrez">([\s\S]*?)<\/PubMedPubDate>/)?.[1];
     return [
       {
         source: 'pubmed' as const,
@@ -219,6 +240,7 @@ export function parsePubmed(xml: string): PaperRecord[] {
         abstract: abstract || undefined,
         doi: art.match(/<ELocationID[^>]*EIdType="doi"[^>]*>([^<]+)</)?.[1]?.trim(),
         pmid: tag(art, 'PMID'),
+        date: entrez ? ymd(tag(entrez, 'Year'), tag(entrez, 'Month'), tag(entrez, 'Day')) : undefined,
         venue: tag(journal, 'Title'),
         type: 'journal' as const,
       },

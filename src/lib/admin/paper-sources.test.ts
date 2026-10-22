@@ -147,6 +147,16 @@ test('parsePubmed reads the PMID', () => {
   assert.equal(parsePubmed(fixture('pubmed.xml'))[0].pmid, '37096593');
 });
 
+test('parsePubmed dates a record by its PubMed entry date', () => {
+  assert.equal(parsePubmed(fixture('pubmed.xml'))[0].date, '2023-04-25');
+  assert.equal(parsePubmed('<PubmedArticle><ArticleTitle>T</ArticleTitle></PubmedArticle>')[0].date, undefined);
+});
+
+test('parseBiorxiv dates a record by its posting date', () => {
+  assert.equal(parseBiorxiv(JSON.parse(fixture('biorxiv.json')), 'biorxiv')[0].date, '2024-01-01');
+  assert.equal(parseBiorxiv({ collection: [{ title: 'T', date: 'NA' }] }, 'biorxiv')[0].date, undefined);
+});
+
 test('parseArxivRss reads id, authors, abstract, categories and announce type', () => {
   const xml = fs.readFileSync(new URL('../../../tests/fixtures/reading/arxiv-rss.xml', import.meta.url), 'utf8');
   const items = parseArxivRss(xml);
@@ -168,6 +178,10 @@ test('parseArxivRss reads id, authors, abstract, categories and announce type', 
   assert.doesNotMatch(r.abstract ?? '', /Announce Type|\n/);
   assert.deepEqual(r.categories, ['cs.CL', 'cs.SD', 'eess.AS']);
   assert.equal(r.year, 2026);
+  assert.equal(r.date, '2026-10-22');
+  // The announcement day as written, not shifted to UTC.
+  const late = xml.replace(/<pubDate>[^<]*<\/pubDate>/, '<pubDate>Thu, 22 Oct 2026 23:30:00 -0400</pubDate>');
+  assert.equal(parseArxivRss(late)[0].date, '2026-10-22');
 });
 
 test('parseOpenAlex rebuilds the abstract and maps fields', () => {

@@ -21,6 +21,7 @@ const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 /** Keyword hits, case-insensitive and whole-word: 2 per keyword in the title, 1 per keyword in the abstract. */
 export function overlap(p: { title: string; abstract?: string | null }, keywords: string[]): number {
   return keywords.reduce((sum, k) => {
+    if (!k.trim()) return sum;
     const word = new RegExp(`(?<![\\p{L}\\p{N}])${escape(k.trim())}(?![\\p{L}\\p{N}])`, 'iu');
     return sum + (word.test(p.title) ? 2 : 0) + (p.abstract && word.test(p.abstract) ? 1 : 0);
   }, 0);

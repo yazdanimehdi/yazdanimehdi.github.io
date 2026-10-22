@@ -29,6 +29,10 @@ test('overlap counts title hits double', () => {
   assert.equal(overlap({ title: 'Scaling GPT-4 evals', abstract: null }, ['gpt-4']), 2);
 });
 
+test('overlap ignores blank keywords', () => {
+  assert.equal(overlap({ title: 'A title: two', abstract: 'An abstract - yes' }, ['', '   ']), 0);
+});
+
 test('topByOverlap keeps feed order among equals', () => {
   const items = [
     { id: 'a', s: 1 },

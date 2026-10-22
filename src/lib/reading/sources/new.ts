@@ -19,9 +19,12 @@ const twoDaysBefore = (day: string) =>
 function toNew(r: PaperRecord, url: string, categories: string[]): NewPaper[] {
   const key = paperKey(r);
   if (!key) return [];
-  const { arxiv, doi, pmid, source, title, authors, abstract } = r;
-  return [{ key, arxiv, doi, pmid, source, title, authors, abstract, url, categories }];
+  const { arxiv, doi, pmid, source, title, authors, abstract, date: publishedAt } = r;
+  return [{ key, arxiv, doi, pmid, source, title, authors, abstract, url, publishedAt, categories }];
 }
+
+/** One paper per key: the contract later steps rely on (the last record for a key wins). */
+const unique = (papers: NewPaper[]) => [...new Map(papers.map((p) => [p.key, p])).values()];
 
 export async function fetchNew(
   id: (typeof NEW_SOURCES)[number],
@@ -34,9 +37,11 @@ export async function fetchNew(
     const { categories } = prefs.sources.arxiv;
     if (!categories.length) return [];
     const xml = await get(`https://rss.arxiv.org/rss/${categories.join('+')}`, 'application/rss+xml');
-    return parseArxivRss(xml)
-      .filter((r) => r.announce === 'new' || r.announce === 'cross')
-      .flatMap((r) => toNew(r, `https://arxiv.org/abs/${r.arxiv}`, r.categories));
+    return unique(
+      parseArxivRss(xml)
+        .filter((r) => r.announce === 'new' || r.announce === 'cross')
+        .flatMap((r) => toNew(r, `https://arxiv.org/abs/${r.arxiv}`, r.categories)),
+    );
   }
   if (id === 'pubmed') {
     const term = prefs.sources.pubmed.query.trim();
@@ -48,18 +53,27 @@ export async function fetchNew(
     const ids: unknown[] = search?.esearchresult?.idlist ?? [];
     if (!ids.length) return [];
     const xml = await get(`${EUTILS}efetch.fcgi?db=pubmed&retmode=xml&id=${ids.map((i) => q(String(i))).join(',')}`);
-    return parsePubmed(xml).flatMap((r) => (r.pmid ? toNew(r, `https://pubmed.ncbi.nlm.nih.gov/${r.pmid}/`, []) : []));
+    return unique(
+      parsePubmed(xml).flatMap((r) => (r.pmid ? toNew(r, `https://pubmed.ncbi.nlm.nih.gov/${r.pmid}/`, []) : [])),
+    );
   }
   const papers: NewPaper[] = [];
   for (const category of prefs.sources[id].categories) {
+    // `details` lists a paper once per version posted in the window: keep its latest version.
+    const latest = new Map<unknown, { version?: unknown }>();
     for (let page = 0, cursor = 0; page < MAX_PAGES; page++, cursor += PAGE) {
       const json = JSON.parse(
         await get(`https://api.biorxiv.org/details/${id}/${from}/${day}/${cursor}?category=${q(category)}`),
       );
-      papers.push(...parseBiorxiv(json, id).flatMap((r) => toNew(r, `https://doi.org/${r.doi}`, [category])));
+      for (const c of Array.isArray(json?.collection) ? json.collection : []) {
+        const seen = latest.get(c?.doi);
+        if (!seen || Number(c?.version) > Number(seen.version)) latest.set(c?.doi, c);
+      }
       // The API sends `total` as a string, and none at all when nothing matched.
       if (!(cursor + PAGE < Number(json?.messages?.[0]?.total))) break;
     }
+    const records = parseBiorxiv({ collection: [...latest.values()] }, id);
+    papers.push(...records.flatMap((r) => toNew(r, `https://doi.org/${r.doi}`, [category])));
   }
-  return papers;
+  return unique(papers);
 }
