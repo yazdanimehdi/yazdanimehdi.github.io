@@ -136,3 +136,42 @@ export interface LibraryItem {
   paper: Pick<Paper, 'id' | 'title' | 'authors' | 'source' | 'url' | 'publishedAt' | 'state'>;
   savedAt: string;
 }
+
+export type NoteKind = 'paper' | 'chat' | 'free';
+
+/** A saved answer as a chat note keeps it, whatever happens to the chat. askedAt: the answer's time. */
+export interface ChatSnapshot {
+  question: string;
+  answer: string;
+  cites: Cite[];
+  askedAt: string;
+}
+
+export interface VaultNote {
+  id: number;
+  kind: NoteKind;
+  title: string;
+  body: string;
+  paperId: number | null;
+  chat: ChatSnapshot | null;
+  chatId: number | null;
+  notebookId: number | null;
+  suggestedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface NoteRow {
+  id: number;
+  kind: NoteKind;
+  title: string;
+  updatedAt: string;
+}
+
+/** targetId null: a new concept note */
+export interface Suggestion {
+  id: number;
+  targetId: number | null;
+  title: string;
+  reason: string;
+}

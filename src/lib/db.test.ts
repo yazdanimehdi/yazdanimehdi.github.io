@@ -16,6 +16,7 @@ test('migrate creates the tables once; a second run applies nothing', async () =
     '007_apply_lock.sql',
     '008_reading.sql',
     '009_reading_room.sql',
+    '010_vault.sql',
   ]);
   assert.deepEqual(await migrate(sql), []);
   await sql`insert into documents (path, content) values ('config/site.yml', 'title: A')`;
@@ -50,6 +51,9 @@ test('migrate creates the tables once; a second run applies nothing', async () =
       'revisions',
       'schema_migrations',
       'secrets',
+      'vault_links',
+      'vault_notes',
+      'vault_suggestions',
     ],
   );
 });
