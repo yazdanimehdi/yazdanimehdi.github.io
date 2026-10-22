@@ -82,11 +82,16 @@ async function load(first = false) {
     else report(e);
     return;
   }
-  // Poll while something is on its way: a run writing an output, or a text being fetched for the first time. A text
-  // with an error isn't polled: each room GET would start another fetch.
-  if (busy.value) timer ??= setInterval(load, 3000);
+  // Poll while something is on its way: a run writing an output, or a text being fetched for the first time (for
+  // PENDING_POLLS at most: a text-only run that died leaves it never fetched). A text with an error isn't polled: each
+  // room GET would start another fetch.
+  const running = Object.values(room.value!.outputs).some((o) => o.status === 'running');
+  const waiting = room.value!.papers.some(pending) && pendingPolls++ < PENDING_POLLS;
+  if (running || waiting) timer ??= setInterval(load, 3000);
   else stop();
 }
+const PENDING_POLLS = 100; // 5 minutes: a notebook's texts wait 15 s apart on arXiv
+let pendingPolls = 0;
 function stop() {
   clearInterval(timer);
   timer = undefined;
@@ -95,11 +100,6 @@ const pending = (p: Paper) => {
   const t = room.value!.texts[p.id];
   return !!p.arxiv && !t.source && !t.error;
 };
-const busy = computed(
-  () =>
-    !!room.value &&
-    (Object.values(room.value.outputs).some((o) => o.status === 'running') || room.value.papers.some(pending)),
-);
 
 const cur = computed(() => room.value?.papers.find((p) => p.id === shown.value) ?? null);
 const text = computed(() => (cur.value ? room.value!.texts[cur.value.id] : null));
@@ -245,6 +245,7 @@ const adding = ref(false);
 async function addPaper() {
   if (!newRef.value.trim()) return;
   adding.value = true;
+  pendingPolls = 0; // the added paper's text is fetched next
   if (await patchNotebook({ add: newRef.value.trim() })) newRef.value = '';
   adding.value = false;
 }
@@ -252,6 +253,7 @@ async function addPaper() {
 // The paper pane: an upload for a paper without its full text, highlights on a selection.
 const uploadError = ref('');
 const uploading = ref(false);
+watch(shown, () => (uploadError.value = ''));
 async function upload(e: Event) {
   const input = e.target as HTMLInputElement;
   const file = input.files?.[0];
@@ -262,6 +264,7 @@ async function upload(e: Event) {
   uploading.value = true;
   try {
     await api(`reading/papers/${shown.value}/pdf`, { form: file });
+    summaryAsked = false; // the upload cleared the summary written from the old text: write it again
     await load();
   } catch (err) {
     uploadError.value = err instanceof Error ? err.message : String(err);
@@ -329,7 +332,8 @@ async function saveComment() {
   if (t?.kind !== 'mark') return;
   try {
     await api(`reading/highlights/${t.hl.id}`, { method: 'PATCH', body: { comment: t.comment.trim() } });
-    t.hl.comment = t.comment.trim();
+    const hl = room.value!.highlights.find((x) => x.id === t.hl.id); // a poll may have replaced t.hl
+    if (hl) hl.comment = t.comment.trim();
     tool.value = null;
   } catch (e) {
     report(e);
@@ -442,10 +446,25 @@ async function saveNote() {
     report(e);
   }
 }
+/** Leaving the page: the last edit goes with a keepalive request, which outlives the page. */
+function flushNote() {
+  if (note.value === savedNote) return;
+  clearTimeout(noteTimer);
+  void fetch('/api/admin/reading/notes', {
+    method: 'PUT',
+    keepalive: true,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ...target, body: note.value }),
+  });
+  savedNote = note.value;
+}
+const onHidden = () => document.visibilityState === 'hidden' && flushNote();
 const paperTitle = (id: number) => visible(room.value?.papers.find((p) => p.id === id)?.title ?? '');
 
 onMounted(async () => {
   wideQuery.addEventListener('change', onWide);
+  addEventListener('pagehide', flushNote);
+  document.addEventListener('visibilitychange', onHidden);
   await load(true);
   const [c, n] = await Promise.allSettled([
     api<{ messages: ChatMessage[] }>(`reading/chat?${chatQuery}`),
@@ -459,6 +478,8 @@ onBeforeUnmount(() => {
   stop();
   clearTimeout(flashTimer);
   wideQuery.removeEventListener('change', onWide);
+  removeEventListener('pagehide', flushNote);
+  document.removeEventListener('visibilitychange', onHidden);
 });
 </script>
 
@@ -500,7 +521,14 @@ onBeforeUnmount(() => {
                 <span class="adm-row-detail">{{ meta(p) }}</span>
               </span>
               <span class="adm-row-action">
-                <button type="button" class="adm-btn" @click="patchNotebook({ remove: p.id })">Remove</button>
+                <button
+                  type="button"
+                  class="adm-btn"
+                  :aria-label="`Remove ${visible(p.title)}`"
+                  @click="patchNotebook({ remove: p.id })"
+                >
+                  Remove
+                </button>
               </span>
             </li>
           </ul>
@@ -619,9 +647,14 @@ onBeforeUnmount(() => {
                       <button type="button" class="adm-btn" @click="generate(k)">Regenerate</button>
                     </div>
                   </template>
-                  <p v-if="k === 'summary' && !room.outputs.summary && !room.papers.length" class="adm-muted">
-                    Add a paper to this notebook to write its summary.
-                  </p>
+                  <template v-if="k === 'summary' && !room.outputs.summary">
+                    <div v-if="room.papers.length" class="adm-actions">
+                      <button type="button" class="adm-btn adm-btn-primary" @click="generate('summary')">
+                        Write the summary
+                      </button>
+                    </div>
+                    <p v-else class="adm-muted">Add a paper to this notebook to write its summary.</p>
+                  </template>
                 </template>
                 <template v-if="k === 'summary'">
                   <h2 class="adm-h2">Study aids</h2>

@@ -26,14 +26,14 @@ function citeNodes(cites: Cite[], p: CiteProps, emit: (c: Cite) => void): (VNode
     const label = citeLabel(c, p.papers);
     const known = p.known.has(`${c.paper}:${c.pid}`);
     const node = p.scans.has(c.paper)
-      ? h('span', { class: 'adm-cite' }, label)
+      ? h('span', { class: 'adm-cite', title: c.pid }, label)
       : h(
           'button',
           {
             type: 'button',
             class: 'adm-cite',
             disabled: !known,
-            title: known ? undefined : 'This passage is no longer in the text',
+            title: known ? c.pid : 'This passage is no longer in the text',
             onClick: () => emit(c),
           },
           label,

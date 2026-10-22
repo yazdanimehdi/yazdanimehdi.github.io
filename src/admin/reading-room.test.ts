@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   citeLabel,
+  pidLabel,
   markdownBlocks,
   passageSegments,
   progressLine,
@@ -135,10 +136,11 @@ test('a cite button emits its Cite; unknown ones are disabled, scan pages plain 
   assert.deepEqual(
     buttons.map((b) => [b.textContent, b.disabled]),
     [
-      ['S2.p3', false],
-      ['S9.p9', true],
+      ['§2 ¶3', false],
+      ['§9 ¶9', true],
     ],
   );
+  assert.equal(buttons[0].title, 'S2.p3');
   assert.equal(buttons[1].title, 'This passage is no longer in the text');
   buttons[0].click();
   assert.deepEqual(got, [{ paper: 12, pid: 'S2.p3' }]);
@@ -167,7 +169,7 @@ test('a cite button emits its Cite; unknown ones are disabled, scan pages plain 
   for (const s of ['Main result', 'It works.', 'Transformers exist.', 'Background', 'Your work: My paper'])
     assert.ok(text.includes(s), s);
   (list.querySelector('button') as unknown as HTMLButtonElement).click();
-  assert.equal(list.querySelector('button')?.textContent, 'Vaswani S2.p3');
+  assert.equal(list.querySelector('button')?.textContent, 'Vaswani §2 ¶3');
   assert.equal(got.length, 2);
 });
 
@@ -243,15 +245,41 @@ test('selectionInPassage refuses a selection across passages', async () => {
 });
 
 test('citeLabel names the paper in a notebook', () => {
-  assert.equal(citeLabel({ paper: 1, pid: 'S2.p3' }), 'S2.p3');
+  assert.equal(citeLabel({ paper: 1, pid: 'S2.p3' }), '§2 ¶3');
   assert.equal(citeLabel({ paper: 1, pid: 'page3' }), 'p. 3');
   const papers = new Map([
     [1, { authors: ['Ashish Vaswani', 'Noam Shazeer'] }],
     [2, { authors: [] }],
   ]);
-  assert.equal(citeLabel({ paper: 1, pid: 'S2.p3' }, papers), 'Vaswani S2.p3');
+  assert.equal(citeLabel({ paper: 1, pid: 'S2.p3' }, papers), 'Vaswani §2 ¶3');
   assert.equal(citeLabel({ paper: 1, pid: 'page3' }, papers), 'Vaswani p. 3');
-  assert.equal(citeLabel({ paper: 2, pid: 'S1.p1' }, papers), 'S1.p1');
+  assert.equal(citeLabel({ paper: 2, pid: 'S1.p1' }, papers), '§1 ¶1');
+});
+
+test('pidLabel names a passage as a reader would', () => {
+  const cases: [string, string][] = [
+    ['S3.SS5.p5', '§3.5 ¶5'],
+    ['S1.p4', '§1 ¶4'],
+    ['S1', '§1'],
+    ['S3.SS2.SSS1.p2', '§3.2.1 ¶2'],
+    ['S7.SS0.SSS0.Px1.p1', '§7 ¶1'],
+    ['A1.SS2.p3', '§A.2 ¶3'],
+    ['Sx1.p2', '¶2'],
+    ['p1', '¶1'],
+    ['abs.1', 'Abstract'],
+    ['abs.2', 'Abstract ¶2'],
+    ['S2.F1', 'Figure 1'],
+    ['Sx1.F3', 'Figure 3'],
+    ['S6.T2', 'Table 2'],
+    ['page4', 'p. 4'],
+    ['p4.2', 'p. 4 ¶2'],
+    ['S3.F1.sf2', 'S3.F1.sf2'],
+    ['weird', 'weird'],
+  ];
+  assert.deepEqual(
+    cases.map(([pid]) => [pid, pidLabel(pid)]),
+    cases,
+  );
 });
 
 test('textLabel', () => {

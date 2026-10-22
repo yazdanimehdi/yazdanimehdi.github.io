@@ -1,10 +1,36 @@
 import { visible } from '../lib/career/text';
 import type { Cite, Highlight, Output, OutputKind, TextState } from '../lib/reading/types';
 
-/** 'S2.p3'; a scan page 'p. 3'; in a notebook (`papers` given) the first author's surname first: 'Vaswani S2.p3'. */
+/**
+ * A passage id as a reader names it: arXiv's 'S3.SS5.p5' → '§3.5 ¶5', 'abs.1' → 'Abstract', 'S2.F1' → 'Figure 1',
+ * 'S6.T2' → 'Table 2'; a PDF's 'p4.2' → 'p. 4 ¶2'; a scan's 'page3' → 'p. 3'. An id it can't read stays as it is.
+ */
+export function pidLabel(pid: string): string {
+  let m = /^page(\d+)$/.exec(pid);
+  if (m) return `p. ${m[1]}`;
+  if ((m = /^p(\d+)\.(\d+)$/.exec(pid))) return `p. ${m[1]} ¶${m[2]}`;
+  if ((m = /^abs\.(\d+)$/.exec(pid))) return m[1] === '1' ? 'Abstract' : `Abstract ¶${m[1]}`;
+  const parts = pid.split('.');
+  const sec: string[] = [];
+  let para = '';
+  for (const [i, part] of parts.entries()) {
+    const last = i === parts.length - 1;
+    if ((m = /^S{1,3}(\d+)$/.exec(part))) {
+      if (m[1] !== '0') sec.push(m[1]); // LaTeXML numbers an unnumbered subsection 0
+    } else if ((m = /^A(\d+)$/.exec(part))) sec.push(String.fromCharCode(64 + Number(m[1])));
+    else if (/^(S{1,3}|P)x\d+$/.test(part))
+      continue; // an unnumbered section or paragraph heading
+    else if (last && (m = /^p(\d+)$/.exec(part))) para = `¶${m[1]}`;
+    else if (last && (m = /^([FT])(\d+)$/.exec(part))) return `${m[1] === 'F' ? 'Figure' : 'Table'} ${m[2]}`;
+    else return pid;
+  }
+  const label = [sec.length ? `§${sec.join('.')}` : '', para].filter(Boolean).join(' ');
+  return label || pid;
+}
+
+/** pidLabel's name; in a notebook (`papers` given) the first author's surname first: 'Vaswani §2 ¶3'. */
 export function citeLabel(c: Cite, papers?: Map<number, { authors: string[] }>): string {
-  const page = /^page(\d+)$/.exec(c.pid);
-  const label = page ? `p. ${page[1]}` : c.pid;
+  const label = pidLabel(c.pid);
   const surname = visible(papers?.get(c.paper)?.authors[0] ?? '')
     .trim()
     .split(/\s+/)
