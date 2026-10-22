@@ -5,7 +5,7 @@ import AdminShell from './AdminShell.vue';
 import { api, report, session, toast } from './api';
 import { formatDateTime, relativeTime } from './dates';
 import { vDialog } from './dialog';
-import { READY_STATE, digestError, runLine, visible, isRunning, type ReadyRow, type RunStatus } from './career';
+import { READY_STATE, runLine, runNotes, visible, isRunning, type ReadyRow, type RunStatus } from './career';
 import type { AdminCtx } from './types';
 import type { CareerPrefs } from '../lib/career/settings';
 import type { Feed, PostingSummary } from '../lib/career/types';
@@ -88,7 +88,7 @@ async function approveAll() {
       ? 'Nothing was approved'
       : queued
         ? `Approved ${approved.length}: each is submitted in the next few minutes`
-        : `Approved ${approved.length}: they are submitted when the queue next runs (at the latest with tonight’s run)`;
+        : `Approved ${approved.length}: submitted when the queue next runs (at the latest with tonight’s run)`;
     const again = skipped.filter((s) => s.reason === 'pre-filled again').length;
     const gone = skipped.length - again;
     const left = [again && `${again} pre-filled again since you looked`, gone && `${gone} no longer waiting`]
@@ -204,16 +204,9 @@ onBeforeUnmount(() => {
       </button>
     </div>
     <template v-if="run.lastRun">
-      <p v-if="run.lastRun.stopped" class="adm-err" role="status">Stopped early: {{ visible(run.lastRun.stopped) }}</p>
-      <p v-if="digestError(run.lastRun)" class="adm-err" role="status">
-        The digest email wasn’t sent: {{ visible(digestError(run.lastRun)!) }}
-      </p>
-      <p v-if="run.lastRun.scoreSkipped" class="adm-err" role="status">
-        Nothing was scored: {{ visible(run.lastRun.scoreSkipped) }}
-      </p>
-      <p v-if="run.lastRun.scoreError" class="adm-err" role="status">
-        Scoring hit an error: {{ visible(run.lastRun.scoreError) }}. Those postings wait for the next run.
-      </p>
+      <div v-if="runNotes(run.lastRun).length" class="adm-run-notes" role="status">
+        <p v-for="note in runNotes(run.lastRun)" :key="note" class="adm-err">{{ note }}</p>
+      </div>
       <details v-if="run.lastRun.sources.length" class="adm-nav-more" :open="run.lastRun.sources.some((s) => s.error)">
         <summary>By source ({{ run.lastRun.sources.length }})</summary>
         <ul class="adm-rows">

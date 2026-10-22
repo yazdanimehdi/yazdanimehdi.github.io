@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { coverageLine, coverageState, evidenceLabel, httpUrl, runLine, visible } from './career';
+import { coverageLine, coverageState, evidenceLabel, httpUrl, runLine, runNotes, visible } from './career';
 
 test('visible strips format characters and turns line separators into spaces', () => {
   assert.equal(visible('a\u202eb\u200bc\u2028d\u2029e\ufefff'), 'abc d ef');
@@ -93,4 +93,14 @@ test('runLine counts the night, its non-zero outcomes included, or says it was p
       '4 held back by limits',
   );
   assert.equal(runLine({ ...run, paused: true }), 'Paused: nothing ran');
+});
+
+test('runNotes lists why the night stopped and a digest that failed, never a sent or skipped one', () => {
+  const run = { at: '2026-10-22T03:00:00Z', sources: [], scored: 0, failed: 0, deferred: 0 };
+  assert.deepEqual(runNotes({ ...run, digest: 'sent' }), []);
+  assert.deepEqual(runNotes({ ...run, digest: 'skipped' }), []);
+  assert.deepEqual(runNotes({ ...run, stopped: 'out of quota\u202e', digest: 'Resend: domain not verified' }), [
+    'Stopped early: out of quota',
+    'The digest email wasn’t sent: Resend: domain not verified',
+  ]);
 });

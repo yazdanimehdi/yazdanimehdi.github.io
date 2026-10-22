@@ -27,14 +27,22 @@ export function runLine(r: RunSummary): string {
   );
 }
 
-/** The digest's outcome when it is Resend's error rather than sent or skipped. */
-export const digestError = (r: RunSummary) =>
-  r.digest && r.digest !== 'sent' && r.digest !== 'skipped' ? r.digest : null;
+/** What went wrong in the last run, one line each, its third-party text cleaned: shown below the run strip. */
+export function runNotes(r: RunSummary): string[] {
+  const digest = r.digest && r.digest !== 'sent' && r.digest !== 'skipped' ? r.digest : null;
+  return [
+    r.stopped && `Stopped early: ${visible(r.stopped)}`,
+    digest && `The digest email wasn’t sent: ${visible(digest)}`,
+    r.scoreSkipped && `Nothing was scored: ${visible(r.scoreSkipped)}`,
+    r.scoreError && `Scoring hit an error: ${visible(r.scoreError)}. Those postings wait for the next run.`,
+  ].filter((n): n is string => !!n);
+}
 
 /** Still working: poll until it isn't. */
 export const isRunning = (status: string | null) => status === 'running' || status === 'pending';
 
-export { visible } from '../lib/career/text';
+import { visible } from '../lib/career/text';
+export { visible };
 
 export type CoverageState = 'shown' | 'cut' | 'reworded' | 'gap';
 

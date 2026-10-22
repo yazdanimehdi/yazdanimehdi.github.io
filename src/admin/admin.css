@@ -551,6 +551,13 @@
   gap: 8px 16px;
   padding-block: 6px;
 }
+.adm-run-notes {
+  display: grid;
+  gap: 4px;
+}
+.adm-run-notes > p {
+  margin: 0;
+}
 .adm-run > p {
   margin: 0;
   font-variant-numeric: tabular-nums;
