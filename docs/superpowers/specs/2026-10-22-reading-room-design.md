@@ -279,6 +279,69 @@ Project 1 shipped as planned in `docs/superpowers/plans/2026-10-22-paper-digest.
   passage id. When a notebook is too large for the model's context, retrieve the most relevant passages with Postgres
   full-text search. No embeddings.
 
+### Built (2026-10-22)
+
+Project 2 shipped as planned in `docs/superpowers/plans/2026-10-22-reading-room.md`. Decisions made while building it:
+
+- **Chat runs in the request,** not as a background run: one AI call (90 s timeout) and a few queries fit the
+  functions' 300 s limit with room, need no resume, and a failed turn stores nothing and is just asked again. A turn
+  sends the question (up to 2,000 characters), the last 12 turns, the owner's profile and the paper text. An answer
+  left with no words once its citations to passages not in the prompt are dropped is not stored: chat answers "The
+  answer cited only passages that aren't in the paper, so it was dropped. Ask again." The summary and study aids are
+  a workflow, as planned, since they may first wait on arXiv.
+- **Passage ids:** arXiv HTML keeps LaTeXML's own element ids (`S2.p3`, `S2.F1`, `abs.1`), so a citation names the
+  same paragraph arXiv does; a PDF's are page and paragraph (`p4.2`), a scan's a page (`page3`). The page shows them
+  readably ("§2 ¶3", "Figure 1", "Abstract", "p. 4 ¶2", "p. 3"; in a notebook the first author's surname first), with
+  the raw id kept as the citation's title.
+- **PDF text:** `unpdf` pinned exactly to 1.8.1 (it reads per-page text in Node with no canvas, and bundles and runs
+  under the Workflow SDK's esbuild; 1.9.x was under two weeks old). Paragraphs come from line geometry only: a break
+  where the gap to the previous line is over 1.5 × the page's median line gap (the usual median, the mean of the two
+  middle gaps on an even count), or where the next line is higher (the next column). A heading or a two-column table
+  can run into the paragraph next to it. Bare page numbers and control characters are dropped: pdf.js gives an
+  equation's unmapped big brackets as control characters, and Postgres refuses a NUL, which in the live check left
+  arXiv 2610.28674 stored as a retryable error until it was fixed. A PDF averaging under 50 characters a page is a scan.
+- **Fetching:** each run tries each source at most once per paper (HTML, then PDF after a 404 or HTML with no
+  paragraphs), so a 503 can't spin a run. A source that answered 404 is not fetched again; any other failure is a
+  retryable error, which the nightly run (for a digest paper) and the next open fetch again. A fetch stores only if the text row is
+  unchanged since it began, under the paper's row lock, so it never replaces an owner's upload. The site-wide arXiv
+  slot is one statement on `reading_settings.arxiv_at`; checked live on the local Postgres, the fetches went out
+  15.0 s apart.
+- **When text is fetched:** on Save, on adding a paper to a notebook, and on opening a paper or notebook whose text was
+  never fetched or has a retryable error, even when a summary already exists (the "tried again on the next open"
+  promise). Adding an unknown paper id to a notebook answers 404.
+- **Grounding:** the whole text when the papers fit in 300,000 characters of passages (about 75k tokens, inside every
+  configured provider's context). Past that, chat searches the question's words (3 or more letters or digits, at most
+  30) or-ed in Postgres full-text search, sanitized so any question is a valid query, and takes the abstracts first,
+  then the hits by rank; with no hits, and for the summary and study aids, each paper gets an equal share from its
+  start. A passage that doesn't fit its share is skipped and the next one tried, so one long first paragraph can't
+  empty a paper. The summary step and chat share one grounding helper (the allowed citations, the `mine` list of the
+  owner's papers and areas, and scans).
+- **Scans:** a scan of 4 MB or less is kept (`reading_texts.pdf`) and sent as the AI's PDF input when it is the only
+  paper, including a notebook of that one paper; in a notebook of several, it contributes only its abstract, to the
+  summary and to chat alike (one PDF per prompt). Its citations name a page.
+- **Uploads:** the owner's PDF replaces only an abstract, a scan, a missing text or a failed fetch, never a fetched
+  full text; up to 4 MB (Vercel's 4.5 MB request body, and the AI's PDF input limit), read only up to that size.
+  Uploading clears the paper's summary and study aids, written from the old text.
+- **PubMed Central** full text is not fetched: bioRxiv, medRxiv, PubMed and DOI-only papers start with the abstract,
+  and an upload gives them full text.
+- **Runs:** an output that says running for over 15 minutes is treated as stopped, on the page (Try again) and when a
+  new run starts; a second start while one runs gets 409. A failed text fetch fails the run with "Couldn't fetch the
+  text of "<title>": <error>", naming the paper because notebooks hold several. The workflow itself calls only steps,
+  so no database code reaches its bundle. The summary starts the first time the Summary tab is shown (on open, from
+  1024px).
+- **The daily cap** counts each summary, study-aid, chat or retried-parse call when it is made, per UTC day
+  (`reading_ai_use`). The provider key is checked first, so with no key a failure spends nothing ("Today: 0 of 100").
+- **The page:** a highlight lies within one paragraph (or one figure caption); a selection across paragraphs is
+  refused with a line saying so. A citation to a passage no longer in the text is shown disabled, and a scan's page
+  citation as plain text. The paper's text label covers a text never fetched ("Text not fetched yet").
+- **Notes tab, for Project 3:** the owner's free note per paper or notebook (`reading_notes`), the highlights with
+  their comments (`reading_highlights`), and chat answers saved with Save to notes (`reading_chats.saved_at`). These
+  are what the vault will turn into paper and chat notes; nothing creates a note yet.
+- **How it was built:** the missing-key check and the `<paper>` defang are Project 1's, shared (`missingAiKey`,
+  `defangPaper`); an output row is updated only in the fields given, so recording a run never wipes the last summary;
+  tests build PDFs with a support module (`src/lib/reading/test-pdf.ts`), not a test file; the room page came before
+  the Library and Notebooks pages and their links.
+
 ## Project 3: vault
 
 - **What it holds.** Markdown notes with YAML front matter and `[[wikilinks]]`, the format Obsidian uses.

@@ -904,7 +904,7 @@ Do this once, as the owner, after a preview deploys:
 
 ### Reading (Postgres mode)
 
-A private paper digest inside the admin. Each night it collects the day's new papers from the sources you turn on, ranks them against your field, adds the papers people in your wider area are talking about, and saves the result under **Reading → Today**. Nothing in it reaches the public site.
+A private paper digest and reading room inside the admin. Each night it collects the day's new papers from the sources you turn on, ranks them against your field, adds the papers people in your wider area are talking about, and saves the result under **Reading → Today**. Any paper opens in the reading room: its full text beside a cited summary, chat and your notes. Nothing in it reaches the public site.
 
 **Owner only, Postgres mode only.** The same rule as the [job search](#job-search-postgres-mode): only the owner sees the screens and the data, anyone else gets a 404, and in static and git mode every Reading screen and route answers 404 and the sidebar's Reading group is hidden.
 
@@ -930,7 +930,7 @@ A private paper digest inside the admin. Each night it collects the day's new pa
 1. **Collect.** Each new-today source's papers are fetched; the 60 with the most keyword overlap are stored, and papers shown on an earlier day, saved or dismissed are left out. The 60 closest to your keywords across all sources form the night's pool. Papers never shown are deleted after 30 days.
 2. **Rank in-field papers.** The AI scores the pool ten papers per call against your field, keywords, research areas and up to 40 of your publications: a 0–100 score, a one-line reason and, when one fits, the paper of yours it is close to. Papers already scored cost no new call, so a second run the same day is cheap. **New in your field** keeps the best **8** (`inField`) at or above the minimum score (**60**). A short list is not padded; one sentence says why.
 3. **Collect talked-about papers.** Candidates from the traction sources that were not shown before are ranked by their numbers; one AI call drops those outside your wider area (it can only drop, and with no wider area set there is no call). Bluesky counts are added. The list keeps the best **5** (`talked`), ranked by each paper's best share of the night's highest number per source (Hugging Face upvotes, OpenAlex citations, alphaXiv visits) plus half its share of the highest Bluesky count. A paper shown as talked-about comes back only once one of its numbers has at least doubled.
-4. **Fetch text ahead.** The arXiv HTML of each digest paper is fetched 15 seconds apart (arXiv's crawl delay) and stored privately for the reading room to come. It is not shown yet.
+4. **Fetch text ahead.** The full text of each digest paper is fetched for the reading room (see [Text sources](#reading-room-text)), 15 seconds apart.
 5. **Save and send.** The day's digest replaces any earlier one for the same day, and the email goes out if it is on.
 
 **At most 20 AI calls a night** (`AI calls per night`, up to 100). Papers left when the cap is spent are listed under **Not ranked tonight**.
@@ -939,13 +939,38 @@ A private paper digest inside the admin. Each night it collects the day's new pa
 
 **Failures stay local.** A source that fails is named under the run strip and the rest of the digest still appears. A provider error, or a missing AI key, stops ranking for the night: no other provider is tried, and the unscored papers are listed under **Not ranked tonight** with the reason.
 
-**Today.** **People are talking about** and **New in your field**, each paper with its authors, source and date, its numbers or reason, **Save** and **Dismiss**; earlier days are listed by date below. The run strip shows the last run with **Run now**, and the dashboard's Reading row shows today's count, or that ranking stopped.
+**Today.** **People are talking about** and **New in your field**, each paper with its authors, source and date, a **Source** link, its numbers or reason, **Save** and **Dismiss**; its title opens it in the reading room. Earlier days are listed by date below. The run strip shows the last run with **Run now**, and the dashboard's Reading row shows today's count, or that ranking stopped.
 
 **Email digest.** **Reading → Settings → Digest → Email** sends the day's digest after each run. It is off by default and uses the job search's `RESEND_API_KEY` (see [Email digest](#email-digest)); **To** defaults to the email on your CV. A day with nothing in it sends nothing, and a failed email is noted on the run, never failing it.
 
 **Pause** under the same section makes every run do nothing.
 
-**Where the data lives.** `reading_settings`, `reading_papers`, `reading_digest` and `reading_texts` (migration `008_reading.sql`), not `documents`, so they never reach the git backup or `db:export`. As with the job search, a Vercel preview shares the production database: a run on a preview writes the live digest and spends your real AI credits.
+#### Reading room
+
+**Library and Notebooks.** **Reading → Library** lists the papers you saved and adds one by its arXiv id (`2401.01234`, an arXiv link) or DOI; it is saved and opens in the reading room. **Reading → Notebooks** groups papers: add a paper from its room (**Add to notebook…**) or by arXiv id or DOI inside the notebook. Deleting a notebook deletes its summary, study aids, chat and note, never its papers.
+
+**The page.** The paper on the left, in passages you can read and highlight; **Summary**, **Chat** and **Notes** tabs on the right. Below 1024px it is one column, with the paper as a fourth tab. A notebook works the same across its papers, with a picker for the paper shown.
+
+- **Summary.** Written the first time the Summary tab is shown, as a background run that shows its progress: a short summary; what they did, what they found and why it matters; and how it relates to your work, naming your own papers and research areas. **Briefing**, **FAQ** and **Glossary** are written on demand; each is kept and can be regenerated.
+- **Citations.** Every claim and chat answer cites passages ("§3.2 ¶4", "Figure 2", "Abstract", "p. 4 ¶2"; in a notebook led by the first author's surname). Following one scrolls the paper to the passage and flashes it. A citation to a passage the paper doesn't have is dropped.
+- **Chat.** Questions about the paper or notebook, answered in the request with the paper's text, your profile and the last 12 turns. History is kept per paper and per notebook; **Save to notes** keeps an answer under Notes.
+- **Notes.** One free note per paper or notebook, your highlights (select text within one paragraph, then **Highlight** or **Comment**) and your saved answers. Project 3's vault will turn them into linked Markdown notes.
+
+<a id="reading-room-text"></a>**Text sources.** A paper's text is fetched the first time you open or save it (or overnight, for a digest paper), in this order:
+
+1. **arXiv HTML.** Sections and paragraphs keep arXiv's own ids. Up to 10 MB.
+2. **arXiv PDF**, when there is no HTML. Its text is extracted in code and split into paragraphs per page; equations and tables may read oddly, and the page says so. Up to 30 MB, 60 seconds.
+3. **The abstract**, when arXiv has neither, or for a paper not on arXiv (bioRxiv, medRxiv, PubMed and DOI-only papers: their full text is not fetched). The page says only the abstract is available, and everything is grounded on it.
+
+Every arXiv HTML or PDF fetch on the site, nightly or on open, takes a slot 15 seconds after the last (arXiv's crawl delay), so a notebook's texts can take a minute. A 404 moves on to the next source; any other failure (a 503, a timeout) is kept as an error, shown on the page and tried again on the next open or night, never stored as abstract-only.
+
+**Your own PDF.** Over an abstract, a scan or a failed fetch, **Upload the PDF** replaces the paper's text with yours, split the same way; its summary and study aids are cleared, since they were written from the old text. PDFs up to 4 MB (Vercel's request limit).
+
+**Scans.** A PDF with no text layer (fewer than 50 characters a page on average) has no passages to show. When it is 4 MB or less it is kept and sent to the AI as a PDF, and citations name a page only ("p. 3"); a bigger one leaves the abstract. In a notebook of several papers a scan contributes only its abstract.
+
+**AI calls per day.** Summaries, study aids and chat turns count against **Reading → Settings → Reading room → AI calls per day** (default 100, 1 to 1,000, reset at midnight UTC); the section shows today's use. At the cap, chat says so plainly and a summary fails with the reason; the paper, highlights and notes still work. The reading room uses the AI provider you configured, with no fallback; the model gets no tools, and paper text is marked as untrusted data in every prompt and shown only as text.
+
+**Where the data lives.** `reading_settings`, `reading_papers`, `reading_digest` and `reading_texts` (migration `008_reading.sql`), and the reading room's `reading_passages`, `reading_notebooks`, `reading_notebook_papers`, `reading_outputs`, `reading_chats`, `reading_highlights`, `reading_notes` and `reading_ai_use` (migration `009_reading_room.sql`), not `documents`, so they never reach the git backup or `db:export`. As with the job search, a Vercel preview shares the production database: a run or a chat on a preview writes the live data and spends your real AI credits.
 
 ### Cookie Consent (GDPR)
 
