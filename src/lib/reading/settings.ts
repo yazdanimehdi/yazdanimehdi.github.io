@@ -1,9 +1,11 @@
 import { z } from 'astro/zod';
 import { field, lenientOnly, list } from '../career/settings';
 
-const arxivCategory = z.string().regex(/^[a-z-]+(\.[A-Za-z-]+)?$/, 'An arXiv category, like cs.CL');
+export const ARXIV_CATEGORY = /^[a-z-]+(\.[A-Za-z-]+)?$/;
 /** bioRxiv and medRxiv collections: lowercase words, '_' for spaces. */
-const rxivCategory = z.string().regex(/^[a-z]+(_[a-z]+)*$/, "Lowercase words, '_' for spaces");
+export const RXIV_CATEGORY = /^[a-z]+(_[a-z]+)*$/;
+const arxivCategory = z.string().regex(ARXIV_CATEGORY, 'An arXiv category, like cs.CL');
+const rxivCategory = z.string().regex(RXIV_CATEGORY, "Lowercase words, '_' for spaces");
 const topic = z.object({ id: z.string().regex(/^(fields|subfields)\/\d+$/), name: z.string() });
 
 /** A source: `on` plus its own fields; lenient falls back per field, strict surfaces inner errors. */
