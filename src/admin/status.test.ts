@@ -249,6 +249,21 @@ test('the job search row shows only when the daily career step reported (owner, 
   assert.equal(row(failed, 'career').state, 'Job search failed to start');
 });
 
+test('the owner’s job search row counts what waits for approval and links to it', () => {
+  const at = '2026-10-18T03:00:00Z';
+  const none = row(base({ mode: 'postgres', career: { ready: 0 } }), 'career');
+  assert.equal(none.state, 'Nothing waiting');
+  assert.equal(none.action, undefined);
+  const three = row(base({ mode: 'postgres', career: { ready: 3 }, runs: { career: { ok: true, at } } }), 'career');
+  assert.equal(three.state, '3 ready for approval');
+  assert.equal(three.tone, 'ok');
+  assert.equal(three.at, at);
+  assert.deepEqual(three.action, { kind: 'screen', label: 'Review', path: 'career?status=ready' });
+  const failed = row(base({ mode: 'postgres', career: { ready: 2 }, runs: { career: { ok: false, at } } }), 'career');
+  assert.equal(failed.state, 'Job search failed to start', 'a failed run still leads');
+  assert.equal(failed.action?.label, 'Review');
+});
+
 test('scheduled posts with no release run: fine in git mode, unknown only where the job runner should have run it', () => {
   const posts = [post('soon', { date: '2026-10-20' })];
   const git = base({ posts });

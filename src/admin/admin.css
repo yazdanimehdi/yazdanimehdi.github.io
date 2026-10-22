@@ -638,6 +638,7 @@
   font-size: 13px;
 }
 .adm input[type='text'],
+.adm input[type='email'],
 .adm input[type='date'],
 .adm input[type='number'],
 .adm input[type='search'],
@@ -820,9 +821,32 @@
   flex-wrap: nowrap;
   margin-block-start: 6px;
 }
-.adm-keys input {
+.adm-keys input,
+.adm-keys textarea {
   flex: 1;
   min-width: 0;
+}
+.adm-keys form:has(textarea) {
+  align-items: flex-start;
+}
+/* A radio group: a 13px/500 legend over one choice per line, each with its Caption line. */
+.adm-choices {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.adm-choices > legend {
+  padding: 0;
+  margin-block-end: 6px;
+  font-size: 13px;
+  font-weight: 500;
+}
+.adm-choices .adm-check {
+  align-items: baseline;
 }
 /* A sub-group inside a section: a heading over a Rule, not a box. */
 .adm-subhead {
@@ -1294,6 +1318,9 @@
     text-align: start;
   }
   /* Status rows: the action shares the label's line instead of taking one of its own. */
+  .adm-check {
+    min-height: var(--adm-touch);
+  }
   .adm-status-rows > li {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
@@ -1856,6 +1883,68 @@ details.adm-editor-ask[open] > summary {
   margin: 0;
 }
 
+/* Application form: screenshot thumbnails that open full size, then one ruled row per field. */
+.adm-apply-shots {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.adm-apply-shots img,
+.adm-apply-shot img {
+  display: block;
+  inline-size: 220px;
+  max-inline-size: 100%;
+  block-size: 150px;
+  object-fit: cover;
+  object-position: top;
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+  background: var(--adm-tint);
+}
+.adm-apply-shot {
+  align-self: flex-start;
+}
+.adm-apply-fields .adm-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-inline-size: 640px;
+}
+.adm-apply-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.adm-apply-label {
+  font-weight: 500;
+}
+.adm-card > .adm-h2[id] {
+  scroll-margin-block-start: calc(var(--adm-head-h, 0px) + 16px);
+}
+.adm-fields > p {
+  margin: 0;
+}
+.adm-apply-value {
+  white-space: pre-wrap;
+}
+.adm-apply-working {
+  margin: 0;
+}
+.adm-ready-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.adm-ready-head > p {
+  margin: 0;
+  max-inline-size: 60ch;
+}
 .adm-job-handoff td {
   background: var(--adm-warn-bg);
 }

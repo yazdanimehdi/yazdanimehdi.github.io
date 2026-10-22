@@ -7,6 +7,7 @@ import DocBanners from './DocBanners.vue';
 import FormFields from './FormFields.vue';
 import { api, report, toast } from './api';
 import { text, type FieldDef } from './fields';
+import { CAREER_KEY_HELP } from './career';
 import { useDocument } from './useDocument';
 import type { AdminCtx, CommitResult } from './types';
 import { DEFAULT_MODELS, IMAGE_PROVIDERS, TEXT_PROVIDERS, resolveAiConfig, scheduleLabel } from '../lib/ai/providers';
@@ -215,11 +216,22 @@ onMounted(() => {
             </span>
             <div class="adm-row-main">
               {{ status(k) }}
+              <span v-if="CAREER_KEY_HELP[k.name]" class="adm-row-detail">{{ CAREER_KEY_HELP[k.name] }}</span>
               <span v-if="k.undecryptable" class="adm-err">
                 The stored key can’t be decrypted (SESSION_SECRET changed): enter it again.
               </span>
               <form v-if="editable" class="adm-actions" @submit.prevent="saveKey(k.name, typed[k.name] ?? '')">
+                <textarea
+                  v-if="k.name === 'CODEX_AUTH_JSON'"
+                  v-model="typed[k.name]"
+                  rows="3"
+                  autocomplete="off"
+                  spellcheck="false"
+                  :aria-label="`New ${k.label}`"
+                  placeholder="Paste the file’s contents"
+                />
                 <input
+                  v-else
                   v-model="typed[k.name]"
                   type="password"
                   autocomplete="off"

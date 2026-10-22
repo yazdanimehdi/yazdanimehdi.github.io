@@ -62,6 +62,10 @@ const GROUPS = computed(() => {
   ];
 });
 const href = (path: string) => (path ? `${base}/${path}` : base);
+/** A sidebar link's count: the page's own, else the job search's ready count from `me`. */
+function badge(path: string) {
+  return props.badges?.[path] ?? (path === 'career' ? session.careerReady : null);
+}
 const inMore = (links: string[][]) => links.some(([path]) => path === current.value);
 
 /** Opening moves focus to the current page's link; closing (button or Escape) returns it to the button. */
@@ -150,8 +154,9 @@ onMounted(async () => {
   addEventListener('beforeunload', onLeave);
   if (head.value) heights.observe(head.value);
   try {
-    const { capabilities } = await api<{ capabilities: { error?: string } }>('me');
+    const { capabilities, career } = await api<{ capabilities: { error?: string }; career?: { ready: number } }>('me');
     banner.value = capabilities.error ?? '';
+    session.careerReady = career?.ready ?? null;
   } catch {
     // 401 reloads to the login page; other errors surface on the first save
   }
@@ -202,8 +207,8 @@ async function signOut() {
               <li v-for="[path, label] in group.links" :key="path">
                 <a :href="href(path)" :aria-current="current === path ? 'page' : undefined"
                   >{{ label
-                  }}<span v-if="badges?.[path]" class="adm-badge"
-                    >{{ badges[path] }}<span class="adm-visually-hidden"> waiting</span></span
+                  }}<span v-if="badge(path)" class="adm-badge"
+                    >{{ badge(path) }}<span class="adm-visually-hidden"> waiting</span></span
                   ></a
                 >
               </li>

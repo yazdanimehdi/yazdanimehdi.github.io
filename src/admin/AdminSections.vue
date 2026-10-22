@@ -53,8 +53,9 @@ watch(active, (id) =>
   nextTick(() => list.value?.querySelector(`#adm-tab-${id}`)?.scrollIntoView({ block: 'nearest', inline: 'nearest' })),
 );
 onMounted(() => {
-  fromHash();
-  active.value ||= props.sections[0].id;
+  // One write: under a parent's v-model, `active` reads the old value until the parent re-renders.
+  const id = decodeURIComponent(location.hash.slice(1));
+  active.value = props.sections.some((s) => s.id === id) ? id : active.value || props.sections[0].id;
   addEventListener('hashchange', fromHash);
 });
 onBeforeUnmount(() => removeEventListener('hashchange', fromHash));
