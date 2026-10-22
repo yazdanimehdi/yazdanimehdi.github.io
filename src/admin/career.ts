@@ -157,7 +157,12 @@ export const LIMIT_FIELDS: FieldDef[] = [
     type: 'number',
     hint: 'Postings at one company that you drafted, sent or moved further in this window count.',
   },
-  { key: 'nightly.paused', label: 'Pause all nightly job search', type: 'checkbox' },
+  {
+    key: 'nightly.paused',
+    label: 'Pause all nightly job search',
+    type: 'checkbox',
+    hint: 'The nightly run does nothing. Applications you approve are still submitted.',
+  },
 ];
 
 export type WorkerChoice = 'api' | 'claude' | 'codex' | 'gemini';

@@ -206,6 +206,34 @@ test('paused does nothing', async () => {
   assert.deepEqual(ai, { score: 0, draft: 0, review: 0, values: 0 });
 });
 
+test('paused still starts the submit queue for the owner’s own approvals', async () => {
+  await setPrefs({ nightly: { paused: true } });
+  let queues = 0;
+  setApplyRunsForTests({
+    get: () => ({
+      status: Promise.resolve('completed'),
+      createdAt: Promise.resolve(new Date()),
+      cancel: async () => {},
+    }),
+    prefill: async () => ({ runId: 'wrun_p' }),
+    queue: async () => (queues++, { runId: 'wrun_q' }),
+  });
+  const id = await match('Acme');
+  const at = new Date().toISOString();
+  await updatePosting(sql, id, {
+    application: {
+      state: 'approved',
+      at,
+      url: 'https://x.test',
+      fields: [],
+      shots: [],
+      approved: { at, by: 'ada', fields: [] },
+    },
+  });
+  assert.equal((await careerNightly()).paused, true);
+  assert.equal(queues, 1);
+});
+
 test('stage 1 gathers without scoring', async () => {
   await setPrefs({ nightly: { stage: 1 } }, ['arbeitnow']);
   const run = await careerNightly();

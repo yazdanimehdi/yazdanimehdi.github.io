@@ -52,6 +52,8 @@ export async function careerNightly(): Promise<RunSummary> {
       paused: true,
       stage,
     };
+    // Pausing stops the nightly automation, not the owner's own approvals.
+    await ensureQueueStep();
     await finishRun(summary);
     return summary;
   }
