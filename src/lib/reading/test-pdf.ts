@@ -2,7 +2,7 @@
  * A one-font PDF for tests: each page is a list of [y, text] lines drawn at x 72 in Helvetica 12.
  * Lives outside a .test.ts so importing it doesn't rerun a test file.
  */
-export function minimalPdf(pages: [number, string][][]): Uint8Array {
+export function minimalPdf(pages: [number, string][][]): Uint8Array<ArrayBuffer> {
   const esc = (s: string) => s.replace(/[\\()]/g, '\\$&');
   const objs: string[] = [];
   const add = (body: string) => objs.push(body) && objs.length;

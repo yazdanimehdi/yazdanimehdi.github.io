@@ -1,12 +1,11 @@
 // The nightly paper digest's steps. Each takes and returns ids and plain JSON (the workflow log stores both); pure
 // helpers live in match.ts, rank.ts and prompts.ts, since a 'use step' module exports only steps.
 import { generateText, readAiConfig } from '../admin/ai';
-import { readConfig } from '../admin/content';
 import { getStore } from '../admin/get-store';
 import { postgresOnly } from '../admin/http';
 import { paperLookupFor } from '../admin/papers';
 import { getSecret } from '../admin/secrets';
-import { getText, SourceError } from '../career/sources/http';
+import { SourceError } from '../career/sources/http';
 import { getSql } from '../db';
 import {
   getPapers,
@@ -15,7 +14,6 @@ import {
   pruneCandidates,
   readReading,
   saveDigest,
-  saveText,
   setScore,
   shownBefore,
   upsertPapers,
@@ -308,28 +306,6 @@ export async function saveDigestStep(input: {
       items.map((i) => i.paperId),
     ),
   };
-}
-
-/** arXiv's HTML full text for one paper, cached privately; a failure is stored too ('404' or its message). */
-export async function fetchTextStep(id: number): Promise<boolean> {
-  'use step';
-  const sql = getSql();
-  const [p] = await getPapers(sql, [id]);
-  if (!p?.arxiv) return false;
-  const site = await readConfig(readingStore(), 'site');
-  const siteUrl = typeof site.data.siteUrl === 'string' ? site.data.siteUrl : '';
-  let body: string | null = null;
-  let error: string | null = null;
-  try {
-    body = await getText(`https://arxiv.org/html/${p.arxiv}`, {
-      maxBytes: 10 * 1024 * 1024,
-      headers: { 'User-Agent': siteUrl ? `ScholarOS reading (+${siteUrl})` : 'ScholarOS reading' },
-    });
-  } catch (e) {
-    error = e instanceof SourceError && e.status === 404 ? '404' : (e as Error).message;
-  }
-  await saveText(sql, id, { source: 'arxiv-html', body, error });
-  return body !== null;
 }
 
 /**

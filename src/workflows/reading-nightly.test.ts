@@ -86,7 +86,7 @@ beforeEach(async () => {
     hosts.push(new URL(url).host);
     if (url.startsWith('https://arxiv.org/html/')) {
       log.push(`html ${url.slice('https://arxiv.org/html/'.length)}`);
-      return new Response('<html><body>Full text</body></html>');
+      return new Response('<html><body><div id="S1.p1" class="ltx_para"><p>Full text</p></div></body></html>');
     }
     if (url === 'https://api.resend.com/emails') return (emails++, Response.json({ id: 'email_1' }));
     if (!url.startsWith('https://api.anthropic.com/')) return new Response('missing', { status: 404 });
@@ -257,15 +257,20 @@ test('prefetch fetches arXiv HTML for digest papers only', async () => {
   await setPrefs({ sources: { ...ARXIV, ...HF } });
   routes['rss.arxiv.org'] = () => fixture('reading/arxiv-rss.xml');
   routes['huggingface.co'] = () => hfDaily();
+  // A sleep returns at once, so it moves arXiv's last slot back by its length, as if that time had passed.
+  (globalThis as Record<symbol, unknown>)[SLEEP] = async (ms: number) => {
+    log.push(ms > 14_000 && ms <= 15_000 ? 'sleep ~15s' : `sleep ${ms}`);
+    await sql`update reading_settings set arxiv_at = arxiv_at - ${ms} * interval '1 millisecond'`;
+  };
   const run = await readingNightly();
   assert.equal(run.inField, 1, 'only the speech paper scores high enough');
   assert.deepEqual(log, [
     'html 2610.14224',
-    'sleep 15s',
+    'sleep ~15s',
     'html 2610.23374',
-    'sleep 15s',
+    'sleep ~15s',
     'html 2508.02739',
-    'sleep 15s',
+    'sleep ~15s',
     'html 2610.28673',
   ]);
   assert.deepEqual(run.texts, { fetched: 4, failed: 0 });

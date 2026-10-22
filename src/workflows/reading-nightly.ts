@@ -1,4 +1,3 @@
-import { sleep } from 'workflow';
 import { getRun, start } from 'workflow/api';
 import type { Sql } from '../lib/db';
 import { readReading, writeReading } from '../lib/reading/db';
@@ -10,7 +9,6 @@ import {
   collectNew,
   collectTraction,
   emailStep,
-  fetchTextStep,
   finishReading,
   pruneStep,
   readingPlan,
@@ -20,6 +18,7 @@ import {
 } from '../lib/reading/steps';
 import type { ReadingRun } from '../lib/reading/types';
 import { errorText, startUnlessRunning, type Runs } from './runs';
+import { ensureTexts } from './texts';
 
 const BATCH = 10;
 const POOL = 60;
@@ -86,13 +85,7 @@ export async function readingNightly(): Promise<ReadingRun> {
   if (plan.bluesky && talked.length) await blueskyStep(talked, day);
 
   const digest = await saveDigestStep({ day, talked, pool, stopped: !!stopped });
-  const texts = { fetched: 0, failed: 0 };
-  for (const [i, id] of digest.prefetch.entries()) {
-    // arXiv's Crawl-delay for its HTML pages.
-    if (i) await sleep('15s');
-    if (await fetchTextStep(id).catch(() => false)) texts.fetched++;
-    else texts.failed++;
-  }
+  const texts = await ensureTexts(digest.prefetch);
 
   const run: ReadingRun = {
     at: new Date().toISOString(),

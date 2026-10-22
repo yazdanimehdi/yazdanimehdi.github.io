@@ -19,14 +19,13 @@ import {
   writeReading,
 } from './db';
 import type { NewPaper, Signals } from './types';
-import { areaFilter, collectNew, fetchTextStep, saveDigestStep, scoreBatch, tractionShortlist } from './steps';
+import { areaFilter, collectNew, saveDigestStep, scoreBatch, tractionShortlist } from './steps';
 
 let sql: Sql;
 let routes: Record<string, () => string>;
 let aiCalls: number;
 let aiPrompts: string[];
 let aiReply: () => Response;
-let htmlAgents: string[];
 
 const fixture = (path: string) => fs.readFileSync(`tests/fixtures/${path}`, 'utf8');
 const savedKey = process.env.ANTHROPIC_API_KEY;
@@ -58,7 +57,6 @@ beforeEach(async () => {
   aiCalls = 0;
   aiPrompts = [];
   aiReply = () => reply({});
-  htmlAgents = [];
   mock.method(globalThis, 'fetch', async (input: string | URL, init?: RequestInit) => {
     const url = String(input);
     if (url.startsWith('https://api.anthropic.com/')) {
@@ -66,12 +64,6 @@ beforeEach(async () => {
       const body = JSON.parse(String(init!.body));
       aiPrompts.push(`${body.system}\n${body.messages[0].content}`);
       return aiReply();
-    }
-    if (url.startsWith('https://arxiv.org/html/')) {
-      htmlAgents.push((init!.headers as Record<string, string>)['User-Agent']);
-      return url.endsWith('/2610.1')
-        ? new Response('<html><body>Full text</body></html>')
-        : new Response('missing', { status: 404 });
     }
     return new Response('missing', { status: 404 });
   });
@@ -291,21 +283,5 @@ test('saveDigestStep leaves the field section short rather than below minScore',
   assert.deepEqual(
     today.items.map((i) => [i.section, i.paper.id]),
     [['field', b]],
-  );
-});
-
-test('fetchTextStep stores the HTML, or the 404', async () => {
-  const [ok, gone] = await add(paper('arxiv:2610.1', { arxiv: '2610.1' }), paper('arxiv:2610.2', { arxiv: '2610.2' }));
-  assert.equal(await fetchTextStep(ok), true);
-  assert.equal(await fetchTextStep(gone), false);
-  assert.deepEqual(htmlAgents, ['ScholarOS reading (+https://site.test)', 'ScholarOS reading (+https://site.test)']);
-  const rows = await sql<{ paper_id: string; source: string; body: string | null; error: string | null }>`
-    select paper_id, source, body, error from reading_texts order by paper_id`;
-  assert.deepEqual(
-    rows.map((r) => [Number(r.paper_id), r.source, r.body, r.error]),
-    [
-      [ok, 'arxiv-html', '<html><body>Full text</body></html>', null],
-      [gone, 'arxiv-html', null, '404'],
-    ],
   );
 });

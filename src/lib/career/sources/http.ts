@@ -18,6 +18,8 @@ export interface FetchInit {
   siteUrl?: string;
   /** Body cap; 5 MB unless raised. */
   maxBytes?: number;
+  /** For the whole request, redirects and body included; 15 000 unless raised. */
+  timeoutMs?: number;
 }
 
 const MAX_BYTES = 5 * 1024 * 1024;
@@ -100,14 +102,14 @@ const fail = (url: URL) => (e: unknown) => {
   throw e instanceof SourceError ? e : new SourceError(`${url.host}: ${(e as Error).message}`);
 };
 
-/** GET with the job-search User-Agent, a 15 s timeout, checked redirects, and a body cap (`init.maxBytes`, 5 MB by default). */
+/** GET with the job-search User-Agent, a timeout (`init.timeoutMs`, 15 s by default), checked redirects, and a body cap (`init.maxBytes`, 5 MB by default). */
 export async function getText(url: string, init: FetchInit = {}): Promise<string> {
   return (await getBytes(url, init)).toString('utf8');
 }
 
 /** getText's body as bytes (a PDF). */
 export async function getBytes(url: string, init: FetchInit = {}): Promise<Buffer> {
-  const signal = AbortSignal.timeout(15_000);
+  const signal = AbortSignal.timeout(init.timeoutMs ?? 15_000);
   let headers: Record<string, string> = {
     'User-Agent': init.siteUrl ? `ScholarOS job search (+${init.siteUrl})` : 'ScholarOS job search',
     ...init.headers,

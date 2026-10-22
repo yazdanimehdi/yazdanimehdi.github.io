@@ -77,8 +77,8 @@ export interface PdfLine {
 
 /** Each page's text lines, as pdf.js reads them. Throws on a file pdf.js can't open. */
 export async function pdfLines(bytes: Uint8Array): Promise<PdfLine[][]> {
-  // pdf.js takes ownership of the buffer it's given, so hand it a copy.
-  const doc = await getDocumentProxy(bytes.slice(), { verbosity: 0 });
+  // pdf.js takes ownership of the buffer it’s given and refuses a Buffer, so hand it a plain Uint8Array copy.
+  const doc = await getDocumentProxy(new Uint8Array(bytes), { verbosity: 0 });
   try {
     const pages: PdfLine[][] = [];
     for (let i = 1; i <= doc.numPages; i++) {
