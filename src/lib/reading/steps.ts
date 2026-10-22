@@ -22,6 +22,7 @@ import {
   upsertPapers,
   writeReading,
 } from './db';
+import { sendReadingDigest } from './digest';
 import { overlap, topByOverlap } from './match';
 import { areaPrompt, parseArea, parseScores, scorePrompt } from './prompts';
 import { profileText, readProfile } from './profile';
@@ -330,6 +331,14 @@ export async function fetchTextStep(id: number): Promise<boolean> {
   await saveText(sql, id, { source: 'arxiv-html', body, error });
   return body !== null;
 }
+
+/** Emails the day's digest when the email is on; the result goes in the run summary. Never throws. */
+export async function emailStep(day: string): Promise<string> {
+  'use step';
+  return sendReadingDigest(getSql(), day);
+}
+// A retry could send the email twice.
+emailStep.maxRetries = 0;
 
 export async function finishReading(run: ReadingRun): Promise<void> {
   'use step';

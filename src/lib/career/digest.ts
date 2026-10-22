@@ -1,6 +1,7 @@
-// The nightly email digest, sent through Resend's HTTP API (no SDK).
+// The nightly email digest, sent through Resend (resend.ts).
 import { readConfig } from '../admin/content';
 import { PostgresStore } from '../admin/postgres-store';
+import { DEFAULT_FROM, esc, sendEmail } from '../admin/resend';
 import { getSecret } from '../admin/secrets';
 import { adminSettings } from '../admin/settings';
 import type { Sql } from '../db';
@@ -9,11 +10,6 @@ import { parsePrefs } from './settings';
 import type { PostingSummary, RunSummary } from './types';
 
 type Row = Pick<PostingSummary, 'id' | 'company' | 'title' | 'score'>;
-
-const FROM = 'ScholarOS <onboarding@resend.dev>';
-
-const esc = (s: string) =>
-  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 
 /**
  * The digest for a night: its counts, why it stopped (if it did), the postings waiting for approval and tonight's
@@ -100,23 +96,7 @@ export async function sendDigest(
       `${siteUrl}/${adminSettings().adminPath}`,
     );
     if (!mail) return 'skipped';
-    let res: Response;
-    try {
-      res = await fetchFn('https://api.resend.com/emails', {
-        method: 'POST',
-        headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json' },
-        body: JSON.stringify({ from: digest.from.trim() || FROM, to: [to], ...mail }),
-        signal: AbortSignal.timeout(30_000),
-      });
-    } catch (e) {
-      return `Resend could not be reached: ${(e as Error).message}`.slice(0, 300);
-    }
-    if (res.ok) return 'sent';
-    const body = (await res.json().catch(() => null)) as { message?: unknown } | null;
-    return `Resend answered ${res.status}: ${typeof body?.message === 'string' ? body.message : res.statusText}`.slice(
-      0,
-      300,
-    );
+    return await sendEmail(key, { from: digest.from.trim() || DEFAULT_FROM, to, ...mail }, fetchFn);
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('[career] digest', e);
