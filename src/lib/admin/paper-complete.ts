@@ -1,4 +1,5 @@
 // Finds a paper's own record on arXiv, bioRxiv/medRxiv, Crossref, PubMed and OpenAlex, and merges its fields by source quality.
+import { isDeepStrictEqual } from 'node:util';
 import { getText, SourceError } from '../career/sources/http';
 import {
   arxivBibtex,
@@ -286,6 +287,86 @@ export async function completedFields(
       own[0],
     );
   return { fields, sources };
+}
+
+/** One proposed field: `fill` when the paper had nothing there; `source` is where `to` came from. */
+export interface FieldChange {
+  field: Completable;
+  from: unknown;
+  to: unknown;
+  fill: boolean;
+  source?: Source;
+}
+export interface PaperProposal {
+  slug: string;
+  title: string;
+  changes: FieldChange[];
+  error?: string;
+  noMatch?: true;
+}
+/** slug → field → JSON of the proposed value the owner declined. */
+export type Declined = Record<string, Partial<Record<Completable, string>>>;
+
+const empty = (v: unknown) => v === undefined || v === null || v === '' || (Array.isArray(v) && !v.length);
+// Whitespace never counts as a change (Scholar's double spaces, arXiv's wrapped abstracts).
+const squash = (v: unknown) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim() : v);
+
+/** The completed fields that differ from the paper's, in COMPLETABLE order, less the values the owner declined. */
+export function proposeChanges(
+  current: Record<string, unknown>,
+  completed: Completed,
+  declined: Partial<Record<Completable, string>> = {},
+  sources: Partial<Record<Completable, Source>> = {},
+): FieldChange[] {
+  return COMPLETABLE.filter(
+    (f) =>
+      completed[f] !== undefined &&
+      !isDeepStrictEqual(squash(completed[f]), squash(current[f])) &&
+      declined[f] !== JSON.stringify(completed[f]),
+  ).map((f) => ({ field: f, from: current[f], to: completed[f], fill: empty(current[f]), source: sources[f] }));
+}
+
+const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+
+/** One stored paper's proposal: a lookup failure is its `error`, nothing found is `noMatch`. */
+export async function proposeFor(
+  slug: string,
+  data: Record<string, unknown>,
+  look: Lookup,
+  declined?: Partial<Record<Completable, string>>,
+): Promise<PaperProposal> {
+  const title = text(data.title) ?? '';
+  const authors = Array.isArray(data.authors) ? data.authors.map(String) : [];
+  try {
+    const found = await findPaper(
+      { title, authors, doi: text(data.doi), arxiv: text(data.arxiv), url: text(data.url), pdf: text(data.pdf) },
+      look,
+    );
+    if (!found) return { slug, title, changes: [], noMatch: true };
+    const { fields, sources } = await completedFields(found, { venue: text(data.venue), type: text(data.type) }, look);
+    return { slug, title, changes: proposeChanges(data, fields, declined, sources) };
+  } catch (e) {
+    return { slug, title, changes: [], error: e instanceof Error ? e.message : String(e) };
+  }
+}
+
+/** No paper's lookups start this long into a batch, so a slow source can't push a request past the function limit. */
+export const PROPOSE_FOR_MS = 60_000;
+
+/** Proposals for a batch, in order: at least one, then none started past PROPOSE_FOR_MS, and none after a source fails. */
+export async function proposeBatch(
+  entries: { slug: string; data: Record<string, unknown> }[],
+  look: Lookup,
+  declined: Declined,
+  clock: () => number = Date.now,
+): Promise<PaperProposal[]> {
+  const deadline = clock() + PROPOSE_FOR_MS;
+  const out: PaperProposal[] = [];
+  for (const e of entries) {
+    if (out.length && (clock() >= deadline || out.at(-1)!.error)) break;
+    out.push(await proposeFor(e.slug, e.data, look, declined[e.slug]));
+  }
+  return out;
 }
 
 /** Minimum gap between calls per host: arXiv's API terms (one per 3 s); NCBI's 3 requests/s without a key. */

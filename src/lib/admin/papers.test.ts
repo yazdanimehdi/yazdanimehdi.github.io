@@ -273,6 +273,15 @@ test('first run is a baseline: imports missing publications, marks everything se
   assert.equal(store.log.length, 1, 'one commit');
 });
 
+test('a scholar.json holding only declines (no sync yet) still makes a baseline run, and runs keep the declines', async () => {
+  const declined = { smith2020manual: { url: JSON.stringify('https://arxiv.org/abs/1') } };
+  await store.commit([{ path: SCHOLAR_JSON, content: JSON.stringify({ seen: [], declined }) }], 'decline', {});
+  articles = [article('a', 'Sparse Attention for Robots', '2026')];
+  const r = await syncPapers(store, deps(), NOW);
+  assert.deepEqual(r.posts, [], 'baseline: no posts');
+  assert.deepEqual(await state(), { seen: ['AUTH:a'], lastRun: NOW.toISOString(), declined });
+});
+
 test('second run: one new paper becomes a publication and a draft post with relatedPublication and coverImage', async () => {
   await baseline();
   articles = [article('c', 'Graph Planning at Scale', '2026'), ...articles];

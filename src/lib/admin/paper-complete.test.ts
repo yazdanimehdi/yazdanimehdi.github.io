@@ -6,6 +6,9 @@ import {
   completedFields,
   findPaper,
   paperLookup,
+  proposeBatch,
+  proposeChanges,
+  PROPOSE_FOR_MS,
   resetPacingForTests,
   sameAuthors,
   surnames,
@@ -359,4 +362,71 @@ test('paperLookup does not retry other sources', async () => {
   const { look, urls } = realLookup(() => new Response('', { status: 503 }));
   await assert.rejects(look.get('https://api.crossref.org/works/10.1/x'), { status: 503 });
   assert.equal(urls.length, 1);
+});
+
+test('proposeChanges: fills, replacements, whitespace-only titles and declines', () => {
+  const current = {
+    title: 'Mirage:  measuring interpolation',
+    authors: ['M Yazdani-Jahromi'],
+    url: 'https://scholar.google.com/x',
+  };
+  const completed = {
+    title: 'Mirage: measuring interpolation',
+    authors: ['Mehdi Yazdani-Jahromi', 'A B', 'C D'],
+    url: 'https://arxiv.org/abs/2609.14491',
+    arxiv: '2609.14491',
+  };
+  const ch = proposeChanges(current, completed);
+  assert.deepEqual(
+    ch.map((c) => [c.field, c.fill]),
+    [
+      ['authors', false],
+      ['arxiv', true],
+      ['url', false],
+    ],
+  );
+  const again = proposeChanges(current, completed, { url: JSON.stringify('https://arxiv.org/abs/2609.14491') });
+  assert.deepEqual(
+    again.map((c) => c.field),
+    ['authors', 'arxiv'],
+  );
+  const newer = proposeChanges(
+    current,
+    { ...completed, url: 'https://arxiv.org/abs/2609.14491v2' },
+    { url: JSON.stringify('https://arxiv.org/abs/2609.14491') },
+  );
+  assert.ok(
+    newer.some((c) => c.field === 'url'),
+    'a different value is offered again',
+  );
+  assert.deepEqual(proposeChanges({ authors: ['A B'], year: 2026 }, { authors: ['A B'], year: 2026 }), [], 'equal');
+  const sourced = proposeChanges({}, { arxiv: '1' }, {}, { arxiv: 'arxiv' });
+  assert.deepEqual(sourced, [{ field: 'arxiv', from: undefined, to: '1', fill: true, source: 'arxiv' }]);
+});
+
+test('proposeBatch: one paper at least, none started after PROPOSE_FOR_MS, and it stops at a source failure', async () => {
+  const entries = ['a', 'b', 'c'].map((slug) => ({ slug, data: { title: `Paper ${slug}`, authors: ['J Smith'] } }));
+  let t = 0;
+  const slow: Lookup = {
+    async get() {
+      t += PROPOSE_FOR_MS; // each paper's lookups use up the whole budget
+      throw new SourceError('nothing here', 404);
+    },
+  };
+  const timed = await proposeBatch(entries, slow, {}, () => t);
+  assert.deepEqual(
+    timed.map((p) => [p.slug, p.noMatch]),
+    [['a', true]],
+  );
+
+  const down: Lookup = {
+    async get() {
+      throw new SourceError('arXiv answered 503', 503);
+    },
+  };
+  const failed = await proposeBatch(entries, down, {});
+  assert.deepEqual(
+    failed.map((p) => [p.slug, p.error]),
+    [['a', 'arXiv answered 503']],
+  );
 });

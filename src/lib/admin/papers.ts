@@ -6,7 +6,7 @@ import { suggestSlug } from '../utils';
 import { generateImage, generateText, readAiConfig, saveImage } from './ai';
 import { entryChange, listEntries, readConfig } from './content';
 import { commitChanges } from './http';
-import { completedFields, findPaper, paperLookup, type Completed, type Lookup } from './paper-complete';
+import { completedFields, findPaper, paperLookup, type Completed, type Declined, type Lookup } from './paper-complete';
 import { SCHOLAR_JSON } from './paths';
 import { getSecret, secretsDb } from './secrets';
 import { UpstreamError, type Change, type ContentStore } from './store';
@@ -42,9 +42,12 @@ export interface PapersResult {
   skipped?: string;
 }
 
-interface ScholarState {
+export interface ScholarState {
   seen: string[];
+  /** Set by every committed sync; absent until the first, which is then a baseline. */
   lastRun?: string;
+  /** Completions the owner declined for existing papers (Complete papers). */
+  declined?: Declined;
 }
 
 interface Article {
@@ -116,10 +119,15 @@ const unique = (base: string, taken: Set<string>) => {
 
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
-function parseState(text: string | undefined): ScholarState {
+export function parseState(text: string | undefined): ScholarState {
   try {
     const raw = JSON.parse(text ?? '');
-    return { seen: Array.isArray(raw?.seen) ? raw.seen.filter((s: unknown) => typeof s === 'string') : [] };
+    const declined = raw?.declined && typeof raw.declined === 'object' && !Array.isArray(raw.declined);
+    return {
+      seen: Array.isArray(raw?.seen) ? raw.seen.filter((s: unknown) => typeof s === 'string') : [],
+      ...(typeof raw?.lastRun === 'string' ? { lastRun: raw.lastRun } : {}),
+      ...(declined ? { declined: raw.declined as Declined } : {}),
+    };
   } catch {
     return { seen: [] };
   }
@@ -143,8 +151,10 @@ export async function syncPapers(store: ContentStore, deps: PapersDeps, now = ne
     .filter(Boolean);
   if (!authors.length) return { ...result, skipped: 'no Scholar author id in config/scholar.yml' };
 
-  const baseline = !stateFile;
-  const seen = new Set(parseState(stateFile?.content).seen);
+  // A file holding only declines (written before any sync) still leaves the first sync a baseline.
+  const prev = parseState(stateFile?.content);
+  const baseline = !prev.lastRun;
+  const seen = new Set(prev.seen);
   const { autoPost, maxPostsPerRun } = resolveAiConfig(ai.data).papers;
 
   // One failed author fails the run: a partial baseline would turn the missing papers into posts next time.
@@ -298,7 +308,7 @@ export async function syncPapers(store: ContentStore, deps: PapersDeps, now = ne
 
   // Nothing new: no commit (in git mode every commit redeploys the site).
   if (!baseline && newlySeen.length === 0) return result;
-  const state: ScholarState = { seen: [...seen, ...newlySeen], lastRun: now.toISOString() };
+  const state: ScholarState = { ...prev, seen: [...seen, ...newlySeen], lastRun: now.toISOString() };
   changes.push({ path: SCHOLAR_JSON, content: `${JSON.stringify(state, null, 2)}\n` });
   await commitChanges(store, changes, 'Import papers from Google Scholar', {
     [SCHOLAR_JSON]: stateFile?.version ?? null,
@@ -329,19 +339,29 @@ export function serpapiClient(key: string, fetchFn: typeof fetch = fetch): Paper
 export async function papersDeps(store: ContentStore): Promise<PapersDeps | null> {
   const key = await getSecret(secretsDb(store), 'SERPAPI_KEY');
   if (!key) return null;
-  const [config, site, cv] = await Promise.all([
-    readAiConfig(store),
-    readConfig(store, 'site'),
-    readConfig(store, 'cv'),
-  ]);
-  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
-  const email = str((site.data.socials as any)?.email) ?? str((cv.data.cv as any)?.email);
+  const [config, lookup] = await Promise.all([readAiConfig(store), paperLookupFor(store)]);
   return {
     serpapi: serpapiClient(key),
     text: (input) => generateText(store, config, input),
     image: (prompt) => generateImage(store, config, prompt),
-    lookup: paperLookup({ siteUrl: str(site.data.siteUrl) ?? '', email }),
+    lookup,
   };
+}
+
+let testLookup: Lookup | null = null;
+
+/** Tests swap the paper sources' network; production code never calls this. */
+export function setPaperLookupForTests(lookup: Lookup | null): void {
+  testLookup = lookup;
+}
+
+/** The paper sources' network, identified by the site's URL and email (site.yml socials, else the CV's). */
+export async function paperLookupFor(store: ContentStore): Promise<Lookup> {
+  if (testLookup) return testLookup;
+  const [site, cv] = await Promise.all([readConfig(store, 'site'), readConfig(store, 'cv')]);
+  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+  const email = str((site.data.socials as any)?.email) ?? str((cv.data.cv as any)?.email);
+  return paperLookup({ siteUrl: str(site.data.siteUrl) ?? '', email });
 }
 
 /** "Imported 2 · drafted 1 · failed: …" for the jobs record and the AI screen. */
