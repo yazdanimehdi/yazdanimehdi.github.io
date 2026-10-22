@@ -1,48 +1,78 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
+import AdminTabLinks from './AdminTabLinks.vue';
 import AdminShell from './AdminShell.vue';
 import { api, report, toast } from './api';
+import { relativeTime } from './dates';
 import { visible, isRunning, type RunStatus } from './career';
 import type { AdminCtx } from './types';
 import type { CareerPrefs } from '../lib/career/settings';
-import type { Feed, PostingStatus, PostingSummary } from '../lib/career/types';
+import type { Feed, PostingSummary } from '../lib/career/types';
 
 // Every string from a posting or a source error is third-party text: shown with {{ }} only, never as HTML.
 const props = defineProps<{ ctx: AdminCtx }>();
 const base = `/${props.ctx.adminPath}`;
-const STATUSES: PostingStatus[] = [
-  'found',
-  'skipped',
-  'drafted',
-  'ready',
-  'submitted',
-  'interview',
-  'offer',
-  'rejected',
-  'no-response',
-  'withdrawn',
-];
+// The common statuses are filter tabs; the rest sit in a small select. `open` is every status not closed.
+const TABS = [
+  ['open', 'Open'],
+  ['drafted', 'Drafted'],
+  ['ready', 'Ready for approval'],
+  ['submitted', 'Submitted'],
+] as const;
+const OTHER = [
+  ['skipped', 'Skipped'],
+  ['interview', 'Interview'],
+  ['offer', 'Offer'],
+  ['rejected', 'Rejected'],
+  ['no-response', 'No response'],
+  ['withdrawn', 'Withdrawn'],
+  ['all', 'All'],
+] as const;
+const KNOWN = new Set<string>([...TABS, ...OTHER].map(([s]) => s));
+const fromUrl = () => {
+  const s = new URLSearchParams(location.search).get('status') ?? '';
+  return KNOWN.has(s) ? s : 'open';
+};
 
 const empty = { rows: [], total: 0 };
 const groups = ref<Feed>({ matches: empty, below: empty, gated: empty, unscored: empty });
 const threshold = ref(70);
-const filter = ref('open');
+const filter = ref(fromUrl());
 const run = ref<RunStatus>({ runId: null, status: null, lastRun: null });
 const loading = ref(true);
-const loaded = ref(false);
 const starting = ref(false);
 let timer: ReturnType<typeof setInterval> | undefined;
 
 const running = computed(() => starting.value || isRunning(run.value.status));
 
+// Ready for approval is part of Open, so either view gives its count from what it loaded; other views keep the last.
+const ready = ref(0);
 async function loadRows() {
+  const status = filter.value;
   try {
-    groups.value = await api<Feed>(`career/postings${filter.value ? `?status=${filter.value}` : ''}`);
+    const feed = await api<Feed>(`career/postings${status === 'all' ? '' : `?status=${status}`}`);
+    if (status !== filter.value) return; // a later filter's answer wins
+    groups.value = feed;
+    const all = Object.values(feed);
+    if (status === 'ready') ready.value = all.reduce((n, g) => n + g.total, 0);
+    if (status === 'open') ready.value = all.flatMap((g) => g.rows).filter((r) => r.status === 'ready').length;
   } catch (e) {
     report(e);
   } finally {
     loading.value = false;
   }
+}
+
+/** A history entry per filter, so Back and reload come back to it. */
+function setFilter(status: string) {
+  if (status === filter.value) return;
+  filter.value = status;
+  history.pushState(null, '', status === 'open' ? location.pathname : `?status=${status}`);
+  void loadRows();
+}
+function onPop() {
+  filter.value = fromUrl();
+  void loadRows();
 }
 
 async function poll() {
@@ -79,43 +109,67 @@ async function runNow() {
   }
 }
 
-const when = (iso: string) => new Date(iso).toLocaleString();
+const found = computed(() => run.value.lastRun?.sources.reduce((n, s) => n + s.found, 0) ?? 0);
 const where = (r: PostingSummary) => [r.location, r.remote ? 'remote' : ''].filter(Boolean).join(' · ');
 
+// The run status is unknown until `career/run` answers; until then the strip shows a placeholder, not "No run yet".
+const runKnown = ref(false);
 onMounted(async () => {
-  try {
-    const s = await api<{ prefs: CareerPrefs }>('career/settings');
-    threshold.value = s.prefs.threshold;
-    run.value = await api<RunStatus>('career/run');
-  } catch (e) {
-    report(e);
-  }
-  loaded.value = true;
-  await loadRows();
-  if (isRunning(run.value.status)) watch();
+  addEventListener('popstate', onPop);
+  void loadRows();
+  const [s, r] = await Promise.allSettled([
+    api<{ prefs: CareerPrefs }>('career/settings'),
+    api<RunStatus>('career/run'),
+  ]);
+  if (s.status === 'fulfilled') threshold.value = s.value.prefs.threshold;
+  else report(s.reason);
+  if (r.status === 'fulfilled') {
+    run.value = r.value;
+    runKnown.value = true;
+    if (isRunning(run.value.status)) watch();
+  } else report(r.reason);
 });
-onBeforeUnmount(stop);
+onBeforeUnmount(() => {
+  stop();
+  removeEventListener('popstate', onPop);
+});
 </script>
 
 <template>
   <AdminShell :ctx="ctx" active="career" title="Job search">
-    <section class="adm-card" aria-labelledby="career-run">
-      <h2 id="career-run" class="adm-h2">Last run</h2>
-      <p v-if="run.status === 'failed'" class="adm-err" role="status">
-        The last run failed. The summary below is from the last run that finished.
-      </p>
-      <template v-if="run.lastRun">
-        <p class="adm-muted">
-          {{ when(run.lastRun.at) }} · scored {{ run.lastRun.scored }}
+    <AdminTabLinks
+      label="Job search"
+      :tabs="[
+        { href: `${base}/career`, label: 'Postings', current: filter !== 'ready' },
+        { href: `${base}/career?status=ready`, label: 'Ready for approval', current: filter === 'ready', count: ready },
+        { href: `${base}/career/settings`, label: 'Settings' },
+      ]"
+    />
+    <div v-if="!runKnown" class="adm-verdict" aria-hidden="true"><span class="adm-skel-bar" /></div>
+    <div v-else class="adm-verdict adm-run" :class="{ 'is-attention': run.status === 'failed' }">
+      <p role="status">
+        <template v-if="run.status === 'failed'">The last run failed. </template>
+        <template v-if="run.lastRun">
+          {{ run.status === 'failed' ? 'Last finished run' : 'Last run' }} {{ relativeTime(run.lastRun.at) }} ·
+          {{ found }} found · {{ run.lastRun.scored }} scored
           <template v-if="run.lastRun.deferred"> · {{ run.lastRun.deferred }} left for later</template>
           <template v-if="run.lastRun.failed"> · {{ run.lastRun.failed }} failed to score</template>
-        </p>
-        <p v-if="run.lastRun.scoreSkipped" class="adm-err" role="status">
-          Nothing was scored: {{ visible(run.lastRun.scoreSkipped) }}
-        </p>
-        <p v-if="run.lastRun.scoreError" class="adm-err" role="status">
-          Scoring hit an error: {{ visible(run.lastRun.scoreError) }}. Those postings wait for the next run.
-        </p>
+        </template>
+        <template v-else-if="run.status !== 'failed'">No run yet. The search runs every night.</template>
+      </p>
+      <button type="button" class="adm-btn adm-btn-primary" :disabled="running" @click="runNow">
+        {{ running ? 'Running…' : 'Run now' }}
+      </button>
+    </div>
+    <template v-if="run.lastRun">
+      <p v-if="run.lastRun.scoreSkipped" class="adm-err" role="status">
+        Nothing was scored: {{ visible(run.lastRun.scoreSkipped) }}
+      </p>
+      <p v-if="run.lastRun.scoreError" class="adm-err" role="status">
+        Scoring hit an error: {{ visible(run.lastRun.scoreError) }}. Those postings wait for the next run.
+      </p>
+      <details v-if="run.lastRun.sources.length" class="adm-nav-more" :open="run.lastRun.sources.some((s) => s.error)">
+        <summary>By source ({{ run.lastRun.sources.length }})</summary>
         <ul class="adm-rows">
           <li v-for="s in run.lastRun.sources" :key="s.id">
             <span class="adm-row-label">{{ s.id }}</span>
@@ -126,25 +180,23 @@ onBeforeUnmount(stop);
             </span>
           </li>
         </ul>
-      </template>
-      <p v-else-if="loaded" class="adm-muted">No run yet. The search runs every night, or now:</p>
-      <div class="adm-actions">
-        <button type="button" class="adm-btn adm-btn-primary" :disabled="running" @click="runNow">
-          {{ running ? 'Running…' : 'Run now' }}
-        </button>
-        <a class="adm-btn" :href="`${base}/career/settings`">Settings</a>
-      </div>
-    </section>
+      </details>
+    </template>
 
-    <div class="adm-form">
-      <label class="adm-field">
-        <span>Status</span>
-        <select v-model="filter" @change="loadRows">
-          <option value="open">Open</option>
-          <option value="">All</option>
-          <option v-for="s in STATUSES" :key="s" :value="s">{{ s }}</option>
-        </select>
-      </label>
+    <div class="adm-filter-row">
+      <div class="adm-filter" role="group" aria-label="Status">
+        <button v-for="[s, label] in TABS" :key="s" type="button" :aria-pressed="filter === s" @click="setFilter(s)">
+          {{ label }}
+        </button>
+      </div>
+      <select
+        aria-label="Other status"
+        :value="OTHER.some(([s]) => s === filter) ? filter : ''"
+        @change="setFilter(($event.target as HTMLSelectElement).value || 'open')"
+      >
+        <option value="">Other status</option>
+        <option v-for="[s, label] in OTHER" :key="s" :value="s">{{ label }}</option>
+      </select>
     </div>
 
     <p v-if="loading" class="adm-muted">Loading…</p>

@@ -513,6 +513,62 @@
   color: var(--adm-ink);
   font-weight: 500;
 }
+/* Links between sibling screens under a page title (Job search, CV): Body text; the current one Ink, 2px Accent rule. */
+.adm-tablinks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 24px;
+  border-block-end: 1px solid var(--adm-rule);
+}
+.adm .adm-tablinks a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--adm-touch);
+  border-block-end: 2px solid transparent;
+  margin-block-end: -1px;
+  color: var(--ed-body-2, #3d4357);
+  font-size: 15px;
+  text-decoration: none;
+}
+.adm .adm-tablinks a:hover {
+  color: var(--adm-ink);
+}
+.adm .adm-tablinks a[aria-current='page'] {
+  border-block-end-color: var(--adm-accent);
+  color: var(--adm-ink);
+  font-weight: 500;
+}
+.adm-tablinks .adm-count {
+  font-variant-numeric: tabular-nums;
+}
+/* The job feed's run strip: the verdict line with Run now at its end; then status tabs and the other-status select. */
+.adm-run {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding-block: 6px;
+}
+.adm-run > p {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.adm-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 20px;
+  border-block-end: 1px solid var(--adm-rule);
+}
+.adm-filter-row > .adm-filter {
+  border: 0;
+}
+.adm .adm-filter-row > select {
+  inline-size: auto;
+  margin-block-end: 6px;
+}
 .adm-count {
   color: var(--adm-muted);
   font-size: 12px;

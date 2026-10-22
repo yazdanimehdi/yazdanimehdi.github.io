@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 import AdminShell from './AdminShell.vue';
+import AdminTabLinks from './AdminTabLinks.vue';
 import { api, report, toast } from './api';
 import { coverageLine, coverageState, evidenceLabel, httpUrl, visible } from './career';
 import { PostingText } from './PostingText';
@@ -303,7 +304,14 @@ onMounted(async () => {
 
 <template>
   <AdminShell :ctx="ctx" active="career" :title="posting ? posting.title : 'Job'">
-    <p><a :href="`${base}/career`">← All postings</a></p>
+    <AdminTabLinks
+      label="Job search"
+      :tabs="[
+        { href: `${base}/career`, label: 'Postings', current: posting?.status !== 'ready' },
+        { href: `${base}/career?status=ready`, label: 'Ready for approval', current: posting?.status === 'ready' },
+        { href: `${base}/career/settings`, label: 'Settings' },
+      ]"
+    />
     <p v-if="loading" class="adm-muted">Loading…</p>
     <p v-else-if="missing || !posting" class="adm-muted">This posting could not be loaded.</p>
     <template v-else>
