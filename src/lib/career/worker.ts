@@ -30,23 +30,37 @@ const BY = 'ScholarOS jobs';
 const PROVIDER: Record<Cli['agent'], TextProviderId> = { claude: 'anthropic', codex: 'openai', gemini: 'google' };
 const LABEL: Record<Cli['agent'], string> = { claude: 'Claude Code', codex: 'Codex', gemini: 'Gemini CLI' };
 
-const npmInstall = (bin: string, pkg: string) => `command -v ${bin} >/dev/null || npm i -g ${pkg} >/dev/null 2>&1`;
+/**
+ * Installs `pkg@min` unless `bin --version` is already at least `min`: the sandbox image's preinstalled CLIs can be
+ * older than the flags RUN uses. A marker per version skips the check on later calls in the same VM.
+ */
+const atLeast = (bin: string, pkg: string, min: string) => {
+  const marker = `"$HOME/.scholaros-cli/${bin}-${min}"`;
+  return `test -f ${marker} || {
+  v=$(${bin} --version 2>/dev/null | grep -oE '[0-9]+\\.[0-9]+\\.[0-9]+' | head -1)
+  if [ -z "$v" ] || ! printf '%s\\n%s\\n' ${min} "$v" | sort -V -C; then npm i -g ${pkg}@${min} >/dev/null || exit 1; fi
+  mkdir -p "$HOME/.scholaros-cli" && touch ${marker}
+}`;
+};
+// The versions RUN's flags were checked with (--help).
 const INSTALL: Record<Cli['agent'], string> = {
-  claude: npmInstall('claude', '@anthropic-ai/claude-code'),
-  codex: npmInstall('codex', '@openai/codex'),
-  gemini: AGENTS.google.install!,
+  claude: atLeast('claude', '@anthropic-ai/claude-code', '2.1.305'),
+  codex: atLeast('codex', '@openai/codex', '0.163.0'),
+  gemini: atLeast('gemini', '@google/gemini-cli', '0.65.0'),
 };
 
 // One-shot, tool-less runs (the editor's AGENTS lines run tool-using agents). $1 is the call's own directory; the
-// prompt arrives on stdin, so its size and a leading "-" don't matter. Flags checked with --help: Claude Code
-// 2.1.305, codex-cli 0.163.0, Gemini CLI 0.65.0.
+// prompt arrives on stdin, so its size and a leading "-" don't matter.
 const RUN: Record<Cli['agent'], string> = {
   claude: `cd "$1" && claude -p --output-format json --tools "" --no-session-persistence --system-prompt "$(cat system.txt)" < prompt.txt`,
   codex: `cd "$1" && mkdir -p codex && CODEX_HOME="$1/codex" codex exec --skip-git-repo-check -s read-only -o last.txt - < prompt.txt`,
   gemini: `cd "$1" && gemini --skip-trust --output-format json -p 'Answer the request above.' < prompt.txt`,
 };
-/** A call that died half-way leaves its directory (a Codex sign-in included): swept once it is 15 minutes old. */
-const PREP = `mkdir -p ${ROOT} && find ${ROOT} -mindepth 1 -maxdepth 1 -mmin +15 -exec rm -rf {} +; exit 0`;
+/**
+ * A call that died half-way leaves its directory (a Codex sign-in included): swept once it is 15 minutes old. No
+ * `exit` here: the install runs after it in the same script.
+ */
+const PREP = `mkdir -p ${ROOT} && find ${ROOT} -mindepth 1 -maxdepth 1 -mmin +15 -exec rm -rf {} +; true`;
 /** Prints `idle` when no other call is using the VM, so the last one out stops it. */
 const CLEAN = `rm -rf "$1"; rmdir ${ROOT} 2>/dev/null && echo idle; exit 0`;
 

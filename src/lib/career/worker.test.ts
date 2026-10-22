@@ -1,5 +1,9 @@
 import test, { afterEach, beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { migrate } from '../db-migrate';
 import { pgliteSql } from '../pglite-sql';
 import { setSqlForTests, type Sql } from '../db';
@@ -40,7 +44,7 @@ function fakeVm(reply: CommandResult, files: Record<string, string> = {}): Fake 
     status: 'running',
     async run(script: string, args: string[] = [], opts: { env?: Record<string, string> } = {}) {
       fake.runs.push({ script, args, env: opts.env });
-      if (/claude -p|codex exec|gemini --/.test(script)) {
+      if (/claude -p|codex exec|gemini --skip-trust/.test(script)) {
         for (const [name, content] of Object.entries(files)) fake.written.set(`${args[0]}/${name}`, content);
         return reply;
       }
@@ -213,11 +217,70 @@ test('gemini runs on the Gemini API key in either auth mode', async () => {
   const vm = fakeVm({ exitCode: 0, stdout: JSON.stringify({ response: 'gem' }), stderr: '' });
   setWorkerSandboxForTests(vm.api);
   assert.equal(await workerText(store, cli('gemini', 'subscription'), INPUT), 'gem');
-  const run = vm.runs.find((r) => r.script.includes('gemini --'))!;
+  const run = vm.runs.find((r) => r.script.includes('gemini --skip-trust'))!;
   assert.equal(run.env?.GEMINI_API_KEY, PLACEHOLDER);
   assert.deepEqual(vm.policies.at(-1)!.allow['generativelanguage.googleapis.com'], [
     { transform: [{ headers: { 'x-goog-api-key': 'g-key' } }] },
   ]);
+});
+
+/**
+ * The setup script the worker sends before its CLI runs, run here in bash against a stub CLI printing `version` (none:
+ * not installed) and a stub npm that logs its arguments. Returns what npm was asked and whether --version was asked.
+ */
+async function install(agent: 'claude' | 'codex' | 'gemini', version: string | null, home?: string) {
+  process.env.OPENAI_API_KEY = 'o-key';
+  process.env.GEMINI_API_KEY = 'g-key';
+  const vm = fakeVm(claudeJson('ok'), { 'last.txt': 'ok' });
+  setWorkerSandboxForTests(vm.api);
+  await workerText(store, cli(agent, 'key'), INPUT).catch(() => {});
+  const script = vm.runs[0].script;
+  const dir = home ?? mkdtempSync(join(tmpdir(), 'worker-install-'));
+  const bin = join(dir, 'bin');
+  execFileSync('mkdir', ['-p', bin]);
+  rmSync(join(dir, 'log'), { force: true });
+  const stub = (name: string, body: string) => {
+    writeFileSync(join(bin, name), `#!/bin/sh\n${body}\n`);
+    chmodSync(join(bin, name), 0o755);
+  };
+  stub('npm', `echo "npm $*" >> "${dir}/log"`);
+  if (version) stub(agent, `echo "${agent} $*" >> "${dir}/log"; echo "${version}"`);
+  else rmSync(join(bin, agent), { force: true });
+  execFileSync('bash', ['-c', script], {
+    env: { PATH: `${bin}:/usr/bin:/bin`, HOME: dir },
+    stdio: ['ignore', 'ignore', 'ignore'],
+  });
+  const log = existsSync(join(dir, 'log')) ? readFileSync(join(dir, 'log'), 'utf8').trim().split('\n') : [];
+  return { npm: log.filter((l) => l.startsWith('npm ')), asked: log.some((l) => l === `${agent} --version`), dir };
+}
+
+test('a CLI older than the flags it is run with is replaced by the pinned version', async () => {
+  const cases = [
+    ['claude', '2.1.283 (Claude Code)', 'npm i -g @anthropic-ai/claude-code@2.1.305'],
+    ['codex', 'codex-cli 0.158.0', 'npm i -g @openai/codex@0.163.0'],
+    ['gemini', '0.63.0', 'npm i -g @google/gemini-cli@0.65.0'],
+    ['claude', null, 'npm i -g @anthropic-ai/claude-code@2.1.305'],
+  ] as const;
+  for (const [agent, version, expected] of cases) {
+    const { npm, dir } = await install(agent, version);
+    rmSync(dir, { recursive: true, force: true });
+    assert.deepEqual(npm, [expected], `${agent} ${version}`);
+  }
+});
+
+test('a new enough CLI is kept, and the marker skips the check next time', async () => {
+  for (const [agent, version] of [
+    ['claude', '2.1.305 (Claude Code)'],
+    ['codex', 'codex-cli 0.170.2'],
+    ['gemini', '0.65.0'],
+  ] as const) {
+    const first = await install(agent, version);
+    assert.deepEqual(first.npm, [], `${agent} ${version}`);
+    assert.ok(first.asked, 'the version was checked');
+    const again = await install(agent, version, first.dir);
+    assert.deepEqual([again.npm, again.asked], [[], false], `${agent}: the marker answers`);
+    rmSync(first.dir, { recursive: true, force: true });
+  }
 });
 
 test('a missing sign-in names the key', async () => {
