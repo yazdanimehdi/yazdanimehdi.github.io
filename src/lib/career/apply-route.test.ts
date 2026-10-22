@@ -123,6 +123,21 @@ test('approve-all needs the list the owner saw: no body, or more than 200 items,
   assert.equal((await getPosting(kit.sql, id))!.application?.state, 'ready');
 });
 
+test('withdraw returns an approval the queue hasn’t claimed to ready and keeps the status', async () => {
+  const id = await posting(kit.sql, approvedApp());
+  await updatePosting(kit.sql, id, { status: 'ready' });
+  const res = await call(apply, ownerUser(), String(id), { action: 'withdraw' });
+  assert.equal(res.status, 200);
+  const p = (await getPosting(kit.sql, id))!;
+  assert.equal(p.application?.state, 'ready');
+  assert.equal(p.application?.approved, undefined, 'the approved values are gone');
+  assert.equal(p.status, 'ready');
+  assert.equal((await call(apply, ownerUser(), String(id), { action: 'withdraw' })).status, 409, 'nothing to withdraw');
+  const sending = await posting(kit.sql, approvedApp({ state: 'submitting' }));
+  assert.equal((await call(apply, ownerUser(), String(sending), { action: 'withdraw' })).status, 409);
+  assert.equal((await getPosting(kit.sql, sending))!.application?.state, 'submitting');
+});
+
 const unconfirmed = () => approvedApp({ state: 'unconfirmed', reason: 'Submitted, but the page didn’t confirm it' });
 
 test('confirm: the owner says an unconfirmed application went out', async () => {

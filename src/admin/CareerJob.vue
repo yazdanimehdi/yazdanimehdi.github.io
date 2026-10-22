@@ -184,6 +184,13 @@ function stop() {
   clearInterval(timer);
   timer = undefined;
 }
+/** Polls every 5 s; an approval still waiting for the queue after 2 minutes is checked every minute instead. */
+let fastSince: number | null = null;
+function watch() {
+  if (timer) return;
+  fastSince = Date.now();
+  timer = setInterval(poll, 5000);
+}
 const working = (p: Posting) => p.draftState === 'running' || isApplying(p.application?.state);
 async function poll() {
   try {
@@ -191,6 +198,10 @@ async function poll() {
     if (!working(res.posting)) {
       stop();
       take(res);
+    } else if (res.posting.application?.state === 'approved' && fastSince && Date.now() - fastSince > 120_000) {
+      fastSince = null;
+      clearInterval(timer);
+      timer = setInterval(poll, 60_000);
     }
   } catch (e) {
     stop();
@@ -204,7 +215,7 @@ async function draft(part: Part) {
       body: { part, instruction: part === 'render' ? '' : instruction[part] },
     });
     posting.value = { ...posting.value!, draftState: 'running' };
-    timer ??= setInterval(poll, 5000);
+    watch();
   } catch (e) {
     report(e);
   }
@@ -317,7 +328,7 @@ const acting = ref(false);
 const confirming = ref(false);
 
 type ApplyBody =
-  | { action: 'prefill' | 'skip' | 'handoff' | 'confirm' | 'not-sent' }
+  | { action: 'prefill' | 'skip' | 'withdraw' | 'handoff' | 'confirm' | 'not-sent' }
   | { action: 'approve'; at: string; fields: { id: string; value: string }[] };
 
 /** Every apply action answers once the server has moved the application; the page then shows where it is. */
@@ -329,10 +340,11 @@ async function apply(body: ApplyBody) {
     if (body.action === 'approve')
       toast(
         res.queued === false
-          ? 'Approved. It will be submitted with the next queue run.'
+          ? 'Approved. It will be submitted when the queue next runs (at the latest with tonight’s run).'
           : 'Approved: it is submitted in the next few minutes',
       );
     if (body.action === 'skip') toast('Skipped');
+    if (body.action === 'withdraw') toast('Approval withdrawn: it waits for your approval again');
   } catch (e) {
     // A 409 on approve is usually a pre-fill that ran again meanwhile: those values were never approved.
     if (body.action === 'approve' && e instanceof ApiError && e.status === 409) conflict = e;
@@ -343,7 +355,7 @@ async function apply(body: ApplyBody) {
   try {
     const res = await api<JobView>(`career/postings/${props.id}`);
     take(res);
-    if (working(res.posting)) timer ??= setInterval(poll, 5000);
+    if (working(res.posting)) watch();
     if (conflict && body.action === 'approve') {
       if (res.posting.application?.at !== body.at)
         toast('This application was pre-filled again; review the new version.');
@@ -367,7 +379,7 @@ onMounted(async () => {
   try {
     const res = await api<JobView>(`career/postings/${props.id}`);
     take(res);
-    if (working(res.posting)) timer ??= setInterval(poll, 5000);
+    if (working(res.posting)) watch();
     // The Ready list's Review link points at the Application form, which exists only once the posting loaded.
     if (location.hash) void nextTick(() => document.getElementById(location.hash.slice(1))?.scrollIntoView());
   } catch (e) {
@@ -475,6 +487,17 @@ onMounted(async () => {
           </p>
         </template>
 
+        <template v-else-if="app.state === 'approved'">
+          <p class="adm-apply-working" role="status">
+            Approved. It is submitted to {{ links()!.host }} when the queue next runs, usually within a few minutes and
+            at the latest with tonight’s run.
+          </p>
+          <p class="adm-actions">
+            <button type="button" class="adm-btn" :disabled="acting" @click="apply({ action: 'withdraw' })">
+              Withdraw approval
+            </button>
+          </p>
+        </template>
         <p v-else-if="isApplying(app.state)" class="adm-apply-working" role="status">
           {{
             app.state === 'prefilling'
