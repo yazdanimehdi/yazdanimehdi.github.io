@@ -70,3 +70,15 @@ test('parseReadingPrefs drops junk sources but keeps the rest', () => {
   assert.equal(p.talked, 5);
   assert.equal(p.inField, 3);
 });
+
+test("validateReadingPrefs takes medRxiv's HIV/AIDS as the API spells it", () => {
+  // api.biorxiv.org files it under 'hiv aids' and takes category=hiv_aids; 'HIV/AIDS' silently returns every category.
+  assert.deepEqual(
+    validateReadingPrefs({ sources: { medrxiv: { on: true, categories: ['hiv_aids'] } } }).sources.medrxiv,
+    {
+      on: true,
+      categories: ['hiv_aids'],
+    },
+  );
+  assert.throws(() => validateReadingPrefs({ sources: { medrxiv: { on: true, categories: ['HIV/AIDS'] } } }), ZodError);
+});

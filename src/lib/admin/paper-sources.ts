@@ -11,6 +11,7 @@ export interface PaperRecord {
   arxiv?: string;
   primaryClass?: string;
   doi?: string;
+  pmid?: string;
   /** DOI of the published version, as reported by bioRxiv/medRxiv. */
   publishedDoi?: string;
   /** arXiv's arxiv:journal_ref. */
@@ -67,6 +68,30 @@ export function parseArxivFeed(xml: string): PaperRecord[] {
         primaryClass: entry.match(/<arxiv:primary_category[^>]*\bterm="([^"]+)"/)?.[1],
         doi: tag(entry, 'arxiv:doi'),
         journalRef: tag(entry, 'arxiv:journal_ref'),
+      },
+    ];
+  });
+}
+
+/** Parse an arXiv RSS feed (rss.arxiv.org/rss/<categories>) into records with their categories and announce type. */
+export function parseArxivRss(xml: string): (PaperRecord & { announce: string; categories: string[] })[] {
+  return all(xml, 'item').flatMap((item) => {
+    const id = tag(item, 'link')?.match(/abs\/(.+?)(?:v\d+)?$/)?.[1];
+    const title = tag(item, 'title');
+    if (!id || !title) return [];
+    return [
+      {
+        source: 'arxiv' as const,
+        title,
+        authors: (tag(item, 'dc:creator') ?? '')
+          .split(', ')
+          .map((a) => a.trim())
+          .filter(Boolean),
+        year: yearOf(tag(item, 'pubDate')),
+        abstract: tag(item, 'description')?.match(/Abstract:\s*([\s\S]+)/)?.[1],
+        arxiv: id,
+        announce: tag(item, 'arxiv:announce_type') ?? '',
+        categories: all(item, 'category').map((c) => tag(c, 'category') ?? ''),
       },
     ];
   });
@@ -193,6 +218,7 @@ export function parsePubmed(xml: string): PaperRecord[] {
         year: yearOf(pubDate) || yearOf(tag(art, 'MedlineDate')),
         abstract: abstract || undefined,
         doi: art.match(/<ELocationID[^>]*EIdType="doi"[^>]*>([^<]+)</)?.[1]?.trim(),
+        pmid: tag(art, 'PMID'),
         venue: tag(journal, 'Title'),
         type: 'journal' as const,
       },
