@@ -118,6 +118,26 @@ test('parseOpenAlex rebuilds the abstract and maps fields', () => {
   assert.match(r.pdf ?? '', /^https:\/\/arxiv\.org\/pdf\//);
 });
 
+test('parseOpenAlex takes the type from the venue: conference, journal, or no proof for a repository', () => {
+  const [w] = JSON.parse(fixture('openalex.json')).results;
+  const as = (sourceType: string | undefined, pdf = 'https://x.test/a.pdf') =>
+    parseOpenAlex({
+      results: [
+        {
+          ...w,
+          type: 'article',
+          primary_location: { source: sourceType ? { display_name: 'V', type: sourceType } : null },
+          best_oa_location: { pdf_url: pdf },
+        },
+      ],
+    })[0];
+  assert.equal(as('conference').type, 'conference');
+  assert.equal(as('journal').type, 'journal');
+  assert.equal(as('repository').type, undefined);
+  assert.equal(as(undefined).type, undefined);
+  assert.equal(as('journal', 'javascript:alert(1)').pdf, undefined);
+});
+
 test('parseArxivFeed drops invalid numeric character references', () => {
   const [e] = parseArxivFeed(
     '<feed><entry><id>http://arxiv.org/abs/1234.5678v1</id><title>a&#99999999;b&#xD800;c&#0;d</title><published>2020-01-02T00:00:00Z</published></entry></feed>',

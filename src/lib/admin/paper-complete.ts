@@ -69,6 +69,20 @@ const EUTILS = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/';
 const OPENALEX = 'https://api.openalex.org/works';
 const q = encodeURIComponent;
 
+/** A DOI without a doi.org or doi: prefix, or undefined unless it looks like one (10.…). */
+function cleanDoi(d: string | undefined): string | undefined {
+  const v = d
+    ?.trim()
+    .replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '')
+    .replace(/^doi:/i, '');
+  return v?.startsWith('10.') ? v : undefined;
+}
+
+/** A DOI for a URL path: each segment encoded, the slashes kept. */
+const doiPath = (doi: string) => doi.split('/').map(q).join('/');
+
+const sameDoi = (a: string | undefined, b: string) => a?.toLowerCase() === b.toLowerCase();
+
 function json(s: string | undefined): unknown {
   try {
     return s ? JSON.parse(s) : {};
@@ -98,12 +112,12 @@ export async function findPaper(
     });
   // ponytail: bioRxiv/PubMed/OpenAlex failures are dropped silently; report them if the owner needs to know one was down.
   const secondary = (url: string) => look.get(url).catch(() => undefined);
-  const crossrefDoi = async (doi: string) => parseCrossrefWorks(json(await primary(`${CROSSREF}/${doi}`)))[0];
+  const crossrefDoi = async (doi: string) => parseCrossrefWorks(json(await primary(`${CROSSREF}/${doiPath(doi)}`)))[0];
 
   const found: Found = {};
   const id = arxivId(pub);
   if (id) found.arxiv = parseArxivFeed((await primary(`${ARXIV}id_list=${q(id)}`)) ?? '').find((r) => r.arxiv === id);
-  const doi = pub.doi?.trim().replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, '') || found.arxiv?.doi;
+  const doi = cleanDoi(pub.doi) ?? cleanDoi(found.arxiv?.doi);
   if (doi) found.crossref = await crossrefDoi(doi);
   if (!found.arxiv && !doi) {
     const phrase = pub.title
@@ -122,21 +136,22 @@ export async function findPaper(
     );
   }
 
-  const preprintDoi = [doi, found.crossref?.doi].find((d) => d?.startsWith('10.1101/'));
+  const preprintDoi = [doi, cleanDoi(found.crossref?.doi)].find((d) => d?.startsWith('10.1101/'));
   if (preprintDoi)
     for (const server of ['biorxiv', 'medrxiv'] as const) {
       found[server] = parseBiorxiv(
-        json(await secondary(`https://api.biorxiv.org/details/${server}/${preprintDoi}`)),
+        json(await secondary(`https://api.biorxiv.org/details/${server}/${doiPath(preprintDoi)}`)),
         server,
       ).at(-1);
       if (found[server]) break;
     }
   const preprint = found.biorxiv ?? found.medrxiv;
   // bioRxiv's published DOI is proof of publication: Crossref has the journal's record.
-  if (preprint?.publishedDoi && found.crossref?.doi !== preprint.publishedDoi)
-    found.crossref = (await crossrefDoi(preprint.publishedDoi)) ?? found.crossref;
+  const publishedDoi = cleanDoi(preprint?.publishedDoi);
+  if (publishedDoi && !sameDoi(found.crossref?.doi, publishedDoi))
+    found.crossref = (await crossrefDoi(publishedDoi)) ?? found.crossref;
 
-  const anyDoi = found.crossref?.doi ?? doi ?? preprint?.doi;
+  const anyDoi = cleanDoi(found.crossref?.doi) ?? doi ?? cleanDoi(preprint?.doi);
   const ref = found.arxiv ?? preprint ?? found.crossref ?? pub;
   const term = anyDoi ? `${anyDoi}[doi]` : `"${ref.title}"[title]`;
   const search = json(
@@ -148,12 +163,19 @@ export async function findPaper(
       `${EUTILS}efetch.fcgi?db=pubmed&retmode=xml&tool=ScholarOS&id=${ids.map((i) => q(String(i))).join(',')}`,
     );
     const records = parsePubmed(xml ?? '');
-    found.pubmed = anyDoi ? records[0] : best(records, ref);
+    // esearch is a search, not a resolver: a DOI hit must carry that DOI, else pass the title rule.
+    found.pubmed = records.find((r) => anyDoi && sameDoi(r.doi, anyDoi)) ?? best(records, ref);
   }
 
-  found.openalex = anyDoi
-    ? parseOpenAlex({ results: [json(await secondary(`${OPENALEX}/doi:${anyDoi}`))] })[0]
+  const doiNow = anyDoi ?? cleanDoi(found.pubmed?.doi);
+  found.openalex = doiNow
+    ? parseOpenAlex({ results: [json(await secondary(`${OPENALEX}/doi:${doiPath(doiNow)}`))] })[0]
     : best(parseOpenAlex(json(await secondary(`${OPENALEX}?search=${q(ref.title)}&per-page=5`))), ref);
+
+  // A DOI only PubMed or OpenAlex knew: Crossref's record has the published type (e.g. a DOI'd conference paper).
+  const lateDoi = [found.pubmed?.doi, found.openalex?.doi].map(cleanDoi).find(Boolean);
+  if (lateDoi && (!found.crossref || found.crossref.type === 'preprint') && !sameDoi(found.crossref?.doi, lateDoi))
+    found.crossref = (await crossrefDoi(lateDoi)) ?? found.crossref;
 
   const hits = Object.entries(found).filter(([, r]) => r);
   return hits.length ? Object.fromEntries(hits) : null;
@@ -212,11 +234,11 @@ export async function completedFields(
 
   // Venue and type change only on proof of publication, and never downgrade a published venue to a preprint.
   const published = [found.crossref, found.pubmed, found.openalex].find(
-    (r) => r?.venue && r.type !== 'preprint' && inferType(r.venue) !== 'preprint',
+    (r) => r?.venue && r.type && r.type !== 'preprint' && inferType(r.venue) !== 'preprint',
   );
   if (published) {
     set('venue', published.venue, published);
-    set('type', published.type ?? inferType(published.venue!), published);
+    set('type', published.type, published);
     set('year', published.year, published);
   } else if (arxiv?.journalRef) {
     set('venue', arxiv.journalRef, arxiv);
@@ -236,16 +258,17 @@ export async function completedFields(
         ? preprint
         : undefined
       : own.find((r) => r.doi);
-  set('doi', doiRecord?.doi, doiRecord);
-  if (!arxiv && doiRecord) set('url', `https://doi.org/${doiRecord.doi}`, doiRecord);
+  const doi = cleanDoi(doiRecord?.doi);
+  set('doi', doi, doiRecord);
+  if (!arxiv && doi) set('url', `https://doi.org/${doiPath(doi)}`, doiRecord);
 
   const title = word(fields.title) ?? '';
   const authors = (fields.authors as string[] | undefined) ?? [];
   const year = Number(fields.year) || own[0]?.year || 0;
   const key = generateId(authors, year, title);
   const bib =
-    doiRecord &&
-    (await look.get(`https://doi.org/${doiRecord.doi}`, 'application/x-bibtex').then(
+    doi &&
+    (await look.get(`https://doi.org/${doiPath(doi)}`, 'application/x-bibtex').then(
       (s) => s.trim(),
       () => '',
     ));
@@ -280,6 +303,14 @@ function retryWait(header: string | undefined, now: number): number | null {
   return ms > MAX_RETRY_WAIT ? null : Math.max(ms, 0);
 }
 
+// Per host and per process, so the gap holds however many lookups exist; one queue so concurrent callers keep it too.
+const paced = new Map<string, { last: number; queue: Promise<unknown> }>();
+
+/** Tests start each case with no recent calls. */
+export function resetPacingForTests(): void {
+  paced.clear();
+}
+
 const pause = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 /** The real Lookup: the safe fetch, paced per host, with arXiv's 503/429 retried; `sleep` and `now` are for tests. */
@@ -291,8 +322,6 @@ export function paperLookup(opts: {
 }): Lookup {
   const { siteUrl, email, sleep = pause, now = Date.now } = opts;
   const ua = `ScholarOS paper import (+${siteUrl}${email ? `; mailto:${email}` : ''})`;
-  // One queue per paced host, so concurrent callers still keep the gap.
-  const paced = new Map<string, { last: number; queue: Promise<unknown> }>();
   return {
     get(url, accept) {
       const contact = url.startsWith(EUTILS) ? 'email' : url.startsWith(OPENALEX) ? 'mailto' : '';

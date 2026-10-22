@@ -161,12 +161,9 @@ export function parsePubmed(xml: string): PaperRecord[] {
   });
 }
 
-const OPENALEX_TYPES: Record<string, PubType> = {
-  article: 'journal',
-  'proceedings-article': 'conference',
-  conference: 'conference',
-  preprint: 'preprint',
-};
+// OpenAlex files proceedings papers under `article`; the venue's own type tells a conference from a journal.
+// A repository (arXiv, Zenodo, HAL…) or no venue is no proof of publication, so no type.
+const OPENALEX_VENUE_TYPES: Record<string, PubType> = { conference: 'conference', journal: 'journal' };
 
 /** Parse an OpenAlex `/works` response into records. */
 export function parseOpenAlex(json: unknown): PaperRecord[] {
@@ -174,6 +171,8 @@ export function parseOpenAlex(json: unknown): PaperRecord[] {
     const w = obj(raw);
     const title = str(w.display_name) ?? str(w.title);
     if (!title) return [];
+    const venue = obj(obj(w.primary_location).source);
+    const pdf = str(obj(w.best_oa_location).pdf_url);
     const words: string[] = [];
     for (const [word, at] of Object.entries(obj(w.abstract_inverted_index)))
       for (const i of list(at)) words[Number(i)] = word;
@@ -187,9 +186,9 @@ export function parseOpenAlex(json: unknown): PaperRecord[] {
         year: Number(w.publication_year) || 0,
         abstract: words.length ? collapse(words.filter(Boolean).join(' ')) : undefined,
         doi: str(w.doi)?.replace(/^https?:\/\/(?:dx\.)?doi\.org\//i, ''),
-        venue: str(obj(obj(w.primary_location).source).display_name),
-        type: OPENALEX_TYPES[String(w.type)],
-        pdf: str(obj(w.best_oa_location).pdf_url),
+        venue: str(venue.display_name),
+        type: w.type === 'preprint' ? ('preprint' as const) : OPENALEX_VENUE_TYPES[String(venue.type)],
+        pdf: pdf && /^https?:\/\//i.test(pdf) ? pdf : undefined,
       },
     ];
   });

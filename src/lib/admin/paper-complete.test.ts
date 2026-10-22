@@ -2,7 +2,15 @@ import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { setLookupForTests, SourceError } from '../career/sources/http';
-import { completedFields, findPaper, paperLookup, sameAuthors, surnames, type Lookup } from './paper-complete';
+import {
+  completedFields,
+  findPaper,
+  paperLookup,
+  resetPacingForTests,
+  sameAuthors,
+  surnames,
+  type Lookup,
+} from './paper-complete';
 
 const fixture = (name: string) =>
   fs.readFileSync(new URL(`../../../tests/fixtures/papers/${name}`, import.meta.url), 'utf8');
@@ -148,8 +156,10 @@ test('an OpenAlex-only conference paper gets venue and abstract', async () => {
   const work = {
     ...w,
     doi: null,
-    type: 'proceedings-article',
-    primary_location: { source: { display_name: 'International Conference on Learning Representations' } },
+    type: 'article',
+    primary_location: {
+      source: { display_name: 'International Conference on Learning Representations', type: 'conference' },
+    },
   };
   const look = fake({ 'https://api.openalex.org/works?search=': JSON.stringify({ results: [work] }) });
   const found = await findPaper(
@@ -163,6 +173,25 @@ test('an OpenAlex-only conference paper gets venue and abstract', async () => {
   assert.equal(sources.abstract, 'openalex');
   assert.equal(f.pdf, w.best_oa_location.pdf_url);
   assert.match(String(f.bibtex), /^@inproceedings\{.*booktitle = \{International Conference/s);
+});
+
+test('an OpenAlex work in a repository (Zenodo) is no proof of publication', async () => {
+  const [w] = JSON.parse(fixture('openalex.json')).results;
+  const work = {
+    ...w,
+    doi: null,
+    type: 'article',
+    primary_location: { source: { display_name: 'Zenodo', type: 'repository' } },
+  };
+  const look = fake({ 'https://api.openalex.org/works?search=': JSON.stringify({ results: [work] }) });
+  const found = await findPaper(
+    { title: 'HELM: hierarchical encoding for mRNA language modeling', authors: ['M Yazdani-Jahromi'] },
+    look,
+  );
+  const { fields: f, sources } = await completedFields(found!, {}, look);
+  assert.equal(sources.abstract, 'openalex');
+  assert.equal(f.venue, undefined);
+  assert.equal(f.type, undefined);
 });
 
 test('a bioRxiv DOI completes from bioRxiv, and its published DOI gives the venue', async () => {
@@ -204,6 +233,47 @@ test('a bioRxiv-only preprint keeps venue bioRxiv', async () => {
   assert.equal(f.url, 'https://doi.org/10.1101/2023.12.31.573522');
 });
 
+test('a PubMed DOI search that returns another paper is not used', async () => {
+  const look = fake({
+    'https://api.crossref.org/works/10.52202': crossrefWork,
+    'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?': '{"esearchresult":{"idlist":["37078687"]}}',
+    'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?': 'pubmed.xml',
+  });
+  const found = await findPaper({ title: 'x', authors: [], doi: '10.52202/085713-0904' }, look);
+  assert.ok(look.calls.some(([u]) => u.includes('efetch')));
+  assert.equal(found?.pubmed, undefined);
+});
+
+test('a DOI that PubMed found and Crossref never returned is looked up on Crossref', async () => {
+  const work = { ...crossrefItems()[0], DOI: '10.1093/bib/bbad136', type: 'proceedings-article' };
+  const look = fake({
+    'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?': '{"esearchresult":{"idlist":["37078687"]}}',
+    'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?': 'pubmed.xml',
+    'https://api.crossref.org/works/10.1093/bib/bbad136': JSON.stringify({ message: work }),
+  });
+  const found = await findPaper(
+    {
+      title:
+        'BindingSite-AugmentedDTA: enabling a next-generation pipeline for interpretable prediction models in drug repurposing',
+      authors: ['M Yazdani-Jahromi'],
+    },
+    look,
+  );
+  const { fields: f, sources } = await completedFields(found!, {}, look);
+  assert.equal(sources.type, 'crossref');
+  assert.equal(f.type, 'conference');
+});
+
+test('DOIs are encoded in URL paths, and anything not starting 10. is not a DOI', async () => {
+  const look = fake({});
+  await findPaper({ title: 'x', authors: ['A B'], doi: '10.1000/a#b?c' }, look);
+  assert.ok(look.calls.some(([u]) => u === 'https://api.crossref.org/works/10.1000/a%23b%3Fc'));
+  assert.ok(look.calls.some(([u]) => u === 'https://api.openalex.org/works/doi:10.1000/a%23b%3Fc'));
+  const other = fake({});
+  await findPaper({ title: 'x', authors: ['A B'], doi: 'not-a-doi' }, other);
+  assert.ok(!other.calls.some(([u]) => u.includes('not-a-doi')));
+});
+
 /** paperLookup over the real safe fetch, with fetch faked and time kept by the fake sleep. */
 function realLookup(answers: (url: string) => Response) {
   const urls: string[] = [];
@@ -227,7 +297,10 @@ function realLookup(answers: (url: string) => Response) {
   return { look, urls, headers, waits };
 }
 
-test.beforeEach(() => setLookupForTests(async () => [{ address: '93.184.215.14', family: 4 }]));
+test.beforeEach(() => {
+  resetPacingForTests();
+  setLookupForTests(async () => [{ address: '93.184.215.14', family: 4 }]);
+});
 test.afterEach(() => {
   mock.restoreAll();
   setLookupForTests(null);
@@ -247,6 +320,18 @@ test('paperLookup keeps 3 s between arXiv calls and names the site with a mailto
   assert.match(urls[4], /&mailto=me%40site\.test$/);
 });
 
+test('paperLookup keeps the arXiv gap across instances', async () => {
+  const one = realLookup(() => new Response('ok'));
+  await one.look.get('https://export.arxiv.org/api/query?id_list=1');
+  const two = paperLookup({
+    siteUrl: 'https://site.test',
+    sleep: async (ms) => void one.waits.push(ms),
+    now: () => 1_000_000,
+  });
+  await two.get('https://export.arxiv.org/api/query?id_list=2');
+  assert.deepEqual(one.waits, [3000]);
+});
+
 test('paperLookup paces concurrent arXiv calls too', async () => {
   const { look, waits } = realLookup(() => new Response('ok'));
   await Promise.all([1, 2, 3].map((i) => look.get(`https://export.arxiv.org/api/query?id_list=${i}`)));
@@ -262,6 +347,7 @@ test('paperLookup retries arXiv 503/429 twice, honouring Retry-After, then gives
   assert.equal(busy.urls.length, 3);
   assert.deepEqual(busy.waits, [7000, 5000]);
   mock.restoreAll();
+  resetPacingForTests();
 
   let m = 0;
   const flaky = realLookup(() => (++m === 1 ? new Response('', { status: 503 }) : new Response('feed')));
