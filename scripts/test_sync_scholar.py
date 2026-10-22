@@ -37,4 +37,9 @@ assert ss.papers_due({"every": "week", "weekday": 1}, mon) and not ss.papers_due
 assert ss.papers_due({"every": "week", "weekday": 0}, sun), "0 is Sunday"
 assert ss.papers_due({"every": "week"}, mon), "weekday defaults to Monday"
 assert ss.papers_due({"every": "month", "monthday": 1}, first) and not ss.papers_due({"every": "month", "monthday": 1}, tue)
+import yaml
+
+assert not ss.papers_due(yaml.safe_load("every: off"), mon), "unquoted off is False in PyYAML"
+assert ss.papers_due({"every": "week", "weekday": True}, mon) and not ss.papers_due({"every": "week", "weekday": True}, tue), "bool weekday: default Monday"
+assert ss.papers_due(yaml.safe_load("every: week\nweekday: 2"), tue)
 print("sync-scholar self-check passed")

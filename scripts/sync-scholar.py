@@ -43,14 +43,15 @@ def papers_due(schedule, today) -> bool:
     """Mirrors papersDue in src/lib/admin/papers.ts: today is a UTC date; weekday 0 is Sunday."""
     s = schedule if isinstance(schedule, dict) else {}
     every = s.get("every", "day")
-    if every == "off":
+    # YAML 1.1 (PyYAML) reads an unquoted `off` as False.
+    if every is False or every == "off":
         return False
     if every == "week":
         weekday = s.get("weekday")
-        return (today.isoweekday() % 7) == (weekday if isinstance(weekday, int) and 0 <= weekday <= 6 else 1)
+        return (today.isoweekday() % 7) == (weekday if type(weekday) is int and 0 <= weekday <= 6 else 1)
     if every == "month":
         monthday = s.get("monthday")
-        return today.day == (monthday if isinstance(monthday, int) and 1 <= monthday <= 28 else 1)
+        return today.day == (monthday if type(monthday) is int and 1 <= monthday <= 28 else 1)
     return True
 
 

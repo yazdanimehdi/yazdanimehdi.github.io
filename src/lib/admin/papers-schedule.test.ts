@@ -30,3 +30,9 @@ test('resolveAiConfig schedule: default day, invalid falls back', () => {
     monthday: 15,
   });
 });
+
+test('ai schema accepts a schedule the empty select option left without every', async () => {
+  const { aiConfigSchema } = await import('../schemas');
+  assert.equal(aiConfigSchema.safeParse({ papers: { schedule: {} } }).success, true);
+  assert.deepEqual(resolveAiConfig({ papers: { schedule: {} } }).papers.schedule, { every: 'day' });
+});

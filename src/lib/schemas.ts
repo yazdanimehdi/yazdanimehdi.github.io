@@ -304,7 +304,7 @@ export const aiConfigSchema = z
         maxPostsPerRun: z.number().int().min(0).optional(),
         schedule: z
           .object({
-            every: z.enum(['off', 'day', 'week', 'month']),
+            every: z.enum(['off', 'day', 'week', 'month']).optional(), // the select's empty option removes the key: daily
             weekday: z.number().int().min(0).max(6).optional(),
             monthday: z.number().int().min(1).max(28).optional(),
           })
