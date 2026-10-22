@@ -185,5 +185,5 @@ export const CAREER_KEY_HELP: Partial<Record<SecretName, string>> = {
   RESEND_API_KEY: 'Sends the job search’s email digest. Create one in your Resend account under API Keys.',
   CLAUDE_CODE_OAUTH_TOKEN: 'Run “claude setup-token” on your computer and paste the token it prints.',
   CODEX_AUTH_JSON:
-    'Sign in to Codex with ChatGPT, then paste ~/.codex/auth.json. Codex reads and refreshes this file, so it is copied into each drafting VM, which is discarded afterwards and reaches only OpenAI’s hosts.',
+    'Sign in to Codex with ChatGPT, then paste ~/.codex/auth.json. Codex reads and refreshes this file, so it is copied into the drafting VM for each call and deleted when the call ends (by the next call at the latest, if one dies). That VM reaches only OpenAI’s hosts, and npm’s registry to install Codex.',
 };

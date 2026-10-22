@@ -1,7 +1,7 @@
 import test, { afterEach, beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { migrate } from '../db-migrate';
@@ -281,6 +281,49 @@ test('a new enough CLI is kept, and the marker skips the check next time', async
     assert.deepEqual([again.npm, again.asked], [[], false], `${agent}: the marker answers`);
     rmSync(first.dir, { recursive: true, force: true });
   }
+});
+
+/**
+ * Runs the call's first script (the sweep and install) against a local copy of the worker root holding two other
+ * calls' Codex sign-ins: one written 6 minutes ago (its call is over) and one just now (its call may still run).
+ */
+async function sweep(prefs: CareerPrefs) {
+  await setSecret(sql, 'CODEX_AUTH_JSON', AUTH, 'owner');
+  process.env.OPENAI_API_KEY = 'o-key';
+  const vm = fakeVm(claudeJson('ok'), { 'last.txt': 'ok' });
+  setWorkerSandboxForTests(vm.api);
+  await workerText(store, prefs, INPUT).catch(() => {});
+  const home = mkdtempSync(join(tmpdir(), 'worker-sweep-'));
+  const root = join(home, 'worker');
+  const auth = (call: string) => join(root, call, 'codex', 'auth.json');
+  for (const call of ['old', 'live']) {
+    execFileSync('mkdir', ['-p', join(root, call, 'codex')]);
+    writeFileSync(auth(call), AUTH);
+  }
+  const sixMinutesAgo = new Date(Date.now() - 6 * 60_000);
+  utimesSync(auth('old'), sixMinutesAgo, sixMinutesAgo);
+  const bin = join(home, 'bin');
+  execFileSync('mkdir', ['-p', bin]);
+  for (const name of ['claude', 'codex']) {
+    writeFileSync(join(bin, name), '#!/bin/sh\necho 99.0.0\n');
+    chmodSync(join(bin, name), 0o755);
+  }
+  execFileSync('bash', ['-c', vm.runs[0].script.replaceAll('/vercel/sandbox/worker', root)], {
+    env: { PATH: `${bin}:/usr/bin:/bin`, HOME: home },
+    stdio: ['ignore', 'ignore', 'ignore'],
+  });
+  const left = { old: existsSync(auth('old')), live: existsSync(auth('live')) };
+  rmSync(home, { recursive: true, force: true });
+  return left;
+}
+
+test('each Codex call first deletes the sign-ins other calls left behind, not a live call’s', async () => {
+  assert.deepEqual(await sweep(cli('codex', 'subscription')), { old: false, live: true });
+});
+
+test('a worker that doesn’t sign in to Codex deletes every Codex sign-in in the VM', async () => {
+  assert.deepEqual(await sweep(cli('claude', 'key')), { old: false, live: false });
+  assert.deepEqual(await sweep(cli('codex', 'key')), { old: false, live: false });
 });
 
 test('a missing sign-in names the key', async () => {

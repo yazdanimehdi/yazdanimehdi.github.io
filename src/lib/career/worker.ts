@@ -57,10 +57,14 @@ const RUN: Record<Cli['agent'], string> = {
   gemini: `cd "$1" && gemini --skip-trust --output-format json -p 'Answer the request above.' < prompt.txt`,
 };
 /**
- * A call that died half-way leaves its directory (a Codex sign-in included): swept once it is 15 minutes old. No
- * `exit` here: the install runs after it in the same script.
+ * The start of every call. A call that died half-way leaves its directory: swept once it is 15 minutes old. The VM
+ * persists between calls, so a Codex sign-in another call left is deleted at once: every one when this worker doesn't
+ * sign in to Codex, else every one older than a call can run (plus a minute), which no live call owns. No `exit`
+ * here: the install runs after it in the same script.
  */
-const PREP = `mkdir -p ${ROOT} && find ${ROOT} -mindepth 1 -maxdepth 1 -mmin +15 -exec rm -rf {} +; true`;
+const prep = (codexAuth: boolean) =>
+  `mkdir -p ${ROOT} && find ${ROOT} -mindepth 1 -maxdepth 1 -mmin +15 -exec rm -rf {} +
+find ${ROOT} -mindepth 3 -maxdepth 3 -path '*/codex/auth.json'${codexAuth ? ` -mmin +${RUN_MS / 60_000 + 1}` : ''} -delete; true`;
 /** Prints `idle` when no other call is using the VM, so the last one out stops it. */
 const CLEAN = `rm -rf "$1"; rmdir ${ROOT} 2>/dev/null && echo idle; exit 0`;
 
@@ -175,7 +179,7 @@ async function runCli(store: ContentStore, w: Cli, input: TextInput): Promise<st
   // Every call sets it: calls share the VM, and they all run the one configured worker.
   await sb.setNetworkPolicy(policy);
   await sb.extendTimeout(SESSION_MS).catch(() => undefined);
-  const install = await sb.run(`${PREP}\n${INSTALL[w.agent]}`, [], { timeoutMs: 180_000 });
+  const install = await sb.run(`${prep(codexAuth)}\n${INSTALL[w.agent]}`, [], { timeoutMs: 180_000 });
   if (install.exitCode !== 0) throw new Error(`Installing ${LABEL[w.agent]} failed: ${tail(install.stderr)}`);
   const dir = `${ROOT}/${randomUUID()}`;
   const prompt = w.agent === 'claude' ? input.prompt : `${input.system}\n\n${input.prompt}`;
