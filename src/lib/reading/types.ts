@@ -62,5 +62,7 @@ export interface ReadingRun {
   inField: number;
   texts: { fetched: number; failed: number };
   stopped?: string;
+  /** Why the talked-about list was emptied before the area check could run. */
+  talkedSkipped?: 'ranking stopped' | 'AI cap spent';
   email?: 'sent' | 'skipped' | string;
 }

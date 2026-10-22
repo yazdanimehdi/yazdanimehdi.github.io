@@ -44,11 +44,12 @@ const running = computed(() => starting.value || isRunning(run.value.status));
 const newest = computed(() => days.value[0] ?? null);
 const earlier = computed(() => days.value.slice(1).filter((d) => d.items.length));
 const inSection = (d: Day, s: DigestSection) => d.items.filter((i) => i.section === s);
-/** Under a short section of the newest day: why it is short. */
+/** Under a short section of the newest day: why it is short, only when the last run built that day. */
 function thin(s: DigestSection): string | null {
-  if (s === 'unranked' || !prefs.value || !newest.value) return null;
+  const last = run.value.lastRun;
+  if (s === 'unranked' || !prefs.value || !newest.value || last?.day !== newest.value.day) return null;
   const max = s === 'talked' ? prefs.value.talked : prefs.value.inField;
-  return thinLine(s, inSection(newest.value, s).length, max, prefs.value.area);
+  return thinLine(s, inSection(newest.value, s).length, max, prefs.value.area, last);
 }
 const meta = (i: DigestItem) =>
   [

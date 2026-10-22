@@ -12,6 +12,7 @@ import {
   saveText,
   setPaperState,
   shownBefore,
+  todayCount,
   upsertPapers,
 } from './db';
 import type { NewPaper } from './types';
@@ -93,7 +94,7 @@ test('shownBefore ignores the given day and returns the latest earlier showing',
   assert.deepEqual([...(await shownBefore(sql, [a], '2026-10-19'))], [[a, { section: 'field', signals: null }]]);
 });
 
-test('listDigests leaves out dismissed papers and orders talked, field, unranked', async () => {
+test('listDigests and todayCount leave out dismissed papers; listDigests orders talked, field, unranked', async () => {
   const [a, b, c, d] = await ids(paper('a'), paper('b'), paper('c'), paper('d'));
   await saveDigest(sql, '2026-10-21', [
     { paperId: a, section: 'unranked', rank: 1, line: 'u' },
@@ -113,6 +114,7 @@ test('listDigests leaves out dismissed papers and orders talked, field, unranked
     ],
   );
   assert.equal(day.items[0].paper.title, 'Paper d');
+  assert.equal(await todayCount(sql, '2026-10-21'), 3, 'the dashboard counts what the page shows');
   assert.deepEqual(await listDigests(sql, { before: '2026-10-21', days: 5 }), []);
 });
 

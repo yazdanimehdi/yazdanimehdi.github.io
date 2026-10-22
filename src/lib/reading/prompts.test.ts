@@ -23,6 +23,7 @@ test('paperFence defangs a closing tag inside an abstract', () => {
   assert.equal(f.match(/<\/paper/g)?.length, 1);
   assert.equal(f.match(/<paper/g)?.length, 1);
   assert.ok(f.length < 1600, 'abstract capped');
+  assert.equal(paperFence(1, { title: 'T'.repeat(1000), abstract: null }).split('\n')[1].length, 300, 'title capped');
   for (const p of [scorePrompt([{ id: 1, title: 'T', abstract: null }], 'P'), areaPrompt([], 'ML')]) {
     assert.ok(p.system.includes(UNTRUSTED_PAPERS));
   }

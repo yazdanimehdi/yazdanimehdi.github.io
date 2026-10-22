@@ -54,22 +54,49 @@ test('readingRunNotes: a ranking stop, an email error and each source error, the
 });
 
 test('thinLine: nothing for a full list; otherwise why the list is short, never padded', () => {
-  assert.equal(thinLine('talked', 5, 5, 'Machine learning'), null);
-  assert.equal(thinLine('field', 9, 8, ''), null);
+  const ok = { unranked: 0 };
+  assert.equal(thinLine('talked', 5, 5, 'Machine learning', ok), null);
+  assert.equal(thinLine('field', 9, 8, '', ok), null);
   assert.equal(
-    thinLine('talked', 2, 5, 'Machine learning'),
+    thinLine('talked', 2, 5, 'Machine learning', ok),
     'Only 2 papers in Machine learning had traction numbers from your sources today. The list is not padded.',
   );
   assert.equal(
-    thinLine('talked', 1, 5, ''),
+    thinLine('talked', 1, 5, '', ok),
     'Only 1 paper in your area had traction numbers from your sources today. The list is not padded.',
   );
   assert.equal(
-    thinLine('talked', 0, 5, 'Neuroscience'),
+    thinLine('talked', 0, 5, 'Neuroscience', ok),
     'No paper in Neuroscience had traction numbers from your sources today.',
   );
-  assert.equal(thinLine('field', 3, 8, 'x'), 'Only 3 new papers scored high enough today.');
-  assert.equal(thinLine('field', 0, 8, 'x'), 'No new paper scored high enough today.');
+  assert.equal(thinLine('field', 3, 8, 'x', ok), 'Only 3 new papers scored high enough today.');
+  assert.equal(thinLine('field', 0, 8, 'x', ok), 'No new paper scored high enough today.');
+});
+
+test('thinLine: when the AI stopped or the cap ran out, that is the reason given', () => {
+  const stopped = { stopped: 'HTTP 400', unranked: 5, talkedSkipped: 'ranking stopped' as const };
+  const capped = { unranked: 5, talkedSkipped: 'AI cap spent' as const };
+  assert.equal(
+    thinLine('talked', 0, 5, 'Machine learning', stopped),
+    'Ranking stopped before the check for papers in Machine learning, so no talked-about paper is listed.',
+  );
+  assert.equal(
+    thinLine('talked', 0, 5, '', capped),
+    'The night’s AI cap ran out before the check for papers in your area, so no talked-about paper is listed.',
+  );
+  assert.equal(
+    thinLine('field', 2, 8, 'x', stopped),
+    'Ranking stopped before every new paper was scored. The rest are under Not ranked tonight.',
+  );
+  assert.equal(
+    thinLine('field', 0, 8, 'x', capped),
+    'The night’s AI cap ran out before every new paper was scored. The rest are under Not ranked tonight.',
+  );
+  assert.equal(
+    thinLine('field', 2, 8, 'x', { stopped: 'HTTP 400', unranked: 0 }),
+    'Only 2 new papers scored high enough today.',
+    'ranking stopped after every new paper was scored',
+  );
 });
 
 test('authorsLine: up to three names, then et al.', () => {

@@ -68,17 +68,20 @@ export async function readingNightly(): Promise<ReadingRun> {
     day,
     plan.talked,
   );
+  let talkedSkipped: ReadingRun['talkedSkipped'];
   if (talked.length && plan.area) {
-    if (stopped || aiCalls >= plan.maxAiCalls) talked = [];
+    if (stopped) talkedSkipped = 'ranking stopped';
+    else if (aiCalls >= plan.maxAiCalls) talkedSkipped = 'AI cap spent';
     else {
       try {
         talked = await areaFilter(talked);
         aiCalls++;
       } catch (e) {
         stopped = errorText(e);
-        talked = [];
+        talkedSkipped = 'ranking stopped';
       }
     }
+    if (talkedSkipped) talked = [];
   }
   if (plan.bluesky && talked.length) await blueskyStep(talked, day);
 
@@ -107,6 +110,7 @@ export async function readingNightly(): Promise<ReadingRun> {
     inField: digest.inField,
     texts,
     ...(stopped ? { stopped } : {}),
+    ...(talkedSkipped ? { talkedSkipped } : {}),
   };
   run.email = await emailStep(day);
   await finishReading(run);

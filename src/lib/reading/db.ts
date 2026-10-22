@@ -186,9 +186,11 @@ export async function listDigests(
   return out;
 }
 
-/** How many items that day's digest holds. */
+/** How many items that day's digest shows: dismissed papers are left out, as on the page. */
 export async function todayCount(sql: Sql, day: string): Promise<number> {
-  const [r] = await sql<{ n: number }>`select count(*)::int as n from reading_digest where day = ${day}::date`;
+  const [r] = await sql<{ n: number }>`
+    select count(*)::int as n from reading_digest d join reading_papers p on p.id = d.paper_id
+    where d.day = ${day}::date and p.state <> 'dismissed'`;
   return r.n;
 }
 

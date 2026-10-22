@@ -330,7 +330,7 @@ schema already includes the shared papers table (ids, metadata, state, digest me
 - Four projects in this order (digest, reading room, vault, blog). Proposed in chat. The owner didn't object, but didn't
   explicitly agree either.
 - Field and wider area derived from the profile, with editable settings, and sources chosen to follow the field.
-- Traction sources: Hugging Face (ML only), OpenAlex, Bluesky, alphaXiv off by default. Altmetric, Reddit and Semantic
+- Traction sources: Hugging Face (ML only), OpenAlex, Bluesky (on by default), alphaXiv (off by default). Altmetric, Reddit and Semantic
   Scholar left out for the reasons in the table.
 - Digest sizes 5 and 8. The digest runs in the existing 03:00 UTC daily cron, with no separate schedule.
 - Summary and key findings generated when a paper is first opened, not for every digest paper each night (cost).

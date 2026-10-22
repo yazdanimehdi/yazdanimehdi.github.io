@@ -82,7 +82,8 @@ export async function pruneStep(): Promise<number> {
 
 /**
  * The day's new papers from one source: the 60 with the most keyword overlap are stored, then those shown on an
- * earlier day or no longer 'new' are left out. Never throws: a failure is the result's `error`.
+ * earlier day or dismissed are left out (a paper saved today stays in a rerun of today). Never throws: a failure is
+ * the result's `error`.
  */
 export async function collectNew(
   id: string,
@@ -106,7 +107,7 @@ export async function collectNew(
     const stored = await upsertPapers(sql, cut);
     const ids = stored.map((s) => s.id);
     const [shown, papers] = await Promise.all([shownBefore(sql, ids, day), getPapers(sql, ids)]);
-    const fresh = new Set(papers.filter((p) => p.state === 'new' && !shown.has(p.id)).map((p) => p.id));
+    const fresh = new Set(papers.filter((p) => p.state !== 'dismissed' && !shown.has(p.id)).map((p) => p.id));
     return {
       id,
       found,
@@ -218,16 +219,16 @@ const byTraction = (papers: Paper[], bluesky: boolean) => {
 };
 
 /**
- * The talked-about candidates worth an area check: 'new' papers not shown before (a paper shown as talked-about comes
- * back once a number it had then has doubled), with a source number, by those numbers (not Bluesky); the first 3n,
- * at most 40.
+ * The talked-about candidates worth an area check: papers not dismissed and not shown before (a paper shown as
+ * talked-about comes back once a number it had then has doubled), with a source number, by those numbers (not
+ * Bluesky); the first 3n, at most 40.
  */
 export async function tractionShortlist(ids: number[], day: string, n: number): Promise<number[]> {
   'use step';
   const sql = getSql();
   const [papers, shown] = await Promise.all([getPapers(sql, ids), shownBefore(sql, ids, day)]);
   const open = papers.filter((p) => {
-    if (p.state !== 'new') return false;
+    if (p.state === 'dismissed') return false;
     const s = shown.get(p.id);
     return !s || (s.section === 'talked' && resurfaces(p.signals, s.signals));
   });
@@ -334,10 +335,16 @@ export async function fetchTextStep(id: number): Promise<boolean> {
   return body !== null;
 }
 
-/** Emails the day's digest when the email is on; the result goes in the run summary. Never throws. */
+/**
+ * Emails the day's digest when the email is on; the result goes in the run summary. Never throws. Once a day: a rerun
+ * after today's email was sent stays 'sent' without sending again.
+ */
 export async function emailStep(day: string): Promise<string> {
   'use step';
-  return sendReadingDigest(getSql(), day);
+  const sql = getSql();
+  const { lastRun } = await readReading(sql);
+  if (lastRun?.day === day && lastRun.email === 'sent') return 'sent';
+  return sendReadingDigest(sql, day);
 }
 // A retry could send the email twice.
 emailStep.maxRetries = 0;

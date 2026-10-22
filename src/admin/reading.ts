@@ -41,14 +41,29 @@ export function readingRunNotes(r: ReadingRun): string[] {
   ].filter((n): n is string => !!n);
 }
 
-/** Why a section holds fewer papers than it could: the list is never padded. Null when it is full. */
-export function thinLine(section: 'talked' | 'field', count: number, max: number, area: string): string | null {
+/**
+ * Why a section of the run's digest holds fewer papers than it could: the list is never padded. Null when it is full.
+ * When the AI stopped or the night's cap ran out, that is the reason given.
+ */
+export function thinLine(
+  section: 'talked' | 'field',
+  count: number,
+  max: number,
+  area: string,
+  run: Pick<ReadingRun, 'stopped' | 'unranked' | 'talkedSkipped'>,
+): string | null {
   if (count >= max) return null;
-  if (section === 'field')
+  const where = area || 'your area';
+  const cause = (skipped: boolean) => (skipped ? 'Ranking stopped' : 'The night’s AI cap ran out');
+  if (section === 'field') {
+    if (run.unranked)
+      return `${cause(!!run.stopped)} before every new paper was scored. The rest are under Not ranked tonight.`;
     return count
       ? `Only ${count} new paper${plural(count)} scored high enough today.`
       : 'No new paper scored high enough today.';
-  const where = area || 'your area';
+  }
+  if (run.talkedSkipped)
+    return `${cause(run.talkedSkipped === 'ranking stopped')} before the check for papers in ${where}, so no talked-about paper is listed.`;
   return count
     ? `Only ${papers(count)} in ${where} had traction numbers from your sources today. The list is not padded.`
     : `No paper in ${where} had traction numbers from your sources today.`;

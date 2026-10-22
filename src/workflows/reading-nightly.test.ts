@@ -8,7 +8,7 @@ import { SourceError, setLookupForTests } from '../lib/career/sources/http';
 import { setSqlForTests, type Sql } from '../lib/db';
 import { migrate } from '../lib/db-migrate';
 import { pgliteSql } from '../lib/pglite-sql';
-import { listDigests, readReading, writeReading } from '../lib/reading/db';
+import { listDigests, readReading, setPaperState, writeReading } from '../lib/reading/db';
 import { readingNightly, setReadingRunsForTests, startReading } from './reading-nightly';
 import type { Runs } from './runs';
 
@@ -18,6 +18,7 @@ let ai: { score: number; area: number };
 let failScoreCall: number;
 let hosts: string[];
 let log: string[];
+let emails: number;
 
 const fixture = (path: string) => fs.readFileSync(`tests/fixtures/${path}`, 'utf8');
 /** The Hugging Face fixture as if each paper reached Daily Papers two days ago, inside the run's 7-day window. */
@@ -29,6 +30,7 @@ const hfDaily = () =>
     })),
   );
 const savedKey = process.env.ANTHROPIC_API_KEY;
+const savedResend = process.env.RESEND_API_KEY;
 const SLEEP = Symbol.for('WORKFLOW_SLEEP');
 setLookupForTests(async () => [{ address: '93.184.215.14', family: 4 }]);
 
@@ -77,6 +79,7 @@ beforeEach(async () => {
   failScoreCall = 0;
   hosts = [];
   log = [];
+  emails = 0;
   (globalThis as Record<symbol, unknown>)[SLEEP] = async (d: string) => void log.push(`sleep ${d}`);
   mock.method(globalThis, 'fetch', async (input: string | URL, init?: RequestInit) => {
     const url = String(input);
@@ -85,6 +88,7 @@ beforeEach(async () => {
       log.push(`html ${url.slice('https://arxiv.org/html/'.length)}`);
       return new Response('<html><body>Full text</body></html>');
     }
+    if (url === 'https://api.resend.com/emails') return (emails++, Response.json({ id: 'email_1' }));
     if (!url.startsWith('https://api.anthropic.com/')) return new Response('missing', { status: 404 });
     const body = JSON.parse(String(init!.body));
     const ids = [...String(body.messages[0].content).matchAll(/<paper id="(\d+)">\n([^\n]*)/g)].map((m) => ({
@@ -115,6 +119,8 @@ afterEach(() => {
   delete (globalThis as Record<symbol, unknown>)[SLEEP];
   if (savedKey === undefined) delete process.env.ANTHROPIC_API_KEY;
   else process.env.ANTHROPIC_API_KEY = savedKey;
+  if (savedResend === undefined) delete process.env.RESEND_API_KEY;
+  else process.env.RESEND_API_KEY = savedResend;
 });
 
 test('paused does nothing else', async () => {
@@ -179,6 +185,7 @@ test('a provider error stops ranking and lists the rest as not ranked tonight', 
   assert.deepEqual([run.ranked, run.unranked, run.aiCalls, run.inField], [10, 5, 1, 8]);
   assert.deepEqual(ai, { score: 2, area: 0 }, 'ranking stops; no area check after a provider error');
   assert.equal(run.talked, 0, 'without the area check, no talked-about list');
+  assert.equal(run.talkedSkipped, 'ranking stopped');
   const items = await today();
   assert.equal(items.filter((i) => i.section === 'unranked').length, 5);
   assert.ok(items.filter((i) => i.section === 'unranked').every((i) => i.line === 'Not ranked tonight'));
@@ -190,12 +197,14 @@ test('a provider error stops ranking and lists the rest as not ranked tonight', 
 });
 
 test('the AI cap leaves the rest unranked without stopping', async () => {
-  await setPrefs({ maxAiCalls: 1, sources: BIORXIV });
+  await setPrefs({ maxAiCalls: 1, area: 'speech', sources: { ...BIORXIV, ...HF } });
   routes['api.biorxiv.org'] = () => rxiv(15);
+  routes['huggingface.co'] = () => hfDaily();
   const run = await readingNightly();
   assert.equal(run.stopped, undefined);
   assert.deepEqual([run.aiCalls, run.ranked, run.unranked], [1, 10, 5]);
-  assert.equal(ai.score, 1);
+  assert.deepEqual(ai, { score: 1, area: 0 });
+  assert.deepEqual([run.talked, run.talkedSkipped], [0, 'AI cap spent'], 'the cap is why talked is empty');
 });
 
 test('a second run the same day replaces today’s digest without rescoring', async () => {
@@ -205,13 +214,31 @@ test('a second run the same day replaces today’s digest without rescoring', as
   const first = await readingNightly();
   const before = await today();
   assert.equal(ai.score, 1);
+  const saved = [before[0], before.at(-1)!];
+  assert.deepEqual(
+    saved.map((i) => i.section),
+    ['talked', 'field'],
+  );
+  for (const i of saved) await setPaperState(sql, i.paper.id, 'saved');
   const second = await readingNightly();
   assert.equal(ai.score, 1, 'already-scored papers cost no new call');
   assert.equal(second.aiCalls, 0);
   const after = await today();
-  assert.deepEqual(after, before, 'today’s papers are kept, not dropped as shown before');
+  const shape = (items: typeof before) => items.map((i) => [i.section, i.paper.id, i.line]);
+  assert.deepEqual(shape(after), shape(before), 'today’s papers are kept, saved ones too, not dropped as shown before');
   assert.equal(new Set(after.map((i) => i.paper.id)).size, after.length, 'no paper twice');
   assert.deepEqual([second.talked, second.inField], [first.talked, first.inField]);
+});
+
+test('a second run the same day does not email the digest again', async () => {
+  process.env.RESEND_API_KEY = 're_test';
+  await setPrefs({ sources: BIORXIV, email: { on: true, to: 'me@site.test' } });
+  routes['api.biorxiv.org'] = () => rxiv(3);
+  assert.equal((await readingNightly()).email, 'sent');
+  assert.equal(emails, 1);
+  assert.equal((await readingNightly()).email, 'sent', 'today’s email still counts as sent');
+  assert.equal((await readingNightly()).email, 'sent');
+  assert.equal(emails, 1, 'sent once');
 });
 
 test('talked papers carry their numbers', async () => {
