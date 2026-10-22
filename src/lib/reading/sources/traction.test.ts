@@ -87,7 +87,7 @@ const openalexPrefs = (topics: { id: string; name: string }[]) =>
   parseReadingPrefs({ sources: { openalex: { on: true, topics } } });
 const works = () => fixture('reading/openalex-works.json');
 const SELECT =
-  'select=id,doi,display_name,authorships,publication_year,publication_date,cited_by_count,abstract_inverted_index,primary_location,best_oa_location,type';
+  'select=id,doi,display_name,authorships,publication_year,publication_date,cited_by_count,abstract_inverted_index,primary_location,best_oa_location,type,created_date';
 
 test('fetchTraction openalex adds api_key only when given', async () => {
   const prefs = openalexPrefs([{ id: 'subfields/1702', name: 'Artificial Intelligence' }]);
@@ -194,6 +194,39 @@ test('fetchTraction keeps OpenAlex papers (conference papers too) from the last 
   assert.deepEqual(
     papers.map((p) => p.publishedAt),
     [preprint.publication_date, article.publication_date, '2026-10-01'],
+  );
+});
+
+test('fetchTraction drops an old paper OpenAlex re-dates: an old record or an old arXiv id', async () => {
+  const [, preprint, article] = json('reading/openalex-works.json').results;
+  // The mis-dated conference paper seen live: dated 2026-09-11, its record created 2025-10-10.
+  const oldRecord = {
+    ...article,
+    id: 'https://openalex.org/W2146101030',
+    doi: 'https://doi.org/10.1/conf',
+    type: 'conference-paper',
+    publication_date: '2026-09-11',
+    created_date: '2025-10-10T00:00:00',
+  };
+  const noRecordDate = { ...article, id: 'https://openalex.org/W5', doi: 'https://doi.org/10.1/x', created_date: null };
+  // A new record and date, but the arXiv id says July 2026, before the window (from 2026-08-23).
+  const oldArxiv = {
+    ...preprint,
+    id: 'https://openalex.org/W6',
+    doi: 'https://doi.org/10.48550/arxiv.2607.01234',
+  };
+  const sameMonth = { ...preprint, id: 'https://openalex.org/W7', doi: 'https://doi.org/10.48550/arxiv.2608.00001' };
+  const { get } = fake([
+    [
+      'api.openalex.org/works',
+      () => JSON.stringify({ results: [preprint, article, oldRecord, noRecordDate, oldArxiv, sameMonth] }),
+    ],
+  ]);
+  const prefs = openalexPrefs([{ id: 'subfields/1702', name: 'Artificial Intelligence' }]);
+  const papers = await fetchTraction('openalex', prefs, get, '2026-10-22');
+  assert.deepEqual(
+    papers.map((p) => p.key),
+    ['arxiv:2610.14004', 'doi:10.1145/3845797', 'arxiv:2608.00001'],
   );
 });
 

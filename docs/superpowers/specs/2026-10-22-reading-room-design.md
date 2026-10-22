@@ -207,9 +207,13 @@ Project 1 shipped as planned in `docs/superpowers/plans/2026-10-22-paper-digest.
   `type:article|preprint|review|conference-paper,is_paratext:false` (checked live); conference papers count because
   CS publishes at conferences. A work of another type, or with no publication date or one before the 60-day window, is
   dropped in code too. Without the filter, subfield 1702's list on 2026-10-22 was led by a dataset with 463 citations
-  and a journal-level record. Two old conference papers OpenAlex dates September 2026 still pass and led that list
-  with 122 and 115 citations: OpenAlex's own date is trusted. `counts_by_year` is not used: it counts by calendar
-  year, so it shows no velocity inside a 60-day window.
+  and a journal-level record.
+- **An old paper never leads talked-about:** OpenAlex re-dates an old paper when a new version or DOI appears (two
+  conference papers from 2000 were dated 2026-09-11 and led the list with 122 and 115 citations). The record itself
+  is checked: `created_date` (returned without a key) must fall inside the 60-day window, and a new-style arXiv id's
+  YYMM must not be older than the window's first month. On 2026-10-22, 27 of subfield 1702's top 50 had
+  `created_date` 2025-10-10, an OpenAlex backfill date; all are dropped, and 17 remain, led by 16, 14 and 12
+  citations. `counts_by_year` is not used: it counts by calendar year, so it shows no velocity inside a 60-day window.
 - **bioRxiv and medRxiv categories:** the regex (lowercase words, `_` for spaces) was checked against the live API
   and not widened. Every real category fits; medRxiv's "HIV/AIDS" is `hiv_aids`, and a slash makes the API ignore the
   category and return every paper.

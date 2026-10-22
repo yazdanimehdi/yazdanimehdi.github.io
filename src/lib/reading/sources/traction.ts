@@ -11,7 +11,7 @@ export const TRACTION_SOURCES = ['huggingface', 'openalex', 'alphaxiv'] as const
 
 const OPENALEX = 'https://api.openalex.org';
 const WORK_FIELDS =
-  'id,doi,display_name,authorships,publication_year,publication_date,cited_by_count,abstract_inverted_index,primary_location,best_oa_location,type';
+  'id,doi,display_name,authorships,publication_year,publication_date,cited_by_count,abstract_inverted_index,primary_location,best_oa_location,type,created_date';
 const LEVELS = ['field', 'subfield'] as const;
 const q = encodeURIComponent;
 const date = (iso: string | undefined) => iso?.slice(0, 10);
@@ -127,14 +127,21 @@ export async function fetchTraction(
     if (!ids.length) continue;
     const filter = `primary_topic.${level}.id:${ids.join('|')},from_publication_date:${from},type:${PAPER_TYPES},is_paratext:false`;
     const url = `${OPENALEX}/works?filter=${filter}&sort=cited_by_count:desc&per_page=50&select=${WORK_FIELDS}${key}`;
-    // The filter asks for this already; a work that slips through anyway is dropped here.
+    // Type and date: the filter asks for them already; a work that slips through anyway is dropped here. An old paper
+    // OpenAlex re-dates (a new version or DOI) keeps its old record: created_date shows it, and so does an arXiv id's
+    // YYMM.
     const results = list(obj(JSON.parse(await get(url))).results).filter((w) => {
-      const { type, publication_date: date } = obj(w);
-      return PAPER_TYPES.split('|').includes(str(type) ?? '') && (str(date) ?? '') >= from;
+      const { type, publication_date: date, created_date: created } = obj(w);
+      return (
+        PAPER_TYPES.split('|').includes(str(type) ?? '') &&
+        (str(date) ?? '') >= from &&
+        (str(created) ?? '').slice(0, 10) >= from
+      );
     });
     papers.push(...parseOpenAlexTraction({ results }));
   }
-  return unique(papers);
+  const month = from.slice(2, 4) + from.slice(5, 7);
+  return unique(papers.filter((p) => !p.arxiv || !/^\d{4}\./.test(p.arxiv) || p.arxiv.slice(0, 4) >= month));
 }
 
 /** Bluesky posts in the last 60 days linking the paper's arXiv page, else naming its DOI; null with neither. */
