@@ -33,7 +33,7 @@ const MAX_SUMMARY_FILE = 8192;
 /** Postgres mode keeps every document (isDocumentPath) under these folders. */
 const DOC_DIRS = ['config', 'src/content', 'src/data'];
 /** The CLI must see a key to start; the sandbox firewall replaces the header carrying it with the real one. */
-const PLACEHOLDER = 'brokered-by-the-sandbox-firewall';
+export const PLACEHOLDER = 'brokered-by-the-sandbox-firewall';
 
 /** The session's only store: a file in the sandbox, so it works in git and Postgres mode alike. */
 export interface EditorSession {

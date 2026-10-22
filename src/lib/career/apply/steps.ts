@@ -1,13 +1,13 @@
 // The apply steps: pre-fill a posting's form (never submitting it) and submit exactly what the owner approved.
 import { basename } from 'node:path';
-import { generateText, readAiConfig } from '../../admin/ai';
 import { getStore } from '../../admin/get-store';
 import { postgresOnly } from '../../admin/http';
 import { getSql, type Sql } from '../../db';
 import { addEvent, applyBusy, approvedPostings, getPosting, moveApplication, readCareer } from '../db';
 import { putCareerFile } from '../files';
-import { parseAnswers } from '../settings';
+import { parseAnswers, parsePrefs } from '../settings';
 import { baseCv } from '../tailor';
+import { workerText } from '../worker';
 import type { PostingStatus } from '../types';
 import { runInApplySandbox, RunnerLostError } from './sandbox';
 import type { Application, ApplyField, ApplyState, RunnerResult } from './types';
@@ -104,7 +104,7 @@ export async function prefillStep(id: number): Promise<Application | null> {
   let fields = knownValues(read.fields, cv, answers);
   if (fields.some(pending)) {
     const prompt = valuesPrompt(fields, p, cv, answers, p.letter ?? '');
-    fields = parseValues(await generateText(store, await readAiConfig(store), prompt), fields);
+    fields = parseValues(await workerText(store, parsePrefs(career.prefs), prompt), fields);
   }
   const unsure = needsHandoff(fields);
   if (unsure) return end({ state: 'handoff', url, fields, reason: unsure });

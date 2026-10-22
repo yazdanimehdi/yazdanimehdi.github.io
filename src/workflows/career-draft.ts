@@ -10,7 +10,7 @@ import {
   noteAnswersFailed,
   renderStep,
   reviewStep,
-  scoreReady,
+  draftReady,
   startDraft,
 } from '../lib/career/steps';
 import type { DraftPart, ReviewIssue } from '../lib/career/tailor';
@@ -31,13 +31,13 @@ export async function careerDraft(id: number, part: DraftPart, instruction: stri
   try {
     await startDraft(id, part);
     if (part === 'answers') {
-      const failed = (await scoreReady()) ?? (await answersStep(id, instruction));
+      const failed = (await draftReady()) ?? (await answersStep(id, instruction));
       if (failed) return await failDraft(id, failed);
       return await finishDraft(id, null, part);
     }
     let review: { ok: boolean; issues: ReviewIssue[] } | null = null;
     if (part !== 'render') {
-      const failed = (await scoreReady()) ?? (await draftStep(id, part, instruction, null));
+      const failed = (await draftReady()) ?? (await draftStep(id, part, instruction, null));
       if (failed) return await failDraft(id, failed);
       review = await reviewStep(id, part);
       if (!review.ok) {

@@ -17,6 +17,7 @@ import { setLookupForTests } from './sources/http';
 import { PATCH } from '../../admin/routes/api/career/postings/[id]';
 import { getPosting, listEvents, updatePosting, upsertPostings, writeCareer } from './db';
 import { pdfPages, setBlobForTests } from './files';
+import { setWorkerSandboxForTests } from './worker';
 import {
   assembleCv,
   baseCv,
@@ -577,6 +578,50 @@ test('no AI key fails the draft cleanly without calling the AI', async () => {
   assert.equal((await getPosting(sql, id))!.draftState, 'failed');
   assert.deepEqual(calls, { draft: 0, review: 0 });
   assert.match((await listEvents(sql, id))[0].detail!, /^ANTHROPIC_API_KEY is not set/);
+});
+
+test('a CLI worker drafts in its sandbox; out of quota, the draft fails with the reason and the API is never called', async () => {
+  const savedToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+  process.env.CLAUDE_CODE_OAUTH_TOKEN = 'sk-ant-oat01-test';
+  await writeCareer(
+    sql,
+    { prefs: { cvStyle: 'sharp', worker: { kind: 'cli', agent: 'claude', auth: 'subscription' } } },
+    'test',
+  );
+  const reply = (result: string, isError = false) => ({
+    exitCode: isError ? 1 : 0,
+    stdout: JSON.stringify({ type: 'result', is_error: isError, result }),
+    stderr: '',
+  });
+  let answers = [reply(JSON.stringify(PLAN)), reply(JSON.stringify({ ok: true, issues: [] }))];
+  const vm = {
+    status: 'running',
+    run: async (script: string) =>
+      script.includes('claude -p') ? answers.shift()! : { exitCode: 0, stdout: '', stderr: '' },
+    spawn: async () => {},
+    readFile: async () => null,
+    writeFiles: async () => {},
+    domain: () => '',
+    setNetworkPolicy: async () => {},
+    extendTimeout: async () => {},
+    stop: async () => {},
+    delete: async () => {},
+    setTags: async () => {},
+  };
+  setWorkerSandboxForTests({ get: async () => vm, create: async () => vm });
+  try {
+    await careerDraft(id, 'cv', '');
+    assert.equal((await getPosting(sql, id))!.draftState, 'done');
+    answers = [reply('Claude AI usage limit reached|1792771200', true)];
+    await careerDraft(id, 'cv', '');
+    assert.equal((await getPosting(sql, id))!.draftState, 'failed');
+    assert.match((await listEvents(sql, id))[0].detail!, /^Your Claude subscription is out of quota until /);
+    assert.deepEqual(calls, { draft: 0, review: 0 }, 'never the API');
+  } finally {
+    setWorkerSandboxForTests(null);
+    if (savedToken === undefined) delete process.env.CLAUDE_CODE_OAUTH_TOKEN;
+    else process.env.CLAUDE_CODE_OAUTH_TOKEN = savedToken;
+  }
 });
 
 test('render-only skips the AI', async () => {

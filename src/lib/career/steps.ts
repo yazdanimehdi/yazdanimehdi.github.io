@@ -19,6 +19,7 @@ import { hardGate, postingKey, tidyPosting } from './match';
 import { prefsText } from './profile';
 import { parseScore, scorePrompt, totalScore, type ScoreDetail } from './score';
 import { parseAnswers, parsePrefs } from './settings';
+import { workerMissing, workerText } from './worker';
 import { SOURCES, type SourceContext } from './sources';
 import { SourceError } from './sources/http';
 import { clearRobotsCache } from './sources/robots';
@@ -154,9 +155,18 @@ export async function scoreReady(): Promise<string | null> {
   const ai = await readAiConfig(store);
   for (const name of TEXT_PROVIDERS[ai.text.provider].keys)
     if (!(await getSecret(getSql(), name))) return missingKey(name).message;
-  return (await cvTextOf(store)) ? null : 'There is no CV yet: add one on the CV screen';
+  return (await cvTextOf(store)) ? null : NO_CV_YET;
 }
 
+/** Why drafting can't run (the drafting worker's key or sign-in, or no CV), or null when ready. */
+export async function draftReady(): Promise<string | null> {
+  'use step';
+  const store = careerStore();
+  const prefs = parsePrefs((await readCareer(getSql())).prefs);
+  return (await workerMissing(store, prefs)) ?? ((await cvTextOf(store)) ? null : NO_CV_YET);
+}
+
+const NO_CV_YET = 'There is no CV yet: add one on the CV screen';
 const REPLIES = 3;
 
 /**
@@ -230,13 +240,13 @@ export async function draftStep(
   'use step';
   const sql = getSql();
   const store = careerStore();
-  const [p, base, abstracts, career, ai] = await Promise.all([
+  const [p, base, abstracts, career] = await Promise.all([
     getPosting(sql, id),
     baseCv(store),
     paperAbstracts(store),
     readCareer(sql),
-    readAiConfig(store),
   ]);
+  const prefs = parsePrefs(career.prefs);
   if (!p) return 'The posting no longer exists';
   if (!base.cv?.sections) return NO_CV;
   const prompt = draftPrompt(base, p, parseAnswers(career.answers), instruction, issues ?? undefined, abstracts);
@@ -244,7 +254,7 @@ export async function draftStep(
   let rejected = '';
   for (let attempt = 1; !plan; attempt++) {
     const again = `\n\nYour last reply was rejected: ${rejected}. Reply again with the corrected JSON.`;
-    const text = await generateText(store, ai, rejected ? { ...prompt, prompt: prompt.prompt + again } : prompt);
+    const text = await workerText(store, prefs, rejected ? { ...prompt, prompt: prompt.prompt + again } : prompt);
     try {
       plan = parseTailorPlan(text);
       if (part !== 'letter') assembleCv(base, plan);
@@ -275,7 +285,7 @@ export async function answersStep(id: number, instruction: string): Promise<stri
   const p = await getPosting(sql, id);
   if (!p) return 'The posting no longer exists';
   if (p.ats?.kind !== 'greenhouse') return 'Only Greenhouse postings have a form to answer';
-  const [base, career, ai] = await Promise.all([baseCv(store), readCareer(sql), readAiConfig(store)]);
+  const [base, career] = await Promise.all([baseCv(store), readCareer(sql)]);
   if (!base.cv?.sections) return NO_CV;
   const a = parseAnswers(career.answers);
   let qs: Awaited<ReturnType<typeof greenhouseQuestions>>;
@@ -289,9 +299,9 @@ export async function answersStep(id: number, instruction: string): Promise<stri
   let proposed: FormAnswer[] = [];
   if (known.rest.length) {
     const prompt = answersPrompt(known.rest, base, a, p);
-    const text = await generateText(
+    const text = await workerText(
       store,
-      ai,
+      parsePrefs(career.prefs),
       instruction.trim()
         ? { ...prompt, prompt: `${prompt.prompt}\n\nThe candidate asks: ${instruction.trim().slice(0, 500)}` }
         : prompt,
@@ -323,12 +333,12 @@ export async function noteAnswersFailed(id: number, message: string): Promise<vo
 export async function reviewStep(id: number, part: DraftPart): Promise<{ ok: boolean; issues: ReviewIssue[] }> {
   'use step';
   const store = careerStore();
-  const [p, base, ai] = await Promise.all([getPosting(getSql(), id), baseCv(store), readAiConfig(store)]);
+  const [p, base, career] = await Promise.all([getPosting(getSql(), id), baseCv(store), readCareer(getSql())]);
   const plan = p?.cv as TailorPlan | null;
   const pairs = part !== 'letter' && plan?.sections && base.cv?.sections ? rewordedPairs(base, plan) : [];
   const letter = part === 'cv' ? '' : (p?.letter ?? '');
   if (!pairs.length && !letter) return { ok: true, issues: [] };
-  const review = parseReview(await generateText(store, ai, reviewPrompt(base, pairs, letter)));
+  const review = parseReview(await workerText(store, parsePrefs(career.prefs), reviewPrompt(base, pairs, letter)));
   return part === 'cv' || part === 'letter'
     ? { ...review, issues: review.issues.map((i) => ({ ...i, part })) }
     : review;
