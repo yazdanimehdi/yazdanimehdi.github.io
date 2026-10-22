@@ -6,7 +6,6 @@ import { ApiError, api, report, toast } from './api';
 import { text, type FieldDef } from './fields';
 import { detectAts } from '../lib/career/sources/detect';
 import type { ApplicationAnswers, CareerPrefs } from '../lib/career/settings';
-import type { SecretStatus } from '../lib/admin/secrets';
 import type { AdminCtx } from './types';
 import type { CvStylesConfig } from '../lib/types';
 
@@ -27,9 +26,6 @@ const floor = ref<Floor>({});
 const sources = ref<SourceInfo[]>([]);
 const suggested = ref<{ label: string; url: string }[]>([]);
 const styles = ref<{ id: string; name: string }[]>([]);
-const keys = ref<SecretStatus[]>([]);
-const typed = ref<Record<string, string>>({});
-const savingKey = ref('');
 const saving = ref(false);
 const errors = ref<Record<string, string>>({});
 // Which sections hold suggestions not yet saved; the banner shows while either does.
@@ -223,31 +219,12 @@ function savePrefs() {
   return save({ prefs: { ...prefs.value!, salaryFloor } as CareerPrefs });
 }
 
-const status = (k: SecretStatus) =>
-  k.source === 'admin' ? `Set in admin · …${k.last4}` : k.source === 'env' ? 'From environment' : 'Not set';
-
-async function saveKey(name: string, value: string | null) {
-  savingKey.value = name;
-  try {
-    keys.value = await api<SecretStatus[]>('career/keys', { method: 'PUT', body: { name, value } });
-    typed.value[name] = '';
-    toast(value ? 'Key saved' : 'Key cleared');
-  } catch (e) {
-    report(e);
-  } finally {
-    savingKey.value = '';
-  }
-}
-
 onMounted(async () => {
   void load();
-  const [k, s, c] = await Promise.allSettled([
-    api<SecretStatus[]>('career/keys'),
+  const [s, c] = await Promise.allSettled([
     api<{ sources: SourceInfo[]; suggestedFeeds: { label: string; url: string }[] }>('career/sources'),
     api<{ data: CvStylesConfig }>('cv/styles'),
   ]);
-  if (k.status === 'fulfilled') keys.value = k.value;
-  else report(k.reason);
   if (s.status === 'fulfilled') {
     sources.value = s.value.sources;
     suggested.value = s.value.suggestedFeeds;
@@ -259,9 +236,13 @@ onMounted(async () => {
 <template>
   <AdminShell :ctx="ctx" active="career" title="Job search settings">
     <p><a :href="`${base}/career`">← Back to the feed</a></p>
+    <p class="adm-muted">Keys for job sources are on <a :href="`${base}/ai#keys`">Integrations → Keys</a>.</p>
 
     <template v-if="prefs && answers">
-      <p v-if="suggestError" class="adm-banner adm-banner-error" role="alert">{{ suggestError }}</p>
+      <p v-if="suggestError" class="adm-banner adm-banner-error" role="alert">
+        {{ suggestError }}
+        <a v-if="/ is not set/.test(suggestError)" :href="`${base}/ai#keys`">Add the key</a>
+      </p>
       <p v-else-if="unsaved.prefs || unsaved.answers" class="adm-banner" role="status">
         Suggested from your CV and publications. Review, then Save.
       </p>
@@ -288,7 +269,9 @@ onMounted(async () => {
               />
               {{ s.label }}
             </label>
-            <small v-if="s.needs.length">Needs {{ s.needs.join(', ') }} (see Keys below).</small>
+            <small v-if="s.needs.length"
+              >Needs {{ s.needs.join(', ') }} (<a :href="`${base}/ai#keys`">Integrations → Keys</a>).</small
+            >
             <small v-if="s.warning" class="adm-err" role="note">{{ s.warning }}</small>
             <label v-for="o in SOURCE_OPTIONS[s.id] ?? []" :key="o.key" class="adm-field">
               <span>{{ s.label }}: {{ o.label }}</span>
@@ -363,62 +346,5 @@ onMounted(async () => {
         </div>
       </fieldset>
     </template>
-
-    <section id="keys" class="adm-form" aria-labelledby="adm-keys">
-      <h2 id="adm-keys" class="adm-h2">Keys</h2>
-      <p class="adm-muted">
-        Keys typed here are stored encrypted in the database. Without one, the environment variable of the same name is
-        used.
-      </p>
-      <table class="adm-table">
-        <thead>
-          <tr>
-            <th>Key</th>
-            <th>Status</th>
-            <th><span class="adm-visually-hidden">Change</span></th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="k in keys" :key="k.name">
-            <td>
-              {{ k.label }}<br /><code class="adm-muted">{{ k.name }}</code>
-            </td>
-            <td>
-              {{ status(k) }}
-              <span v-if="k.undecryptable" class="adm-err">
-                The stored key can’t be decrypted (SESSION_SECRET changed): enter it again.
-              </span>
-            </td>
-            <td>
-              <form class="adm-actions" @submit.prevent="saveKey(k.name, typed[k.name] ?? '')">
-                <input
-                  v-model="typed[k.name]"
-                  type="password"
-                  autocomplete="off"
-                  :aria-label="`New ${k.label} key`"
-                  placeholder="Paste a new key"
-                />
-                <button
-                  type="submit"
-                  class="adm-btn adm-btn-small adm-btn-primary"
-                  :disabled="savingKey === k.name || !typed[k.name]"
-                >
-                  Save
-                </button>
-                <button
-                  v-if="k.source === 'admin' || k.undecryptable"
-                  type="button"
-                  class="adm-btn adm-btn-small"
-                  :disabled="savingKey === k.name"
-                  @click="saveKey(k.name, null)"
-                >
-                  Clear
-                </button>
-              </form>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </section>
   </AdminShell>
 </template>

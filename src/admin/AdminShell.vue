@@ -272,7 +272,7 @@ async function signOut() {
             @click="go(d.path)"
             @mousemove="picked = i"
           >
-            {{ d.label }}<span v-if="d.group" class="adm-muted">{{ d.group }}</span>
+            {{ d.label }}<span v-if="d.group" class="adm-muted"> {{ d.group }}</span>
           </li>
         </ul>
         <p v-if="!matches.length" class="adm-muted">Nothing matches.</p>
