@@ -53,9 +53,8 @@ async function loadRows() {
     const feed = await api<Feed>(`career/postings${status === 'all' ? '' : `?status=${status}`}`);
     if (status !== filter.value) return; // a later filter's answer wins
     groups.value = feed;
-    const all = Object.values(feed);
-    if (status === 'ready') ready.value = all.reduce((n, g) => n + g.total, 0);
-    if (status === 'open') ready.value = all.flatMap((g) => g.rows).filter((r) => r.status === 'ready').length;
+    // Exact only from the Ready view's group totals: other views cap the rows per group, so no count there.
+    if (status === 'ready') ready.value = Object.values(feed).reduce((n, g) => n + g.total, 0);
   } catch (e) {
     report(e);
   } finally {
@@ -123,9 +122,9 @@ onMounted(async () => {
   ]);
   if (s.status === 'fulfilled') threshold.value = s.value.prefs.threshold;
   else report(s.reason);
+  runKnown.value = true; // on a failure too: "No run yet" and Run now, rather than a placeholder forever
   if (r.status === 'fulfilled') {
     run.value = r.value;
-    runKnown.value = true;
     if (isRunning(run.value.status)) watch();
   } else report(r.reason);
 });
