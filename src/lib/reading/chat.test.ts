@@ -103,6 +103,27 @@ test("chat sends the owner's profile and earlier turns", async () => {
   assert.match(requests[0].prompt, /Owner: How does this compare to MIRAGE\?$/);
 });
 
+test('chat reads only the last turns', async () => {
+  const id = await add('2310.06825', [p('S1.p1', 'X works.')]);
+  for (let n = 1; n <= 4; n++) await addChat(sql, { paper: id }, { role: 'user', body: `Turn ${n}`, cites: [] });
+  assert.deepEqual(
+    (await listChat(sql, { paper: id }, 2)).map((m) => m.body),
+    ['Turn 3', 'Turn 4'],
+  );
+  assert.equal((await listChat(sql, { paper: id })).length, 4);
+});
+
+test('an answer citing only unknown passages is dropped', async () => {
+  const id = await add('2310.06825', [p('S1.p1', 'X works.')]);
+  reply = '[999:S1.p1] [12:S9.p9].';
+  await assert.rejects(
+    askChat(sql, store, { paper: id }, 'Does X work?'),
+    refused(502, 'The answer cited only passages that aren’t in the paper, so it was dropped. Ask again.'),
+  );
+  assert.deepEqual(await listChat(sql, { paper: id }), []);
+  assert.equal(await aiUse(sql, day()), 1, 'the call still counts');
+});
+
 test('at the cap chat says so', async () => {
   const id = await add('2310.06825', [p('S1.p1', 'X works.')]);
   await writeReading(sql, { prefs: { roomAiCalls: 1 } }, 'test');

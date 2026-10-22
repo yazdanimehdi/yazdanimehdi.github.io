@@ -199,7 +199,7 @@ export function parseOutput(
   return { papers, sections: sections.slice(0, LIMIT[kind].sections) };
 }
 
-const HISTORY = 12;
+export const HISTORY = 12;
 const HISTORY_CHARS = 2000;
 
 export function chatPrompt(

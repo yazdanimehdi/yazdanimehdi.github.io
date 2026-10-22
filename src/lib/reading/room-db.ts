@@ -288,12 +288,14 @@ const toChat = (r: Row): ChatMessage => ({
   createdAt: iso(r.created_at),
 });
 
-/** Oldest first. */
-export async function listChat(sql: Sql, target: Target): Promise<ChatMessage[]> {
+/** Oldest first; only the `last` few when given. */
+export async function listChat(sql: Sql, target: Target, last?: number): Promise<ChatMessage[]> {
   const [p, n] = owner(target);
   const rows = await sql<Row>`
-    select id, role, body, cites, saved_at, created_at from reading_chats
-    where paper_id = ${p}::bigint or notebook_id = ${n}::bigint order by id`;
+    select * from (
+      select id, role, body, cites, saved_at, created_at from reading_chats
+      where paper_id = ${p}::bigint or notebook_id = ${n}::bigint order by id desc limit ${last ?? null}
+    ) x order by id`;
   return rows.map(toChat);
 }
 

@@ -7,7 +7,7 @@ import type { Sql } from '../db';
 import { errorText } from '../../workflows/runs';
 import { allowedCites, loadGrounding } from './ground';
 import { addChat, getNotebook, listChat, missingAiKey, searchPassages, useAiCall } from './room-db';
-import { CONTEXT_CHARS, chatPrompt, orQuery, parseAnswer, pickPassages } from './room-prompts';
+import { CONTEXT_CHARS, HISTORY, chatPrompt, orQuery, parseAnswer, pickPassages } from './room-prompts';
 import type { ChatMessage, Target } from './types';
 
 export async function askChat(
@@ -44,7 +44,7 @@ export async function askChat(
   const query = orQuery(q);
   const hits = query ? await searchPassages(sql, ids, query, 200) : null;
   const papers = pickPassages(g.papers, hits, opts.budget ?? CONTEXT_CHARS);
-  const history = await listChat(sql, target);
+  const history = await listChat(sql, target, HISTORY);
   let reply: string;
   try {
     reply = await generateText(store, ai, chatPrompt(papers, g.profile, history, q, g.scan));
@@ -52,8 +52,10 @@ export async function askChat(
     throw new HttpError(502, errorText(e));
   }
   const answer = parseAnswer(reply, allowedCites(papers, g.scan));
-  return {
-    question: await addChat(sql, target, { role: 'user', body: q, cites: [] }),
-    answer: await addChat(sql, target, { role: 'assistant', ...answer }),
-  };
+  if (!/[\p{L}\p{N}]/u.test(answer.body))
+    throw new HttpError(502, 'The answer cited only passages that aren’t in the paper, so it was dropped. Ask again.');
+  return sql.begin(async (tx) => ({
+    question: await addChat(tx, target, { role: 'user', body: q, cites: [] }),
+    answer: await addChat(tx, target, { role: 'assistant', ...answer }),
+  }));
 }
