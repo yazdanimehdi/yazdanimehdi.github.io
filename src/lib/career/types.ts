@@ -52,6 +52,23 @@ export interface RunSummary {
   scoreSkipped?: string;
   /** The first provider or network error of the night (at most 300 characters); set when an error deferred a posting. */
   scoreError?: string;
+  // Runs from before the nightly stages lack the fields below.
+  /** The pause switch was on: nothing else ran. */
+  paused?: true;
+  /** How far the run was set to go: 1 search, 2 + score, 3 + tailor, 4 + pre-fill. */
+  stage?: 1 | 2 | 3 | 4;
+  /** Drafts that finished (done or needs review). */
+  drafted?: number;
+  /** Pre-fills that ended ready for approval. */
+  prefilled?: number;
+  /** Pre-fills that ended in a hand-off. */
+  handedOff?: number;
+  /** Matches held back tonight by the per-night or per-company limit. */
+  limited?: number;
+  /** Why drafting or pre-filling stopped early (a quota, a provider error, the worker not set up). */
+  stopped?: string;
+  /** The email digest: sent, skipped (off, no key, no address, nothing new), or Resend's error. */
+  digest?: 'sent' | 'skipped' | string;
 }
 
 export interface PostingSummary {

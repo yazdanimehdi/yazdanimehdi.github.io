@@ -10,7 +10,19 @@ import { configPath, PathError, THEME_NAME } from '../admin/paths';
 import { CvRenderError, cvRenderRequest, renderCv } from '../cv-render';
 import { BUILT_IN_THEMES, parseStyles, readThemeFiles } from '../cv-styles';
 import { getSql } from '../db';
-import { addEvent, getPosting, readCareer, updatePosting, upsertPostings, writeCareer } from './db';
+import {
+  addEvent,
+  CLAIM,
+  companyApplications,
+  getPosting,
+  listPostings,
+  readCareer,
+  updatePosting,
+  upsertPostings,
+  writeCareer,
+} from './db';
+import { sendDigest } from './digest';
+import { companyKey, draftCandidates } from './nightly';
 import { cvTextOf } from './cv-text';
 import { pdfPages, putCareerPdf } from './files';
 import { answersPrompt, type FormAnswer, greenhouseQuestions, parseFormAnswers, splitQuestions } from './answers';
@@ -18,7 +30,7 @@ import { guardPosting } from './guard';
 import { hardGate, postingKey, tidyPosting } from './match';
 import { prefsText } from './profile';
 import { parseScore, scorePrompt, totalScore, type ScoreDetail } from './score';
-import { parseAnswers, parsePrefs } from './settings';
+import { parseAnswers, parsePrefs, type CareerPrefs } from './settings';
 import { workerMissing, workerText } from './worker';
 import { SOURCES, type SourceContext } from './sources';
 import { SourceError } from './sources/http';
@@ -38,7 +50,7 @@ import {
   type TailorPlan,
   withCoverage,
 } from './tailor';
-import type { RunSummary } from './types';
+import type { DraftState, RunSummary } from './types';
 
 /** The same bot author as the daily cron; these steps only read content. */
 const BOT = { name: 'ScholarOS jobs', email: 'scholaros-jobs@users.noreply.github.com' };
@@ -55,7 +67,12 @@ function sourceMessage(id: string, e: unknown): string {
 }
 
 /** Sources on in prefs (`defaultOn` when prefs don't say); one missing a key it needs comes back `skipped`. */
-export async function enabledSources(): Promise<{ sources: { id: string; skipped?: string }[]; maxScores: number }> {
+export async function enabledSources(): Promise<{
+  sources: { id: string; skipped?: string }[];
+  maxScores: number;
+  stage: CareerPrefs['nightly']['stage'];
+  paused: boolean;
+}> {
   'use step';
   const sql = getSql();
   const prefs = parsePrefs((await readCareer(sql)).prefs);
@@ -66,7 +83,7 @@ export async function enabledSources(): Promise<{ sources: { id: string; skipped
     for (const name of source.needs ?? []) if (!missing && !(await getSecret(sql, name))) missing = name;
     sources.push(missing ? { id, skipped: `no ${missing}` } : { id });
   }
-  return { sources, maxScores: prefs.maxScoresPerRun };
+  return { sources, maxScores: prefs.maxScoresPerRun, stage: prefs.nightly.stage, paused: prefs.nightly.paused };
 }
 
 /**
@@ -212,6 +229,49 @@ export async function finishRun(summary: RunSummary): Promise<void> {
   'use step';
   await writeCareer(getSql(), { lastRun: summary }, BOT.name);
 }
+
+/**
+ * Tonight's drafts (nightly.ts `draftCandidates`), each with whether it has a Greenhouse form to answer, and how many
+ * matches the limits held back. The company window counts applications found or moved in the last `perCompany.days`.
+ */
+export async function draftPlan(): Promise<{ drafts: { id: number; greenhouse: boolean }[]; limited: number }> {
+  'use step';
+  const sql = getSql();
+  const prefs = parsePrefs((await readCareer(sql)).prefs);
+  const matches = (await listPostings(sql, { status: 'found', scored: true, limit: 500 })).filter(
+    (m) => m.score! >= prefs.threshold,
+  );
+  const since = new Date(Date.now() - prefs.nightly.perCompany.days * 86_400_000).toISOString();
+  const counts = new Map<string, number>();
+  for (const key of new Set(matches.map((m) => companyKey(m.company)))) {
+    counts.set(key, await companyApplications(sql, key, since));
+  }
+  const { ids, limited } = draftCandidates(matches, prefs, counts);
+  const drafts = await Promise.all(
+    ids.map(async (id) => ({ id, greenhouse: (await getPosting(sql, id))?.ats?.kind === 'greenhouse' })),
+  );
+  return { drafts, limited };
+}
+
+/**
+ * Claims a posting for the nightly run's draft the way startDraftRun does (draft_run_id `starting:<ms>`), only while
+ * no draft has started: an owner's draft started in the meantime keeps it.
+ */
+export async function claimDraft(id: number): Promise<boolean> {
+  'use step';
+  const claimed =
+    await getSql()`update career_postings set draft_state = 'running', draft_run_id = ${CLAIM + Date.now()}
+    where id = ${id} and draft_state = 'none' returning id`;
+  return claimed.length > 0;
+}
+
+/** Sends the night's email digest (digest.ts); never throws. */
+export async function digestStep(summary: RunSummary, drafted: number[]): Promise<string> {
+  'use step';
+  return sendDigest(getSql(), summary, drafted);
+}
+// A retry could send the email twice.
+digestStep.maxRetries = 0;
 
 // ---- Drafting: a tailored CV and cover letter for one posting (careerDraft) ----
 
@@ -405,7 +465,7 @@ export async function finishDraft(
   id: number,
   review: { ok: boolean; issues: ReviewIssue[] } | null,
   part: DraftPart = 'all',
-): Promise<void> {
+): Promise<DraftState> {
   'use step';
   const sql = getSql();
   const p = await getPosting(sql, id);
@@ -417,14 +477,13 @@ export async function finishDraft(
       : review.issues;
   const flagged = issues.length > 0 || (review !== null && !review.ok);
   const drafted = p?.cv != null || p?.letter != null;
-  await updatePosting(sql, id, {
-    draftState: flagged ? 'needs-review' : drafted ? 'done' : 'none',
-    draftIssues: flagged ? issues : null,
-  });
+  const draftState = flagged ? 'needs-review' : drafted ? 'done' : 'none';
+  await updatePosting(sql, id, { draftState, draftIssues: flagged ? issues : null });
   const moved =
     await sql`update career_postings set status = 'drafted' where id = ${id} and status = 'found' returning id`;
   if (moved.length) await addEvent(sql, id, 'status', 'found → drafted');
   await addEvent(sql, id, 'draft finished', flagged ? `needs review (${issues.length} issues)` : 'done');
+  return draftState;
 }
 
 export async function failDraft(id: number, message: string): Promise<void> {

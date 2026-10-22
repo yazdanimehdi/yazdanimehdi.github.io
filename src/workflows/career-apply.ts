@@ -1,11 +1,12 @@
 import { sleep } from 'workflow';
 import { getRun, start } from 'workflow/api';
-import type { Sql } from '../lib/db';
+import { getSql, type Sql } from '../lib/db';
 import { failPrefill, nextSubmit, prefillStep, submitLost, submitStep } from '../lib/career/apply/steps';
 import { MAY_BE_SENT, type Application, type ApplyField } from '../lib/career/apply/types';
 import {
   addEvent,
   applyBusy,
+  CLAIM,
   getPosting,
   moveApplication,
   readCareer,
@@ -13,7 +14,7 @@ import {
   updatePosting,
   writeCareer,
 } from '../lib/career/db';
-import { CLAIM, finished, reasonOf, type DraftRuns } from './career-draft';
+import { finished, reasonOf, type DraftRuns } from './career-draft';
 
 /** Pre-fills one posting's application form; it never submits. */
 export async function careerPrefill(id: number): Promise<void> {
@@ -66,16 +67,17 @@ export function setApplyRunsForTests(runs: ApplyRuns | null): void {
 }
 
 /**
- * Starts a pre-fill: `{ runId }`; `no-draft` without a tailored CV PDF; `locked` once the application is approved or
- * may have been sent; `running` while this posting's pre-fill runs; `busy` while another posting's apply run holds the
- * sandbox; null when there is no such posting.
+ * Claims a posting for a pre-fill (state `prefilling`, apply_run_id `starting:<ms>`): the application it set; `no-draft`
+ * without a tailored CV PDF; `locked` once the application is approved or may have been sent; `running` while this
+ * posting's pre-fill runs; `busy` while another posting's apply run holds the sandbox; null when there is no such
+ * posting.
  */
-export async function startPrefill(
+async function claimPrefill(
   sql: Sql,
   id: number,
-  runs: ApplyRuns = testRuns ?? workflowRuns,
-  now = Date.now(),
-): Promise<{ runId: string } | 'running' | 'no-draft' | 'busy' | 'locked' | null> {
+  runs: Pick<ApplyRuns, 'get'>,
+  now: number,
+): Promise<Application | 'running' | 'no-draft' | 'busy' | 'locked' | null> {
   const p = await getPosting(sql, id);
   if (!p) return null;
   if (!p.cvPdfUrl) return 'no-draft';
@@ -96,7 +98,18 @@ export async function startPrefill(
     where id = ${id} and application->>'state' is not distinct from ${state}
       and apply_run_id is not distinct from ${p.applyRunId}
     returning id`;
-  if (!claimed) return 'running';
+  return claimed ? app : 'running';
+}
+
+/** Starts a pre-fill: `{ runId }`, or why not (claimPrefill). */
+export async function startPrefill(
+  sql: Sql,
+  id: number,
+  runs: ApplyRuns = testRuns ?? workflowRuns,
+  now = Date.now(),
+): Promise<{ runId: string } | 'running' | 'no-draft' | 'busy' | 'locked' | null> {
+  const app = await claimPrefill(sql, id, runs, now);
+  if (typeof app === 'string' || !app) return app;
   let runId: string;
   try {
     ({ runId } = await runs.prefill(id));
@@ -110,6 +123,16 @@ export async function startPrefill(
   await updatePosting(sql, id, { applyRunId: runId });
   await addEvent(sql, id, 'apply', 'prefilling');
   return { runId };
+}
+
+/** The nightly run's pre-fill claim: startPrefill's, inside the nightly run instead of a run of its own. */
+export async function claimPrefillStep(id: number): Promise<'ok' | 'running' | 'no-draft' | 'busy' | 'locked' | null> {
+  'use step';
+  const sql = getSql();
+  const app = await claimPrefill(sql, id, testRuns ?? workflowRuns, Date.now());
+  if (typeof app === 'string' || !app) return app;
+  await addEvent(sql, id, 'apply', 'prefilling');
+  return 'ok';
 }
 
 /** Starts the submit queue unless one runs (a queue still running after an hour is cancelled and replaced). */

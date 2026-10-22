@@ -11,6 +11,9 @@ import type {
   RunSummary,
 } from './types';
 
+/** A run id while `start()` is in flight (or a nightly run holds the posting), so a second click sees it starting. */
+export const CLAIM = 'starting:';
+
 // JSON goes in as `${text}::text::jsonb`: with a bare `::jsonb`, postgres.js sees a jsonb parameter and encodes the
 // string again, storing a jsonb string instead of the object (PGlite doesn't, so only a real Postgres shows it).
 type Row = Record<string, unknown>;

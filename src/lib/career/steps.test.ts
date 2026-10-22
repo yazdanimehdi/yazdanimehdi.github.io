@@ -32,13 +32,14 @@ const SCORE = JSON.stringify({
 });
 const arbeitnow = fs.readFileSync('tests/fixtures/career/arbeitnow.json', 'utf8');
 
-/** Only remotive and arbeitnow are on; the keywords match both arbeitnow fixture postings. */
+/** Only remotive and arbeitnow are on; the keywords match both arbeitnow fixture postings. Stage 2: these pin search and scoring. */
 const setPrefs = (extra: Record<string, unknown> = {}) =>
   writeCareer(
     sql,
     {
       prefs: {
         keywords: ['partner', 'sales'],
+        nightly: { stage: 2 },
         sources: Object.fromEntries(
           Object.keys(SOURCES).map((id) => [id, { on: id === 'remotive' || id === 'arbeitnow' }]),
         ),
