@@ -121,7 +121,10 @@ function median(xs: number[]): number {
 export function splitPdfPages(pages: PdfLine[][]): Passage[] {
   const out: Passage[] = [];
   pages.forEach((all, i) => {
-    const lines = all.filter((l) => !/^\d+$/.test(l.text.trim()));
+    // Control characters (pdf.js's unmapped glyphs, such as big brackets) go: Postgres refuses a NUL in text.
+    const lines = all
+      .map((l) => ({ ...l, text: l.text.replace(/\p{Cc}/gu, '') }))
+      .filter((l) => l.text.trim() && !/^\d+$/.test(l.text.trim()));
     const gaps = lines.slice(1).map((l, j) => lines[j].y - l.y);
     const wide = 1.5 * median(gaps.filter((g) => g > 0));
     const paras: string[] = [];

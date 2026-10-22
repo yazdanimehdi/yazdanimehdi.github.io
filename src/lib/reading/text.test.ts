@@ -122,6 +122,13 @@ test('a hyphen at a line end joins the word', () => {
   );
 });
 
+// pdf.js gives an unmapped glyph (a big bracket in an equation) as a control character; Postgres refuses a NUL.
+test('control characters from unmapped glyphs are dropped', () => {
+  assert.deepEqual(splitPdfPages([[{ text: '= \u0000f (xn)\u0001 + \u0012x\u0013', y: 700 }]]), [
+    { pid: 'p1.1', kind: 'p', body: '= f (xn) + x' },
+  ]);
+});
+
 test('isScan is true for a PDF with no text', async () => {
   const lines = await pdfLines(minimalPdf([[], []]));
   assert.equal(isScan(splitPdfPages(lines), lines.length), true);
