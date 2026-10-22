@@ -15,11 +15,21 @@ export const SECRETS = {
   ADZUNA_APP_ID: 'Adzuna app id',
   ADZUNA_APP_KEY: 'Adzuna app key',
   USAJOBS_API_KEY: 'USAJobs API key',
+  RESEND_API_KEY: 'Resend (email digest)',
+  CLAUDE_CODE_OAUTH_TOKEN: 'Claude Code subscription token',
+  CODEX_AUTH_JSON: 'Codex sign-in (auth.json)',
 } as const;
 export type SecretName = keyof typeof SECRETS;
 
 /** Job-source keys: listed and set only through the owner-only career route, never `ai/keys`. */
-export const CAREER_SECRETS: SecretName[] = ['ADZUNA_APP_ID', 'ADZUNA_APP_KEY', 'USAJOBS_API_KEY'];
+export const CAREER_SECRETS: SecretName[] = [
+  'ADZUNA_APP_ID',
+  'ADZUNA_APP_KEY',
+  'USAJOBS_API_KEY',
+  'RESEND_API_KEY',
+  'CLAUDE_CODE_OAUTH_TOKEN',
+  'CODEX_AUTH_JSON',
+];
 
 export interface SecretStatus {
   name: SecretName;

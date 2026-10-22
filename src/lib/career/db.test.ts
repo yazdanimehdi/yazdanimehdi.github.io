@@ -3,13 +3,17 @@ import assert from 'node:assert/strict';
 import { migrate } from '../db-migrate';
 import type { Sql } from '../db';
 import { pgliteSql } from '../pglite-sql';
+import type { Application } from './apply/types';
 import {
   addEvent,
+  approvedPostings,
+  companyApplications,
   feedPostings,
   getPosting,
   listEvents,
   listPostings,
   readCareer,
+  readyPostings,
   updatePosting,
   upsertPostings,
   writeCareer,
@@ -131,4 +135,82 @@ test('writeCareer changes only the given fields', async () => {
   assert.deepEqual(await readCareer(sql), { prefs: { a: 1 }, answers: { x: 'y' }, lastRun: null, runId: 'r1' });
   await writeCareer(sql, { runId: null }, 'jane');
   assert.equal((await readCareer(sql)).runId, null);
+});
+
+const application = (over: Partial<Application> = {}): Application => ({
+  state: 'ready',
+  at: '2026-10-20T10:00:00.000Z',
+  url: 'https://jobs.test/apply/1',
+  fields: [{ id: 'email', label: 'Email', kind: 'email', required: true, value: 'a@b.test', source: 'cv' }],
+  shots: ['https://blob.test/1.png'],
+  ...over,
+});
+
+test('application round-trips through updatePosting and getPosting', async () => {
+  await upsertPostings(sql, [row('A')]);
+  const [{ id }] = await listPostings(sql, {});
+  assert.equal((await getPosting(sql, id))!.application, null);
+  const app = application({
+    state: 'approved',
+    reason: 'x',
+    approved: { at: '2026-10-21T00:00:00.000Z', by: 'jane', fields: application().fields },
+  });
+  await updatePosting(sql, id, { application: app, applyRunId: 'run1' });
+  const p = await getPosting(sql, id);
+  assert.deepEqual(p!.application, app);
+  assert.equal(p!.applyRunId, 'run1');
+  await updatePosting(sql, id, { notes: 'n' });
+  assert.deepEqual((await getPosting(sql, id))!.application, app, 'an unrelated patch leaves it alone');
+  await updatePosting(sql, id, { application: null, applyRunId: null });
+  const cleared = await getPosting(sql, id);
+  assert.equal(cleared!.application, null);
+  assert.equal(cleared!.applyRunId, null);
+});
+
+test('readyPostings lists only status ready, newest pre-fill first', async () => {
+  await upsertPostings(sql, ['A', 'B', 'C'].map(row));
+  const ids = (await listPostings(sql, {})).map((r) => r.id).sort((a, b) => a - b);
+  await updatePosting(sql, ids[0], { status: 'ready', application: application({ at: '2026-10-01T00:00:00.000Z' }) });
+  await updatePosting(sql, ids[1], { status: 'drafted' });
+  await updatePosting(sql, ids[2], { status: 'ready', application: application({ at: '2026-10-05T00:00:00.000Z' }) });
+  assert.deepEqual(
+    (await readyPostings(sql)).map((r) => r.id),
+    [ids[2], ids[0]],
+  );
+});
+
+test('approvedPostings lists application state approved, oldest approval first', async () => {
+  await upsertPostings(sql, ['A', 'B', 'C'].map(row));
+  const ids = (await listPostings(sql, {})).map((r) => r.id).sort((a, b) => a - b);
+  const approved = (at: string) => application({ state: 'approved', approved: { at, by: 'jane', fields: [] } });
+  await updatePosting(sql, ids[0], { application: approved('2026-10-03T00:00:00.000Z') });
+  await updatePosting(sql, ids[1], { application: application({ state: 'submitting' }) });
+  await updatePosting(sql, ids[2], { application: approved('2026-10-02T00:00:00.000Z') });
+  assert.deepEqual(await approvedPostings(sql), [ids[2], ids[0]]);
+});
+
+test('companyApplications counts the same company case-insensitively inside the window only (found_at or a status event)', async () => {
+  const at = (days: number) => new Date(Date.now() - days * 864e5).toISOString();
+  await upsertPostings(sql, [
+    { ...row('A'), company: 'Uber' },
+    { ...row('B'), company: 'uber ' },
+    { ...row('C'), company: 'Uber' },
+    { ...row('D'), company: 'Uber' },
+    { ...row('E'), company: 'Lyft' },
+  ]);
+  const ids = (await listPostings(sql, {})).map((r) => r.id).sort((a, b) => a - b);
+  const set = async (id: number, status: 'drafted' | 'submitted' | 'skipped', days: number) => {
+    await updatePosting(sql, id, { status });
+    await sql`update career_postings set found_at = ${at(days)} where id = ${id}`;
+  };
+  await set(ids[0], 'drafted', 10);
+  await set(ids[1], 'drafted', 10);
+  await set(ids[2], 'submitted', 40);
+  await set(ids[3], 'skipped', 1);
+  await set(ids[4], 'drafted', 1);
+  assert.equal(await companyApplications(sql, ' UBER', at(30)), 2);
+  await addEvent(sql, ids[2], 'note');
+  assert.equal(await companyApplications(sql, 'Uber', at(30)), 2, 'only a status event counts');
+  await addEvent(sql, ids[2], 'status', 'ready → submitted');
+  assert.equal(await companyApplications(sql, 'Uber', at(30)), 3);
 });

@@ -1,4 +1,5 @@
 import type { Sql } from '../db';
+import type { Application } from './apply/types';
 import type {
   DraftState,
   Feed,
@@ -150,6 +151,8 @@ export async function getPosting(sql: Sql, id: number): Promise<Posting | null> 
     draftState: r.draft_state as DraftState,
     draftIssues: r.draft_issues,
     draftRunId: r.draft_run_id as string | null,
+    application: r.application as Application | null,
+    applyRunId: r.apply_run_id as string | null,
   };
 }
 
@@ -171,6 +174,8 @@ type Patch = Partial<
     | 'scoreDetail'
     | 'scoreError'
     | 'description'
+    | 'application'
+    | 'applyRunId'
   >
 >;
 
@@ -195,8 +200,42 @@ export async function updatePosting(sql: Sql, id: number, patch: Patch): Promise
       score_detail = case when ${has('scoreDetail')} then ${j('scoreDetail')}::text::jsonb else score_detail end,
       score_error = case when ${has('scoreError')} then ${patch.scoreError ?? null}::text else score_error end,
       description = case when ${has('description')} then ${patch.description ?? null}::text else description end,
+      application = case when ${has('application')} then ${j('application')}::text::jsonb else application end,
+      apply_run_id = case when ${has('applyRunId')} then ${patch.applyRunId ?? null}::text else apply_run_id end,
       scored_at = case when ${has('score') || has('scoreError')} then now() else scored_at end
     where id = ${id}`;
+}
+
+/** Postings waiting for the owner's approval, the latest pre-fill first. */
+export async function readyPostings(sql: Sql): Promise<PostingSummary[]> {
+  const rows = await sql<Row>`
+    select id, company, title, location, remote, score, gate, status, found_at, flags, draft_state
+    from career_postings where status = 'ready'
+    order by application->>'at' desc nulls last, found_at desc`;
+  return rows.map(summary);
+}
+
+/** Ids of approved applications in the order they were approved, for the submit queue. */
+export async function approvedPostings(sql: Sql): Promise<number[]> {
+  const rows = await sql<Row>`
+    select id from career_postings where application->>'state' = 'approved'
+    order by application->'approved'->>'at' asc nulls last, id`;
+  return rows.map((r) => Number(r.id));
+}
+
+/**
+ * Applications to `company` (case-insensitive, trimmed) that count against the per-company limit: drafted or further
+ * along, and found or moved to a status on or after `sinceIso`.
+ */
+export async function companyApplications(sql: Sql, company: string, sinceIso: string): Promise<number> {
+  const [r] = await sql<{ n: number }>`
+    select count(*)::int as n from career_postings p
+    where lower(trim(p.company)) = lower(trim(${company}))
+      and p.status in ('drafted', 'ready', 'submitted', 'interview', 'offer')
+      and (p.found_at >= ${sinceIso}::timestamptz or exists (
+        select 1 from career_events e
+        where e.posting_id = p.id and e.kind = 'status' and e.at >= ${sinceIso}::timestamptz))`;
+  return r.n;
 }
 
 export async function addEvent(sql: Sql, postingId: number, kind: string, detail?: string): Promise<void> {

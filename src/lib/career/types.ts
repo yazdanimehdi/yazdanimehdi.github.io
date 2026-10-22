@@ -1,3 +1,5 @@
+import type { Application } from './apply/types';
+
 export type PostingStatus =
   | 'found'
   | 'skipped'
@@ -103,4 +105,6 @@ export interface Posting {
   draftState: DraftState;
   draftIssues: unknown;
   draftRunId: string | null;
+  application: Application | null;
+  applyRunId: string | null;
 }
