@@ -188,6 +188,8 @@ onBeforeUnmount(stop);
       label="Reading"
       :tabs="[
         { href: `${base}/reading`, label: 'Today', current: true },
+        { href: `${base}/reading/library`, label: 'Library' },
+        { href: `${base}/reading/notebooks`, label: 'Notebooks' },
         { href: `${base}/reading/settings`, label: 'Settings' },
       ]"
     />
@@ -236,8 +238,10 @@ onBeforeUnmount(stop);
           <ul v-if="inSection(newest, s).length" class="adm-rows">
             <li v-for="i in inSection(newest, s)" :key="i.paper.id" :data-row="rowKey(newest, i)">
               <span class="adm-row-main">
-                <a :href="i.paper.url" target="_blank" rel="noopener noreferrer">{{ visible(i.paper.title) }}</a>
-                <span class="adm-row-detail">{{ meta(i) }}</span>
+                <a :href="`${base}/reading/papers/${i.paper.id}`">{{ visible(i.paper.title) }}</a>
+                <span class="adm-row-detail"
+                  >{{ meta(i) }} · <a :href="i.paper.url" target="_blank" rel="noopener noreferrer">Source</a></span
+                >
                 <span class="adm-row-detail">{{ visible(i.line) }}</span>
               </span>
               <span class="adm-row-action adm-reading-actions">
@@ -259,8 +263,10 @@ onBeforeUnmount(stop);
           <ul class="adm-rows">
             <li v-for="i in d.items" :key="i.paper.id" :data-row="rowKey(d, i)">
               <span class="adm-row-main">
-                <a :href="i.paper.url" target="_blank" rel="noopener noreferrer">{{ visible(i.paper.title) }}</a>
-                <span class="adm-row-detail">{{ meta(i) }}</span>
+                <a :href="`${base}/reading/papers/${i.paper.id}`">{{ visible(i.paper.title) }}</a>
+                <span class="adm-row-detail"
+                  >{{ meta(i) }} · <a :href="i.paper.url" target="_blank" rel="noopener noreferrer">Source</a></span
+                >
                 <span class="adm-row-detail">{{ visible(i.line) }}</span>
               </span>
               <span class="adm-row-action adm-reading-actions">

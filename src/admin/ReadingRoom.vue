@@ -484,7 +484,11 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <AdminShell :ctx="ctx" active="reading" :title="room ? visible(room.title) : isNb ? 'Notebook' : 'Paper'">
+  <AdminShell
+    :ctx="ctx"
+    :active="isNb ? 'reading/notebooks' : 'reading'"
+    :title="room ? visible(room.title) : isNb ? 'Notebook' : 'Paper'"
+  >
     <p v-if="loadError" class="adm-err" role="alert">{{ loadError }}</p>
     <p v-else-if="!room" class="adm-muted">Loading…</p>
     <template v-else>

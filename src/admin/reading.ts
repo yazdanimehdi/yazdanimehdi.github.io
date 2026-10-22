@@ -11,6 +11,7 @@ export const SOURCE_NAMES: Record<string, string> = {
   huggingface: 'Hugging Face',
   bluesky: 'Bluesky',
   alphaxiv: 'alphaXiv',
+  library: 'Added by id',
 };
 
 const plural = (n: number) => (n === 1 ? '' : 's');

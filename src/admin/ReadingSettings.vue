@@ -17,6 +17,8 @@ const props = defineProps<{ ctx: AdminCtx }>();
 const base = `/${props.ctx.adminPath}`;
 const prefs = ref<ReadingPrefs | null>(null);
 const keys = ref<Keys | null>(null);
+// The reading room's AI calls so far today (UTC), against the saved cap.
+const roomUse = ref({ today: 0, cap: 0 });
 const errors = ref<Record<string, string>>({});
 const saving = ref(false);
 const section = ref('');
@@ -51,6 +53,14 @@ const DIGEST_FIELDS: FieldDef[] = [
   { key: 'maxAiCalls', label: 'AI calls per night (1–100)', type: 'number' },
   { key: 'paused', label: 'Pause the nightly digest', type: 'checkbox' },
 ];
+const ROOM_FIELDS: FieldDef[] = [
+  {
+    key: 'roomAiCalls',
+    label: 'AI calls per day',
+    type: 'number',
+    hint: 'Summaries, study aids and chat turns in the reading room (1–1000). Resets at midnight UTC.',
+  },
+];
 const EMAIL_FIELDS: FieldDef[] = [
   { key: 'email.on', label: 'Email me the digest each morning', type: 'checkbox' },
   { ...text('email.to', 'To'), hint: 'Empty sends it to the email on your CV.' },
@@ -64,11 +74,13 @@ const SECTIONS = [
   { id: 'profile', label: 'Profile', fields: ['field', 'keywords', 'area'] },
   { id: 'sources', label: 'Sources', fields: ['sources'] },
   { id: 'digest', label: 'Digest', fields: ['talked', 'inField', 'minScore', 'maxAiCalls', 'paused', 'email'] },
+  { id: 'room', label: 'Reading room', fields: ['roomAiCalls'] },
 ];
 
-function loaded(s: { prefs: ReadingPrefs; keys: Keys }) {
+function loaded(s: { prefs: ReadingPrefs; keys: Keys; roomUse: number }) {
   prefs.value = s.prefs;
   keys.value = s.keys;
+  roomUse.value = { today: s.roomUse, cap: s.prefs.roomAiCalls };
   saved.value = JSON.stringify(s.prefs);
 }
 
@@ -145,6 +157,8 @@ onMounted(async () => {
       label="Reading"
       :tabs="[
         { href: `${base}/reading`, label: 'Today' },
+        { href: `${base}/reading/library`, label: 'Library' },
+        { href: `${base}/reading/notebooks`, label: 'Notebooks' },
         { href: `${base}/reading/settings`, label: 'Settings', current: true },
       ]"
     />
@@ -230,6 +244,11 @@ onMounted(async () => {
             >
           </p>
           <FormFields :fields="EMAIL_FIELDS" :model="prefs" :errors="errors" />
+        </template>
+
+        <template #room>
+          <FormFields :fields="ROOM_FIELDS" :model="prefs" :errors="errors" />
+          <p class="adm-muted">Today: {{ roomUse.today }} of {{ roomUse.cap }}</p>
         </template>
       </AdminSections>
     </template>

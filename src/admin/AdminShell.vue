@@ -51,6 +51,8 @@ const GROUPS = computed(() => {
             label: 'Reading',
             links: [
               ['reading', 'Today'],
+              ['reading/library', 'Library'],
+              ['reading/notebooks', 'Notebooks'],
               ['reading/settings', 'Settings'],
             ],
             more: [],
