@@ -1,9 +1,9 @@
 // Runs runner.mjs in the apply sandbox: one persistent VM, reused one run at a time (the apply lock), that holds no
 // secrets. Each call works in its own directory, so even a run that outlived its lock can't read another's files.
 import { randomUUID } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
 import type { NetworkPolicy, SandboxApi, SandboxHandle } from '../../admin/editor';
 import { vercelSandbox } from '../../admin/sandbox';
+import { RUNNER_SOURCE } from './runner-source';
 import type { RunnerInput, RunnerResult } from './types';
 
 const NAME = 'scholaros-apply';
@@ -56,12 +56,6 @@ export function setApplySandboxForTests(api: SandboxApi | null): void {
   testApi = api;
 }
 
-async function runnerSource(): Promise<string> {
-  const raw = (await import('./runner.mjs?raw')) as { default?: unknown };
-  // The site build (Vite) gives the text; plain Node (tsx: tests, scripts) ignores `?raw` and gives the module.
-  return typeof raw.default === 'string' ? raw.default : readFile(new URL('./runner.mjs', import.meta.url), 'utf8');
-}
-
 async function download(url: string | undefined, what: string): Promise<Buffer | undefined> {
   if (!url) return undefined;
   const res = await fetch(url, { signal: AbortSignal.timeout(30_000) });
@@ -95,11 +89,7 @@ export async function stopApplySandbox(): Promise<void> {
  */
 export async function runInApplySandbox(input: ApplyRun): Promise<RunnerResult & { files: Record<string, Buffer> }> {
   const { cvPdfUrl, letterPdfUrl, ...rest } = input;
-  const [source, cv, letter] = await Promise.all([
-    runnerSource(),
-    download(cvPdfUrl, 'tailored CV'),
-    download(letterPdfUrl, 'cover letter'),
-  ]);
+  const [cv, letter] = await Promise.all([download(cvPdfUrl, 'tailored CV'), download(letterPdfUrl, 'cover letter')]);
   const api = testApi ?? vercelSandbox;
   const sb =
     (await api.get(NAME, { resume: true })) ??
@@ -116,7 +106,7 @@ export async function runInApplySandbox(input: ApplyRun): Promise<RunnerResult &
       files: { ...(cv ? { cv: `${dir}/cv.pdf` } : {}), ...(letter ? { letter: `${dir}/letter-approved.pdf` } : {}) },
     };
     await sb.writeFiles([
-      { path: `${dir}/runner.mjs`, content: Buffer.from(source) },
+      { path: `${dir}/runner.mjs`, content: Buffer.from(RUNNER_SOURCE) },
       { path: `${dir}/input.json`, content: Buffer.from(JSON.stringify(runner)) },
       ...(cv ? [{ path: runner.files!.cv!, content: cv }] : []),
       ...(letter ? [{ path: runner.files!.letter!, content: letter }] : []),

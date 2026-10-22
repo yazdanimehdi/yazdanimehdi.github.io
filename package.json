@@ -27,6 +27,7 @@
     "lint:fix": "eslint --fix . && prettier --write .",
     "format": "prettier --write .",
     "check": "astro check",
+    "gen:runner": "node scripts/gen-runner-source.mjs",
     "test": "tsx --test \"src/**/*.test.ts\"",
     "test:e2e": "playwright test",
     "check:themes": "node scripts/check-themes.mjs"
