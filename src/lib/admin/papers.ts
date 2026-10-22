@@ -1,11 +1,12 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- SerpApi responses are parsed defensively from unknown JSON */
 import type { ImageOutput, TextInput } from '../ai/providers';
 import { resolveAiConfig } from '../ai/providers';
-import { imagePrompt, paperPostPrompt, parsePaperPost, type PaperPost } from '../ai/prompts';
+import { imagePrompt, paperPostPrompt, parsePaperPost, type PaperInput, type PaperPost } from '../ai/prompts';
 import { suggestSlug } from '../utils';
 import { generateImage, generateText, readAiConfig, saveImage } from './ai';
 import { entryChange, listEntries, readConfig } from './content';
 import { commitChanges } from './http';
+import { completedFields, findPaper, paperLookup, type Completed, type Lookup } from './paper-complete';
 import { SCHOLAR_JSON } from './paths';
 import { getSecret, secretsDb } from './secrets';
 import { UpstreamError, type Change, type ContentStore } from './store';
@@ -16,7 +17,12 @@ export interface PapersDeps {
   serpapi(params: Record<string, string>): Promise<any>;
   text(input: TextInput): Promise<string>;
   image(prompt: string): Promise<ImageOutput>;
+  /** The network for completing new papers from arXiv, Crossref and the rest. */
+  lookup: Lookup;
 }
+
+/** New papers completed per run: about 30–60 s of paced arXiv calls; the rest wait for Complete papers. */
+export const COMPLETE_PER_RUN = 10;
 
 export interface PapersResult {
   /** Publication slugs written this run. */
@@ -25,6 +31,8 @@ export interface PapersResult {
   posts: string[];
   /** Citation ids left for the next run (over maxPostsPerRun): neither imported nor marked seen. */
   deferred: string[];
+  /** Publication slugs imported as Scholar gave them: past the budget, unmatched, or a source failed. */
+  notCompleted: string[];
   failed: { item: string; error: string }[];
   /** Set when the run did nothing because it can't (no Scholar id). */
   skipped?: string;
@@ -125,7 +133,7 @@ export async function syncPapers(store: ContentStore, deps: PapersDeps, now = ne
     listEntries(store, 'publications'),
     listEntries(store, 'posts'),
   ]);
-  const result: PapersResult = { imported: [], posts: [], deferred: [], failed: [] };
+  const result: PapersResult = { imported: [], posts: [], deferred: [], notCompleted: [], failed: [] };
   const authors = (Array.isArray(scholar.data.authors) ? scholar.data.authors : [])
     .map((a: any) => (typeof a?.scholar_id === 'string' ? a.scholar_id.trim() : ''))
     .filter(Boolean);
@@ -172,7 +180,8 @@ export async function syncPapers(store: ContentStore, deps: PapersDeps, now = ne
     planned.push({ a, pubSlug: unique(generateId(a.authors, a.year, a.title), pubSlugs), writePost });
   }
 
-  const pubOf = (a: Article, abstract?: string) => ({
+  // The completed fields win over Scholar's: its scholar.google.com link stays only when no url was found.
+  const pubOf = (a: Article, abstract?: string, fields: Completed = {}) => ({
     title: a.title,
     authors: a.authors,
     venue: a.venue || 'Unknown venue',
@@ -181,27 +190,51 @@ export async function syncPapers(store: ContentStore, deps: PapersDeps, now = ne
     type: inferType(a.venue),
     featured: false,
     abstract,
+    // Checked against the publication schema before it is kept (below).
+    ...(fields as Partial<PaperInput>),
   });
+
+  // Sequential: arXiv's pacing serialises its calls anyway, and the budget keeps the run inside the time limit.
+  const completed: (Completed | undefined)[] = [];
+  for (const [i, { a, pubSlug }] of planned.entries()) {
+    if (i < COMPLETE_PER_RUN)
+      try {
+        const found = await findPaper({ title: a.title, authors: a.authors, url: a.link }, deps.lookup);
+        if (found) {
+          const { fields } = await completedFields(found, { venue: a.venue, type: inferType(a.venue) }, deps.lookup);
+          entryChange('publications', pubSlug, pubOf(a, undefined, fields), ''); // a field the schema refuses fails this paper only
+          completed[i] = fields;
+          continue;
+        }
+      } catch (e) {
+        result.failed.push({ item: `completing ${pubSlug}`, error: message(e) });
+      }
+    result.notCompleted.push(pubSlug);
+  }
 
   // Concurrent so a run of several slow model calls stays inside the function time limit.
   const drafts = await Promise.all(
-    planned.map(async ({ a, writePost }): Promise<Draft | undefined> => {
+    planned.map(async ({ a, writePost }, i): Promise<Draft | undefined> => {
       if (!writePost) return undefined;
-      let abstract: string | undefined;
-      try {
-        const cited = await deps.serpapi({
-          engine: 'google_scholar_author',
-          view_op: 'view_citation',
-          citation_id: a.citationId,
-        });
-        abstract =
-          typeof cited?.citation?.description === 'string' ? cited.citation.description.trim() || undefined : undefined;
-      } catch {
-        // the post is still written, from the title alone
-      }
+      const fields = completed[i];
+      let abstract = typeof fields?.abstract === 'string' ? fields.abstract : undefined;
+      if (!abstract)
+        try {
+          const cited = await deps.serpapi({
+            engine: 'google_scholar_author',
+            view_op: 'view_citation',
+            citation_id: a.citationId,
+          });
+          abstract =
+            typeof cited?.citation?.description === 'string'
+              ? cited.citation.description.trim() || undefined
+              : undefined;
+        } catch {
+          // the post is still written, from the title alone
+        }
       let post: PaperPost;
       try {
-        post = parsePaperPost(await deps.text(paperPostPrompt(pubOf(a, abstract))));
+        post = parsePaperPost(await deps.text(paperPostPrompt(pubOf(a, abstract, fields))));
       } catch (e) {
         return { abstract, error: message(e) };
       }
@@ -216,7 +249,7 @@ export async function syncPapers(store: ContentStore, deps: PapersDeps, now = ne
   // Sequential: in git mode each saveImage is its own commit, and concurrent commits on one branch conflict.
   for (const [i, { a, pubSlug }] of planned.entries()) {
     const draft = drafts[i];
-    changes.push(entryChange('publications', pubSlug, pubOf(a, draft?.abstract), ''));
+    changes.push(entryChange('publications', pubSlug, pubOf(a, draft?.abstract, completed[i]), ''));
     result.imported.push(pubSlug);
     if (!draft) continue;
 
@@ -280,11 +313,18 @@ export function serpapiClient(key: string, fetchFn: typeof fetch = fetch): Paper
 export async function papersDeps(store: ContentStore): Promise<PapersDeps | null> {
   const key = await getSecret(secretsDb(store), 'SERPAPI_KEY');
   if (!key) return null;
-  const config = await readAiConfig(store);
+  const [config, site, cv] = await Promise.all([
+    readAiConfig(store),
+    readConfig(store, 'site'),
+    readConfig(store, 'cv'),
+  ]);
+  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+  const email = str((site.data.socials as any)?.email) ?? str((cv.data.cv as any)?.email);
   return {
     serpapi: serpapiClient(key),
     text: (input) => generateText(store, config, input),
     image: (prompt) => generateImage(store, config, prompt),
+    lookup: paperLookup({ siteUrl: str(site.data.siteUrl) ?? '', email }),
   };
 }
 
@@ -293,6 +333,7 @@ export function papersSummary(r: PapersResult): string {
   if (r.skipped) return `skipped: ${r.skipped}`;
   const parts = [`imported ${r.imported.length}`, `drafted ${r.posts.length}`];
   if (r.deferred.length) parts.push(`${r.deferred.length} left for the next run`);
+  if (r.notCompleted.length) parts.push(`${r.notCompleted.length} not completed (use Complete papers)`);
   if (r.failed.length) parts.push(`failed: ${r.failed.map((f) => `${f.item}: ${f.error}`).join('; ')}`);
   return parts.join(' · ');
 }

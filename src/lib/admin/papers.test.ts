@@ -6,7 +6,17 @@ import path from 'node:path';
 import { readEntry } from './content';
 import { setStoreForTests } from './get-store';
 import { MemoryStore } from './memory-store';
-import { generateId, inferType, serpapiClient, syncPapers, type PapersDeps } from './papers';
+import { SourceError } from '../career/sources/http';
+import type { Lookup } from './paper-complete';
+import {
+  COMPLETE_PER_RUN,
+  generateId,
+  inferType,
+  papersSummary,
+  serpapiClient,
+  syncPapers,
+  type PapersDeps,
+} from './papers';
 import { SCHOLAR_JSON } from './paths';
 import { UpstreamError } from './store';
 import { POST as syncRoute } from '../../admin/routes/api/papers/sync';
@@ -47,6 +57,35 @@ beforeEach(() => {
 });
 after(() => setStoreForTests(null));
 
+const fixture = (name: string) =>
+  fs.readFileSync(new URL(`../../../tests/fixtures/papers/${name}`, import.meta.url), 'utf8');
+
+/** Answers the first route whose key prefixes the URL with that fixture; anything else 404s (no match). */
+const fakeLookup = (routes: Record<string, string> = {}): Lookup => ({
+  async get(url) {
+    const hit = Object.keys(routes).find((k) => url.startsWith(k));
+    if (!hit) throw new SourceError(`${url} answered 404`, 404);
+    return fixture(routes[hit]);
+  },
+});
+
+const ARXIV_SEARCH = 'https://export.arxiv.org/api/query?search_query=';
+
+/** An arXiv title search that finds every paper (by Jane Smith), counting the searches: one per findPaper. */
+function countingLookup() {
+  const calls = { papers: 0 };
+  const lookup: Lookup = {
+    async get(url) {
+      if (!url.startsWith(ARXIV_SEARCH)) throw new SourceError(`${url} answered 404`, 404);
+      calls.papers++;
+      const title = /ti:"(.*)"/.exec(decodeURIComponent(url))![1];
+      const id = `2601.${String(calls.papers).padStart(5, '0')}`;
+      return `<feed><entry><id>http://arxiv.org/abs/${id}v1</id><title>${title}</title><published>2026-01-05T00:00:00Z</published><summary>About ${title}.</summary><author><name>Jane Smith</name></author></entry></feed>`;
+    },
+  };
+  return { lookup, calls };
+}
+
 const postJson = (title: string) =>
   JSON.stringify({ title, subtitle: 'Sub', excerpt: 'One line.', tags: ['ml'], body: 'We **did** it.' });
 
@@ -65,6 +104,7 @@ function deps(overrides: Partial<PapersDeps> = {}): PapersDeps {
       calls.image.push(prompt);
       return { bytes: JPEG, contentType: 'image/jpeg' };
     },
+    lookup: fakeLookup(),
     ...overrides,
   };
 }
@@ -78,6 +118,67 @@ async function baseline() {
   articles = [article('a', 'Sparse Attention for Robots', '2026'), article('b', 'Dense Rewards', '2025')];
   return syncPapers(store, deps(), NOW);
 }
+
+const MIRAGE = 'MIRAGE: Measuring Interpolation and Redundancy in Affinity GEneralization';
+
+test('a new Scholar paper is completed from arXiv, and its abstract feeds the post', async () => {
+  await baseline();
+  articles = [
+    {
+      ...article('mirage', MIRAGE, '2026', 'M Yazdani-Jahromi, AK Yalabadi, …'),
+      publication: 'arXiv preprint arXiv:2609.14491, 2026',
+    },
+  ];
+  const r = await syncPapers(store, deps({ lookup: fakeLookup({ [ARXIV_SEARCH]: 'arxiv-mirage.xml' }) }), NOW);
+  const pub = (await readEntry(store, 'publications', r.imported[0]))!.data;
+  assert.equal(pub.url, 'https://arxiv.org/abs/2609.14491');
+  assert.equal(pub.arxiv, '2609.14491');
+  assert.equal(pub.pdf, 'https://arxiv.org/pdf/2609.14491');
+  assert.deepEqual(pub.authors, ['Mehdi Yazdani-Jahromi', 'Sanjay Padhi', 'Ivan Garibay']);
+  assert.equal(pub.title, MIRAGE);
+  assert.equal(pub.type, 'preprint');
+  assert.match(String(pub.abstract), /^Deep learning now underpins/);
+  assert.match(String(pub.bibtex), /^@misc\{/);
+  assert.equal(pub.featured, false);
+  assert.deepEqual(r.notCompleted, []);
+  assert.deepEqual(r.failed, []);
+  assert.match(calls.text[0], /Abstract: Deep learning now underpins/);
+  assert.deepEqual(
+    calls.serpapi.filter((p) => p.view_op),
+    [],
+    'no SerpApi abstract call when completion found one',
+  );
+});
+
+test('when the sources fail, the paper imports as Scholar gave it and the run says so', async () => {
+  articles = [article('a', 'Sparse Attention for Robots', '2026')];
+  const failing: Lookup = {
+    get: async () => {
+      throw new Error('timeout');
+    },
+  };
+  const r = await syncPapers(store, deps({ lookup: failing }), NOW);
+  assert.deepEqual(r.imported, ['smith2026sparse']);
+  assert.deepEqual(r.notCompleted, r.imported);
+  assert.deepEqual(r.failed, [{ item: 'completing smith2026sparse', error: 'timeout' }]);
+  const pub = (await readEntry(store, 'publications', 'smith2026sparse'))!.data;
+  assert.equal(pub.url, articles[0].link);
+  assert.match(papersSummary(r), /1 not completed \(use Complete papers\)/);
+});
+
+test('only COMPLETE_PER_RUN papers are completed per run, newest first', async () => {
+  articles = Array.from({ length: 12 }, (_, i) =>
+    article(`n${i}`, `Paper Number ${String.fromCharCode(97 + i)}`, String(2026 - i)),
+  );
+  const { lookup, calls: looked } = countingLookup();
+  const r = await syncPapers(store, deps({ lookup }), NOW);
+  assert.equal(r.imported.length, 12);
+  assert.deepEqual(r.notCompleted, r.imported.slice(COMPLETE_PER_RUN));
+  assert.equal(looked.papers, COMPLETE_PER_RUN);
+  assert.equal((await readEntry(store, 'publications', r.imported[0]))!.data.arxiv, '2601.00001');
+  assert.equal((await readEntry(store, 'publications', r.imported[11]))!.data.arxiv, undefined);
+  assert.deepEqual(r.failed, []);
+});
 
 test('generateId and inferType follow scripts/sync-scholar.py', () => {
   assert.equal(generateId(['J Smith', 'A Chen'], 2024, 'The Adaptive Way'), 'smith2024adaptive');
@@ -95,7 +196,13 @@ test('first run is a baseline: imports missing publications, marks everything se
     article('m', 'Learning to grasp — a survey', '2020'), // the manual entry, punctuated differently
   ];
   const r = await syncPapers(store, deps(), NOW);
-  assert.deepEqual(r, { imported: ['smith2026sparse'], posts: [], deferred: [], failed: [] });
+  assert.deepEqual(r, {
+    imported: ['smith2026sparse'],
+    posts: [],
+    deferred: [],
+    notCompleted: ['smith2026sparse'],
+    failed: [],
+  });
   assert.deepEqual(await pubs(), ['smith2020manual', 'smith2026sparse']);
   assert.deepEqual(await postFiles(), []);
   assert.deepEqual(await state(), { seen: ['AUTH:a', 'AUTH:m'], lastRun: NOW.toISOString() });
@@ -117,7 +224,13 @@ test('second run: one new paper becomes a publication and a draft post with rela
   await baseline();
   articles = [article('c', 'Graph Planning at Scale', '2026'), ...articles];
   const r = await syncPapers(store, deps(), NOW);
-  assert.deepEqual(r, { imported: ['smith2026graph'], posts: ['graph-planning-at-scale'], deferred: [], failed: [] });
+  assert.deepEqual(r, {
+    imported: ['smith2026graph'],
+    posts: ['graph-planning-at-scale'],
+    deferred: [],
+    notCompleted: ['smith2026graph'],
+    failed: [],
+  });
   const post = (await readEntry(store, 'posts', 'graph-planning-at-scale'))!;
   assert.equal(post.data.draft, true);
   assert.equal(post.data.date, '2026-10-12');
@@ -147,7 +260,7 @@ test('a new paper whose title matches an existing publication is only marked see
   await baseline();
   articles = [article('d', 'LEARNING TO GRASP: a Survey.', '2026')];
   const r = await syncPapers(store, deps(), NOW);
-  assert.deepEqual(r, { imported: [], posts: [], deferred: [], failed: [] });
+  assert.deepEqual(r, { imported: [], posts: [], deferred: [], notCompleted: [], failed: [] });
   assert.deepEqual(await pubs(), ['smith2020manual', 'smith2025dense', 'smith2026sparse']);
   assert.ok((await state()).seen.includes('AUTH:d'));
   assert.deepEqual(calls.text, []);
@@ -159,7 +272,7 @@ test('a publication the owner deleted is not re-imported; an unchanged run commi
   await store.commit([{ path: file.path, content: null }], 'delete', { [file.path]: file.version });
   const commits = store.log.length;
   const r = await syncPapers(store, deps(), NOW);
-  assert.deepEqual(r, { imported: [], posts: [], deferred: [], failed: [] });
+  assert.deepEqual(r, { imported: [], posts: [], deferred: [], notCompleted: [], failed: [] });
   assert.equal(await store.read('src/content/publications/smith2025dense.md'), null);
   assert.equal(store.log.length, commits);
 });
@@ -169,11 +282,23 @@ test('the cap defers extra papers without importing them or marking them seen; t
   write('config/ai.yml', 'papers:\n  autoPost: true\n  maxPostsPerRun: 1\n');
   articles = [article('e', 'Older Paper', '2025'), article('f', 'Newest Paper', '2026'), ...articles];
   const r = await syncPapers(store, deps(), NOW);
-  assert.deepEqual(r, { imported: ['smith2026newest'], posts: ['newest-paper'], deferred: ['AUTH:e'], failed: [] });
+  assert.deepEqual(r, {
+    imported: ['smith2026newest'],
+    posts: ['newest-paper'],
+    deferred: ['AUTH:e'],
+    notCompleted: ['smith2026newest'],
+    failed: [],
+  });
   assert.ok(!(await state()).seen.includes('AUTH:e'));
   assert.ok(!(await pubs()).includes('smith2025older'));
   const next = await syncPapers(store, deps(), NOW);
-  assert.deepEqual(next, { imported: ['smith2025older'], posts: ['older-paper'], deferred: [], failed: [] });
+  assert.deepEqual(next, {
+    imported: ['smith2025older'],
+    posts: ['older-paper'],
+    deferred: [],
+    notCompleted: ['smith2025older'],
+    failed: [],
+  });
 });
 
 test('posts are generated concurrently, covers are stored one at a time, in newest-first order', async () => {
@@ -228,6 +353,7 @@ test('posts are generated concurrently, covers are stored one at a time, in newe
     imported: ['smith2026paper', 'smith2025paper', 'smith2024paper'],
     posts: ['paper-one', 'paper-two', 'paper-three'],
     deferred: [],
+    notCompleted: ['smith2026paper', 'smith2025paper', 'smith2024paper'],
     failed: [],
   });
   assert.deepEqual(
@@ -247,6 +373,7 @@ test('with autoPost off, new papers are imported without posts', async () => {
     imported: ['smith2026quiet'],
     posts: [],
     deferred: [],
+    notCompleted: ['smith2026quiet'],
     failed: [],
   });
   assert.deepEqual(calls.text, []);
