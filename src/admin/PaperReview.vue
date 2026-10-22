@@ -100,7 +100,7 @@ onBeforeUnmount(() => run++);
   >
     <div>
       <div class="adm-head">
-        <h2 class="adm-h2">Complete papers from arXiv and Crossref</h2>
+        <h2 class="adm-h2">Complete papers from their sources</h2>
         <button type="button" class="adm-btn adm-btn-small" @click="emit('close')">Close</button>
       </div>
       <p>

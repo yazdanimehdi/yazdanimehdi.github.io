@@ -118,11 +118,19 @@ export async function findPaper(
   const secondary = (url: string) => look.get(url).catch(() => undefined);
   const crossrefDoi = async (doi: string) => parseCrossrefWorks(json(await primary(`${CROSSREF}/${doiPath(doi)}`)))[0];
 
+  // A typo'd or stale id or DOI resolves to another paper: with authors to compare, its record must share one.
+  const ours = (r: PaperRecord | undefined) =>
+    pub.authors.length && r && !sameAuthors(pub.authors, r.authors) ? undefined : r;
   const found: Found = {};
   const id = arxivId(pub);
-  if (id) found.arxiv = parseArxivFeed((await primary(`${ARXIV}id_list=${q(id)}`)) ?? '').find((r) => r.arxiv === id);
-  const doi = cleanDoi(pub.doi) ?? cleanDoi(found.arxiv?.doi);
-  if (doi) found.crossref = await crossrefDoi(doi);
+  if (id)
+    found.arxiv = ours(parseArxivFeed((await primary(`${ARXIV}id_list=${q(id)}`)) ?? '').find((r) => r.arxiv === id));
+  let doi = cleanDoi(pub.doi) ?? cleanDoi(found.arxiv?.doi);
+  if (doi) {
+    const record = await crossrefDoi(doi);
+    found.crossref = ours(record);
+    if (record && !found.crossref) doi = undefined;
+  }
   if (!found.arxiv && !doi) {
     const phrase = pub.title
       .replace(/[^\p{L}\p{N}\s]/gu, ' ')
@@ -305,6 +313,8 @@ export interface PaperProposal {
   title: string;
   changes: FieldChange[];
   error?: string;
+  /** The error is the PDF read's, not a source's: the batch goes on. */
+  pdfError?: true;
   noMatch?: true;
 }
 /** slug → field → JSON of the proposed value the owner declined. */
@@ -443,7 +453,7 @@ export async function proposeFor(
     }
   }
   if (changes.length) return { slug, title, changes };
-  if (pdfError) return { slug, title, changes, error: pdfError };
+  if (pdfError) return { slug, title, changes, error: pdfError, pdfError: true };
   return found ? { slug, title, changes } : { slug, title, changes, noMatch: true };
 }
 
@@ -451,8 +461,9 @@ export async function proposeFor(
 export const PROPOSE_FOR_MS = 60_000;
 
 /**
- * Proposals for a batch, in order: at least one, then none started past PROPOSE_FOR_MS, none after a failure, and none
- * from the first paper that needs a PDF read once the budget is spent (the next batch starts there).
+ * Proposals for a batch, in order: at least one, then none started past PROPOSE_FOR_MS, none after a source failure
+ * (an unreadable PDF is only that paper's error), and none from the first paper that needs a PDF read once the budget
+ * is spent (the next batch starts there).
  */
 export async function proposeBatch(
   entries: { slug: string; data: Record<string, unknown> }[],
@@ -464,7 +475,8 @@ export async function proposeBatch(
   const deadline = clock() + PROPOSE_FOR_MS;
   const out: PaperProposal[] = [];
   for (const e of entries) {
-    if (out.length && (clock() >= deadline || out.at(-1)!.error)) break;
+    const last = out.at(-1);
+    if (last && (clock() >= deadline || (last.error && !last.pdfError))) break;
     try {
       out.push(await proposeFor(e.slug, e.data, look, declined[e.slug], readPdf));
     } catch (error) {

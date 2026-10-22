@@ -75,6 +75,39 @@ test('an arXiv URL in url or pdf counts as its id', async () => {
   assert.equal(found?.arxiv?.arxiv, '2609.14491');
 });
 
+const searched = (look: ReturnType<typeof fake>) =>
+  look.calls.some(([u]) => u.startsWith('https://export.arxiv.org/api/query?search_query='));
+
+test("a wrong arXiv id (another paper's authors) is dropped for a title search", async () => {
+  const look = fake({ 'https://export.arxiv.org/api/query?id_list=2609.14491': 'arxiv-mirage.xml' });
+  const found = await findPaper({ title: 'Another paper', authors: ['J Doe'], arxiv: '2609.14491' }, look);
+  assert.equal(found, null);
+  assert.ok(searched(look));
+});
+
+test("a wrong DOI (another paper's authors) is dropped for a title search", async () => {
+  const look = fake({ 'https://api.crossref.org/works/10.52202': crossrefWork });
+  const found = await findPaper({ title: 'Another paper', authors: ['J Doe'], doi: '10.52202/085713-0904' }, look);
+  assert.equal(found, null);
+  assert.ok(searched(look));
+  assert.ok(!look.calls.some(([u]) => u.includes('085713-0904[doi]')), 'the dropped DOI is not searched on PubMed');
+});
+
+test("a right arXiv id is kept with Scholar's abbreviated authors, and its DOI gives the published version", async () => {
+  const feed = fixture('arxiv-mirage.xml').replace(
+    '</summary>',
+    '</summary>\n    <arxiv:doi>10.52202/085713-0904</arxiv:doi>',
+  );
+  const look = fake({
+    'https://export.arxiv.org/api/query?id_list=2609.14491': feed,
+    'https://api.crossref.org/works/10.52202/085713-0904': crossrefWork,
+  });
+  const found = await findPaper({ title: 'Mirage', authors: ['M Yazdani-Jahromi'], arxiv: '2609.14491' }, look);
+  assert.equal(found?.arxiv?.arxiv, '2609.14491');
+  assert.equal(found?.crossref?.doi, '10.52202/085713-0904');
+  assert.ok(!searched(look));
+});
+
 test("a title search matches Scholar's abbreviated, truncated authors and other casing", async () => {
   const look = fake({
     'https://export.arxiv.org/api/query?search_query=': 'arxiv-mirage.xml',
@@ -435,6 +468,18 @@ test('proposeBatch: one paper at least, none started after PROPOSE_FOR_MS, and i
     failed.map((p) => [p.slug, p.error]),
     [['a', 'arXiv answered 503']],
   );
+
+  const broken: ReadPdf = async () => {
+    throw new Error('The AI did not answer with JSON');
+  };
+  const withPdf = entries.map((e) => ({ ...e, data: { ...e.data, pdf: `/images/${e.slug}.pdf` } }));
+  const unreadable = await proposeBatch(withPdf, NOWHERE, {}, broken);
+  assert.deepEqual(
+    unreadable.map((p) => p.slug),
+    ['a', 'b', 'c'],
+    "an unreadable PDF is that paper's error, not the batch's end",
+  );
+  assert.ok(unreadable.every((p) => /your PDF/.test(p.error!)));
 });
 
 const MIRAGE = 'MIRAGE: Measuring Interpolation and Redundancy in Affinity GEneralization';

@@ -694,23 +694,25 @@ Google Scholar papers into draft posts, using your own provider keys.
   with Higgsfield image-to-video, and saves a looping animated WebP. It needs the Higgsfield keys whichever image
   provider is chosen, and takes one to three minutes. Its **Animation model** setting on the Scholar & AI screen
   defaults to `bytedance/seedance-2.5/image-to-video`.
-- **Paper drafts.** Add the Scholar author id (the `user=` value of the profile URL) on the Scholar & AI screen.
-  Postgres mode checks daily; **Check now** works in both modes. New papers become publications and, unless turned
-  off, **draft** posts with a cover image, linked to the publication. The first check only records the papers already
-  on the profile (no posts), so turning this on doesn't write a post for every old paper. Each check writes at most
-  **Posts per run** posts (default three); the rest wait for the next one. A publication you delete is not imported
-  again.
+- **Paper drafts.** Add the Scholar author id (the `user=` value of the profile URL) on the Scholar & AI screen. Both
+  modes check Scholar every day by default; **Check for new papers** on the same screen (`papers.schedule` in
+  `config/ai.yml`) picks every day, a weekday each week, a day each month (UTC), or never. **Check now** works in both
+  modes, whatever the schedule. New papers become publications and, unless turned off, **draft** posts with a cover
+  image, linked to the publication. The first check only records the papers already on the profile (no posts), so
+  turning this on doesn't write a post for every old paper. Each check writes at most **Posts per run** posts (default
+  three); the rest wait for the next one. A publication you delete is not imported again.
 - **Completing papers.** A paper that arrives from Scholar has little more than a title, so new ones are completed
   automatically (up to 10 per run; the rest wait for the **Complete papers** button) from arXiv, bioRxiv/medRxiv,
-  Crossref/DOI, PubMed and OpenAlex: the abstract, DOI, authors, venue and year they can confirm. **Complete papers**
-  on the Publications screen reviews the same for papers you already have: empty fields are ticked, replacements of a
-  value you have are unticked, each value shows its source, and a change you decline is not offered again. The
-  sources are free and need no key, and their rate limits are respected. Your own fields are never touched: nothing
-  is replaced unless you tick it.
+  Crossref/DOI, PubMed and OpenAlex: the abstract, DOI, authors, venue, year, type, links, PDF and BibTeX they can
+  confirm. **Complete papers** on the Publications screen reviews the same for papers you already have: empty fields
+  are ticked, replacements of a value you have are unticked, each value shows its source, and a change you decline is
+  not offered again. The sources are free and need no key, and their rate limits are respected. Your own fields are
+  never touched: nothing is replaced unless you tick it.
 - **Upload PDF.** Next to a paper's PDF field, **Upload PDF** stores the file with the site's media (4 MB max) and
   fills in its link; uploaded PDFs aren't listed on the Media screen.
-- **Git mode.** The weekly Scholar GitHub Action (`sync-scholar.yml`) only adds new papers and fills empty fields; it
-  no longer overwrites a title, authors, venue or year you already have.
+- **Git mode.** The Scholar GitHub Action (`sync-scholar.yml`) runs daily and follows `papers.schedule`, so a git-mode
+  site now checks Scholar every day by default (it used to be weekly). It only adds new papers and fills empty
+  fields; it no longer overwrites a title, authors, venue or year you already have.
 - **Cost.** Each paper post is one writing call and one image call on your provider accounts. Scholar is read
   through [SerpApi](https://serpapi.com/google-scholar-author-api): one search per author per check plus one per
   paper post. The free tier (about 250 searches a month) covers one author daily plus a few new papers.
