@@ -140,7 +140,12 @@ async function remove() {
 </script>
 
 <template>
-  <AdminShell :ctx="ctx" :active="name === 'publications' ? 'publications' : `content/${name}`" :title="cfg.label">
+  <AdminShell
+    :ctx="ctx"
+    :active="name === 'publications' ? 'publications' : `content/${name}`"
+    :title="cfg.label"
+    :dirty="doc.dirty"
+  >
     <template #actions>
       <button v-if="name === 'publications'" type="button" class="adm-btn" @click="reviewing = true">
         Complete papers

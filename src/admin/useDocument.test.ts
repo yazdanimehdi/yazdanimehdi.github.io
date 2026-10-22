@@ -151,4 +151,6 @@ test('dirty: set by an edit, cleared by a save or a reload, and back when the ed
   assert.equal(doc.dirty, true, 'a failed save keeps the change');
   await doc.reload();
   assert.equal(doc.dirty, false, 'reloaded');
+  doc.current = null;
+  assert.equal(doc.dirty, false, 'nothing open (an entry just deleted)');
 });

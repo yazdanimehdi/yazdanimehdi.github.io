@@ -677,13 +677,13 @@ story in, the Writing page shows only the site's copy.
 The admin can draft and rewrite post and news bodies, generate cover images and publication figures, and turn new
 Google Scholar papers into draft posts, using your own provider keys.
 
-- **Keys.** Open **Scholar & AI** in the admin. In Postgres mode, paste a key and **Save**: it is stored encrypted in
+- **Keys.** Open **Integrations** in the admin. In Postgres mode, paste a key and **Save**: it is stored encrypted in
   the database (with a key derived from `SESSION_SECRET`; changing that secret means entering the keys again). In git
-  mode, set them as environment variables in Vercel; the Scholar & AI screen shows which are set. An environment
+  mode, set them as environment variables in Vercel; the Integrations screen shows which are set. An environment
   variable is the fallback in both modes. Keys: `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`,
   `HIGGSFIELD_API_KEY` + `HIGGSFIELD_API_SECRET`, `SERPAPI_KEY`.
 - **Models.** Writing uses Anthropic, OpenAI or Google; images use OpenAI, Google or Higgsfield. Pick them on the
-  Scholar & AI screen (saved to `config/ai.yml`); an empty model uses the current default (`claude-sonnet-5-5`,
+  Integrations screen (saved to `config/ai.yml`); an empty model uses the current default (`claude-sonnet-5-5`,
   `gpt-6-astra`, `gemini-3.8-flash`; `gpt-image-2.5-flare`, `gemini-3.1-flash-image`, `higgsfield-ai/soul/standard`).
 - **What is sent.** **Write** and **Rewrite** send the title, subtitle, your instruction and the body to the writing
   provider. **Generate image** sends the title and summary to the image provider. Paper posts send the paper's
@@ -692,9 +692,9 @@ Google Scholar papers into draft posts, using your own provider keys.
 - **Publication figures and GIFs.** In the publication editor, **Generate image** draws a journal-style figure from
   the title and abstract. **Generate GIF** (posts, news and publications) asks Higgsfield for a still, animates it
   with Higgsfield image-to-video, and saves a looping animated WebP. It needs the Higgsfield keys whichever image
-  provider is chosen, and takes one to three minutes. Its **Animation model** setting on the Scholar & AI screen
+  provider is chosen, and takes one to three minutes. Its **Animation model** setting on the Integrations screen
   defaults to `bytedance/seedance-2.5/image-to-video`.
-- **Paper drafts.** Add the Scholar author id (the `user=` value of the profile URL) on the Scholar & AI screen. Both
+- **Paper drafts.** Add the Scholar author id (the `user=` value of the profile URL) on the Integrations screen. Both
   modes check Scholar every day by default; **Check for new papers** on the same screen (`papers.schedule` in
   `config/ai.yml`) picks every day, a weekday each week, a day each month (UTC), or never. **Check now** works in both
   modes, whatever the schedule. New papers become publications and, unless turned off, **draft** posts with a cover
@@ -725,9 +725,9 @@ the news section above publications"). A coding agent edits a private copy of th
 commits it so the site redeploys.
 
 - **Requirements.** The admin on Vercel (git or Postgres mode), `GITHUB_TOKEN` with Contents: read and write (the
-  token git mode and the backup already use), and a key for the writing provider chosen on the Scholar & AI screen.
+  token git mode and the backup already use), and a key for the writing provider chosen on the Integrations screen.
   The agent is that provider's own coding tool: Claude Code for Anthropic, Codex for OpenAI, Gemini CLI for Google,
-  with the writing model from the Scholar & AI screen. On Vercel the sandbox signs in automatically (OIDC). For local
+  with the writing model from the Integrations screen. On Vercel the sandbox signs in automatically (OIDC). For local
   development, run `vercel link` and `vercel env pull` to get `VERCEL_OIDC_TOKEN`.
 - **How it works.** **Start** creates one sandbox for the site (about a minute the first time: clone and install).
   Describe a change and **Run**; the agent's log shows while it works, and the preview reloads when it is done.

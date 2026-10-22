@@ -99,7 +99,7 @@ test('a failure offers the action that fits its diagnosis', () => {
   const retry = { kind: 'sync-papers', label: 'Retry' } as const;
   const keys = { kind: 'screen', label: 'API keys', path: 'ai#keys' } as const;
   const fix = (raw: string) => failure(raw, 'Google Scholar', { settings: keys, retry, then: '. Next: tomorrow' });
-  assert.deepEqual(fix('SERPAPI_KEY is not set: add it on the Scholar & AI screen').action, keys, 'missing key');
+  assert.deepEqual(fix('SERPAPI_KEY is not set: add it on the Integrations screen').action, keys, 'missing key');
   assert.equal(fix('SERPAPI_KEY is not set').detail, 'Google Scholar needs a key');
   assert.deepEqual(fix('HTTP 401 Unauthorized').action, keys, 'refused key');
   assert.equal(fix('429 Too Many Requests').action, undefined, 'a rate limit has no button');

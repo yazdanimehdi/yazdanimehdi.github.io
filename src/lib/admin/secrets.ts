@@ -85,7 +85,7 @@ export async function getSecret(sql: Sql | null, name: SecretName): Promise<stri
 }
 
 export const missingKey = (name: SecretName) =>
-  new HttpError(400, `${name} is not set: add it on the Scholar & AI screen or as an environment variable`);
+  new HttpError(400, `${name} is not set: add it on the Integrations screen or as an environment variable`);
 
 /** Like getSecret, but a missing key is a 400 that says where to set it. */
 export async function requireSecret(sql: Sql | null, name: SecretName): Promise<string> {

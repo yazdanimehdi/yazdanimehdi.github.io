@@ -230,7 +230,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <AdminShell :ctx="ctx" active="cv-styles" title="CV styles">
+  <AdminShell :ctx="ctx" active="cv-styles" title="CV styles" :dirty="doc.dirty">
     <template #actions>
       <a class="adm-btn" :href="`/${ctx.adminPath}/cv`">CV entries</a>
       <button type="button" class="adm-btn adm-btn-primary" :disabled="doc.saving || !doc.current" @click="save">

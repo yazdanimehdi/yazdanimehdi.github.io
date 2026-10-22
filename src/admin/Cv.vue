@@ -405,7 +405,7 @@ async function generatePdf() {
 </script>
 
 <template>
-  <AdminShell :ctx="ctx" active="cv" title="CV">
+  <AdminShell :ctx="ctx" active="cv" title="CV" :dirty="doc.dirty">
     <template #actions>
       <span v-if="pdf" class="adm-muted"
         >{{ pdfLabel }} · <a :href="pdf.url" target="_blank" rel="noopener">run</a></span

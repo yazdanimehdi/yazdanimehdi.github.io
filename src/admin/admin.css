@@ -148,6 +148,70 @@
 .adm-nav-more ul {
   padding-inline-start: 10px;
 }
+.adm-jump-btn {
+  justify-content: space-between;
+  color: var(--adm-muted);
+}
+.adm-jump-btn kbd,
+.adm-editor-kbd kbd {
+  padding: 1px 6px;
+  border: 1px solid var(--adm-rule);
+  border-radius: 4px;
+  background: var(--adm-tint);
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.adm-badge {
+  margin-inline-start: 8px;
+  padding: 0 5px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px var(--adm-rule);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 400;
+}
+.adm-jump {
+  inline-size: min(480px, calc(100% - 32px));
+  margin-block-start: 12vh;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--adm-paper);
+  color: var(--adm-ink);
+  box-shadow: var(--adm-float);
+}
+.adm-jump::backdrop {
+  background: var(--adm-scrim);
+}
+.adm-jump > div {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+.adm-jump ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-block-size: 50vh;
+  overflow-y: auto;
+}
+.adm-jump li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  font-size: 15px;
+  cursor: pointer;
+}
+.adm-jump li[aria-selected='true'] {
+  background: var(--adm-selected);
+}
+.adm-jump p {
+  margin: 0;
+  padding: 8px 10px;
+}
 .adm-side-foot {
   margin-block-start: auto;
   display: flex;
@@ -170,12 +234,22 @@
 .adm-main.is-narrow > :not(.adm-modal) {
   max-inline-size: 880px;
 }
+/* The header stays in reach while the page scrolls; the Rule under it shows only once it is stuck. */
 .adm-head {
+  position: sticky;
+  inset-block-start: 0;
+  z-index: 20;
   display: flex;
   flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 16px;
+  padding-block: 12px;
+  margin-block: -12px;
+  background: var(--adm-paper);
+}
+.adm-head.is-stuck {
+  box-shadow: 0 1px 0 var(--adm-rule);
 }
 .adm-head h1 {
   margin: 0;
@@ -1262,14 +1336,6 @@ details.adm-editor-ask[open] > summary {
   font-size: 13px;
   font-weight: 500;
 }
-.adm-editor-kbd kbd {
-  padding: 1px 6px;
-  border: 1px solid var(--adm-rule);
-  border-radius: 4px;
-  background: var(--adm-tint);
-  font-family: var(--font-mono);
-  font-size: 12px;
-}
 .adm-editor-elapsed {
   color: var(--adm-muted);
   font-size: 14px;
@@ -1520,6 +1586,7 @@ details.adm-editor-ask[open] > summary {
   }
 }
 @media (pointer: coarse), (max-width: 640px) {
+  .adm-jump-btn kbd,
   .adm-editor-kbd {
     display: none;
   }

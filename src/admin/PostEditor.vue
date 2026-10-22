@@ -151,7 +151,7 @@ function setSubtitle(e: Event) {
 </script>
 
 <template>
-  <AdminShell :ctx="ctx" active="posts" :title="isNew ? 'New post' : 'Edit post'">
+  <AdminShell :ctx="ctx" active="posts" :title="isNew ? 'New post' : 'Edit post'" :dirty="doc.dirty">
     <template #actions>
       <button type="button" class="adm-btn" :aria-pressed="preview" @click="preview = !preview">
         {{ preview ? 'Edit' : 'Preview' }}
