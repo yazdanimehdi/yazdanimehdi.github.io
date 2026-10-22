@@ -1,4 +1,4 @@
-import type { Sql } from '../db';
+import type { Sql, Tx } from '../db';
 import type { Application, ApplyState } from './apply/types';
 import type {
   DraftState,
@@ -279,7 +279,7 @@ class Unclaimed extends Error {}
 export async function claimWithLock<T>(
   sql: Sql,
   lock: ApplyLock,
-  claim: (tx: Sql) => Promise<T | undefined>,
+  claim: (tx: Tx) => Promise<T | undefined>,
 ): Promise<T | 'busy' | null> {
   await sql`insert into career_settings (id) values (1) on conflict (id) do nothing`;
   try {

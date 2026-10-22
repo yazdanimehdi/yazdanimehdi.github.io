@@ -1,4 +1,4 @@
-import type { Sql } from '../db';
+import type { Sql, Tx } from '../db';
 import { j, type Row } from './db';
 import type {
   ChatMessage,
@@ -45,7 +45,7 @@ export async function savePassages(sql: Sql, paperId: number, passages: Passage[
 }
 
 /** savePassages inside the caller's transaction (postgres.js has no nested begin). */
-export async function replacePassages(tx: Sql, paperId: number, passages: Passage[]): Promise<void> {
+export async function replacePassages(tx: Tx, paperId: number, passages: Passage[]): Promise<void> {
   await tx`delete from reading_passages where paper_id = ${paperId}`;
   await tx`
     insert into reading_passages (paper_id, pid, seq, kind, body)
@@ -294,7 +294,7 @@ export async function listChat(sql: Sql, target: Target, last?: number): Promise
 }
 
 export async function addChat(
-  sql: Sql,
+  sql: Tx,
   target: Target,
   m: Pick<ChatMessage, 'role' | 'body' | 'cites'>,
 ): Promise<ChatMessage> {

@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import type { Sql } from '../db';
+import type { Sql, Tx } from '../db';
 import { migrate } from '../db-migrate';
 import { pgliteSql } from '../pglite-sql';
 import { PostgresStore, type PostgresDeps } from './postgres-store';
@@ -34,16 +34,19 @@ async function setup(deps: Partial<PostgresDeps> = {}, wrap: (sql: Sql) => Sql =
 /** Throws on the nth query whose text contains `needle`, inside or outside transactions. */
 function failingOn(needle: string, nth: number) {
   let n = 0;
-  const wrap = (inner: Sql): Sql => {
+  const queries = (inner: Tx): Tx => {
     const s = (async (strings: TemplateStringsArray, ...values: unknown[]) => {
       if (strings.join('?').includes(needle) && ++n === nth) throw new Error('boom');
       return inner(strings, ...values);
-    }) as Sql;
-    s.begin = (fn) => inner.begin((tx) => fn(wrap(tx)));
+    }) as Tx;
     s.unsafe = (q) => inner.unsafe(q);
     return s;
   };
-  return wrap;
+  return (inner: Sql): Sql => {
+    const s = queries(inner) as Sql;
+    s.begin = (fn) => inner.begin((tx) => fn(queries(tx)));
+    return s;
+  };
 }
 
 test('create → read → update → list → lastModified', async () => {

@@ -4,7 +4,7 @@ import { readConfig } from '../admin/content';
 import { getStore } from '../admin/get-store';
 import { HttpError } from '../admin/http';
 import { getBytes, getText, SourceError } from '../career/sources/http';
-import type { Sql } from '../db';
+import type { Sql, Tx } from '../db';
 import { getPapers, saveText, type Row } from './db';
 import { readText, replacePassages, savePassages } from './room-db';
 import { isScan, pdfLines, splitArxivHtml, splitPdfPages } from './text';
@@ -22,7 +22,7 @@ const READER = { name: 'ScholarOS reading', email: 'scholaros-reading@users.nore
 const hasParagraph = (passages: Passage[]) => passages.some((p) => p.kind === 'p');
 
 /** The text row's version (its fetched_at), null without a row. */
-async function version(sql: Sql, paperId: number): Promise<string | null> {
+async function version(sql: Tx, paperId: number): Promise<string | null> {
   const [r] = await sql<Row>`select fetched_at::text as at from reading_texts where paper_id = ${paperId}`;
   return (r?.at as string | undefined) ?? null;
 }

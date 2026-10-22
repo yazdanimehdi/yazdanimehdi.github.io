@@ -1,4 +1,4 @@
-import type { Sql } from '../db';
+import type { Sql, Tx } from '../db';
 import type { DigestItem, DigestSection, NewPaper, Paper, PaperState, ReadingRun, Signals, TextSource } from './types';
 
 // JSON goes in as `${text}::text::jsonb`: with a bare `::jsonb`, postgres.js sees a jsonb parameter and encodes the
@@ -227,7 +227,7 @@ export async function missingTexts(sql: Sql, ids: number[]): Promise<number[]> {
 
 /** Upserts the paper's text; omitted fields are stored as null. */
 export async function saveText(
-  sql: Sql,
+  sql: Tx,
   paperId: number,
   t: {
     source: TextSource;

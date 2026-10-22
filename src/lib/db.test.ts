@@ -74,7 +74,7 @@ test('isUnreachable: connection errors yes, query errors no', () => {
   assert.equal(isUnreachable('nope'), false);
 });
 
-test('pgliteSql: array params and nested begin behave like postgres.js', async () => {
+test('pgliteSql: array params, and a transaction handle without begin, as in postgres.js 3.4.9', async () => {
   const sql = pgliteSql();
   await migrate(sql);
   await sql`insert into documents (path, content) values ('a', '1'), ('b', '2'), ('c', '3')`;
@@ -85,6 +85,9 @@ test('pgliteSql: array params and nested begin behave like postgres.js', async (
     rows.map((r) => r.path),
     ['a', 'c'],
   );
-  await sql.begin((tx) => tx.begin((t2) => t2`delete from documents where path = ${'a'}`));
+  await sql.begin(async (tx) => {
+    assert.equal('begin' in tx, false);
+    await tx`delete from documents where path = ${'a'}`;
+  });
   assert.equal((await sql`select * from documents`).length, 2);
 });

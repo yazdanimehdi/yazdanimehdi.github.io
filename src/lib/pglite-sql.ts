@@ -1,14 +1,19 @@
 import { PGlite, type Transaction } from '@electric-sql/pglite';
-import type { Sql } from './db';
+import type { Sql, Tx } from './db';
 
 /** Tests: an in-process Postgres behind the postgres.js surface the app uses (see Sql). */
-export function pgliteSql(db: PGlite | Transaction = new PGlite()): Sql {
-  const sql = (async (strings: TemplateStringsArray, ...values: unknown[]) => {
+export function pgliteSql(db: PGlite = new PGlite()): Sql {
+  const sql = queries(db) as Sql;
+  sql.begin = (fn) => db.transaction((tx) => fn(queries(tx)));
+  return sql;
+}
+
+/** A transaction's handle, like postgres.js 3.4.9's: queries and unsafe, no begin. */
+function queries(db: PGlite | Transaction): Tx {
+  const q = (async (strings: TemplateStringsArray, ...values: unknown[]) => {
     const text = strings.reduce((out, s, i) => `${out}$${i}${s}`);
     return (await db.query(text, values)).rows;
-  }) as Sql;
-  // A nested begin (inside a transaction) just runs in the outer one, like a savepoint-free postgres.js tx.
-  sql.begin = (fn) => ('transaction' in db ? db.transaction((tx) => fn(pgliteSql(tx))) : fn(sql));
-  sql.unsafe = (query) => db.exec(query);
-  return sql;
+  }) as Tx;
+  q.unsafe = (query) => db.exec(query);
+  return q;
 }
