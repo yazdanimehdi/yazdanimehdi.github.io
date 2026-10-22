@@ -378,18 +378,57 @@ test('a run stuck for 15 minutes is shown as stopped', async () => {
 test('opening a paper whose text fetch failed fetches it again', async () => {
   const [id] = await add(arxivPaper(1));
   await saveText(sql, id, { source: 'arxiv-html', error: 'arXiv answered 503' });
-  await ok(await call(papers.GET, { params: { id: String(id) } }));
+  const open = { params: { id: String(id) }, query: '?open=1' };
+  await ok(await call(papers.GET, open));
   assert.deepEqual(starts, [{ papers: [id], outputId: null }]);
-  // While an output's run is going (and fetching the text itself), polling starts nothing more.
+  // While an output's run is going (and fetching the text itself), opening starts nothing more.
   await claimOutput(sql, { paper: id }, 'summary', null, 'claim');
-  await ok(await call(papers.GET, { params: { id: String(id) } }));
+  await ok(await call(papers.GET, open));
   assert.equal(starts.length, 1);
 
   const nb = await createNotebook(sql, 'N');
   await updateNotebook(sql, nb, { add: id });
   starts = [];
-  await ok(await call(notebook.GET, { params: { id: String(nb) } }));
+  await ok(await call(notebook.GET, { params: { id: String(nb) }, query: '?open=1' }));
   assert.deepEqual(starts, [{ papers: [id], outputId: null }], 'a notebook with a failed text fetches it again');
+});
+
+test('a text never fetched is fetched on open, Save and add, for any source', async () => {
+  const [doi, other] = await add(paper('doi:10.1/a'), paper('doi:10.1/b'));
+  const open = (handler: Handler, id: number) => call(handler, { params: { id: String(id) }, query: '?open=1' });
+  await ok(await open(papers.GET, doi));
+  assert.deepEqual(starts, [{ papers: [doi], outputId: null }], 'opening a paper with no text row');
+  starts = [];
+  await ok(await call(papers.GET, { params: { id: String(doi) } }));
+  assert.equal(starts.length, 0, 'a poll starts nothing');
+  await ok(await call(papers.PATCH, { params: { id: String(doi) }, body: { state: 'saved' } }));
+  assert.deepEqual(starts, [{ papers: [doi], outputId: null }], 'Save');
+
+  const nb = await createNotebook(sql, 'N');
+  starts = [];
+  await ok(await call(notebook.PATCH, { params: { id: String(nb) }, body: { add: other } }));
+  assert.deepEqual(starts, [{ papers: [other], outputId: null }], 'adding to a notebook');
+  starts = [];
+  await ok(await open(notebook.GET, nb));
+  assert.deepEqual(starts, [{ papers: [other], outputId: null }], 'opening a notebook with an unfetched paper');
+  starts = [];
+  await ok(await call(notebook.GET, { params: { id: String(nb) } }));
+  assert.equal(starts.length, 0, 'a notebook poll starts nothing');
+  await saveText(sql, other, { source: 'abstract', note: 'This paper is not on arXiv' });
+  await ok(await open(notebook.GET, nb));
+  assert.equal(starts.length, 0, 'nothing to fetch');
+
+  setPaperLookupForTests({
+    get: async (url) => {
+      if (url === 'https://api.crossref.org/works/10.52202/085713-0904')
+        return JSON.stringify({
+          message: JSON.parse(fs.readFileSync('tests/fixtures/papers/crossref-search.json', 'utf8')).message.items[0],
+        });
+      throw new SourceError('Not found', 404);
+    },
+  });
+  const { id } = await ok(await call(library.POST, { body: { ref: '10.52202/085713-0904' } }));
+  assert.deepEqual(starts, [{ papers: [id], outputId: null }], 'adding a DOI to the library');
 });
 
 test('an upload over 4 MB is refused', async () => {
@@ -464,7 +503,8 @@ test('a notebook refuses a 21st paper', async () => {
   assert.equal((await call(notebook.PATCH, { params, body: { add: '2609.14491' } })).status, 409);
   assert.equal((await call(notebook.PATCH, { params: { id: '999' }, body: { add: '2609.14491' } })).status, 404);
   assert.deepEqual(looked, [], 'a full or missing notebook looks nothing up');
-  assert.equal(starts.length, 0, 'papers without arXiv ids have nothing to fetch');
+  assert.equal(starts.length, 20, 'each added paper gets a text run (its abstract, when not on arXiv)');
+  starts = [];
 
   await ok(await call(notebook.PATCH, { params, body: { remove: ids[0], title: 'Folding' } }));
   assert.equal((await call(notebook.PATCH, { params, body: { add: 99999 } })).status, 404, 'no such paper');

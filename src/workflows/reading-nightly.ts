@@ -27,7 +27,7 @@ const NOTHING = { ranked: 0, unranked: 0, aiCalls: 0, talked: 0, inField: 0, tex
 /**
  * The night's paper digest: collect the new papers and keep the 60 closest to the keywords; score them ten at a time
  * up to the AI cap (a provider error stops ranking); collect the talked-about papers and keep those in the wider
- * area; save the day's digest, prefetch its arXiv full texts at arXiv's crawl delay, and email it.
+ * area; save the day's digest, prefetch its texts (arXiv's at its crawl delay), and email it.
  */
 export async function readingNightly(): Promise<ReadingRun> {
   'use workflow';

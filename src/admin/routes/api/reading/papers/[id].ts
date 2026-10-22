@@ -11,7 +11,10 @@ export const prerender = false;
 
 const STATES = new Set<string>(['new', 'saved', 'dismissed'] satisfies PaperState[]);
 
-/** The reading room's data for one paper. A text whose fetch failed is fetched again, unless an output's run is on it. */
+/**
+ * The reading room's data for one paper. On opening (`?open=1`, not a poll), a text never fetched or whose fetch
+ * failed is fetched, unless an output's run is on it.
+ */
 export const GET = careerRoute(async (ctx) => {
   const sql = getSql();
   const id = idParam(ctx.params.id);
@@ -27,7 +30,7 @@ export const GET = careerRoute(async (ctx) => {
     readReading(sql),
   ]);
   if (!paper) throw new HttpError(404, 'Not found');
-  if (t.error && !Object.values(outputs).some((o) => o.status === 'running'))
+  if (ctx.url.searchParams.has('open') && !Object.values(outputs).some((o) => o.status === 'running'))
     await fetchMissingTexts(sql, target, [id]);
   return json({
     paper,

@@ -194,21 +194,32 @@ export async function todayCount(sql: Sql, day: string): Promise<number> {
   return r.n;
 }
 
-/** Deletes untouched candidates: state 'new', found over 30 days ago, never in a digest. Returns how many. */
+/**
+ * Deletes untouched candidates: state 'new', found over 30 days ago, never in a digest, and nothing of the owner's
+ * on it in the reading room (a notebook, note, highlight, chat or output), which would go with it. Returns how many.
+ */
 export async function pruneCandidates(sql: Sql): Promise<number> {
   const rows = await sql`
     delete from reading_papers p
     where state = 'new' and found_at < now() - interval '30 days'
       and not exists (select 1 from reading_digest d where d.paper_id = p.id)
+      and not exists (select 1 from reading_notebook_papers n where n.paper_id = p.id)
+      and not exists (select 1 from reading_notes o where o.paper_id = p.id)
+      and not exists (select 1 from reading_highlights h where h.paper_id = p.id)
+      and not exists (select 1 from reading_chats c where c.paper_id = p.id)
+      and not exists (select 1 from reading_outputs r where r.paper_id = p.id)
     returning id`;
   return rows.length;
 }
 
-/** Of these papers, those with an arXiv id and no `reading_texts` row or a failed (retryable) fetch, in `ids` order. */
+/**
+ * Of these papers, those with no `reading_texts` row or a failed (retryable) fetch, in `ids` order. A paper not on
+ * arXiv is listed too: its run stores the abstract, without a fetch.
+ */
 export async function missingTexts(sql: Sql, ids: number[]): Promise<number[]> {
   const rows = await sql<Row>`
     select id from reading_papers p
-    where id = any(${ids}::bigint[]) and arxiv is not null
+    where id = any(${ids}::bigint[])
       and not exists (select 1 from reading_texts t where t.paper_id = p.id and t.error is null)
     order by array_position(${ids}::bigint[], id)`;
   return rows.map((r) => Number(r.id));

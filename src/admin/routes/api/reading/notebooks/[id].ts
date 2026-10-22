@@ -28,7 +28,10 @@ const Patch = z.strictObject({
   remove: Id.optional(),
 });
 
-/** The reading room's data for a notebook. A paper whose text fetch failed is fetched again, unless an output's run is on it. */
+/**
+ * The reading room's data for a notebook. On opening (`?open=1`, not a poll), papers whose text was never fetched or
+ * whose fetch failed are fetched, unless an output's run is on them.
+ */
 export const GET = careerRoute(async (ctx) => {
   const sql = getSql();
   const id = idParam(ctx.params.id);
@@ -53,7 +56,7 @@ export const GET = careerRoute(async (ctx) => {
     passages[p] = [];
   });
   for (const { paperId, ...p } of passageList) passages[paperId].push(p);
-  if (textList.some((t) => t.error) && !Object.values(outputs).some((o) => o.status === 'running'))
+  if (ctx.url.searchParams.has('open') && !Object.values(outputs).some((o) => o.status === 'running'))
     await fetchMissingTexts(sql, target, ids);
   return json({
     notebook: { id: notebook.id, title: notebook.title },

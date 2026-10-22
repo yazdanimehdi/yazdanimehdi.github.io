@@ -255,7 +255,7 @@ test('saveDigestStep fills talked, field and not-ranked sections with their line
     pool: [t1, f1, u1, f2, f3, u2, u3],
     stopped: true,
   });
-  assert.deepEqual(out, { talked: 2, inField: 2, unranked: 3, prefetch: [t1] });
+  assert.deepEqual(out, { talked: 2, inField: 2, unranked: 3, prefetch: [t2, t1, f2, f3, u1, u2] });
   const [today] = await listDigests(sql, { days: 1 });
   assert.equal(today.day, '2026-10-22');
   assert.deepEqual(
@@ -278,7 +278,7 @@ test('saveDigestStep leaves the field section short rather than below minScore',
   await setScore(sql, a, { score: 59, reason: 'Close.', related: null });
   await setScore(sql, b, { score: 60, reason: 'Enough.', related: null });
   const out = await saveDigestStep({ day: '2026-10-22', talked: [], pool: [a, b], stopped: false });
-  assert.deepEqual(out, { talked: 0, inField: 1, unranked: 0, prefetch: [] });
+  assert.deepEqual(out, { talked: 0, inField: 1, unranked: 0, prefetch: [b] });
   const [today] = await listDigests(sql, { days: 1 });
   assert.deepEqual(
     today.items.map((i) => [i.section, i.paper.id]),

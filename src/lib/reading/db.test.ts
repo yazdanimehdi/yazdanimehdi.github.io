@@ -15,6 +15,7 @@ import {
   todayCount,
   upsertPapers,
 } from './db';
+import { addChat, addHighlight, claimOutput, createNotebook, saveNote, updateNotebook } from './room-db';
 import type { NewPaper } from './types';
 
 let sql: Sql;
@@ -130,7 +131,29 @@ test('pruneCandidates keeps saved and digested papers', async () => {
   );
 });
 
-test('missingTexts returns papers whose fetch failed', async () => {
+test('pruneCandidates keeps an unsaved paper the owner has read in the room', async () => {
+  const [untouched, inNotebook, noted, highlighted, chatted, summarized] = await ids(
+    paper('untouched'),
+    paper('in-notebook'),
+    paper('noted'),
+    paper('highlighted'),
+    paper('chatted'),
+    paper('summarized'),
+  );
+  await sql`update reading_papers set found_at = now() - interval '31 days'`;
+  await updateNotebook(sql, await createNotebook(sql, 'N'), { add: inNotebook });
+  await saveNote(sql, { paper: noted }, 'mine');
+  await addHighlight(sql, { paperId: highlighted, pid: 'abs.1', start: 0, end: 4, quote: 'This', comment: '' });
+  await addChat(sql, { paper: chatted }, { role: 'user', body: 'Why?', cites: [] });
+  await claimOutput(sql, { paper: summarized }, 'summary', null, 'claim');
+  assert.equal(await pruneCandidates(sql), 1);
+  assert.deepEqual(
+    (await getPapers(sql, [untouched, inNotebook, noted, highlighted, chatted, summarized])).map((p) => p.key),
+    ['in-notebook', 'noted', 'highlighted', 'chatted', 'summarized'],
+  );
+});
+
+test('missingTexts returns papers never fetched or whose fetch failed, from any source', async () => {
   const [fetched, abstractOnly, failed, without, doiOnly] = await ids(
     paper('arxiv:1', { arxiv: '1' }),
     paper('arxiv:2', { arxiv: '2' }),
@@ -141,5 +164,9 @@ test('missingTexts returns papers whose fetch failed', async () => {
   await saveText(sql, fetched, { source: 'arxiv-html', body: '<p>x</p>' });
   await saveText(sql, abstractOnly, { source: 'abstract', note: 'arXiv has no HTML or PDF for this paper' });
   await saveText(sql, failed, { source: 'arxiv-html', error: 'HTTP 503' });
-  assert.deepEqual(await missingTexts(sql, [fetched, abstractOnly, failed, without, doiOnly]), [failed, without]);
+  assert.deepEqual(await missingTexts(sql, [fetched, abstractOnly, failed, without, doiOnly]), [
+    failed,
+    without,
+    doiOnly,
+  ]);
 });

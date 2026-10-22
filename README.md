@@ -927,7 +927,7 @@ A private paper digest and reading room inside the admin. Each night it collects
 
 **The nightly run.** The daily cron (03:00 UTC) starts it once a source other than Bluesky is on; **Run now** starts it any time, and a run that is still going is not started twice. It is a [Vercel Workflow](https://vercel.com/docs/workflows), like the job search.
 
-1. **Collect.** Each new-today source's papers are fetched; the 60 with the most keyword overlap are stored, and papers shown on an earlier day, saved or dismissed are left out. The 60 closest to your keywords across all sources form the night's pool. Papers never shown are deleted after 30 days.
+1. **Collect.** Each new-today source's papers are fetched; the 60 with the most keyword overlap are stored, and papers shown on an earlier day, saved or dismissed are left out. The 60 closest to your keywords across all sources form the night's pool. Papers never shown are deleted after 30 days, unless they are in a notebook or have a note, highlight, chat or summary in the reading room.
 2. **Rank in-field papers.** The AI scores the pool ten papers per call against your field, keywords, research areas and up to 40 of your publications: a 0–100 score, a one-line reason and, when one fits, the paper of yours it is close to. Papers already scored cost no new call, so a second run the same day is cheap. **New in your field** keeps the best **8** (`inField`) at or above the minimum score (**60**). A short list is not padded; one sentence says why.
 3. **Collect talked-about papers.** Candidates from the traction sources that were not shown before are ranked by their numbers; one AI call drops those outside your wider area (it can only drop, and with no wider area set there is no call). Bluesky counts are added. The list keeps the best **5** (`talked`), ranked by each paper's best share of the night's highest number per source (Hugging Face upvotes, OpenAlex citations, alphaXiv visits) plus half its share of the highest Bluesky count. A paper shown as talked-about comes back only once one of its numbers has at least doubled.
 4. **Fetch text ahead.** The full text of each digest paper is fetched for the reading room (see [Text sources](#reading-room-text)), 15 seconds apart.
@@ -956,7 +956,7 @@ A private paper digest and reading room inside the admin. Each night it collects
 - **Chat.** Questions about the paper or notebook, answered in the request with the paper's text, your profile and the last 12 turns. History is kept per paper and per notebook; **Save to notes** keeps an answer under Notes.
 - **Notes.** One free note per paper or notebook, your highlights (select text within one paragraph, then **Highlight** or **Comment**) and your saved answers. Project 3's vault will turn them into linked Markdown notes.
 
-<a id="reading-room-text"></a>**Text sources.** A paper's text is fetched the first time you open or save it (or overnight, for a digest paper), in this order:
+<a id="reading-room-text"></a>**Text sources.** A paper's text is fetched the first time you open, save or add it (or overnight, for a digest paper), in this order:
 
 1. **arXiv HTML.** Sections and paragraphs keep arXiv's own ids. Up to 10 MB.
 2. **arXiv PDF**, when there is no HTML. Its text is extracted in code and split into paragraphs per page; equations and tables may read oddly, and the page says so. Up to 30 MB, 60 seconds.

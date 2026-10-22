@@ -306,9 +306,11 @@ Project 2 shipped as planned in `docs/superpowers/plans/2026-10-22-reading-room.
   unchanged since it began, under the paper's row lock, so it never replaces an owner's upload. The site-wide arXiv
   slot is one statement on `reading_settings.arxiv_at`; checked live on the local Postgres, the fetches went out
   15.0 s apart.
-- **When text is fetched:** on Save, on adding a paper to a notebook, and on opening a paper or notebook whose text was
-  never fetched or has a retryable error, even when a summary already exists (the "tried again on the next open"
-  promise). Adding an unknown paper id to a notebook answers 404.
+- **When text is fetched:** on Save, on adding a paper to the library or a notebook, and on opening a paper or notebook
+  whose text was never fetched or has a retryable error, even when a summary already exists (the "tried again on the
+  next open" promise), from any source: a paper not on arXiv gets its abstract, without a fetch. Only the page's first
+  load counts as opening (`?open=1`), so its polls start nothing, and no text run starts while an output's run is
+  going. Adding an unknown paper id to a notebook answers 404.
 - **Grounding:** the whole text when the papers fit in 300,000 characters of passages (about 75k tokens, inside every
   configured provider's context). Past that, chat searches the question's words (3 or more letters or digits, at most
   30) or-ed in Postgres full-text search, sanitized so any question is a valid query, and takes the abstracts first,

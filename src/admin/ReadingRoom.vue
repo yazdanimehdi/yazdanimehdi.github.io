@@ -54,15 +54,16 @@ let savedNote = ''; // the note as last loaded or saved
 let timer: ReturnType<typeof setInterval> | undefined;
 
 async function load(first = false) {
+  const open = first ? '?open=1' : ''; // opening fetches a text never fetched or failed; a poll doesn't
   try {
     let r: Room;
     let n: string;
     if (isNb) {
-      const res = await api<NotebookRes>(`reading/notebooks/${target.notebook}`);
+      const res = await api<NotebookRes>(`reading/notebooks/${target.notebook}${open}`);
       r = { ...res, title: res.notebook.title, inNotebooks: [] };
       n = res.note;
     } else {
-      const res = await api<PaperRes>(`reading/papers/${target.paper}`);
+      const res = await api<PaperRes>(`reading/papers/${target.paper}${open}`);
       r = {
         ...res,
         title: res.paper.title,
@@ -83,8 +84,8 @@ async function load(first = false) {
     return;
   }
   // Poll while something is on its way: a run writing an output, or a text being fetched for the first time (for
-  // PENDING_POLLS at most: a text-only run that died leaves it never fetched). A text with an error isn't polled: each
-  // room GET would start another fetch.
+  // PENDING_POLLS at most: a text-only run that died leaves it never fetched). A text with an error isn't polled: only
+  // reopening fetches it again.
   const running = Object.values(room.value!.outputs).some((o) => o.status === 'running');
   const waiting = room.value!.papers.some(pending) && pendingPolls++ < PENDING_POLLS;
   if (running || waiting) timer ??= setInterval(load, 3000);

@@ -46,12 +46,13 @@ function focusSave(id: number | null) {
 /** Unsaving removes the row, and focus moves to the next row's button; Undo saves it again in its place. */
 async function unsave(item: LibraryItem) {
   const list = papers.value!;
-  const at = list.indexOf(item);
   try {
     await api(`reading/papers/${item.paper.id}`, { method: 'PATCH', body: { state: 'new' } });
   } catch (e) {
     return report(e);
   }
+  const at = list.indexOf(item); // after the await: a double click's first unsave may have removed it already
+  if (at < 0) return;
   list.splice(at, 1);
   focusSave((list[at] ?? list[at - 1])?.paper.id ?? null);
   toast('Removed from the library', undefined, {

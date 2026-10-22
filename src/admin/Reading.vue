@@ -105,14 +105,16 @@ function focusIn(key: string | null, selector: string) {
  */
 async function dismiss(d: Day, i: DigestItem) {
   const was = i.paper.state;
-  const at = days.value.map((x) => x.items.findIndex((y) => y.paper.id === i.paper.id));
-  const list = d.items;
-  const next = list[list.indexOf(i) + 1] ?? list[list.indexOf(i) - 1];
   try {
     await setState(i.paper.id, 'dismissed');
   } catch (e) {
     return report(e);
   }
+  // After the await: a double click's first dismiss may have removed it already.
+  const at = days.value.map((x) => x.items.findIndex((y) => y.paper.id === i.paper.id));
+  if (at.every((n) => n < 0)) return;
+  const k = d.items.findIndex((y) => y.paper.id === i.paper.id);
+  const next = k < 0 ? undefined : (d.items[k + 1] ?? d.items[k - 1]);
   const removed = days.value.map((x, n) => (at[n] < 0 ? null : x.items.splice(at[n], 1)[0]));
   focusIn(next ? rowKey(d, next) : null, '.adm-reading-dismiss');
   toast('Dismissed', undefined, {
