@@ -1,5 +1,5 @@
 import type { Sql } from '../db';
-import type { Application } from './apply/types';
+import type { Application, ApplyState } from './apply/types';
 import type {
   DraftState,
   Feed,
@@ -224,6 +224,38 @@ export async function approvedPostings(sql: Sql): Promise<number[]> {
 }
 
 /**
+ * Replaces the application only if it is still in state `from` (and, given `at`, from that very pre-fill): the one
+ * guard every apply transition goes through, so two actors can't both move it. `status` moves the posting too. Returns
+ * the posting's status before the move, or null when the application had already moved on.
+ */
+export async function moveApplication(
+  sql: Sql,
+  id: number,
+  from: { state: ApplyState | null; at?: string },
+  app: Application,
+  status?: PostingStatus,
+): Promise<PostingStatus | null> {
+  const [r] = await sql<{ old: PostingStatus }>`
+    update career_postings p set application = ${JSON.stringify(app)}::text::jsonb,
+      status = coalesce(${status ?? null}::text, p.status)
+    from (select id, status as old from career_postings where id = ${id}) o
+    where p.id = o.id and p.application->>'state' is not distinct from ${from.state}
+      and (${from.at ?? null}::text is null or p.application->>'at' = ${from.at ?? null})
+    returning o.old`;
+  return r?.old ?? null;
+}
+
+/** Whether another posting's pre-fill or submission started in the last 15 minutes: one apply sandbox at a time. */
+export async function applyBusy(sql: Sql, exceptId: number | null = null): Promise<boolean> {
+  const [r] = await sql`
+    select 1 from career_postings
+    where id is distinct from ${exceptId}::int and application->>'state' in ('prefilling', 'submitting')
+      and (application->>'at')::timestamptz > now() - interval '15 minutes'
+    limit 1`;
+  return !!r;
+}
+
+/**
  * Applications to `company` (case-insensitive, trimmed) that count against the per-company limit: drafted or further
  * along, and found or moved to a status on or after `sinceIso`.
  */
@@ -251,34 +283,49 @@ export async function listEvents(
   return rows.map((r) => ({ at: iso(r.at)!, kind: r.kind as string, detail: r.detail as string | null }));
 }
 
-export async function readCareer(
-  sql: Sql,
-): Promise<{ prefs: unknown; answers: unknown; lastRun: RunSummary | null; runId: string | null }> {
-  const [r] = await sql<Row>`select prefs, answers, last_run, run_id from career_settings where id = 1`;
+export async function readCareer(sql: Sql): Promise<{
+  prefs: unknown;
+  answers: unknown;
+  lastRun: RunSummary | null;
+  runId: string | null;
+  applyQueueRunId: string | null;
+}> {
+  const [r] =
+    await sql<Row>`select prefs, answers, last_run, run_id, apply_queue_run_id from career_settings where id = 1`;
   return {
     prefs: r?.prefs ?? {},
     answers: r?.answers ?? {},
     lastRun: (r?.last_run as RunSummary | null) ?? null,
     runId: (r?.run_id as string | null) ?? null,
+    applyQueueRunId: (r?.apply_queue_run_id as string | null) ?? null,
   };
 }
 
 /** Upserts the single settings row; only the given fields change. */
 export async function writeCareer(
   sql: Sql,
-  patch: Partial<{ prefs: unknown; answers: unknown; lastRun: RunSummary; runId: string | null }>,
+  patch: Partial<{
+    prefs: unknown;
+    answers: unknown;
+    lastRun: RunSummary;
+    runId: string | null;
+    applyQueueRunId: string | null;
+  }>,
   by: string,
 ): Promise<void> {
   const has = (k: keyof typeof patch) => k in patch;
   const j = (v: unknown) => JSON.stringify(v);
   await sql`
-    insert into career_settings (id, prefs, answers, last_run, run_id, updated_by)
+    insert into career_settings (id, prefs, answers, last_run, run_id, apply_queue_run_id, updated_by)
     values (1, ${j(patch.prefs ?? {})}::text::jsonb, ${j(patch.answers ?? {})}::text::jsonb,
-      ${patch.lastRun ? j(patch.lastRun) : null}::text::jsonb, ${patch.runId ?? null}, ${by})
+      ${patch.lastRun ? j(patch.lastRun) : null}::text::jsonb, ${patch.runId ?? null},
+      ${patch.applyQueueRunId ?? null}, ${by})
     on conflict (id) do update set
       prefs = case when ${has('prefs')} then excluded.prefs else career_settings.prefs end,
       answers = case when ${has('answers')} then excluded.answers else career_settings.answers end,
       last_run = case when ${has('lastRun')} then excluded.last_run else career_settings.last_run end,
       run_id = case when ${has('runId')} then excluded.run_id else career_settings.run_id end,
+      apply_queue_run_id = case when ${has('applyQueueRunId')} then excluded.apply_queue_run_id
+        else career_settings.apply_queue_run_id end,
       updated_at = now(), updated_by = ${by}`;
 }

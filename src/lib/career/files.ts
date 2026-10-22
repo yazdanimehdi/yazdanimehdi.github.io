@@ -7,13 +7,13 @@ import { updatePosting } from './db';
 
 /** What putCareerPdf calls outside the database; tests pass fakes. */
 export interface BlobDeps {
-  put(pathname: string, body: Buffer): Promise<{ url: string }>;
+  put(pathname: string, body: Buffer, contentType?: string): Promise<{ url: string }>;
   del(url: string): Promise<void>;
 }
 
 const blobDeps: BlobDeps = {
-  put: (pathname, body) =>
-    put(pathname, body, { access: 'public', addRandomSuffix: true, contentType: 'application/pdf' }),
+  put: (pathname, body, contentType = 'application/pdf') =>
+    put(pathname, body, { access: 'public', addRandomSuffix: true, contentType }),
   // `astro dev` shares the live Blob store, and the dev branch can hold live URLs: never delete from it locally.
   del: async (url) => {
     // eslint-disable-next-line no-console
@@ -25,7 +25,7 @@ const blobDeps: BlobDeps = {
 /** A local check without Blob: CAREER_PDF_DIR writes the PDFs to that folder instead (never in production). */
 const folderDeps = (dir: string): BlobDeps => ({
   put: async (pathname, body) => {
-    const file = path.join(dir, `${pathname.replace(/\W+/g, '-')}-${Date.now()}.pdf`);
+    const file = path.join(dir, `${pathname.replace(/\W+/g, '-')}-${Date.now()}${path.extname(pathname) || '.pdf'}`);
     await mkdir(dir, { recursive: true });
     await writeFile(file, body);
     return { url: pathToFileURL(file).href };
@@ -64,6 +64,14 @@ export async function putCareerPdf(postingId: number, bytes: Uint8Array): Promis
     await d.del(old.cv_pdf_url).catch((e) => console.error('[career] deleting the old PDF', e));
   }
   return url;
+}
+
+/**
+ * Stores one of a posting's application files (a screenshot, the letter PDF) at `career/<id>/<name>` and returns its
+ * URL. ponytail: files of an earlier pre-fill stay in Blob; delete them on re-fill if storage ever matters.
+ */
+export async function putCareerFile(postingId: number, name: string, bytes: Uint8Array, type: string): Promise<string> {
+  return (await deps().put(`career/${postingId}/${name}`, Buffer.from(bytes), type)).url;
 }
 
 /**

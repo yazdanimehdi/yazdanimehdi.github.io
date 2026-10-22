@@ -125,16 +125,30 @@ test('events list newest first and cascade with their posting', async () => {
 });
 
 test('readCareer on a fresh database returns empty prefs and no run', async () => {
-  assert.deepEqual(await readCareer(sql), { prefs: {}, answers: {}, lastRun: null, runId: null });
+  assert.deepEqual(await readCareer(sql), {
+    prefs: {},
+    answers: {},
+    lastRun: null,
+    runId: null,
+    applyQueueRunId: null,
+  });
 });
 
 test('writeCareer changes only the given fields', async () => {
   await writeCareer(sql, { prefs: { a: 1 } }, 'jane');
   await writeCareer(sql, { runId: 'r1' }, 'jane');
   await writeCareer(sql, { answers: { x: 'y' } }, 'jane');
-  assert.deepEqual(await readCareer(sql), { prefs: { a: 1 }, answers: { x: 'y' }, lastRun: null, runId: 'r1' });
+  await writeCareer(sql, { applyQueueRunId: 'q1' }, 'jane');
+  assert.deepEqual(await readCareer(sql), {
+    prefs: { a: 1 },
+    answers: { x: 'y' },
+    lastRun: null,
+    runId: 'r1',
+    applyQueueRunId: 'q1',
+  });
   await writeCareer(sql, { runId: null }, 'jane');
   assert.equal((await readCareer(sql)).runId, null);
+  assert.equal((await readCareer(sql)).applyQueueRunId, 'q1');
 });
 
 const application = (over: Partial<Application> = {}): Application => ({

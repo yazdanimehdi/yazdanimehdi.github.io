@@ -96,6 +96,8 @@ export type EditorStatus =
 
 export interface NetworkPolicy {
   allow: Record<string, { transform: { headers: Record<string, string> }[] }[]>;
+  /** CIDRs; a deny wins over any allowed domain. */
+  subnets?: { deny?: string[] };
 }
 
 export interface CommandResult {

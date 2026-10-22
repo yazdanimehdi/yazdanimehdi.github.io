@@ -16,7 +16,7 @@ import {
 import type { DraftPart, ReviewIssue } from '../lib/career/tailor';
 
 /** A step's own message: past its retries the SDK wraps the original error as `cause` (no classes cross over). */
-function reasonOf(e: unknown): string {
+export function reasonOf(e: unknown): string {
   const err = e as { message?: unknown; cause?: { message?: unknown } } | null;
   return String(err?.cause?.message ?? err?.message ?? 'unexpected error');
 }
@@ -68,7 +68,7 @@ export async function careerDraft(id: number, part: DraftPart, instruction: stri
 /** A draft run older than this that still says pending or running is stuck (a draft takes minutes). */
 const STALE_MS = 60 * 60 * 1000;
 /** Set while `start()` is in flight, so a second click sees a draft starting, not a finished run. */
-const CLAIM = 'starting:';
+export const CLAIM = 'starting:';
 
 /** The slice of the Workflow API startDraftRun uses; tests pass their own. */
 export interface DraftRuns {
@@ -83,10 +83,18 @@ export function setDraftRunsForTests(runs: DraftRuns | null): void {
   testRuns = runs;
 }
 
-/** Whether a posting's `draft_run_id` (read from its row, never from a request) is no longer drafting. */
-async function finished(runId: string | null, runs: DraftRuns, now: number): Promise<boolean> {
+/**
+ * Whether a run id read from a row (never from a request) no longer runs: unknown, ended, or older than `staleMs` (a
+ * stale run is cancelled). A `starting:<ms>` claim counts as running until it is that old.
+ */
+export async function finished(
+  runId: string | null,
+  runs: Pick<DraftRuns, 'get'>,
+  now: number,
+  staleMs = STALE_MS,
+): Promise<boolean> {
   if (!runId) return true;
-  if (runId.startsWith(CLAIM)) return now - Number(runId.slice(CLAIM.length)) > STALE_MS;
+  if (runId.startsWith(CLAIM)) return now - Number(runId.slice(CLAIM.length)) > staleMs;
   const run = runs.get(runId);
   let status: string;
   try {
@@ -96,13 +104,13 @@ async function finished(runId: string | null, runs: DraftRuns, now: number): Pro
     return WorkflowRunNotFoundError.is(e);
   }
   if (status !== 'running' && status !== 'pending') return true;
-  if (now - (await run.createdAt.catch(() => new Date(0))).getTime() < STALE_MS) return false;
+  if (now - (await run.createdAt.catch(() => new Date(0))).getTime() < staleMs) return false;
   try {
     await run.cancel();
     return true;
   } catch (e) {
     // eslint-disable-next-line no-console
-    console.error('[career] cancelling a stale draft', e);
+    console.error('[career] cancelling a stale run', e);
     return false;
   }
 }
