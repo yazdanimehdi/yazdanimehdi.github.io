@@ -29,10 +29,9 @@ const BY_LABEL: [RegExp, string][] = [
   [/^(?:your )?(?:phone|mobile|telephone)(?: number)?$/, 'phone'],
   [/^(?:current )?location$/, 'location'],
 ];
-const FILES: [RegExp, string][] = [
-  [/cover letter/, 'cover_letter'],
-  [/resume|résumé|\bcv\b|curriculum/, 'resume'],
-];
+// The one place a file field's upload is chosen: the runner uploads exactly the file its value names.
+const COVER_LETTER = /cover letter/;
+const CV_FILE = /resume|résumé|\bcv\b|curriculum/;
 
 const TYPE: Record<ApplyField['kind'], string> = {
   text: 'input_text',
@@ -48,12 +47,15 @@ const TYPE: Record<ApplyField['kind'], string> = {
   file: 'input_file',
 };
 
-function question(f: ApplyField): GhQuestion {
-  const label = f.label
+const plain = (label: string) =>
+  label
     .replace(/\(required\)|[*:]/gi, '')
     .trim()
     .toLowerCase();
-  const field = (f.kind === 'file' ? FILES : BY_LABEL).find(([re]) => re.test(label))?.[1] ?? '';
+
+function question(f: ApplyField): GhQuestion {
+  const label = plain(f.label);
+  const field = BY_LABEL.find(([re]) => re.test(label))?.[1] ?? '';
   const options = f.options ?? [];
   return {
     label: f.label,
@@ -82,17 +84,29 @@ const handoff = (f: ApplyField, note: string) => withAnswer(f, { value: '', sour
 /** Left for the AI by `knownValues`: an empty value whose source is still to come. */
 const pending = (f: ApplyField) => f.source === 'ai' && !f.value;
 
+/** A file field's value names its upload: `cv`, `letter` (when there is one), or '' and a hand-off. */
+function upload(f: ApplyField, hasLetter: boolean): ApplyField {
+  const label = plain(f.label);
+  const file = (value: string) => withAnswer(f, { value, source: 'file', note: 'uploaded with the application' });
+  if (COVER_LETTER.test(label)) return hasLetter ? file('letter') : handoff(f, 'there is no cover letter to upload');
+  if (CV_FILE.test(label)) return file('cv');
+  return handoff(f, 'only your CV and cover letter are uploaded');
+}
+
 /**
- * Fills what the CV and Application answers know (EEO per `answers.eeo.mode`), marks the CV and cover-letter uploads
- * source 'file', and leaves the rest value '' with source 'ai' for `valuesPrompt`. A fact the data should hold but
+ * Fills what the CV and Application answers know (EEO per `answers.eeo.mode`), names the upload of each file field
+ * (`upload`), and leaves the rest value '' with source 'ai' for `valuesPrompt`. A fact the data should hold but
  * doesn't is a hand-off, never sent to the AI.
  */
-export function knownValues(fields: ApplyField[], cv: CvConfig, answers: ApplicationAnswers): ApplyField[] {
+export function knownValues(
+  fields: ApplyField[],
+  cv: CvConfig,
+  answers: ApplicationAnswers,
+  hasLetter = true,
+): ApplyField[] {
   return fields.map((f) => {
-    const k = knownAnswer(question(f), cv, answers);
-    if (k) return withAnswer(f, k);
-    if (f.kind === 'file') return handoff(f, 'only your CV and cover letter are uploaded');
-    return withAnswer(f, { value: '', source: 'ai' });
+    if (f.kind === 'file') return upload(f, hasLetter);
+    return withAnswer(f, knownAnswer(question(f), cv, answers) ?? { value: '', source: 'ai' });
   });
 }
 

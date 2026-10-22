@@ -101,7 +101,7 @@ export async function prefillStep(id: number): Promise<Application | null> {
   const store = careerStore();
   const [cv, career] = await Promise.all([baseCv(store), readCareer(sql)]);
   const answers = parseAnswers(career.answers);
-  let fields = knownValues(read.fields, cv, answers);
+  let fields = knownValues(read.fields, cv, answers, !!p.letter?.trim());
   if (fields.some(pending)) {
     const prompt = valuesPrompt(fields, p, cv, answers, p.letter ?? '');
     fields = parseValues(await generateText(store, await readAiConfig(store), prompt), fields);

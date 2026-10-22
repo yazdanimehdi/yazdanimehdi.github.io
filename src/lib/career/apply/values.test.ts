@@ -56,8 +56,14 @@ test('knownValues fills name, email and phone from the CV', () => {
       ['+1 555 0100', 'cv'],
     ],
   );
-  assert.equal(byId(out, 'resume').source, 'file');
-  assert.equal(byId(out, 'cover_letter').source, 'file');
+  assert.deepEqual(
+    ['resume', 'cover_letter'].map((id) => [byId(out, id).value, byId(out, id).source]),
+    [
+      ['cv', 'file'],
+      ['letter', 'file'],
+    ],
+    'a file field names the upload the runner puts in it',
+  );
   const full = knownValues([field('name', 'Full name', 'text')], CV, parseAnswers({}));
   assert.equal(full[0].value, 'Jane Q Doe');
   const left = byId(out, 'why');
@@ -80,9 +86,14 @@ test('EEO fields decline when eeo.mode is decline', () => {
   assert.equal(byId(answered, 'gender').value, 'Female');
 });
 
-test('a file field other than the CV or cover letter is a hand-off', () => {
+test('a file field other than the CV or cover letter is a hand-off with nothing to upload', () => {
   const [f] = knownValues([field('transcript', 'Transcript', 'file')], CV, parseAnswers({}));
-  assert.equal(f.source, 'handoff');
+  assert.deepEqual([f.value, f.source], ['', 'handoff']);
+});
+
+test('a cover-letter field is a hand-off when there is no letter', () => {
+  const [f] = knownValues([field('cover_letter', 'Cover Letter', 'file')], CV, parseAnswers({}), false);
+  assert.deepEqual([f.value, f.source], ['', 'handoff']);
 });
 
 test('valuesPrompt lists only the empty fields, fenced, with the cover letter', () => {
