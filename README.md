@@ -902,6 +902,51 @@ Do this once, as the owner, after a preview deploys:
 4. Find the run in the Vercel Workflow dashboard.
 5. Clean up with `delete from career_postings; update career_settings set last_run = null, run_id = null;` in the Neon SQL editor, delete the `career/` files in the Vercel Blob browser (the test run's tailored PDFs, which are public URLs), then clear the test preferences.
 
+### Reading (Postgres mode)
+
+A private paper digest inside the admin. Each night it collects the day's new papers from the sources you turn on, ranks them against your field, adds the papers people in your wider area are talking about, and saves the result under **Reading → Today**. Nothing in it reaches the public site.
+
+**Owner only, Postgres mode only.** The same rule as the [job search](#job-search-postgres-mode): only the owner sees the screens and the data, anyone else gets a 404, and in static and git mode every Reading screen and route answers 404 and the sidebar's Reading group is hidden.
+
+**Who the digest is for.** Under **Reading → Settings → Profile**, describe your **Field** in a few sentences, list **Keywords**, and name your **Wider area** one level up ("machine learning", "neuroscience"). The field and keywords drive the in-field list; the wider area drives the talked-about one. **Suggest from my profile** makes one AI call that reads your CV, research areas and up to 40 of your publications and fills in the field, keywords, wider area and each source it can (arXiv, bioRxiv and medRxiv categories, a PubMed query, OpenAlex topics), turning on each source it fills. It turns Hugging Face on only when the area is machine learning or AI. Nothing is saved until you press Save.
+
+**Sources.** Turn them on under **Reading → Settings → Sources**. "New today" sources feed the in-field list; traction sources feed the talked-about list.
+
+| Source                       | Kind      | Key                           | On by default | Notes                                                                                                                                                                                        |
+| ---------------------------- | --------- | ----------------------------- | ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| arXiv (`arxiv`)              | new today | none                          | no            | The RSS feed of your categories (`cs.CL`, `q-bio.NC`…), new and cross-listed papers only. arXiv is called at most once every 3 seconds across the site                                       |
+| bioRxiv (`biorxiv`)          | new today | none                          | no            | The last two days in your categories, 30 a page, at most 10 pages a category; a paper posted in several versions is kept once. Categories are lowercase with `_` for spaces (`cell_biology`) |
+| medRxiv (`medrxiv`)          | new today | none                          | no            | As bioRxiv. medRxiv's "HIV/AIDS" is `hiv_aids`: a slash makes the API ignore the category and return every paper                                                                             |
+| PubMed (`pubmed`)            | new today | none                          | no            | Your query over the last two days by entry date, up to 200 papers. NCBI calls are 340 ms apart                                                                                               |
+| OpenAlex (`openalex`)        | traction  | `OPENALEX_API_KEY` (optional) | no            | The most cited works of the last 60 days in the fields and subfields you pick by name (50 per level)                                                                                         |
+| Hugging Face (`huggingface`) | traction  | none                          | no            | The Daily Papers trending list (50). Machine learning only                                                                                                                                   |
+| Bluesky (`bluesky`)          | mentions  | none                          | yes           | For the talked-about papers only: posts in the last 60 days linking the paper's arXiv page, else naming its DOI. Counts stop at 100 ("100+ Bluesky posts"). On its own it starts no digest   |
+| alphaXiv (`alphaxiv`)        | traction  | none                          | no            | Unofficial: no public API, it can break without notice. Visits over the last 7 days                                                                                                          |
+
+**OpenAlex key.** Without `OPENALEX_API_KEY`, OpenAlex shares a small daily budget (about $0.10) with everyone calling from the same IP address, which on Vercel can run out before your run. A free key (verified email) gives $1 a day. Save it under **Integrations → Keys**; Settings says when it is missing. Without it, requests carry a `mailto` instead.
+
+**The nightly run.** The daily cron (03:00 UTC) starts it once a source other than Bluesky is on; **Run now** starts it any time, and a run that is still going is not started twice. It is a [Vercel Workflow](https://vercel.com/docs/workflows), like the job search.
+
+1. **Collect.** Each new-today source's papers are fetched; the 60 with the most keyword overlap are stored, and papers shown on an earlier day, saved or dismissed are left out. The 60 closest to your keywords across all sources form the night's pool. Papers never shown are deleted after 30 days.
+2. **Rank in-field papers.** The AI scores the pool ten papers per call against your field, keywords, research areas and up to 40 of your publications: a 0–100 score, a one-line reason and, when one fits, the paper of yours it is close to. Papers already scored cost no new call, so a second run the same day is cheap. **New in your field** keeps the best **8** (`inField`) at or above the minimum score (**60**). A short list is not padded; one sentence says why.
+3. **Collect talked-about papers.** Candidates from the traction sources that were not shown before are ranked by their numbers; one AI call drops those outside your wider area (it can only drop, and with no wider area set there is no call). Bluesky counts are added. The list keeps the best **5** (`talked`), ranked by each paper's best share of the night's highest number per source (Hugging Face upvotes, OpenAlex citations, alphaXiv visits) plus half its share of the highest Bluesky count. A paper shown as talked-about comes back only once one of its numbers has at least doubled.
+4. **Fetch text ahead.** The arXiv HTML of each digest paper is fetched 15 seconds apart (arXiv's crawl delay) and stored privately for the reading room to come. It is not shown yet.
+5. **Save and send.** The day's digest replaces any earlier one for the same day, and the email goes out if it is on.
+
+**At most 20 AI calls a night** (`AI calls per night`, up to 100). Papers left when the cap is spent are listed under **Not ranked tonight**.
+
+**Numbers, not hype.** Every talked-about line is built in code from a named source's numbers ("120 upvotes and 8 comments on Hugging Face in 3 days · cited 14 times since 2 Sep 2026 (OpenAlex) · 42 Bluesky posts"). The AI never adds a paper and never changes a number. Titles, abstracts and author names are treated as untrusted data in every prompt and are never rendered as HTML.
+
+**Failures stay local.** A source that fails is named under the run strip and the rest of the digest still appears. A provider error, or a missing AI key, stops ranking for the night: no other provider is tried, and the unscored papers are listed under **Not ranked tonight** with the reason.
+
+**Today.** **People are talking about** and **New in your field**, each paper with its authors, source and date, its numbers or reason, **Save** and **Dismiss**; earlier days are listed by date below. The run strip shows the last run with **Run now**, and the dashboard's Reading row shows today's count, or that ranking stopped.
+
+**Email digest.** **Reading → Settings → Digest → Email** sends the day's digest after each run. It is off by default and uses the job search's `RESEND_API_KEY` (see [Email digest](#email-digest)); **To** defaults to the email on your CV. A day with nothing in it sends nothing, and a failed email is noted on the run, never failing it.
+
+**Pause** under the same section makes every run do nothing.
+
+**Where the data lives.** `reading_settings`, `reading_papers`, `reading_digest` and `reading_texts` (migration `008_reading.sql`), not `documents`, so they never reach the git backup or `db:export`. As with the job search, a Vercel preview shares the production database: a run on a preview writes the live digest and spends your real AI credits.
+
 ### Cookie Consent (GDPR)
 
 Optional GDPR-compliant cookie consent banner:

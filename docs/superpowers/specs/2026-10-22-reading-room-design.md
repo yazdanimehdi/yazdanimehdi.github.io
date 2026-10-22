@@ -184,6 +184,43 @@ run never falls back to a different paid provider.
 - **Run strip.** The same pattern as the job search: last run, what failed, Run now.
 - **Thin lists.** When a list is short because the sources are thin in this field, one plain sentence says so.
 
+### Built (2026-10-22)
+
+Project 1 shipped as planned in `docs/superpowers/plans/2026-10-22-paper-digest.md`. Decisions made while building it:
+
+- **Defaults:** minimum in-field score 60 and at most 20 AI calls per run (editable up to 100). Papers left when the
+  cap is spent are listed as not ranked tonight; the run is not marked stopped.
+- **Traction ranking:** each paper's best share of the night's highest number per source (Hugging Face upvotes,
+  OpenAlex citations, alphaXiv visits), plus half its share of the highest Bluesky count. A paper with no source number
+  above 0 is not talked about.
+- **Resurfacing:** a paper shown as talked-about comes back once one of its numbers has at least doubled. Only sources
+  present both when it was shown and now are compared, and a paper shown with no stored numbers never comes back. A
+  paper that newly trends on a second source is therefore not re-shown.
+- **Full text:** the arXiv HTML is stored raw in `reading_texts`, a failure as `404` or its message. Project 2 adds the
+  passages table and splits it. The fetches are 15 seconds apart (arXiv's crawl delay).
+- **Hugging Face:** `sort=trending` without `week=`, the current trending list; the line counts days from the paper's
+  submission to Daily Papers. On 2026-10-22 that list held papers submitted up to 663 days earlier, so old papers can
+  appear; the line shows their age.
+- **OpenAlex:** `cited_by_count` within the last 60 days, sorted by citations. `counts_by_year` is not used: it counts
+  by calendar year, so it shows no velocity inside a 60-day window. On 2026-10-22 the subfield 1702 list included a
+  journal-level record and older works OpenAlex dates as recent; the area filter does not catch these.
+- **bioRxiv and medRxiv categories:** the regex (lowercase words, `_` for spaces) was checked against the live API
+  and not widened. Every real category fits; medRxiv's "HIV/AIDS" is `hiv_aids`, and a slash makes the API ignore the
+  category and return every paper.
+- **bioRxiv versions:** the API lists a paper once per version posted in the window, so only its latest version is
+  kept. Each source's own date becomes the paper's date.
+- **`any(ids::bigint[])`:** confirmed on the local Postgres, not only pglite.
+- **Related paper:** the AI's "close to your…" must name one of the up to 40 publications the prompt lists; any other
+  title is dropped.
+- **Profile failures:** a profile that can't be read (a broken `research.yml`) is logged, and ranking continues on the
+  field and keywords alone that night.
+- **Unranked count:** the run's `unranked` counts every unscored pool paper left, though the digest lists at most the
+  in-field size of them.
+- **Area filter:** no AI call when the talked-about shortlist is empty or no wider area is set. With no wider area the
+  talked list needs no AI, so it survives a ranking stop or a spent cap; with one, a stop or a spent cap empties it.
+- **Suggest from my profile:** turns on each source it fills (arXiv, bioRxiv, medRxiv, PubMed, OpenAlex) and Hugging
+  Face only when the area is ML/AI. Bluesky and alphaXiv are left as they were. Nothing is saved until the owner saves.
+
 ## Project 2: reading room
 
 ### Getting the text
