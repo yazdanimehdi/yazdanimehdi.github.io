@@ -254,4 +254,9 @@ test('readPdf: only a PDF this site uploaded is fetched, through the capped fetc
   assert.equal(await store.readPdf('https://store.public.blob.vercel-storage.com/other-abc123.pdf'), null);
   assert.equal(await store.readPdf('https://arxiv.org/pdf/2609.14491'), null);
   assert.deepEqual(fetched, [pdf.url]);
+  assert.deepEqual(await Promise.all([pdf.url, png.url, '/images/mirage-abc123.pdf'].map((u) => store.isOwnPdf(u))), [
+    true,
+    false,
+    false,
+  ]);
 });

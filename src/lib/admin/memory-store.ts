@@ -94,6 +94,10 @@ export class MemoryStore implements ContentStore {
     return deleteRepoMedia(this, path, version);
   }
 
+  async isOwnPdf(url: string): Promise<boolean> {
+    return sitePdfPath(url) !== null;
+  }
+
   async readPdf(url: string): Promise<Uint8Array | null> {
     const p = sitePdfPath(url);
     if (!p || this.version(p) === null) return null;

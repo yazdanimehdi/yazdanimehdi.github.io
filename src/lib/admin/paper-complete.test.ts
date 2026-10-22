@@ -485,6 +485,8 @@ test('fromPdf: the model reads the attached PDF; its JSON is a pdf-sourced recor
   assert.equal(await fromPdf(bytes, async () => '{"title":" ","authors":[],"abstract":""}'), null, 'nothing usable');
   assert.equal((await fromPdf(bytes, async () => '{"title":"T","year":"soon"}'))?.year, 0, 'no year');
   assert.equal((await fromPdf(bytes, async () => '{"title":"T","year":3026}'))?.year, 0, 'no future year');
+  const long = await fromPdf(bytes, async () => JSON.stringify({ title: 't'.repeat(600), abstract: 'a'.repeat(6000) }));
+  assert.deepEqual([long?.title.length, long?.abstract?.length], [500, 5000], 'capped');
 });
 
 test('proposeFor: a paper no source knows is proposed from its uploaded PDF, every change marked pdf', async () => {

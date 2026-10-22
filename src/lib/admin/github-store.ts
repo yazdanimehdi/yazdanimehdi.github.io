@@ -118,6 +118,10 @@ export class GitHubStore implements ContentStore {
     return { path, content: Buffer.from(file.content ?? '', 'base64').toString('utf8'), version: file.sha };
   }
 
+  async isOwnPdf(url: string): Promise<boolean> {
+    return sitePdfPath(url) !== null;
+  }
+
   /** The raw media type, since the JSON one carries no content past 1 MB. */
   async readPdf(url: string): Promise<Uint8Array | null> {
     const path = sitePdfPath(url);

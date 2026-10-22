@@ -49,4 +49,6 @@ test('readPdf: the bytes of a PDF the site folder serves, null for any other URL
     `${adminSettings().publicFolder}/x.pdf`,
   ])
     assert.equal(await store.readPdf(url), null, url);
+  assert.ok(await store.isOwnPdf('/images/missing.pdf'), "a site path is the site's own, there or not");
+  assert.ok(!(await store.isOwnPdf('https://arxiv.org/pdf/2609.14491.pdf')));
 });

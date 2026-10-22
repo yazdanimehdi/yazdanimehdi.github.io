@@ -342,6 +342,26 @@ export function fullAuthors(authors: unknown): boolean {
   });
 }
 
+const clip = (v: unknown, max = Infinity) =>
+  typeof v === 'string' ? visible(v).replace(/\s+/g, ' ').trim().slice(0, max).trim() : '';
+
+/** The fields a PDF reading proposes. */
+export const PDF_FIELDS = ['title', 'authors', 'abstract', 'year'] as const;
+export type PdfField = (typeof PDF_FIELDS)[number];
+export const isPdfField = (f: string): f is PdfField => (PDF_FIELDS as readonly string[]).includes(f);
+
+/** A value for a PDF field, cleaned and checked as a PDF reading is; undefined when it isn't usable. */
+export function pdfValue(field: PdfField, v: unknown): string | string[] | number | undefined {
+  if (field === 'title') return clip(v, 500) || undefined;
+  if (field === 'abstract') return clip(v, 5000) || undefined;
+  if (field === 'authors') {
+    const names = (Array.isArray(v) ? v : []).map((a) => clip(a)).filter(Boolean);
+    return names.length ? names : undefined;
+  }
+  const year = Number(v);
+  return Number.isInteger(year) && year >= 1900 && year <= new Date().getFullYear() + 1 ? year : undefined;
+}
+
 /** The model's reading of the paper's own PDF; null when it found nothing usable. Rejects a reply that isn't JSON. */
 export async function fromPdf(pdf: Uint8Array, ai: (input: TextInput) => Promise<string>): Promise<PaperRecord | null> {
   const reply = await ai({
@@ -357,25 +377,20 @@ export async function fromPdf(pdf: Uint8Array, ai: (input: TextInput) => Promise
     pdf: { name: 'paper.pdf', bytes: pdf },
   });
   const raw = jsonObject(reply, "The AI did not answer with the paper's details as JSON");
-  const clean = (v: unknown) => (typeof v === 'string' ? visible(v).replace(/\s+/g, ' ').trim() : '');
-  const title = clean(raw.title);
-  const authors = (Array.isArray(raw.authors) ? raw.authors : []).map(clean).filter(Boolean);
-  const abstract = clean(raw.abstract);
-  const year = Number(raw.year);
-  if (!title && !authors.length && !abstract) return null;
-  return {
-    source: 'pdf',
-    title,
-    authors,
-    ...(abstract ? { abstract } : {}),
-    year: Number.isInteger(year) && year >= 1900 && year <= new Date().getFullYear() + 1 ? year : 0,
-  };
+  const title = pdfValue('title', raw.title) as string | undefined;
+  const authors = pdfValue('authors', raw.authors) as string[] | undefined;
+  const abstract = pdfValue('abstract', raw.abstract) as string | undefined;
+  if (!title && !authors && !abstract) return null;
+  const year = (pdfValue('year', raw.year) as number | undefined) ?? 0;
+  return { source: 'pdf', title: title ?? '', authors: authors ?? [], ...(abstract ? { abstract } : {}), year };
 }
 
-/** Reads a paper's own uploaded PDF: null when `url` isn't one (or a batch's budget of reads is spent). */
+/** A batch's PDF budget is spent: the paper that needed a read starts the next batch. */
+export class PdfBudgetSpent extends Error {}
+
+/** Reads a paper's own uploaded PDF: null when `url` isn't one; throws PdfBudgetSpent when a batch can read no more. */
 export type ReadPdf = (url: string) => Promise<PaperRecord | null>;
 
-const PDF_FIELDS = ['title', 'authors', 'abstract', 'year'] as const;
 const byField = (a: FieldChange, b: FieldChange) => COMPLETABLE.indexOf(a.field) - COMPLETABLE.indexOf(b.field);
 
 /**
@@ -423,6 +438,7 @@ export async function proposeFor(
       const replaced = new Set(offered.map((c) => c.field));
       changes = [...changes.filter((c) => !replaced.has(c.field)), ...offered].sort(byField);
     } catch (e) {
+      if (e instanceof PdfBudgetSpent) throw e;
       pdfError = `Reading your PDF failed: ${message(e)}`;
     }
   }
@@ -434,7 +450,10 @@ export async function proposeFor(
 /** No paper's lookups start this long into a batch, so a slow source can't push a request past the function limit. */
 export const PROPOSE_FOR_MS = 60_000;
 
-/** Proposals for a batch, in order: at least one, then none started past PROPOSE_FOR_MS, and none after a failure. */
+/**
+ * Proposals for a batch, in order: at least one, then none started past PROPOSE_FOR_MS, none after a failure, and none
+ * from the first paper that needs a PDF read once the budget is spent (the next batch starts there).
+ */
 export async function proposeBatch(
   entries: { slug: string; data: Record<string, unknown> }[],
   look: Lookup,
@@ -446,7 +465,12 @@ export async function proposeBatch(
   const out: PaperProposal[] = [];
   for (const e of entries) {
     if (out.length && (clock() >= deadline || out.at(-1)!.error)) break;
-    out.push(await proposeFor(e.slug, e.data, look, declined[e.slug], readPdf));
+    try {
+      out.push(await proposeFor(e.slug, e.data, look, declined[e.slug], readPdf));
+    } catch (error) {
+      if (error instanceof PdfBudgetSpent) break;
+      throw error;
+    }
   }
   return out;
 }

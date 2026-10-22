@@ -69,6 +69,8 @@ export interface ContentStore {
   putMedia(folder: MediaFolder, filename: string, base64: string, contentType: string): Promise<UploadResult>;
   /** `path` and `version` as listMedia/putMedia reported them. */
   deleteMedia(path: string, version: string): Promise<CommitResult>;
+  /** True when `url` is where this site's media keeps a PDF (git: a `/images/….pdf` path; Postgres: an uploaded PDF). */
+  isOwnPdf(url: string): Promise<boolean>;
   /** The bytes of a PDF this site's media holds, by the URL putMedia gave it; null for any other URL. */
   readPdf(url: string): Promise<Uint8Array | null>;
 }

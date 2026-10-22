@@ -236,12 +236,16 @@ export class PostgresStore implements ContentStore {
     return { path: url, url, version: '1', commit: { id: `blob:${filename}` } };
   }
 
-  /** Only a URL with a PDF row in `media` (this site's own upload) is fetched. */
-  async readPdf(url: string): Promise<Uint8Array | null> {
+  async isOwnPdf(url: string): Promise<boolean> {
     const [row] = await this.db(
       () => this.sql`select url from media where url = ${url} and content_type = 'application/pdf'`,
     );
-    return row ? (this.deps.get ?? defaultDeps.get)(url) : null;
+    return !!row;
+  }
+
+  /** Only a URL with a PDF row in `media` (this site's own upload) is fetched. */
+  async readPdf(url: string): Promise<Uint8Array | null> {
+    return (await this.isOwnPdf(url)) ? (this.deps.get ?? defaultDeps.get)(url) : null;
   }
 
   /** Only images this site uploaded (a row in `media`) can be deleted. */

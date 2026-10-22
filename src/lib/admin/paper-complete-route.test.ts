@@ -178,7 +178,16 @@ function pdfPapers(slugs: string[], pdf = '/images/mirage-abc123.pdf', reply: un
   return sent;
 }
 
-test('GET proposes from the uploaded PDF of a paper no source knows; POST applies it without asking the AI again', async () => {
+/** Gives each paper its own PDF, so each needs a fresh reading. */
+function ownPdfs(slugs: string[], tag: string) {
+  for (const slug of slugs) {
+    fs.writeFileSync(path.join(root, `public/images/${slug}-abc123.pdf`), Buffer.from(`%PDF-1.7 ${tag} ${slug}`));
+    const md = path.join(root, 'src/content/publications', `${slug}.md`);
+    fs.writeFileSync(md, fs.readFileSync(md, 'utf8').replace('mirage-abc123.pdf', `${slug}-abc123.pdf`));
+  }
+}
+
+test('GET proposes from the uploaded PDF of a paper no source knows; POST applies it with no AI call', async () => {
   const sent = pdfPapers([SLUG]);
   const [p] = (await (await call(GET)).json()).proposals as PaperProposal[];
   assert.deepEqual(
@@ -194,23 +203,91 @@ test('GET proposes from the uploaded PDF of a paper no source knows; POST applie
   const res = await call(POST, { body: { slug: SLUG, apply: [{ field: 'abstract', value: ABSTRACT }], decline: [] } });
   assert.equal(res.status, 200);
   assert.equal((await readEntry(store, 'publications', SLUG))!.data.abstract, ABSTRACT);
-  assert.equal(sent.length, 1, 'the same PDF is not read by the AI twice');
+  assert.equal(sent.length, 1, 'the apply asks no AI');
 });
 
-test('GET reads at most 5 PDFs a batch', async () => {
+test('POST takes a PDF field as reviewed, cleaned, without any AI call, and records a declined one', async () => {
+  const sent = pdfPapers([SLUG]);
+  ownPdfs([SLUG], 'never read');
+  const res = await call(POST, {
+    body: {
+      slug: SLUG,
+      apply: [{ field: 'abstract', value: `  We intro\u00adduce\n MIRAGE.${' x'.repeat(3000)}` }],
+      decline: [{ field: 'title', value: ' MIRAGE:\u200b a benchmark ' }],
+    },
+  });
+  assert.equal(res.status, 200);
+  const abstract = (await readEntry(store, 'publications', SLUG))!.data.abstract as string;
+  assert.ok(abstract.startsWith('We introduce MIRAGE. x x'), abstract.slice(0, 40));
+  assert.equal(abstract.length, 5000, 'capped');
+  const state = JSON.parse((await store.read(SCHOLAR_JSON))!.content);
+  assert.deepEqual(state.declined[SLUG], { title: JSON.stringify('MIRAGE: a benchmark') });
+  assert.equal(sent.length, 0, 'no AI call, empty cache and all');
+});
+
+test("POST refuses a PDF field on a paper whose pdf is not the site's own", async () => {
+  const sent = pdfPapers([SLUG], 'https://example.org/mirage.pdf');
+  const offSite = await call(POST, {
+    body: { slug: SLUG, apply: [{ field: 'abstract', value: ABSTRACT }], decline: [] },
+  });
+  assert.equal(offSite.status, 409);
+  assert.equal(store.log.length, 0);
+  assert.equal(sent.length, 0);
+});
+
+test('POST refuses a PDF value that is unusable', async () => {
+  const sent = pdfPapers([SLUG]);
+  for (const bad of [
+    { field: 'year', value: 'soon' },
+    { field: 'authors', value: 'Jane Doe' },
+    { field: 'title', value: ' ' },
+  ]) {
+    const res = await call(POST, { body: { slug: SLUG, apply: [], decline: [bad] } });
+    assert.equal(res.status, 409, bad.field);
+  }
+  assert.equal(store.log.length, 0);
+  assert.equal(sent.length, 0);
+});
+
+test('GET reads at most 5 PDFs a batch; the next paper starts the next batch', async () => {
   const slugs = ['a2026x', 'b2026x', 'c2026x', 'd2026x', 'e2026x', 'f2026x'];
   const sent = pdfPapers(slugs, '/images/mirage-abc123.pdf', { abstract: 'Budget.' });
-  // A PDF of its own for each paper, so each is a fresh reading.
-  for (const slug of slugs) {
-    fs.writeFileSync(path.join(root, `public/images/${slug}-abc123.pdf`), Buffer.from(`%PDF-1.7 ${slug}`));
-    const md = path.join(root, 'src/content/publications', `${slug}.md`);
-    fs.writeFileSync(md, fs.readFileSync(md, 'utf8').replace('mirage-abc123.pdf', `${slug}-abc123.pdf`));
-  }
+  ownPdfs(slugs, 'budget');
+  const first = await (await call(GET)).json();
+  const read = (first.proposals as PaperProposal[]).map((p) => p.changes.some((c) => c.source === 'pdf'));
+  assert.deepEqual([read, first.offset, sent.length], [[true, true, true, true, true], 5, 5]);
+  const next = await (await call(GET, { query: '?offset=5' })).json();
+  assert.deepEqual(
+    (next.proposals as PaperProposal[]).map((p) => [p.slug, p.changes[0]?.source]),
+    [['f2026x', 'pdf']],
+  );
+  assert.equal(sent.length, 6);
+});
+
+test('a reading already made costs no budget', async () => {
+  const slugs = ['a2026x', 'b2026x', 'c2026x', 'd2026x', 'e2026x', 'f2026x', 'g2026x'];
+  const sent = pdfPapers(slugs, '/images/mirage-abc123.pdf', { abstract: 'Shared.' });
+  fs.writeFileSync(path.join(root, 'public/images/mirage-abc123.pdf'), Buffer.from('%PDF-1.7 shared'));
   const body = await (await call(GET)).json();
-  const read = (body.proposals as PaperProposal[]).map((p) => p.changes.some((c) => c.source === 'pdf'));
-  assert.deepEqual(read, [true, true, true, true, true, false]);
-  assert.equal((body.proposals as PaperProposal[])[5].noMatch, true);
-  assert.equal(sent.length, 5, 'five AI calls');
+  assert.equal(body.offset, 7);
+  assert.ok((body.proposals as PaperProposal[]).every((p) => p.changes[0]?.source === 'pdf'));
+  assert.equal(sent.length, 1);
+});
+
+test("the uploaded PDF is never offered for replacement by a source's PDF link", async () => {
+  pdfPapers([SLUG]);
+  setPaperLookupForTests(arxivAnswers(FEED));
+  const [p] = (await (await call(GET)).json()).proposals as PaperProposal[];
+  assert.ok(fields(p).includes('arxiv'), 'arXiv matched');
+  assert.ok(!fields(p).includes('pdf'), fields(p).join());
+  const res = await call(POST, {
+    body: {
+      slug: SLUG,
+      apply: [{ field: 'pdf', value: 'https://arxiv.org/pdf/2609.14491', from: '/images/mirage-abc123.pdf' }],
+      decline: [],
+    },
+  });
+  assert.equal(res.status, 409);
 });
 
 test('GET never reads a PDF off the site', async () => {
