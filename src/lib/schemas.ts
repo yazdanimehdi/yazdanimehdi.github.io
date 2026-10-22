@@ -15,10 +15,13 @@ const optionalUrl = emptyToUndefined.pipe(z.string().url().optional());
 const urlOrSitePath = emptyToUndefined.pipe(
   z
     .string()
-    .refine((v) =>
-      v.startsWith('/')
-        ? !v.startsWith('//') && !v.includes('\\')
-        : /^https?:\/\//i.test(v) && z.string().url().safeParse(v).success,
+    .refine(
+      (v) =>
+        v.startsWith('/')
+          ? // eslint-disable-next-line no-control-regex -- browsers strip tab/newline from an href: "/\t/host" is "//host"
+            !v.startsWith('//') && !/[\x00-\x20\\]/.test(v)
+          : /^https?:\/\//i.test(v) && z.string().url().safeParse(v).success,
+      'Use a full https:// link or a path on this site starting with /',
     )
     .optional(),
 );

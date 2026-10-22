@@ -124,7 +124,15 @@ test('publication pdf: an absolute URL or a same-site path', () => {
       pdf: v,
     });
   for (const ok of ['/images/x.pdf', 'https://example.org/x.pdf']) assert.ok(pdf(ok).success, ok);
-  for (const bad of ['//evil.test/x.pdf', 'javascript:alert(1)', 'x.pdf', '/\\evil.test']) {
+  for (const bad of [
+    '//evil.test/x.pdf',
+    'javascript:alert(1)',
+    'x.pdf',
+    '/\\evil.test',
+    '/\t/evil.test/x.pdf',
+    '/\n/evil.test',
+    '/images/my paper.pdf',
+  ]) {
     assert.ok(!pdf(bad).success, bad);
   }
   const empty = pdf('');
