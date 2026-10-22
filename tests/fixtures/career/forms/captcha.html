@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>Greenhouse with captcha</title>
+  <script src="https://www.google.com/recaptcha/api.js" async defer></script></head>
+<body>
+  <h1>Research Engineer</h1>
+  <form action="#thanks">
+    <label for="first_name">First Name *</label>
+    <input id="first_name" name="first_name" required />
+    <label for="last_name">Last Name *</label>
+    <input id="last_name" name="last_name" required />
+    <label>Email <input type="email" name="email" aria-required="true" /></label>
+    <input type="tel" id="phone" aria-label="Phone" />
+    <label for="resume">Resume/CV *</label>
+    <input type="file" id="resume" name="resume" required />
+    <label for="cover_letter">Cover Letter</label>
+    <!-- ATS forms often hide the real file input behind a styled button -->
+    <input type="file" id="cover_letter" name="cover_letter" style="display: none" />
+    <label for="q_auth">Are you authorized to work in the US? *</label>
+    <select id="q_auth" name="question_auth" required>
+      <option value="">Please select</option>
+      <option>Yes</option>
+      <option>No</option>
+    </select>
+    <span id="why_label">Why us?</span>
+    <textarea name="why" aria-labelledby="why_label"></textarea>
+    <fieldset>
+      <legend>Will you require sponsorship?</legend>
+      <label><input type="radio" name="sponsorship" value="1" /> Yes</label>
+      <label><input type="radio" name="sponsorship" value="0" /> No</label>
+    </fieldset>
+    <input type="hidden" name="token" value="abc" />
+    <input name="internal" aria-label="Internal" disabled />
+    <input name="trap" aria-label="Leave blank" style="display: none" />
+    <div class="g-recaptcha" data-sitekey="x"></div>
+    <button type="submit">Submit Application</button>
+  </form>
+<script>
+  document.querySelector("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await fetch("/submit", { method: "POST", body: new FormData(e.target) });
+    e.target.outerHTML = "<p id=\"thanks\">Thank you, your application was received</p>";
+  });
+</script>
+</body>
+</html>
