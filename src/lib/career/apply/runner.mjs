@@ -152,9 +152,18 @@ async function poll(page, done, ms) {
   }
 }
 
+class OffWeb extends Error {}
+
+/** The url resolved against the current page; anything but http(s) (file:, javascript:, data:…) is refused. */
+function web(url, from) {
+  const u = new URL(url, from);
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new OffWeb(`refused to open a ${u.protocol} link`);
+  return u.href;
+}
+
 /** Opens the url; if it shows no form field, follows at most one Apply link or button. */
 async function open(page, url) {
-  await page.goto(url);
+  await page.goto(web(url));
   await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {});
   const seen = await page.evaluate(inspect);
   if (seen.fields.length || seen.blocker || seen.apply === null) return seen;
@@ -162,7 +171,7 @@ async function open(page, url) {
     await page.locator('[data-apply-go]').first().click();
     return poll(page, (s) => s.fields.length > 0 || !!s.blocker, 5_000);
   }
-  await page.goto(seen.apply);
+  await page.goto(web(seen.apply, page.url()));
   await page.waitForLoadState('networkidle', { timeout: 5_000 }).catch(() => {});
   return page.evaluate(inspect);
 }
@@ -215,7 +224,18 @@ export async function run(input, chromium) {
     const page = await browser.newPage();
     page.setDefaultTimeout(TIMEOUT);
 
-    const seen = await open(page, input.url);
+    let seen;
+    try {
+      seen = await open(page, input.url);
+    } catch (e) {
+      if (!(e instanceof OffWeb)) throw e;
+      return {
+        ...result,
+        url: page.url() === 'about:blank' ? input.url : page.url(),
+        blocker: 'no-form',
+        error: e.message,
+      };
+    }
     result.url = page.url();
     result.fields = seen.fields;
     if (seen.blocker || !seen.fields.length) return { ...result, blocker: seen.blocker ?? 'no-form' };
@@ -228,11 +248,14 @@ export async function run(input, chromium) {
 
     const files = { ...input.files };
     if (input.mode === 'fill' && input.letterHtml) {
-      const letter = await browser.newPage();
+      // Its own context with no scripts and no network: the letter page can't load or send anything.
+      const context = await browser.newContext({ javaScriptEnabled: false });
+      await context.route('**/*', (r) => r.abort());
+      const letter = await context.newPage();
       await letter.setContent(input.letterHtml);
       files.letter = result.letterPdf = join(input.out, 'letter.pdf');
       await letter.pdf({ path: files.letter, format: 'A4' });
-      await letter.close();
+      await context.close();
     }
     const values = input.values ?? [];
     await fill(page, seen.fields, values, files);

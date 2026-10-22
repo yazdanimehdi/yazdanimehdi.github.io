@@ -16,7 +16,9 @@ const skip = existsSync(chromium.executablePath())
   : 'Playwright chromium is not installed: run `pnpm exec playwright install chromium`';
 
 const posts: string[] = [];
+const gets: string[] = [];
 const server = createServer(async (req, res) => {
+  gets.push(req.url ?? '');
   if (req.method === 'POST') {
     let body = '';
     for await (const chunk of req) body += chunk;
@@ -107,6 +109,20 @@ test('read reports no-form after one Apply click, and for a 404', { skip }, asyn
   }
 });
 
+test('read refuses to open or follow anything but http and https', { skip }, async () => {
+  const landing = await run({ mode: 'read', url: `${base}/landing-file.html`, out: await out() }, offline);
+  assert.equal(landing.ok, false);
+  assert.equal(landing.blocker, 'no-form');
+  assert.equal(landing.url, `${base}/landing-file.html`, 'no navigation');
+  assert.match(landing.error ?? '', /file:/);
+  for (const url of ['file:///etc/passwd', 'javascript:alert(1)']) {
+    const result = await run({ mode: 'read', url, out: await out() }, offline);
+    assert.equal(result.ok, false, url);
+    assert.equal(result.blocker, 'no-form', url);
+    assert.deepEqual(result.fields, [], url);
+  }
+});
+
 test('read reports captcha / login / account as blockers', { skip }, async () => {
   for (const [page, blocker] of [
     ['captcha.html', 'captcha'],
@@ -155,7 +171,8 @@ test('fill renders letterHtml to letter.pdf and uploads it to the cover-letter f
       url: `${base}/greenhouse.html`,
       values: VALUES,
       files: { cv: await cvFile(dir) },
-      letterHtml: '<h1>Dear team</h1><p>I would like to join.</p>',
+      letterHtml: `<h1>Dear team</h1><p>I would like to join.</p><img src="${base}/beacon.png">
+        <script>fetch('${base}/beacon-js')</script>`,
       out: dir,
     },
     offline,
@@ -165,6 +182,11 @@ test('fill renders letterHtml to letter.pdf and uploads it to the cover-letter f
   assert.equal((await readFile(join(dir, 'letter.pdf'))).subarray(0, 5).toString(), '%PDF-');
   assert.equal(result.fields.find((f) => f.id === 'cover_letter')?.value, 'letter.pdf');
   assert.equal(result.fields.find((f) => f.id === 'resume')?.value, 'ada-cv.pdf');
+  assert.deepEqual(
+    gets.filter((g) => g.startsWith('/beacon')),
+    [],
+    'the letter page loads and runs nothing',
+  );
 });
 
 test('submit stops when a required field was added', { skip }, async () => {
