@@ -2,10 +2,11 @@ import { promises as dns } from 'node:dns';
 import { BlockList, isIP } from 'node:net';
 
 export class SourceError extends Error {
-  /** The HTTP status, when the error is a non-2xx answer. */
+  /** The HTTP status, when the error is a non-2xx answer, and its Retry-After header when it sent one. */
   constructor(
     message: string,
     readonly status?: number,
+    readonly retryAfter?: string,
   ) {
     super(message);
   }
@@ -125,7 +126,11 @@ export async function getText(url: string, init: FetchInit = {}): Promise<string
     }
     if (!res.ok) {
       discard(res);
-      throw new SourceError(`${current.host} answered ${res.status}`, res.status);
+      throw new SourceError(
+        `${current.host} answered ${res.status}`,
+        res.status,
+        res.headers.get('retry-after') ?? undefined,
+      );
     }
     return readCapped(res, current.host, init.maxBytes ?? MAX_BYTES).catch(fail(current));
   }
