@@ -702,7 +702,7 @@ Google Scholar papers into draft posts, using your own provider keys.
   turning this on doesn't write a post for every old paper. Each check writes at most **Posts per run** posts (default
   three); the rest wait for the next one. A publication you delete is not imported again.
 - **Completing papers.** A paper that arrives from Scholar has little more than a title, so new ones are completed
-  automatically (up to 10 per run; the rest wait for the **Complete papers** button) from arXiv, bioRxiv/medRxiv,
+  automatically (up to 10 per run; the rest wait for the **Complete papers** button) from arXiv (via DataCite), bioRxiv/medRxiv,
   Crossref/DOI, PubMed and OpenAlex: the abstract, DOI, authors, venue, year, type, links, PDF and BibTeX they can
   confirm. **Complete papers** on the Publications screen reviews the same for papers you already have: empty fields
   are ticked, replacements of a value you have are unticked, each value shows its source, and a change you decline is
