@@ -11,7 +11,6 @@ import {
   getPosting,
   moveApplication,
   readCareer,
-  readyPostings,
   releaseApplyLock,
   updatePosting,
   writeCareer,
@@ -217,15 +216,25 @@ export async function approve(
   return out === 'ok' ? { queued: await startQueue(sql, runs) } : out;
 }
 
-/** "Approve all ready": one approval per `ready` posting with the pre-fill it read, never a blanket permission. */
-export async function approveAll(sql: Sql, by: string, runs: ApplyRuns = testRuns ?? workflowRuns) {
+/**
+ * "Approve all ready": one approval per listed `{ id, at }`, the pre-fills the owner saw, never a blanket permission.
+ * A posting is approved only while it is still `ready` from that very pre-fill; the rest are skipped with a reason.
+ */
+export async function approveAll(
+  sql: Sql,
+  items: { id: number; at: string }[],
+  by: string,
+  runs: ApplyRuns = testRuns ?? workflowRuns,
+) {
   const approved: number[] = [];
-  const skipped: { id: number; reason: string }[] = [];
-  for (const { id } of await readyPostings(sql)) {
-    const app = (await getPosting(sql, id))?.application;
-    const out = app ? await approveOne(sql, id, app.fields, app.at, by) : 'not-ready';
-    if (out === 'ok') approved.push(id);
-    else skipped.push({ id, reason: out });
+  const skipped: { id: number; reason: 'pre-filled again' | 'no longer waiting' }[] = [];
+  for (const { id, at } of items) {
+    const p = await getPosting(sql, id);
+    const app = p?.application;
+    if (p?.status !== 'ready' || app?.state !== 'ready') skipped.push({ id, reason: 'no longer waiting' });
+    else if (app.at !== at) skipped.push({ id, reason: 'pre-filled again' });
+    else if ((await approveOne(sql, id, app.fields, at, by)) === 'ok') approved.push(id);
+    else skipped.push({ id, reason: 'no longer waiting' });
   }
   return { approved, skipped, queued: approved.length > 0 && (await startQueue(sql, runs)) };
 }

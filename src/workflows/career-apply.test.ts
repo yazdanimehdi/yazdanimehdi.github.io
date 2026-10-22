@@ -258,18 +258,52 @@ test('approve stores the owner’s values over the server’s field shapes and s
   assert.equal(await approve(kit.sql, id, fields, ready.at, 'ada', runs), 'not-ready', 'approving twice');
 });
 
-test('approve-all approves each ready posting individually and reports the rest', async () => {
+test('approve-all approves exactly the listed pre-fills, each individually, and reports the rest', async () => {
   const a = await posting(kit.sql, readyApp());
   const b = await posting(kit.sql, readyApp());
   const c = await posting(kit.sql, approvedApp({ state: 'unconfirmed' }));
   for (const id of [a, b, c]) await updatePosting(kit.sql, id, { status: 'ready' });
+  const items = await Promise.all(
+    [a, b, c].map(async (id) => ({ id, at: (await getPosting(kit.sql, id))!.application!.at })),
+  );
   const { runs, seen } = fakeRuns();
-  const out = await approveAll(kit.sql, 'ada', runs);
+  const out = await approveAll(kit.sql, items, 'ada', runs);
   assert.deepEqual(out.approved.sort(), [a, b].sort());
-  assert.deepEqual(out.skipped, [{ id: c, reason: 'not-ready' }]);
+  assert.deepEqual(out.skipped, [{ id: c, reason: 'no longer waiting' }]);
   assert.equal(out.queued, true);
   assert.equal((await getPosting(kit.sql, c))!.application?.state, 'unconfirmed', 'never re-approved');
   assert.equal(seen.queue, 1, 'one queue for all of them');
+});
+
+test('approve-all leaves a posting pre-filled after the dialog opened, or pre-filled again, as it is', async () => {
+  const listed = readyApp({ at: minutesAgo(5) });
+  const refilled = await posting(kit.sql, readyApp());
+  const unlisted = await posting(kit.sql, readyApp());
+  const skippedMeanwhile = await posting(kit.sql, listed);
+  for (const id of [refilled, unlisted]) await updatePosting(kit.sql, id, { status: 'ready' });
+  await updatePosting(kit.sql, skippedMeanwhile, { status: 'skipped' });
+  const { runs, seen } = fakeRuns();
+  const out = await approveAll(
+    kit.sql,
+    [
+      { id: refilled, at: listed.at },
+      { id: skippedMeanwhile, at: listed.at },
+    ],
+    'ada',
+    runs,
+  );
+  assert.deepEqual(out, {
+    approved: [],
+    skipped: [
+      { id: refilled, reason: 'pre-filled again' },
+      { id: skippedMeanwhile, reason: 'no longer waiting' },
+    ],
+    queued: false,
+  });
+  for (const id of [refilled, unlisted, skippedMeanwhile]) {
+    assert.equal((await getPosting(kit.sql, id))!.application?.state, 'ready', `posting ${id} stays ready`);
+  }
+  assert.equal(seen.queue, 0);
 });
 
 test('ensureSubmitQueue starts no second queue while one runs, and a new one once it ended', async () => {

@@ -106,11 +106,21 @@ test('approve, prefill and handoff through the route', async () => {
 });
 
 test('approve-all reports what it approved and skipped', async () => {
-  const id = await posting(kit.sql, readyApp());
+  const app = readyApp();
+  const id = await posting(kit.sql, app);
   await updatePosting(kit.sql, id, { status: 'ready' });
-  const res = await call(approveAll, ownerUser(), '', {});
+  const res = await call(approveAll, ownerUser(), '', { items: [{ id, at: app.at }] });
   assert.equal(res.status, 200);
   assert.deepEqual(await res.json(), { approved: [id], skipped: [], queued: true });
+});
+
+test('approve-all needs the list the owner saw: no body, or more than 200 items, is a 400', async () => {
+  const id = await posting(kit.sql, readyApp());
+  await updatePosting(kit.sql, id, { status: 'ready' });
+  assert.equal((await call(approveAll, ownerUser(), '', {})).status, 400);
+  const items = Array.from({ length: 201 }, () => ({ id, at: 'x' }));
+  assert.equal((await call(approveAll, ownerUser(), '', { items })).status, 400);
+  assert.equal((await getPosting(kit.sql, id))!.application?.state, 'ready');
 });
 
 const unconfirmed = () => approvedApp({ state: 'unconfirmed', reason: 'Submitted, but the page didn’t confirm it' });

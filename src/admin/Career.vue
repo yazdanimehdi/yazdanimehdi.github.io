@@ -73,18 +73,28 @@ function waiting() {
 }
 const confirmAll = ref(false);
 const approving = ref(false);
+/** Approves exactly the rows the dialog listed, each by the pre-fill it showed: one re-filled since is left alone. */
 async function approveAll() {
   confirmAll.value = false;
   approving.value = true;
+  const items = waiting().map((r) => ({ id: r.id, at: r.prefilledAt }));
   try {
-    const { approved, skipped } = await api<{ approved: number[]; skipped: { id: number; reason: string }[] }>(
-      'career/approve-all',
-      { method: 'POST' },
-    );
-    const sent = approved.length
-      ? `Approved ${approved.length}: each is submitted in the next few minutes`
-      : 'Nothing was approved';
-    toast(skipped.length ? `${sent}. ${skipped.length} no longer waiting, left as they were.` : `${sent}.`);
+    const { approved, skipped, queued } = await api<{
+      approved: number[];
+      skipped: { id: number; reason: string }[];
+      queued: boolean;
+    }>('career/approve-all', { body: { items } });
+    const sent = !approved.length
+      ? 'Nothing was approved'
+      : queued
+        ? `Approved ${approved.length}: each is submitted in the next few minutes`
+        : `Approved ${approved.length}: they are submitted when the queue next runs (at the latest with tonight’s run)`;
+    const again = skipped.filter((s) => s.reason === 'pre-filled again').length;
+    const gone = skipped.length - again;
+    const left = [again && `${again} pre-filled again since you looked`, gone && `${gone} no longer waiting`]
+      .filter(Boolean)
+      .join(', ');
+    toast(left ? `${sent}. ${left}: left as they were.` : `${sent}.`);
   } catch (e) {
     report(e);
   } finally {
