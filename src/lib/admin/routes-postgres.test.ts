@@ -17,7 +17,7 @@ import { GET as dashboard } from '../../admin/routes/api/dashboard';
 import { GET as me } from '../../admin/routes/api/me';
 import { GET as ready } from '../../admin/routes/api/career/ready';
 import { setSqlForTests } from '../db';
-import { listPostings, updatePosting, upsertPostings } from '../career/db';
+import { listPostings, updatePosting, upsertPostings, writeCareer } from '../career/db';
 import { nonOwnerUser, ownerUser } from '../career/test-owner';
 
 const user = { login: 'jane', name: 'Jane', avatar: '' };
@@ -233,15 +233,17 @@ test('the owner learns what waits for approval: me, the dashboard and the Ready 
     status: 'ready',
     application: { state: 'ready', at, url: 'https://x.test/apply', fields: [field, field], shots: [] },
   });
-  await updatePosting(sql, b, { status: 'ready' });
+  await updatePosting(sql, b, { status: 'ready' }); // listed, but not waiting for approval: not counted
+  const stopped = 'Your Claude subscription is out of quota';
+  await writeCareer(sql, { lastRun: { at, sources: [], scored: 0, failed: 0, deferred: 0, stopped } }, 'test');
   setSqlForTests(sql);
   const saved = { VERCEL: process.env.VERCEL, DATABASE_URL: process.env.DATABASE_URL };
   process.env.VERCEL = '1';
   process.env.DATABASE_URL = 'postgres://test';
   try {
-    assert.deepEqual((await (await call(me, { as: ownerUser() })).json()).career, { ready: 2 });
+    assert.deepEqual((await (await call(me, { as: ownerUser() })).json()).career, { ready: 1 });
     assert.equal((await (await call(me, { as: nonOwnerUser() })).json()).career, undefined);
-    assert.deepEqual((await (await call(dashboard, { as: ownerUser() })).json()).career, { ready: 2 });
+    assert.deepEqual((await (await call(dashboard, { as: ownerUser() })).json()).career, { ready: 1, stopped });
     assert.equal((await (await call(dashboard, { as: nonOwnerUser() })).json()).career, undefined);
     const rows = (await (await call(ready, { as: ownerUser() })).json()).rows;
     assert.deepEqual(
