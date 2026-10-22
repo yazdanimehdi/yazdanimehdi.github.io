@@ -68,7 +68,7 @@ export function pickPassages(
     for (const g of papers) {
       let left = budget / papers.length;
       for (const q of g.passages.filter((q) => !isHeading(q))) {
-        if (q.body.length > left) break;
+        if (q.body.length > left) continue;
         keep.add(q);
         left -= q.body.length;
       }
@@ -104,7 +104,7 @@ export const SUMMARY_HEADINGS = [
   'How it relates to your work',
 ];
 
-type Scan = { paper: number; pages: number; pdf: Uint8Array };
+export type Scan = { paper: number; pages: number; pdf: Uint8Array };
 
 const scanRule = (scan?: Scan) =>
   scan

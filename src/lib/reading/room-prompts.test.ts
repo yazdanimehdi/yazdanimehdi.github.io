@@ -66,6 +66,12 @@ test('pickPassages without hits gives each paper an equal share', () => {
   assert.equal(picked[0].title, 'Paper 1');
 });
 
+test('pickPassages without hits skips a passage over the share and keeps the ones after it', () => {
+  const big = paper(1, [p('S1.p1', 'x'.repeat(600)), p('S1.p2', 'x'.repeat(100)), p('S1.p3', 'x'.repeat(100))]);
+  const small = paper(2, [p('S1.p1', 'x'.repeat(100))]);
+  assert.deepEqual(pids(pickPassages([big, small], null, 500)), [['S1.p2', 'S1.p3'], ['S1.p1']]);
+});
+
 test('pickPassages with hits takes abstracts, then the best hits', () => {
   const papers = [
     paper(1, [
