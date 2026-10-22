@@ -50,9 +50,17 @@ test('resurfaces only when a number doubled', () => {
     ),
     false,
   );
-  // A source that had nothing when shown now has something.
-  assert.equal(resurfaces({ ...hf(100), alphaxiv: { visits: 40, votes: 1 } }, shown), true);
-  assert.equal(resurfaces({ ...hf(100), alphaxiv: { visits: 0, votes: 0 } }, shown), false);
+  // A source absent (or at 0) when shown never resurfaces the paper.
+  assert.equal(resurfaces({ ...hf(100), openalex: { citations: 1, since: '2026-10-01' } }, shown), false);
+  const zero = { ...shown, alphaxiv: { visits: 0, votes: 0 } };
+  assert.equal(resurfaces({ ...hf(100), alphaxiv: { visits: 40, votes: 1 } }, zero), false);
+  // Nothing recorded when shown: nothing to compare.
+  assert.equal(resurfaces(hf(500), null), false);
+  // Any one doubled source is enough.
+  assert.equal(
+    resurfaces({ ...hf(100), alphaxiv: { visits: 80, votes: 1 } }, { ...shown, alphaxiv: { visits: 40, votes: 1 } }),
+    true,
+  );
 });
 
 test('signalLine', () => {

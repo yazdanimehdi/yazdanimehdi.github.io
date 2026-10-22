@@ -22,10 +22,13 @@ export function tractionScore(s: Signals, max: Partial<Record<Primary | 'bluesky
   return Math.max(...shares) + bluesky;
 }
 
-/** Some primary number is at least double what was shown (a source absent then counts as 0). */
+/** Some primary number shown above 0 is now at least double; a source absent when shown never counts. */
 export function resurfaces(now: Signals, shown: Signals | null): boolean {
   const before = primary(shown ?? {});
-  return Object.entries(primary(now)).some(([k, v]) => v > 0 && v >= 2 * (before[k as Primary] ?? 0));
+  return Object.entries(primary(now)).some(([k, v]) => {
+    const was = before[k as Primary];
+    return !!was && v >= 2 * was;
+  });
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
