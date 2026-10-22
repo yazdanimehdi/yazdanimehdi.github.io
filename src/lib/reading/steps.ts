@@ -48,13 +48,14 @@ function sourceMessage(id: string, e: unknown): string {
   return 'unexpected error';
 }
 
-/** Tonight's settings: the day (UTC), whether paused, the sources on, and the limits. */
+/** Tonight's settings: the day (UTC), whether paused, the sources on, the wider area, and the limits. */
 export async function readingPlan(): Promise<{
   day: string;
   paused: boolean;
   newSources: string[];
   tractionSources: string[];
   bluesky: boolean;
+  area: string;
   talked: number;
   inField: number;
   maxAiCalls: number;
@@ -67,6 +68,7 @@ export async function readingPlan(): Promise<{
     newSources: NEW_SOURCES.filter((id) => prefs.sources[id].on),
     tractionSources: TRACTION_SOURCES.filter((id) => prefs.sources[id].on),
     bluesky: prefs.sources.bluesky.on,
+    area: prefs.area,
     talked: prefs.talked,
     inField: prefs.inField,
     maxAiCalls: prefs.maxAiCalls,

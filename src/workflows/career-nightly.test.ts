@@ -16,7 +16,8 @@ import { SOURCES } from '../lib/career/sources';
 import { setLookupForTests } from '../lib/career/sources/http';
 import type { TailorPlan } from '../lib/career/tailor';
 import { setWorkerSandboxForTests } from '../lib/career/worker';
-import { careerNightly, errorText } from './career-nightly';
+import { careerNightly } from './career-nightly';
+import { errorText } from './runs';
 import { setApplyRunsForTests } from './career-apply';
 
 test('errorText keeps the provider message and drops the step wrapper', () => {

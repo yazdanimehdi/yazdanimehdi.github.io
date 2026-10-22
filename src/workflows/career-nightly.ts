@@ -19,20 +19,11 @@ import {
 import type { RunSummary } from '../lib/career/types';
 import { claimPrefillStep, ensureQueueStep } from './career-apply';
 import { draftPosting, reasonOf } from './career-draft';
+import { errorText, startUnlessRunning, type Runs } from './runs';
 
 const BATCH = 5;
 /** How long a nightly pre-fill waits for the apply sandbox (a submit or a pre-fill the owner started) to free up. */
 const BUSY_WAITS = 10;
-
-/** A step failure's message without the Workflow SDK's wrapper (or its `cause`'s own), short enough to show. */
-export function errorText(reason: unknown): string {
-  const raw = reason && typeof reason === 'object' ? reasonOf(reason) : String(reason);
-  return raw
-    .replace(/^Step "[^"]*" failed:\s*/, '')
-    .replace(/^Error:\s*/, '')
-    .trim()
-    .slice(0, 300);
-}
 
 /**
  * The night, as far as `nightly.stage` goes: 1 gathers every enabled source in parallel; 2 scores what's new, five at
@@ -159,14 +150,6 @@ export async function careerNightly(): Promise<RunSummary> {
   return summary;
 }
 
-/** A run older than this that still says pending or running is stuck (a nightly run takes minutes). */
-const STALE_MS = 6 * 60 * 60 * 1000;
-
-/** The slice of the Workflow API startNightly uses; tests pass their own. */
-export interface Runs {
-  get(runId: string): { status: Promise<string>; createdAt: Promise<Date>; cancel(): Promise<void> };
-  start(): Promise<{ runId: string }>;
-}
 const workflowRuns: Runs = { get: getRun, start: () => start(careerNightly) };
 let testRuns: Runs | null = null;
 
@@ -182,20 +165,5 @@ export async function startNightly(
   now = Date.now(),
 ): Promise<{ runId: string } | { running: string }> {
   const { runId } = await readCareer(sql);
-  if (runId) {
-    const run = runs.get(runId);
-    // A run the world no longer knows (expired, or local data cleared) is not running.
-    const status = await run.status.catch(() => null);
-    if (status === 'running' || status === 'pending') {
-      // A run of unknown age counts as stale.
-      if (now - (await run.createdAt.catch(() => new Date(0))).getTime() < STALE_MS) return { running: runId };
-      // A failed cancel must not block every later night: the new run starts anyway.
-      // eslint-disable-next-line no-console
-      await run.cancel().catch((e) => console.error('[career] cancelling a stale run', e));
-    }
-  }
-  // ponytail: two starts in the same instant can both start a run (the cron and Run now); a conditional update on run_id closes it if that ever matters.
-  const { runId: started } = await runs.start();
-  await writeCareer(sql, { runId: started }, 'ScholarOS jobs');
-  return { runId: started };
+  return startUnlessRunning(runs, runId, (id) => writeCareer(sql, { runId: id }, 'ScholarOS jobs'), now);
 }
