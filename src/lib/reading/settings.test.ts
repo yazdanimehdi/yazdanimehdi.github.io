@@ -22,6 +22,7 @@ test('parseReadingPrefs fills the defaults', () => {
     inField: 8,
     minScore: 60,
     maxAiCalls: 20,
+    roomAiCalls: 100,
     paused: false,
     email: { on: false, to: '', from: '' },
   });
@@ -81,4 +82,12 @@ test("validateReadingPrefs takes medRxiv's HIV/AIDS as the API spells it", () =>
     },
   );
   assert.throws(() => validateReadingPrefs({ sources: { medrxiv: { on: true, categories: ['HIV/AIDS'] } } }), ZodError);
+});
+
+test('validateReadingPrefs rejects roomAiCalls 0', () => {
+  assert.throws(
+    () => validateReadingPrefs({ roomAiCalls: 0 }),
+    (e) => e instanceof ZodError && e.issues[0].path[0] === 'roomAiCalls',
+  );
+  assert.equal(validateReadingPrefs({ roomAiCalls: 1000 }).roomAiCalls, 1000);
 });

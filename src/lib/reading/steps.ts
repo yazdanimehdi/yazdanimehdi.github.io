@@ -5,8 +5,7 @@ import { readConfig } from '../admin/content';
 import { getStore } from '../admin/get-store';
 import { postgresOnly } from '../admin/http';
 import { paperLookupFor } from '../admin/papers';
-import { getSecret, missingKey } from '../admin/secrets';
-import { TEXT_PROVIDERS } from '../ai/providers';
+import { getSecret } from '../admin/secrets';
 import { getText, SourceError } from '../career/sources/http';
 import { getSql } from '../db';
 import {
@@ -23,6 +22,7 @@ import {
   writeReading,
 } from './db';
 import { sendReadingDigest } from './digest';
+import { missingAiKey } from './room-db';
 import { overlap, topByOverlap } from './match';
 import { areaPrompt, parseArea, parseScores, scorePrompt } from './prompts';
 import { profileText, readProfile } from './profile';
@@ -124,10 +124,7 @@ export async function collectNew(
 /** Why the AI can't run (no key for the configured text provider), or null when it can. */
 export async function aiMissing(): Promise<string | null> {
   'use step';
-  const ai = await readAiConfig(readingStore());
-  for (const name of TEXT_PROVIDERS[ai.text.provider].keys)
-    if (!(await getSecret(getSql(), name))) return missingKey(name).message;
-  return null;
+  return missingAiKey(getSql(), await readAiConfig(readingStore()));
 }
 
 const NO_PROFILE = { areas: [], pubs: [] };

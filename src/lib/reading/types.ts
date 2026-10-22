@@ -66,3 +66,73 @@ export interface ReadingRun {
   talkedSkipped?: 'ranking stopped' | 'AI cap spent';
   email?: 'sent' | 'skipped' | string;
 }
+
+// The reading room.
+export type TextSource = 'arxiv-html' | 'arxiv-pdf' | 'upload' | 'scan' | 'abstract';
+
+export interface TextState {
+  source: TextSource | null;
+  error: string | null;
+  note: string | null;
+  pages: number | null;
+}
+
+export interface Passage {
+  pid: string;
+  kind: 'h2' | 'h3' | 'h4' | 'p' | 'figure';
+  body: string;
+}
+
+/** pid 'page3' for a scan */
+export interface Cite {
+  paper: number;
+  pid: string;
+}
+
+/** mine: one of the owner's papers or areas */
+export interface Claim {
+  text: string;
+  cites: Cite[];
+  mine?: string;
+}
+
+export type OutputKind = 'summary' | 'briefing' | 'faq' | 'glossary';
+
+export interface OutputBody {
+  papers: number[];
+  sections: { heading: string; claims: Claim[] }[];
+}
+
+export interface Output {
+  kind: OutputKind;
+  status: 'running' | 'ready' | 'failed';
+  body: OutputBody | null;
+  error: string | null;
+  updatedAt: string;
+}
+
+export type Target = { paper: number } | { notebook: number };
+
+export interface ChatMessage {
+  id: number;
+  role: 'user' | 'assistant';
+  body: string;
+  cites: Cite[];
+  saved: boolean;
+  createdAt: string;
+}
+
+export interface Highlight {
+  id: number;
+  paperId: number;
+  pid: string;
+  start: number;
+  end: number;
+  quote: string;
+  comment: string;
+}
+
+export interface LibraryItem {
+  paper: Pick<Paper, 'id' | 'title' | 'authors' | 'source' | 'url' | 'publishedAt' | 'state'>;
+  savedAt: string;
+}

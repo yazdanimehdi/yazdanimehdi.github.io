@@ -33,6 +33,7 @@ const prefsSchema = (l: boolean) => {
     inField: field(l, z.number().int().min(0).max(30), 8),
     minScore: field(l, z.number().min(0).max(100), 60),
     maxAiCalls: field(l, z.number().int().min(1).max(100), 20),
+    roomAiCalls: field(l, z.number().int().min(1).max(1000), 100),
     paused: field(l, z.boolean(), false),
     email: lenientOnly(
       l,

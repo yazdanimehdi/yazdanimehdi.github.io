@@ -130,12 +130,16 @@ test('pruneCandidates keeps saved and digested papers', async () => {
   );
 });
 
-test('missingTexts lists only arXiv papers with no text row', async () => {
-  const [withText, without, doiOnly] = await ids(
+test('missingTexts returns papers whose fetch failed', async () => {
+  const [fetched, abstractOnly, failed, without, doiOnly] = await ids(
     paper('arxiv:1', { arxiv: '1' }),
     paper('arxiv:2', { arxiv: '2' }),
+    paper('arxiv:3', { arxiv: '3' }),
+    paper('arxiv:4', { arxiv: '4' }),
     paper('doi:10.1/x', { doi: '10.1/x', source: 'openalex' }),
   );
-  await saveText(sql, withText, { source: 'arxiv-html', body: null, error: 'HTTP 404' });
-  assert.deepEqual(await missingTexts(sql, [withText, without, doiOnly]), [without]);
+  await saveText(sql, fetched, { source: 'arxiv-html', body: '<p>x</p>' });
+  await saveText(sql, abstractOnly, { source: 'abstract', note: 'arXiv has no HTML or PDF for this paper' });
+  await saveText(sql, failed, { source: 'arxiv-html', error: 'HTTP 503' });
+  assert.deepEqual(await missingTexts(sql, [fetched, abstractOnly, failed, without, doiOnly]), [failed, without]);
 });

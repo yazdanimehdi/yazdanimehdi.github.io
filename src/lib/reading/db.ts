@@ -1,11 +1,11 @@
 import type { Sql } from '../db';
-import type { DigestItem, DigestSection, NewPaper, Paper, PaperState, ReadingRun, Signals } from './types';
+import type { DigestItem, DigestSection, NewPaper, Paper, PaperState, ReadingRun, Signals, TextSource } from './types';
 
 // JSON goes in as `${text}::text::jsonb`: with a bare `::jsonb`, postgres.js sees a jsonb parameter and encodes the
 // string again, storing a jsonb string instead of the object (PGlite doesn't, so only a real Postgres shows it).
 // Dates come out as `::text`, so a `date` column is never shifted by the client's time zone.
-type Row = Record<string, unknown>;
-const j = (v: unknown) => JSON.stringify(v);
+export type Row = Record<string, unknown>;
+export const j = (v: unknown) => JSON.stringify(v);
 
 export async function readReading(
   sql: Sql,
@@ -204,23 +204,33 @@ export async function pruneCandidates(sql: Sql): Promise<number> {
   return rows.length;
 }
 
-/** Of these papers, those with an arXiv id and no `reading_texts` row (failed fetches have one), in `ids` order. */
+/** Of these papers, those with an arXiv id and no `reading_texts` row or a failed (retryable) fetch, in `ids` order. */
 export async function missingTexts(sql: Sql, ids: number[]): Promise<number[]> {
   const rows = await sql<Row>`
     select id from reading_papers p
     where id = any(${ids}::bigint[]) and arxiv is not null
-      and not exists (select 1 from reading_texts t where t.paper_id = p.id)
+      and not exists (select 1 from reading_texts t where t.paper_id = p.id and t.error is null)
     order by array_position(${ids}::bigint[], id)`;
   return rows.map((r) => Number(r.id));
 }
 
+/** Upserts the paper's text; omitted fields are stored as null. */
 export async function saveText(
   sql: Sql,
   paperId: number,
-  t: { source: 'arxiv-html'; body: string | null; error: string | null },
+  t: {
+    source: TextSource;
+    body?: string | null;
+    error?: string | null;
+    note?: string | null;
+    pdf?: Uint8Array | null;
+    pages?: number | null;
+  },
 ): Promise<void> {
   await sql`
-    insert into reading_texts (paper_id, source, body, error) values (${paperId}, ${t.source}, ${t.body}, ${t.error})
+    insert into reading_texts (paper_id, source, body, error, note, pdf, pages)
+    values (${paperId}, ${t.source}, ${t.body ?? null}, ${t.error ?? null}, ${t.note ?? null}, ${t.pdf ?? null},
+      ${t.pages ?? null})
     on conflict (paper_id) do update set source = excluded.source, body = excluded.body, error = excluded.error,
-      fetched_at = now()`;
+      note = excluded.note, pdf = excluded.pdf, pages = excluded.pages, fetched_at = now()`;
 }
