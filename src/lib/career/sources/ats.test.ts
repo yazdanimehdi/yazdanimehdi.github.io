@@ -2,7 +2,7 @@ import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { ATS_MAX_BYTES, atsPostings, detectAts, watched } from './ats';
-import { getJson, getText, setLookupForTests, SourceError } from './http';
+import { getBytes, getJson, getText, setLookupForTests, SourceError } from './http';
 import { SOURCES, type SourceContext } from './index';
 import { parsePrefs } from '../settings';
 
@@ -186,6 +186,14 @@ test('maxBytes raises or lowers the body cap per call', async () => {
   mock.method(globalThis, 'fetch', async () => new Response('x'.repeat(100)));
   await assert.rejects(getText('https://example.com/a', { maxBytes: 99 }), SourceError);
   assert.equal((await getText('https://example.com/a', { maxBytes: 100 })).length, 100);
+});
+
+test('getBytes returns the body byte for byte, under the same cap and checks', async () => {
+  const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0xff, 0x00, 0xc3]);
+  mock.method(globalThis, 'fetch', async () => new Response(pdf));
+  assert.deepEqual(new Uint8Array(await getBytes('https://example.com/p.pdf')), pdf);
+  await assert.rejects(getBytes('https://example.com/p.pdf', { maxBytes: 6 }), SourceError);
+  await assert.rejects(getBytes('http://127.0.0.1/p.pdf'), /private/);
 });
 
 test('ATS board calls use the raised cap', async () => {

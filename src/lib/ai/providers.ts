@@ -8,6 +8,8 @@ export interface TextInput {
   system: string;
   prompt: string;
   maxTokens: number;
+  /** A PDF the model reads along with the prompt (the owner's own paper; at most 4 MB). */
+  pdf?: { name: string; bytes: Uint8Array };
 }
 export interface ImageInput {
   prompt: string;
@@ -80,6 +82,8 @@ const nonEmpty = (label: string, text: unknown, why = ''): string => {
   throw new AiError(`${label} returned no text${why ? ` (${why})` : ''}`);
 };
 
+const pdf64 = (input: TextInput) => Buffer.from(input.pdf!.bytes).toString('base64');
+
 const fromBase64 = (label: string, b64: unknown): Uint8Array => {
   if (typeof b64 !== 'string' || !b64) throw new AiError(`${label} returned no image`);
   return new Uint8Array(Buffer.from(b64, 'base64'));
@@ -92,7 +96,18 @@ async function openaiText(key: string, model: string, input: TextInput, fetchFn 
       model,
       messages: [
         { role: 'system', content: input.system },
-        { role: 'user', content: input.prompt },
+        {
+          role: 'user',
+          content: input.pdf
+            ? [
+                {
+                  type: 'file',
+                  file: { filename: input.pdf.name, file_data: `data:application/pdf;base64,${pdf64(input)}` },
+                },
+                { type: 'text', text: input.prompt },
+              ]
+            : input.prompt,
+        },
       ],
       // max_tokens is deprecated and refused by reasoning models; this one counts their reasoning too.
       max_completion_tokens: input.maxTokens,
@@ -110,7 +125,17 @@ async function anthropicText(key: string, model: string, input: TextInput, fetch
       model,
       max_tokens: input.maxTokens,
       system: input.system,
-      messages: [{ role: 'user', content: input.prompt }],
+      messages: [
+        {
+          role: 'user',
+          content: input.pdf
+            ? [
+                { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdf64(input) } },
+                { type: 'text', text: input.prompt },
+              ]
+            : input.prompt,
+        },
+      ],
     },
     timeout: TEXT_TIMEOUT,
   });
@@ -135,7 +160,15 @@ async function googleText(key: string, model: string, input: TextInput, fetchFn 
     headers: { 'x-goog-api-key': key },
     body: {
       systemInstruction: { parts: [{ text: input.system }] },
-      contents: [{ role: 'user', parts: [{ text: input.prompt }] }],
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            ...(input.pdf ? [{ inline_data: { mime_type: 'application/pdf', data: pdf64(input) } }] : []),
+            { text: input.prompt },
+          ],
+        },
+      ],
       generationConfig: { maxOutputTokens: input.maxTokens },
     },
     timeout: TEXT_TIMEOUT,
@@ -282,12 +315,32 @@ export const IMAGE_PROVIDERS: Record<ImageProviderId, Provider<ImageInput, Image
 };
 export { higgsfieldImage, higgsfieldVideo };
 
+/** How often the papers sync runs; the daily cron and the GitHub Action both run daily and skip unless due. */
+export type PapersSchedule = { every: 'off' | 'day' | 'week' | 'month'; weekday?: number; monthday?: number };
+
+function resolveSchedule(raw: any): PapersSchedule {
+  const every = ['off', 'day', 'week', 'month'].includes(raw?.every) ? raw.every : 'day';
+  const weekday = Number.isInteger(raw?.weekday) && raw.weekday >= 0 && raw.weekday <= 6 ? raw.weekday : 1;
+  const monthday = Number.isInteger(raw?.monthday) && raw.monthday >= 1 && raw.monthday <= 28 ? raw.monthday : 1;
+  return every === 'week' ? { every, weekday } : every === 'month' ? { every, monthday } : { every };
+}
+
+const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+/** "weekly on Monday": the schedule in words (jobs detail, admin copy). */
+export function scheduleLabel(s: PapersSchedule): string {
+  if (s.every === 'off') return 'off';
+  if (s.every === 'week') return `weekly on ${DAYS[s.weekday ?? 1]}`;
+  if (s.every === 'month') return `monthly on day ${s.monthday ?? 1}`;
+  return 'daily';
+}
+
 export interface AiConfig {
   text: { provider: TextProviderId; model: string };
   image: { provider: ImageProviderId; model: string };
   /** Generate GIF always animates with Higgsfield. */
   video: { model: string };
-  papers: { autoPost: boolean; maxPostsPerRun: number };
+  papers: { autoPost: boolean; maxPostsPerRun: number; schedule: PapersSchedule };
 }
 
 /** config/ai.yml with every missing or unusable value replaced by its default. */
@@ -308,6 +361,7 @@ export function resolveAiConfig(raw: unknown): AiConfig {
     papers: {
       autoPost: r.papers?.autoPost !== false,
       maxPostsPerRun: Number.isInteger(max) && max >= 0 ? max : 3,
+      schedule: resolveSchedule(r.papers?.schedule),
     },
   };
 }

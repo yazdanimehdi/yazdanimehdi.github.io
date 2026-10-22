@@ -143,3 +143,18 @@ test('an internal subset after a decoy DOCTYPE (e.g. in a comment) is still reje
   assert.equal(sniffImage(bytes(svg)), 'svg');
   assert.throws(() => prepareUpload('x.svg', bytes(svg)), isMediaError(415));
 });
+
+test('prepareUpload accepts a PDF by its %PDF- bytes and refuses a fake or oversized one', () => {
+  const pdf = bytes('%PDF-1.7\n%\xe2\xe3\xcf\xd3\n1 0 obj');
+  const ok = prepareUpload('My Paper.pdf', pdf);
+  assert.match(ok.filename, /^my-paper-[0-9a-f]{6}\.pdf$/);
+  assert.equal(ok.contentType, 'application/pdf');
+  assert.throws(() => prepareUpload('paper.pdf', bytes('<html>not a pdf</html>')), isMediaError(415));
+  assert.throws(() => prepareUpload('paper.pdf', new Uint8Array(MAX_UPLOAD + 1).fill(0x25)), isMediaError(413));
+  const big = new Uint8Array(MAX_UPLOAD + 1);
+  big.set(pdf);
+  assert.throws(
+    () => prepareUpload('paper.pdf', big),
+    (e) => isMediaError(413)(e) && /4 MB/.test((e as Error).message),
+  );
+});

@@ -12,6 +12,7 @@ import os
 import re
 import sys
 import time
+from datetime import datetime, timezone
 from difflib import SequenceMatcher
 from pathlib import Path
 
@@ -36,6 +37,22 @@ FETCH_DELAY = 4  # seconds
 def load_config():
     with open(CONFIG_PATH, "r") as f:
         return yaml.safe_load(f)
+
+
+def papers_due(schedule, today) -> bool:
+    """Mirrors papersDue in src/lib/admin/papers.ts: today is a UTC date; weekday 0 is Sunday."""
+    s = schedule if isinstance(schedule, dict) else {}
+    every = s.get("every", "day")
+    # YAML 1.1 (PyYAML) reads an unquoted `off` as False.
+    if every is False or every == "off":
+        return False
+    if every == "week":
+        weekday = s.get("weekday")
+        return (today.isoweekday() % 7) == (weekday if type(weekday) is int and 0 <= weekday <= 6 else 1)
+    if every == "month":
+        monthday = s.get("monthday")
+        return today.day == (monthday if type(monthday) is int and 1 <= monthday <= 28 else 1)
+    return True
 
 
 def load_overrides():
@@ -228,10 +245,10 @@ def merge_with_existing(new_pubs: list[dict], existing: list[dict]) -> list[dict
         existing_pub = existing_by_id.get(pub["id"]) or existing_by_title.get(norm_title)
 
         if existing_pub:
-            # Update existing entry, but preserve non-empty fields from existing
+            # Existing entries keep every non-empty field; Scholar only fills empty ones
             merged_pub = {**existing_pub}
             for key, value in pub.items():
-                if value and (not merged_pub.get(key) or key in ("title", "authors", "venue", "year")):
+                if value and not merged_pub.get(key):
                     merged_pub[key] = value
             merged.append(merged_pub)
         else:
@@ -290,6 +307,13 @@ def setup_proxy():
 
 
 def main():
+    if "--if-due" in sys.argv:
+        ai_path = ROOT / "config" / "ai.yml"
+        ai = (yaml.safe_load(ai_path.read_text()) or {}) if ai_path.exists() else {}
+        schedule = (ai.get("papers") or {}).get("schedule")
+        if not papers_due(schedule, datetime.now(timezone.utc).date()):
+            print("Not due today (config/ai.yml papers.schedule); nothing to do.")
+            return
     config = load_config()
     authors_config = config.get("authors", [])
     max_results = config.get("maxResults", 100)

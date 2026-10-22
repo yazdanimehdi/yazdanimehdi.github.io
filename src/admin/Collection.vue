@@ -6,6 +6,7 @@ import AiAssist from './AiAssist.vue';
 import DocBanners from './DocBanners.vue';
 import FormFields from './FormFields.vue';
 import MarkdownEditor from './MarkdownEditor.vue';
+import PaperReview from './PaperReview.vue';
 import { api, committed, report, toast } from './api';
 import { formatDate } from './dates';
 import { COLLECTIONS, resolveOptions, type Option } from './fields';
@@ -26,6 +27,7 @@ const confirmDelete = ref(false);
 const filters = ref<Record<string, string>>({});
 const topics = ref<Option[]>([]);
 const doc = useDocument<Doc>();
+const reviewing = ref(false);
 
 const path = (slug: string) => `src/content/${props.name}/${slug}.md`;
 const fields = computed(() => resolveOptions(cfg.fields, { topics: topics.value }));
@@ -140,8 +142,12 @@ async function remove() {
 <template>
   <AdminShell :ctx="ctx" :active="name === 'publications' ? 'publications' : `content/${name}`" :title="cfg.label">
     <template #actions>
+      <button v-if="name === 'publications'" type="button" class="adm-btn" @click="reviewing = true">
+        Complete papers
+      </button>
       <button type="button" class="adm-btn adm-btn-primary" @click="startNew">New {{ cfg.singular }}</button>
     </template>
+    <PaperReview v-if="reviewing" @close="reviewing = false" />
     <div class="adm-split">
       <section aria-label="Entries" class="adm-form">
         <div v-if="cfg.filters" class="adm-actions">

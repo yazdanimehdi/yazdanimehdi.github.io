@@ -40,6 +40,7 @@ jobs:
           python3 services/cv-render/test_cvrender.py
           python3 services/cv-render/test_main.py
           python3 scripts/test_render_cv.py
+          python3 scripts/test_sync_scholar.py
 
       - name: Static build (no adapter output; Sveltia admin present)
         run: |

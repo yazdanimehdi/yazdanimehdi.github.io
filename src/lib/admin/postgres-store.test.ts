@@ -233,3 +233,30 @@ test('the image library lists images only (the CV PDF shares the media table)', 
     ['fig-abc123.png'],
   );
 });
+
+test('readPdf: only a PDF this site uploaded is fetched, through the capped fetch', async () => {
+  const fetched: string[] = [];
+  const { store } = await setup({
+    get: async (url) => {
+      fetched.push(url);
+      return Buffer.from('%PDF-1.7');
+    },
+  });
+  const pdf = await store.putMedia(
+    'site',
+    'mirage-abc123.pdf',
+    Buffer.from('%PDF-1.7').toString('base64'),
+    'application/pdf',
+  );
+  const png = await store.putMedia('site', 'fig-abc123.png', 'iVBO', 'image/png');
+  assert.equal(Buffer.from((await store.readPdf(pdf.url))!).toString(), '%PDF-1.7');
+  assert.equal(await store.readPdf(png.url), null);
+  assert.equal(await store.readPdf('https://store.public.blob.vercel-storage.com/other-abc123.pdf'), null);
+  assert.equal(await store.readPdf('https://arxiv.org/pdf/2609.14491'), null);
+  assert.deepEqual(fetched, [pdf.url]);
+  assert.deepEqual(await Promise.all([pdf.url, png.url, '/images/mirage-abc123.pdf'].map((u) => store.isOwnPdf(u))), [
+    true,
+    false,
+    false,
+  ]);
+});

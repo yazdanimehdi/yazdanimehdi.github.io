@@ -1,0 +1,131 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<feed xmlns:opensearch="http://a9.com/-/spec/opensearch/1.1/" xmlns:arxiv="http://arxiv.org/schemas/atom" xmlns="http://www.w3.org/2005/Atom">
+  <id>https://arxiv.org/api/h+w/SE+BmQStYyRFRZr3pZjG8K8</id>
+  <title>arXiv Query: search_query=au:"Yazdani-Jahromi"&amp;id_list=&amp;start=0&amp;max_results=5</title>
+  <updated>2026-10-22T00:06:11Z</updated>
+  <link href="https://arxiv.org/api/query?search_query=au:%22Yazdani-Jahromi%22&amp;start=0&amp;max_results=5&amp;id_list=" type="application/atom+xml"/>
+  <opensearch:itemsPerPage>5</opensearch:itemsPerPage>
+  <opensearch:totalResults>11</opensearch:totalResults>
+  <opensearch:startIndex>0</opensearch:startIndex>
+  <entry>
+    <id>http://arxiv.org/abs/2410.12459v2</id>
+    <title>HELM: Hierarchical Encoding for mRNA Language Modeling</title>
+    <updated>2025-03-12T10:51:14Z</updated>
+    <link href="https://arxiv.org/abs/2410.12459v2" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2410.12459v2" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Messenger RNA (mRNA) plays a crucial role in protein synthesis, with its codon structure directly impacting biological properties. While Language Models (LMs) have shown promise in analyzing biological sequences, existing approaches fail to account for the hierarchical nature of mRNA's codon structure. We introduce Hierarchical Encoding for mRNA Language Modeling (HELM), a novel pre-training strategy that incorporates codon-level hierarchical structure into language model training. HELM modulates the loss function based on codon synonymity, aligning the model's learning process with the biological reality of mRNA sequences. We evaluate HELM on diverse mRNA datasets and tasks, demonstrating that HELM outperforms standard language model pre-training as well as existing foundation model baselines on seven diverse downstream property prediction tasks and an antibody region annotation tasks on average by around 8%. Additionally, HELM enhances the generative capabilities of language model, producing diverse mRNA sequences that better align with the underlying true data distribution compared to non-hierarchical baselines.</summary>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.CE" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2024-10-16T11:16:47Z</published>
+    <arxiv:primary_category term="cs.LG"/>
+    <author>
+      <name>Mehdi Yazdani-Jahromi</name>
+    </author>
+    <author>
+      <name>Mangal Prakash</name>
+    </author>
+    <author>
+      <name>Tommaso Mansi</name>
+    </author>
+    <author>
+      <name>Artem Moskalev</name>
+    </author>
+    <author>
+      <name>Rui Liao</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2508.15103v1</id>
+    <title>Equi-mRNA: Protein Translation Equivariant Encoding for mRNA Language Models</title>
+    <updated>2025-08-20T22:42:10Z</updated>
+    <link href="https://arxiv.org/abs/2508.15103v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2508.15103v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>The growing importance of mRNA therapeutics and synthetic biology highlights the need for models that capture the latent structure of synonymous codon (different triplets encoding the same amino acid) usage, which subtly modulates translation efficiency and gene expression. While recent efforts incorporate codon-level inductive biases through auxiliary objectives, they often fall short of explicitly modeling the structured relationships that arise from the genetic code's inherent symmetries. We introduce Equi-mRNA, the first codon-level equivariant mRNA language model that explicitly encodes synonymous codon symmetries as cyclic subgroups of 2D Special Orthogonal matrix (SO(2)). By combining group-theoretic priors with an auxiliary equivariance loss and symmetry-aware pooling, Equi-mRNA learns biologically grounded representations that outperform vanilla baselines across multiple axes. On downstream property-prediction tasks including expression, stability, and riboswitch switching Equi-mRNA delivers up to approximately 10% improvements in accuracy. In sequence generation, it produces mRNA constructs that are up to approximately 4x more realistic under Frechet BioDistance metrics and approximately 28% better preserve functional properties compared to vanilla baseline. Interpretability analyses further reveal that learned codon-rotation distributions recapitulate known GC-content biases and tRNA abundance patterns, offering novel insights into codon usage. Equi-mRNA establishes a new biologically principled paradigm for mRNA modeling, with significant implications for the design of next-generation therapeutics.</summary>
+    <category term="q-bio.QM" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-08-20T22:42:10Z</published>
+    <arxiv:primary_category term="q-bio.QM"/>
+    <author>
+      <name>Mehdi Yazdani-Jahromi</name>
+    </author>
+    <author>
+      <name>Ali Khodabandeh Yalabadi</name>
+    </author>
+    <author>
+      <name>Ozlem Ozmen Garibay</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2203.07593v3</id>
+    <title>Distraction is All You Need for Fairness</title>
+    <updated>2023-11-04T04:32:40Z</updated>
+    <link href="https://arxiv.org/abs/2203.07593v3" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2203.07593v3" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Bias in training datasets must be managed for various groups in classification tasks to ensure parity or equal treatment. With the recent growth in artificial intelligence models and their expanding role in automated decision-making, ensuring that these models are not biased is vital. There is an abundance of evidence suggesting that these models could contain or even amplify the bias present in the data on which they are trained, inherent to their objective function and learning algorithms; Many researchers direct their attention to this issue in different directions, namely, changing data to be statistically independent, adversarial training for restricting the capabilities of a particular competitor who aims to maximize parity, etc. These methods result in information loss and do not provide a suitable balance between accuracy and fairness or do not ensure limiting the biases in training. To this end, we propose a powerful strategy for training deep learning models called the Distraction module, which can be theoretically proven effective in controlling bias from affecting the classification results. This method can be utilized with different data types (e.g., Tabular, images, graphs, etc.). We demonstrate the potency of the proposed method by testing it on UCI Adult and Heritage Health datasets (tabular), POKEC-Z, POKEC-N and NBA datasets (graph), and CelebA dataset (vision). Using state-of-the-art methods proposed in the fairness literature for each dataset, we exhibit our model is superior to these proposed methods in minimizing bias and maintaining accuracy.</summary>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.AI" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2022-03-15T01:46:55Z</published>
+    <arxiv:primary_category term="cs.LG"/>
+    <author>
+      <name>Mehdi Yazdani-Jahromi</name>
+    </author>
+    <author>
+      <name>AmirArsalan Rajabi</name>
+    </author>
+    <author>
+      <name>Ali Khodabandeh Yalabadi</name>
+    </author>
+    <author>
+      <name>Aida Tayebi</name>
+    </author>
+    <author>
+      <name>Ozlem Ozmen Garibay</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2510.02017v1</id>
+    <title>FairContrast: Enhancing Fairness through Contrastive learning and Customized Augmenting Methods on Tabular Data</title>
+    <updated>2025-10-02T13:43:53Z</updated>
+    <link href="https://arxiv.org/abs/2510.02017v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2510.02017v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>As AI systems become more embedded in everyday life, the development of fair and unbiased models becomes more critical. Considering the social impact of AI systems is not merely a technical challenge but a moral imperative. As evidenced in numerous research studies, learning fair and robust representations has proven to be a powerful approach to effectively debiasing algorithms and improving fairness while maintaining essential information for prediction tasks. Representation learning frameworks, particularly those that utilize self-supervised and contrastive learning, have demonstrated superior robustness and generalizability across various domains. Despite the growing interest in applying these approaches to tabular data, the issue of fairness in these learned representations remains underexplored. In this study, we introduce a contrastive learning framework specifically designed to address bias and learn fair representations in tabular datasets. By strategically selecting positive pair samples and employing supervised and self-supervised contrastive learning, we significantly reduce bias compared to existing state-of-the-art contrastive learning models for tabular data. Our results demonstrate the efficacy of our approach in mitigating bias with minimum trade-off in accuracy and leveraging the learned fair representations in various downstream tasks.</summary>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-10-02T13:43:53Z</published>
+    <arxiv:comment>Accepted to NeurIPS 2025 - Reliable ML Workshop</arxiv:comment>
+    <arxiv:primary_category term="cs.LG"/>
+    <author>
+      <name>Aida Tayebi</name>
+    </author>
+    <author>
+      <name>Ali Khodabandeh Yalabadi</name>
+    </author>
+    <author>
+      <name>Mehdi Yazdani-Jahromi</name>
+    </author>
+    <author>
+      <name>Ozlem Ozmen Garibay</name>
+    </author>
+  </entry>
+  <entry>
+    <id>http://arxiv.org/abs/2501.15631v1</id>
+    <title>BoKDiff: Best-of-K Diffusion Alignment for Target-Specific 3D Molecule Generation</title>
+    <updated>2025-01-26T18:29:11Z</updated>
+    <link href="https://arxiv.org/abs/2501.15631v1" rel="alternate" type="text/html"/>
+    <link href="https://arxiv.org/pdf/2501.15631v1" rel="related" type="application/pdf" title="pdf"/>
+    <summary>Structure-based drug design (SBDD) leverages the 3D structure of biomolecular targets to guide the creation of new therapeutic agents. Recent advances in generative models, including diffusion models and geometric deep learning, have demonstrated promise in optimizing ligand generation. However, the scarcity of high-quality protein-ligand complex data and the inherent challenges in aligning generated ligands with target proteins limit the effectiveness of these methods. We propose BoKDiff, a novel framework that enhances ligand generation by combining multi-objective optimization and Best-of-K alignment methodologies. Built upon the DecompDiff model, BoKDiff generates diverse candidates and ranks them using a weighted evaluation of molecular properties such as QED, SA, and docking scores. To address alignment challenges, we introduce a method that relocates the center of mass of generated ligands to their docking poses, enabling accurate sub-component extraction. Additionally, we integrate a Best-of-N (BoN) sampling approach, which selects the optimal ligand from multiple generated candidates without requiring fine-tuning. BoN achieves exceptional results, with QED values exceeding 0.6, SA scores above 0.75, and a success rate surpassing 35%, demonstrating its efficiency and practicality. BoKDiff achieves state-of-the-art results on the CrossDocked2020 dataset, including a -8.58 average Vina docking score and a 26% success rate in molecule generation. This study is the first to apply Best-of-K alignment and Best-of-N sampling to SBDD, highlighting their potential to bridge generative modeling with practical drug discovery requirements. The code is provided at https://github.com/khodabandeh-ali/BoKDiff.git.</summary>
+    <category term="q-bio.BM" scheme="http://arxiv.org/schemas/atom"/>
+    <category term="cs.LG" scheme="http://arxiv.org/schemas/atom"/>
+    <published>2025-01-26T18:29:11Z</published>
+    <arxiv:comment>This paper is currently under review for ISMB/ECCB 2025</arxiv:comment>
+    <arxiv:primary_category term="q-bio.BM"/>
+    <author>
+      <name>Ali Khodabandeh Yalabadi</name>
+    </author>
+    <author>
+      <name>Mehdi Yazdani-Jahromi</name>
+    </author>
+    <author>
+      <name>Ozlem Ozmen Garibay</name>
+    </author>
+  </entry>
+</feed>

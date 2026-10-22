@@ -2,7 +2,7 @@ name: Sync Scholar Publications
 
 on:
   schedule:
-    - cron: '0 6 * * 1' # Every Monday 6am UTC
+    - cron: '0 6 * * *' # Daily 6am UTC; the script exits unless config/ai.yml papers.schedule says it is due
   workflow_dispatch:
 
 permissions:
@@ -33,7 +33,7 @@ jobs:
       - name: Sync publications from Scholar
         id: sync
         continue-on-error: true
-        run: python3 scripts/sync-scholar.py
+        run: python3 scripts/sync-scholar.py ${{ github.event_name == 'schedule' && '--if-due' || '' }}
 
       - name: Check for changes
         id: diff
