@@ -775,6 +775,7 @@
   display: flex;
   gap: 4px 20px;
   overflow-x: auto;
+  scroll-padding-inline: 16px;
   scrollbar-width: none;
   border-block-end: 1px solid var(--adm-rule);
 }
@@ -1268,6 +1269,11 @@
   .adm-main {
     padding: 20px 16px 40px;
   }
+  /* Section tabs bleed to the screen edges, so a tab scrolled past is cut by the screen, not inside the gutter. */
+  .adm-sections > .adm-tabs {
+    margin-inline: -16px;
+    padding-inline: 16px;
+  }
   .adm-split,
   .adm-split-wide,
   .adm-cols3 {
@@ -1307,25 +1313,33 @@
   .adm select {
     min-height: var(--adm-touch);
   }
-  /* Inline repeater rows stack, each input under its own label. */
-  .adm-rep-cols {
-    grid-auto-flow: row;
+  /* Inline repeaters: two columns stay side by side under their header, the row's buttons on a line of their own. */
+  .adm-rep .adm-list > .adm-list-row {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    padding-block-end: 10px;
+    border-block-end: 1px solid var(--adm-rule);
   }
-  .adm-rep-head {
+  .adm-rep .adm-list > .adm-list-row > :first-child {
+    flex-basis: 100%;
+  }
+  .adm-rep-head .adm-btn {
     display: none;
   }
-  .adm-rep .adm-rep-label {
+  /* Three or more columns stack, each input under its own label. */
+  .adm-rep-cols:has(> :nth-child(3)) {
+    grid-auto-flow: row;
+  }
+  .adm-rep:has(.adm-rep-cols > :nth-child(3)) .adm-rep-head {
+    display: none;
+  }
+  .adm-rep-cols:has(> :nth-child(3)) .adm-rep-label {
     position: static;
     width: auto;
     height: auto;
     clip: auto;
     font-size: 13px;
     font-weight: 500;
-  }
-  .adm-rep .adm-list-row {
-    align-items: flex-end;
-    padding-block-end: 10px;
-    border-block-end: 1px solid var(--adm-rule);
   }
   /* iOS Safari zooms into focused fields under 16px. */
   .adm input:not([type='checkbox'], [type='radio']),
