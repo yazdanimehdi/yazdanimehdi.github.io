@@ -209,11 +209,11 @@ export async function updatePosting(sql: Sql, id: number, patch: Patch): Promise
     where id = ${id}`;
 }
 
-/** Postings waiting for the owner's approval, the latest pre-fill first. */
-export async function readyPostings(sql: Sql): Promise<PostingSummary[]> {
+/** Postings with status ready, the latest pre-fill first; `waiting`: only those whose application awaits approval. */
+export async function readyPostings(sql: Sql, waiting = false): Promise<PostingSummary[]> {
   const rows = await sql<Row>`
     select id, company, title, location, remote, score, gate, status, found_at, flags, draft_state
-    from career_postings where status = 'ready'
+    from career_postings where status = 'ready' and (not ${waiting} or application->>'state' = 'ready')
     order by application->>'at' desc nulls last, found_at desc`;
   return rows.map(summary);
 }

@@ -202,6 +202,10 @@ test('readyCount counts only status ready postings whose application waits for a
   await updatePosting(sql, ids[2], { status: 'ready' });
   await updatePosting(sql, ids[3], { status: 'skipped', application: application({ state: 'ready' }) });
   assert.equal(await readyCount(sql), 1);
+  assert.deepEqual(
+    (await readyPostings(sql, true)).map((r) => r.id),
+    [ids[0]],
+  );
 });
 
 test('approvedPostings lists application state approved, oldest approval first', async () => {

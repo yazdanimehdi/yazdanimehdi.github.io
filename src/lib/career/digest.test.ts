@@ -48,7 +48,11 @@ async function posting(company: string, title: string, status: 'drafted' | 'read
     },
   ]);
   const [{ id }] = await sql<{ id: number }>`select id from career_postings where key = ${key}`;
-  await updatePosting(sql, Number(id), { status, score: 80 });
+  const application =
+    status === 'ready'
+      ? { state: 'ready' as const, at: new Date().toISOString(), url: 'https://jobs.test', fields: [], shots: [] }
+      : undefined;
+  await updatePosting(sql, Number(id), { status, score: 80, application });
   return Number(id);
 }
 const digestOn = (digest: Record<string, unknown> = {}) =>
