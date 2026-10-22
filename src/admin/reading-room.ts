@@ -21,20 +21,27 @@ const toCite = (id: string): Cite => ({
   pid: id.slice(id.indexOf(':') + 1),
 });
 
-// **strong** | `code` | [12:S2.p3, 13:page2] | *em* | _em_ (not inside a word, so snake_case stays text)
-const INLINE =
-  /\*\*(.+?)\*\*|`([^`]+)`|\[(\d+:[A-Za-z0-9.]+(?:[,;]\s*\d+:[A-Za-z0-9.]+)*)\]|\*([^*\s](?:[^*]*[^*\s])?)\*|(?<![A-Za-z0-9])_([^_\s](?:[^_]*[^_\s])?)_(?![A-Za-z0-9])/g;
+const IDS = String.raw`\[(\d+:[A-Za-z0-9.]+(?:[,;]\s*\d+:[A-Za-z0-9.]+)*)\]`; // [12:S2.p3, 13:page2]
+// **strong** | `code` | cites | *em* | _em_ (not inside a word, so snake_case stays text)
+const INLINE = new RegExp(
+  String.raw`\*\*(.+?)\*\*|\x60([^\x60]+)\x60|${IDS}|\*([^*\s](?:[^*]*[^*\s])?)\*|(?<![A-Za-z0-9])_([^_\s](?:[^_]*[^_\s])?)_(?![A-Za-z0-9])`,
+  'g',
+);
+const cite = (ids: string): Inline => ({ t: 'cite', cites: ids.split(/[,;]\s*/).map(toCite) });
+/** Bold or emphasised text, its cites still cites: split() with one group alternates text and ids. */
+const styled = (t: 'strong' | 'em', s: string): Inline[] =>
+  s.split(new RegExp(IDS)).flatMap((part, i) => (i % 2 ? [cite(part)] : part ? [{ t, s: part }] : []));
 
 function inline(s: string): Inline[] {
   const out: Inline[] = [];
   let at = 0;
   for (const m of s.matchAll(INLINE)) {
     if (m.index > at) out.push({ t: 'text', s: s.slice(at, m.index) });
-    const [, strong, code, cites, em1, em2] = m;
-    if (cites !== undefined) out.push({ t: 'cite', cites: cites.split(/[,;]\s*/).map(toCite) });
-    else if (strong !== undefined) out.push({ t: 'strong', s: strong });
+    const [, strong, code, ids, em1, em2] = m;
+    if (ids !== undefined) out.push(cite(ids));
+    else if (strong !== undefined) out.push(...styled('strong', strong));
     else if (code !== undefined) out.push({ t: 'code', s: code });
-    else out.push({ t: 'em', s: em1 ?? em2 });
+    else out.push(...styled('em', em1 ?? em2));
     at = m.index + m[0].length;
   }
   if (at < s.length) out.push({ t: 'text', s: s.slice(at) });
@@ -43,28 +50,33 @@ function inline(s: string): Inline[] {
 
 /**
  * The small Markdown subset chat answers use: blank-line paragraphs, '- '/'* ' and '1. ' lists (a plain line continues
- * the item above), '#' lines as headings, **strong**, *em* or _em_, `code` and [12:S2.p3] cites. Everything else (links,
+ * the item above; blank lines between items keep one list), '#' lines as headings, **strong**, *em* or _em_, `code` and [12:S2.p3] cites. Everything else (links,
  * HTML, images) stays literal text: the result is only ever rendered as text nodes.
  */
 export function markdownBlocks(md: string): Block[] {
   type Raw = { t: 'p' | 'h'; s: string } | { t: 'ul' | 'ol'; items: string[] };
   const raw: Raw[] = [];
-  let open = null as Raw | null; // the block a following plain line continues
+  let open = null as Raw | null; // the block a following line continues
+  let blank = false; // a blank line came since `open`: only an item of the same list continues it
   for (const line of md.split(/\r?\n/)) {
     const l = line.trim();
     const head = /^#{1,6}\s+(.*)$/.exec(l);
     const item = /^(?:([-*])|\d{1,9}[.)])\s+(.*)$/.exec(l);
-    if (!l) open = null;
-    else if (head) {
+    if (!l) {
+      blank = true;
+      continue;
+    }
+    if (head) {
       raw.push({ t: 'h', s: head[1] });
       open = null;
     } else if (item) {
       const t = item[1] ? 'ul' : 'ol';
       if (open?.t !== t) raw.push((open = { t, items: [] }));
       if ('items' in open) open.items.push(item[2]);
-    } else if (open?.t === 'p') open.s += ` ${l}`;
-    else if (open?.t === 'ul' || open?.t === 'ol') open.items[open.items.length - 1] += ` ${l}`;
+    } else if (!blank && open?.t === 'p') open.s += ` ${l}`;
+    else if (!blank && (open?.t === 'ul' || open?.t === 'ol')) open.items[open.items.length - 1] += ` ${l}`;
     else raw.push((open = { t: 'p', s: l }));
+    blank = false;
   }
   return raw.map((b) => ('items' in b ? { t: b.t, items: b.items.map(inline) } : { t: b.t, inl: inline(b.s) }));
 }

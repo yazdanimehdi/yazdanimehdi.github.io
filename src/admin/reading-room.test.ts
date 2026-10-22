@@ -63,6 +63,31 @@ test('markdownBlocks reads paragraphs, lists, emphasis, code and cites', () => {
   ]);
 });
 
+test('markdownBlocks keeps a loose list one list, and a cite inside bold a cite', () => {
+  const T = (s: string) => [{ t: 'text', s }];
+  assert.deepEqual(markdownBlocks('1. a\n\n2. b\n\n3. c\n\nAfter.'), [
+    { t: 'ol', items: [T('a'), T('b'), T('c')] },
+    { t: 'p', inl: T('After.') },
+  ]);
+  assert.deepEqual(markdownBlocks('- a\n\n- b\n\n1. c'), [
+    { t: 'ul', items: [T('a'), T('b')] },
+    { t: 'ol', items: [T('c')] },
+  ]);
+  assert.deepEqual(markdownBlocks('**Key [12:S2.p3] point** and *so [12:S1.p1]*'), [
+    {
+      t: 'p',
+      inl: [
+        { t: 'strong', s: 'Key ' },
+        { t: 'cite', cites: [{ paper: 12, pid: 'S2.p3' }] },
+        { t: 'strong', s: ' point' },
+        { t: 'text', s: ' and ' },
+        { t: 'em', s: 'so ' },
+        { t: 'cite', cites: [{ paper: 12, pid: 'S1.p1' }] },
+      ],
+    },
+  ]);
+});
+
 test('markdownBlocks leaves links and HTML as text', () => {
   const md = 'See [link](javascript:x) and <img src=x onerror=alert(1)> and ![i](y.png) and 2 * 3 * 4';
   assert.deepEqual(markdownBlocks(md), [{ t: 'p', inl: [{ t: 'text', s: md }] }]);
