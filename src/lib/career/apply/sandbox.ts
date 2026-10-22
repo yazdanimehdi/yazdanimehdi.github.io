@@ -1,4 +1,6 @@
-// Runs runner.mjs in the apply sandbox: one persistent VM, reused one run at a time, that holds no secrets.
+// Runs runner.mjs in the apply sandbox: one persistent VM, reused one run at a time (the apply lock), that holds no
+// secrets. Each call works in its own directory, so even a run that outlived its lock can't read another's files.
+import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import type { NetworkPolicy, SandboxApi, SandboxHandle } from '../../admin/editor';
 import { vercelSandbox } from '../../admin/sandbox';
@@ -29,9 +31,11 @@ export const APPLY_POLICY: NetworkPolicy = {
 };
 
 // Playwright pinned to the repo's @playwright/test major (runner.test.ts runs against that); the marker makes later
-// boots skip the install, since a persistent sandbox keeps its files.
+// boots skip the install, since a persistent sandbox keeps its files. A run's directory left by a call that died
+// (a CV inside) is swept once it is 15 minutes old.
 const INSTALL = `set -e
-mkdir -p ${DIR} && cd ${DIR}
+mkdir -p ${DIR}/runs && cd ${DIR}
+find runs -mindepth 1 -maxdepth 1 -mmin +15 -exec rm -rf {} +
 test -f .installed && exit 0
 test -f package.json || npm init -y >/dev/null
 npm i playwright@1.64 >/dev/null
@@ -39,7 +43,8 @@ sudo npx playwright install-deps chromium >/dev/null
 npx playwright install chromium >/dev/null
 touch .installed`;
 
-const RUN = `cd ${DIR} && rm -rf out && node runner.mjs "$1"`;
+// $1 is the run's input.json; runner.mjs beside it finds playwright in ${DIR}/node_modules.
+const RUN = `cd "$(dirname "$1")" && node runner.mjs "$1"`;
 
 /** The runner ran, or may have run, but no result came back: a submit must treat it as possibly sent. */
 export class RunnerLostError extends Error {}
@@ -74,9 +79,17 @@ async function check(sb: SandboxHandle, script: string, timeoutMs: number): Prom
 
 export type ApplyRun = Omit<RunnerInput, 'out' | 'files'> & { cvPdfUrl?: string; letterPdfUrl?: string };
 
+/** Stops the apply VM. Only the apply lock's holder calls this, as it lets go (releaseApplyLock). */
+export async function stopApplySandbox(): Promise<void> {
+  const sb = await (testApi ?? vercelSandbox).get(NAME).catch(() => null);
+  // eslint-disable-next-line no-console
+  await sb?.stop().catch((e) => console.error('[career] stopping the apply sandbox', e));
+}
+
 /**
- * One runner call. The CV and letter PDFs are downloaded here and written into the VM; the screenshots and letter PDF
- * the runner names come back in `files`, keyed by the path in the result. The session stops afterwards. Anything
+ * One runner call, in a directory of its own that is removed afterwards. The CV and letter PDFs are downloaded here
+ * and written into the VM; the screenshots and letter PDF the runner names come back in `files`, keyed by the path in
+ * the result. The VM keeps running: its lock's holder stops it (stopApplySandbox). Anything
  * that fails before the runner starts throws a plain Error (nothing was opened); once it has started, a missing
  * result throws RunnerLostError.
  */
@@ -91,26 +104,27 @@ export async function runInApplySandbox(input: ApplyRun): Promise<RunnerResult &
   const sb =
     (await api.get(NAME, { resume: true })) ??
     (await api.create(NAME, { networkPolicy: APPLY_POLICY, timeoutMs: SESSION_MS, ports: [] }));
+  const dir = `${DIR}/runs/${randomUUID()}`;
   try {
     // A sandbox created before a policy change keeps its old one until told.
     await sb.setNetworkPolicy(APPLY_POLICY);
     await sb.extendTimeout(SESSION_MS).catch(() => undefined);
-    await check(sb, INSTALL, 480_000);
+    await check(sb, `${INSTALL}\nmkdir -p ${dir}`, 480_000);
     const runner: RunnerInput = {
       ...rest,
-      out: `${DIR}/out`,
-      files: { ...(cv ? { cv: `${DIR}/cv.pdf` } : {}), ...(letter ? { letter: `${DIR}/letter-approved.pdf` } : {}) },
+      out: `${dir}/out`,
+      files: { ...(cv ? { cv: `${dir}/cv.pdf` } : {}), ...(letter ? { letter: `${dir}/letter-approved.pdf` } : {}) },
     };
     await sb.writeFiles([
-      { path: `${DIR}/runner.mjs`, content: Buffer.from(source) },
-      { path: `${DIR}/input.json`, content: Buffer.from(JSON.stringify(runner)) },
+      { path: `${dir}/runner.mjs`, content: Buffer.from(source) },
+      { path: `${dir}/input.json`, content: Buffer.from(JSON.stringify(runner)) },
       ...(cv ? [{ path: runner.files!.cv!, content: cv }] : []),
       ...(letter ? [{ path: runner.files!.letter!, content: letter }] : []),
     ]);
     let stdout: string;
     let stderr: string;
     try {
-      ({ stdout, stderr } = await sb.run(RUN, [`${DIR}/input.json`], { timeoutMs: RUN_MS }));
+      ({ stdout, stderr } = await sb.run(RUN, [`${dir}/input.json`], { timeoutMs: RUN_MS }));
     } catch (e) {
       throw new RunnerLostError(`The browser run ended without a result: ${(e as Error).message}`);
     }
@@ -130,6 +144,6 @@ export async function runInApplySandbox(input: ApplyRun): Promise<RunnerResult &
     return { ...result, files };
   } finally {
     // eslint-disable-next-line no-console
-    await sb.stop().catch((e) => console.error('[career] stopping the apply sandbox', e));
+    await sb.run('rm -rf "$1"', [dir]).catch((e) => console.error('[career] removing an apply run directory', e));
   }
 }

@@ -5,12 +5,13 @@ import { failPrefill, nextSubmit, prefillStep, submitLost, submitStep } from '..
 import { MAY_BE_SENT, type Application, type ApplyField } from '../lib/career/apply/types';
 import {
   addEvent,
-  applyBusy,
+  claimWithLock,
   CLAIM,
   getPosting,
   moveApplication,
   readCareer,
   readyPostings,
+  releaseApplyLock,
   updatePosting,
   writeCareer,
 } from '../lib/career/db';
@@ -84,7 +85,6 @@ async function claimPrefill(
   const state = p.application?.state ?? null;
   if (state === 'approved' || (state && MAY_BE_SENT.includes(state))) return 'locked';
   if (state === 'prefilling' && !(await finished(p.applyRunId, runs, now, PREFILL_STALE_MS))) return 'running';
-  if (await applyBusy(sql, id)) return 'busy';
   const app: Application = {
     state: 'prefilling',
     at: new Date(now).toISOString(),
@@ -92,12 +92,17 @@ async function claimPrefill(
     fields: [],
     shots: [],
   };
-  // One conditional update, so two clicks can't both start: the second no longer finds the row it read.
-  const [claimed] = await sql`update career_postings
-    set application = ${JSON.stringify(app)}::text::jsonb, apply_run_id = ${CLAIM + now}
-    where id = ${id} and application->>'state' is not distinct from ${state}
-      and apply_run_id is not distinct from ${p.applyRunId}
-    returning id`;
+  // One conditional update, so two clicks can't both start: the second no longer finds the row it read. It takes the
+  // apply lock in the same transaction, so a submit can't claim the sandbox in between.
+  const claimed = await claimWithLock(sql, { postingId: id, kind: 'prefill', at: app.at }, async (tx) => {
+    const [row] = await tx`update career_postings
+      set application = ${JSON.stringify(app)}::text::jsonb, apply_run_id = ${CLAIM + now}
+      where id = ${id} and application->>'state' is not distinct from ${state}
+        and apply_run_id is not distinct from ${p.applyRunId}
+      returning id`;
+    return row;
+  });
+  if (claimed === 'busy') return 'busy';
   return claimed ? app : 'running';
 }
 
@@ -118,6 +123,7 @@ export async function startPrefill(
       application: { ...app, state: 'failed', reason: 'Could not start' },
       applyRunId: null,
     });
+    await releaseApplyLock(sql, id, app.at, async () => {});
     throw e;
   }
   await updatePosting(sql, id, { applyRunId: runId });

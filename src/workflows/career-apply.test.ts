@@ -23,6 +23,7 @@ import {
   startPrefill,
   type ApplyRuns,
 } from './career-apply';
+import { nextSubmit, prefillStep, submitStep } from '../lib/career/apply/steps';
 
 let kit: Kit;
 beforeEach(async () => {
@@ -77,17 +78,101 @@ test('prefill is refused once an application is approved or may have been sent',
   }
 });
 
+const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
+const lock = async () => (await kit.sql`select apply_lock from career_settings where id = 1`)[0]?.apply_lock ?? null;
+
 test('only one apply sandbox runs at a time', async () => {
-  const minutesAgo = (m: number) => new Date(Date.now() - m * 60_000).toISOString();
-  const other = await posting(kit.sql, { ...readyApp(), state: 'prefilling', at: minutesAgo(1) });
+  const other = await posting(kit.sql);
   const id = await posting(kit.sql);
   const { runs, seen } = fakeRuns();
+  assert.deepEqual(await startPrefill(kit.sql, other, runs), { runId: `wrun_prefill_${other}` });
+  assert.equal(await startPrefill(kit.sql, id, runs), 'busy', 'another pre-fill holds the sandbox');
+  assert.equal((await getPosting(kit.sql, id))!.application, null, 'nothing claimed');
+  assert.deepEqual(seen.prefill, [other]);
+});
+
+test('a lock older than 15 minutes is taken over; a fresh one is not', async () => {
+  const id = await posting(kit.sql);
+  const { runs } = fakeRuns();
+  await kit.sql`update career_settings set apply_lock = ${JSON.stringify({ postingId: 999, kind: 'submit', at: minutesAgo(14) })}::text::jsonb`;
   assert.equal(await startPrefill(kit.sql, id, runs), 'busy');
-  await updatePosting(kit.sql, other, { application: { ...readyApp(), state: 'submitting', at: minutesAgo(1) } });
-  assert.equal(await startPrefill(kit.sql, id, runs), 'busy', 'a submit runs');
-  await updatePosting(kit.sql, other, { application: { ...readyApp(), state: 'prefilling', at: minutesAgo(16) } });
-  assert.deepEqual(await startPrefill(kit.sql, id, runs), { runId: `wrun_prefill_${id}` }, 'a stale one');
-  assert.deepEqual(seen.prefill, [id]);
+  await kit.sql`update career_settings set apply_lock = ${JSON.stringify({ postingId: 999, kind: 'submit', at: minutesAgo(16) })}::text::jsonb`;
+  assert.deepEqual(await startPrefill(kit.sql, id, runs), { runId: `wrun_prefill_${id}` });
+  const app = (await getPosting(kit.sql, id))!.application!;
+  assert.deepEqual(await lock(), { postingId: id, kind: 'prefill', at: app.at });
+});
+
+test('the queue’s submit waits while a pre-fill the owner started holds the sandbox', async () => {
+  // The review's scenario: the queue picks A while nothing is busy, then the owner pre-fills B before A is claimed.
+  const a = await posting(kit.sql, approvedApp());
+  const b = await posting(kit.sql);
+  const sb = fakeSandbox((input) => ok(input));
+  setApplySandboxForTests(sb.api);
+  const { runs } = fakeRuns();
+  assert.equal(await nextSubmit(), a);
+  assert.deepEqual(await startPrefill(kit.sql, b, runs), { runId: `wrun_prefill_${b}` });
+
+  assert.equal((await submitStep(a))?.state, 'approved', 'not claimed');
+  assert.equal(sb.inputs.length, 0, 'the browser never ran for A');
+  assert.equal(await nextSubmit(), 'busy', 'the queue waits');
+
+  assert.equal((await prefillStep(b))?.state, 'ready');
+  assert.equal(await lock(), null, 'the pre-fill let go');
+  assert.equal(await nextSubmit(), a);
+  assert.equal((await submitStep(a))?.state, 'submitted');
+  assert.equal(await lock(), null);
+  assert.deepEqual(
+    sb.inputs.map((i) => i.mode),
+    ['read', 'fill', 'submit'],
+  );
+});
+
+test('a pre-fill and a submit claimed at once: exactly one gets the sandbox', async () => {
+  const a = await posting(kit.sql, approvedApp());
+  const b = await posting(kit.sql);
+  const sb = fakeSandbox((input) => ok(input));
+  setApplySandboxForTests(sb.api);
+  const { runs, seen } = fakeRuns();
+  const [prefill, submit] = await Promise.all([startPrefill(kit.sql, b, runs), submitStep(a)]);
+  const prefilled = typeof prefill === 'object' && prefill !== null;
+  const submitted = submit?.state === 'submitted';
+  assert.ok(prefilled !== submitted, `one of them: ${JSON.stringify(prefill)} / ${submit?.state}`);
+  if (prefilled) {
+    assert.equal(submit?.state, 'approved');
+    assert.equal(sb.inputs.length, 0);
+  } else {
+    assert.equal(prefill, 'busy');
+    assert.deepEqual(seen.prefill, []);
+  }
+});
+
+test('a pre-fill that could not start lets go of the lock', async () => {
+  const id = await posting(kit.sql);
+  const { runs } = fakeRuns();
+  runs.prefill = async () => {
+    throw new Error('workflow down');
+  };
+  await assert.rejects(startPrefill(kit.sql, id, runs), /workflow down/);
+  assert.equal((await getPosting(kit.sql, id))!.application?.state, 'failed');
+  assert.equal(await lock(), null);
+});
+
+test('the apply sandbox stops only when the lock’s holder lets go', async () => {
+  const a = await posting(kit.sql);
+  const { runs } = fakeRuns();
+  const sb = fakeSandbox((input) => ok(input));
+  setApplySandboxForTests(sb.api);
+  await startPrefill(kit.sql, a, runs);
+  await prefillStep(a);
+  assert.equal(sb.stops, 1, 'once, after both runner calls');
+
+  // A pre-fill whose lock went stale and was taken over: it finishes, but the VM is the new holder's now.
+  const late = await posting(kit.sql, { ...readyApp(), state: 'prefilling', at: minutesAgo(16), fields: [] });
+  const holder = { postingId: 999, kind: 'submit', at: new Date().toISOString() };
+  await kit.sql`update career_settings set apply_lock = ${JSON.stringify(holder)}::text::jsonb`;
+  await prefillStep(late);
+  assert.equal(sb.stops, 1, 'not stopped under the holder');
+  assert.deepEqual(await lock(), holder);
 });
 
 test('approve rejects values for ids the form does not have', async () => {

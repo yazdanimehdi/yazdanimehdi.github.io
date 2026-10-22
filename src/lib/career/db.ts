@@ -248,13 +248,76 @@ export async function moveApplication(
   return r?.old ?? null;
 }
 
-/** Whether another posting's pre-fill or submission started in the last 15 minutes: one apply sandbox at a time. */
+/** Who holds the apply sandbox: the posting and the `at` of the application it claimed. */
+export interface ApplyLock {
+  postingId: number;
+  kind: 'prefill' | 'submit';
+  at: string;
+}
+
+/** A lock older than this is stale: its run died without letting go (one takes a few minutes, a step at most 5). */
+const LOCK_STALE = '15 minutes';
+
+/** Thrown inside a claim's transaction to roll the lock back when the posting had moved on. */
+class Unclaimed extends Error {}
+
+/**
+ * Takes the apply lock and runs `claim` (the posting's own conditional UPDATE) in one transaction, so both happen or
+ * neither. The lock is free when empty, stale, or already this posting's (one posting has one actor at a time: its
+ * claim says so). Returns `busy` while another run holds it, what `claim` returned, or null when the posting had moved
+ * on (the lock is then left as it was).
+ */
+export async function claimWithLock<T>(
+  sql: Sql,
+  lock: ApplyLock,
+  claim: (tx: Sql) => Promise<T | undefined>,
+): Promise<T | 'busy' | null> {
+  await sql`insert into career_settings (id) values (1) on conflict (id) do nothing`;
+  try {
+    return await sql.begin(async (tx) => {
+      const [held] = await tx`update career_settings set apply_lock = ${JSON.stringify(lock)}::text::jsonb
+        where id = 1 and (apply_lock is null
+          or (apply_lock->>'at')::timestamptz < now() - ${LOCK_STALE}::interval
+          or apply_lock->>'postingId' = ${String(lock.postingId)})
+        returning id`;
+      if (!held) return 'busy' as const;
+      const out = await claim(tx);
+      if (out === undefined) throw new Unclaimed();
+      return out;
+    });
+  } catch (e) {
+    if (e instanceof Unclaimed) return null;
+    throw e;
+  }
+}
+
+/**
+ * Lets go of the apply lock if this run (`postingId`, `at`) still holds it, running `then` (stopping the VM) before
+ * anyone else can take it. A run whose stale lock was taken over lets go of nothing and leaves the VM to the new
+ * holder.
+ */
+export async function releaseApplyLock(
+  sql: Sql,
+  postingId: number,
+  at: string,
+  then: () => Promise<void>,
+): Promise<boolean> {
+  return sql.begin(async (tx) => {
+    const [held] = await tx`update career_settings set apply_lock = null
+      where id = 1 and apply_lock->>'postingId' = ${String(postingId)} and apply_lock->>'at' = ${at}
+      returning id`;
+    if (held) await then();
+    return !!held;
+  });
+}
+
+/** Whether a run for another posting holds the apply sandbox (one apply run at a time). */
 export async function applyBusy(sql: Sql, exceptId: number | null = null): Promise<boolean> {
   const [r] = await sql`
-    select 1 from career_postings
-    where id is distinct from ${exceptId}::int and application->>'state' in ('prefilling', 'submitting')
-      and (application->>'at')::timestamptz > now() - interval '15 minutes'
-    limit 1`;
+    select 1 from career_settings
+    where id = 1 and apply_lock is not null
+      and (apply_lock->>'at')::timestamptz >= now() - ${LOCK_STALE}::interval
+      and apply_lock->>'postingId' is distinct from ${exceptId === null ? null : String(exceptId)}::text`;
   return !!r;
 }
 

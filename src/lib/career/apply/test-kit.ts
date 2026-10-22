@@ -50,7 +50,7 @@ export interface FakeSandbox {
   inputs: RunnerInput[];
   /** Files written into the VM, by path. */
   written: Map<string, Buffer>;
-  scripts: { script: string; env?: Record<string, string> }[];
+  scripts: { script: string; args: string[]; env?: Record<string, string> }[];
   policies: NetworkPolicy[];
   created: number;
   stops: number;
@@ -72,7 +72,7 @@ export function fakeSandbox(respond: FakeSandbox['respond']): FakeSandbox {
   const handle: SandboxHandle = {
     status: 'running',
     async run(script, args = [], opts = {}): Promise<CommandResult> {
-      fake.scripts.push({ script, env: opts.env });
+      fake.scripts.push({ script, args, env: opts.env });
       if (!script.includes('runner.mjs')) return { exitCode: 0, stdout: '', stderr: '' };
       const input = JSON.parse(fake.written.get(args[0])!.toString()) as RunnerInput;
       fake.inputs.push(input);

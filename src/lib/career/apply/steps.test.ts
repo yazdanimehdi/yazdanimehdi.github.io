@@ -66,8 +66,27 @@ test('prefill moves a drafted posting to ready with fields and screenshots', asy
   assert.equal(app?.shots.length, 1);
   assert.match(app!.shots[0], /^https:\/\/blob\.test\/career\/\d+\/filled-1\.png$/);
   assert.match(app!.letterPdf!, /^https:\/\/blob\.test\/career\/\d+\/letter\.pdf$/);
-  assert.equal(sb.stops, 2, 'the session stops after each run');
   assert.deepEqual(await events(id), ['drafted → ready', 'ready'], 'newest first');
+});
+
+test('each runner call gets its own directory in the VM, removed after its result is read', async () => {
+  const id = await posting(kit.sql, prefilling());
+  const sb = fakeSandbox((input) => ok(input));
+  setApplySandboxForTests(sb.api);
+  await prefillStep(id);
+
+  const runs = sb.scripts.filter((s) => s.script.includes('runner.mjs'));
+  const dirs = runs.map((r) => r.args[0].replace(/\/input\.json$/, ''));
+  assert.equal(new Set(dirs).size, 2, 'two calls, two directories');
+  for (const [i, dir] of dirs.entries()) {
+    assert.match(dir, /^\/vercel\/sandbox\/apply\/runs\/[0-9a-f-]{36}$/);
+    const input = sb.inputs[i];
+    assert.equal(input.out, `${dir}/out`);
+    for (const path of Object.values(input.files ?? {})) assert.ok(path.startsWith(`${dir}/`), path);
+    assert.ok(sb.written.has(`${dir}/runner.mjs`));
+    const removed = sb.scripts.findIndex((s) => s.script.includes('rm -rf') && s.args[0] === dir);
+    assert.ok(removed > sb.scripts.indexOf(runs[i]), `${dir} removed after its run`);
+  }
 });
 
 test('prefill without a cover letter leaves the cover-letter upload empty', async () => {

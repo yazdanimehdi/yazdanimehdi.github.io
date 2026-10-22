@@ -3,13 +3,22 @@ import { basename } from 'node:path';
 import { getStore } from '../../admin/get-store';
 import { postgresOnly } from '../../admin/http';
 import { getSql, type Sql } from '../../db';
-import { addEvent, applyBusy, approvedPostings, getPosting, moveApplication, readCareer } from '../db';
+import {
+  addEvent,
+  applyBusy,
+  approvedPostings,
+  claimWithLock,
+  getPosting,
+  moveApplication,
+  readCareer,
+  releaseApplyLock,
+} from '../db';
 import { putCareerFile } from '../files';
 import { parseAnswers, parsePrefs } from '../settings';
 import { baseCv } from '../tailor';
 import { workerText } from '../worker';
 import type { PostingStatus } from '../types';
-import { runInApplySandbox, RunnerLostError } from './sandbox';
+import { runInApplySandbox, RunnerLostError, stopApplySandbox } from './sandbox';
 import type { Application, ApplyField, ApplyState, RunnerResult } from './types';
 import { knownValues, needsHandoff, parseValues, valuesPrompt } from './values';
 
@@ -41,17 +50,21 @@ ${paragraphs}</body></html>`;
 }
 
 /**
- * Moves the application from `from` to `app` (and the posting to `status`) and records it, unless someone moved it
- * first; then the stored application is returned and nothing is recorded.
+ * Moves the application from `from` (the very claim, by its `at`) to `app` (and the posting to `status`) and records
+ * it, unless someone moved it first; then the stored application is returned and nothing is recorded. A pre-fill or
+ * submit run ends here either way, so it lets go of the apply lock (and stops the VM) if it still holds it.
  */
 async function settle(
   sql: Sql,
   id: number,
-  from: ApplyState,
+  from: { state: ApplyState; at: string },
   app: Application,
   status?: PostingStatus,
 ): Promise<Application | null> {
-  const old = await moveApplication(sql, id, { state: from }, app, status);
+  const old = await moveApplication(sql, id, from, app, status);
+  if (from.state === 'prefilling' || from.state === 'submitting') {
+    await releaseApplyLock(sql, id, from.at, stopApplySandbox);
+  }
   if (!old) return (await getPosting(sql, id))?.application ?? null;
   await addEvent(sql, id, 'apply', (app.reason ? `${app.state}: ${app.reason}` : app.state).slice(0, 500));
   if (status && old !== status) await addEvent(sql, id, 'status', `${old} → ${status}`);
@@ -87,7 +100,7 @@ export async function prefillStep(id: number): Promise<Application | null> {
     settle(
       sql,
       id,
-      'prefilling',
+      { state: 'prefilling', at: start.at },
       { url: start.url, fields: [], shots: [], ...patch, at: new Date().toISOString() },
       patch.state === 'ready' ? 'ready' : undefined,
     );
@@ -142,12 +155,18 @@ export async function failPrefill(id: number, reason: string): Promise<void> {
   const sql = getSql();
   const app = (await getPosting(sql, id))?.application;
   if (app?.state !== 'prefilling') return;
-  await settle(sql, id, 'prefilling', { ...app, state: 'failed', at: new Date().toISOString(), reason });
+  await settle(
+    sql,
+    id,
+    { state: 'prefilling', at: app.at },
+    { ...app, state: 'failed', at: new Date().toISOString(), reason },
+  );
 }
 
 /**
- * Submits the approved values. The application moves approved → submitting in one conditional UPDATE before the
- * sandbox is touched: a retry, a second queue or a double click finds it no longer approved and does nothing. Then
+ * Submits the approved values. The application moves approved → submitting in one conditional UPDATE, taken together
+ * with the apply lock, before the sandbox is touched: a retry, a second queue or a double click finds it no longer
+ * approved and does nothing, and while another run holds the sandbox it stays approved for the queue to retry. Then
  * `submitted` (status too) when the page confirmed, `unconfirmed` when it may have gone out (never sent again),
  * `changed` when the live form differs from the approved one, `handoff` on a blocker, `failed` when nothing was sent.
  */
@@ -155,16 +174,19 @@ export async function submitStep(id: number): Promise<Application | null> {
   'use step';
   const sql = getSql();
   const at = new Date().toISOString();
-  const [claimed] = await sql<{ application: Application }>`
-    update career_postings
-    set application = application || jsonb_build_object('state', 'submitting', 'at', ${at}::text)
-    where id = ${id} and application->>'state' = 'approved'
-    returning application`;
-  if (!claimed) return (await getPosting(sql, id))?.application ?? null;
+  const claimed = await claimWithLock(sql, { postingId: id, kind: 'submit', at }, async (tx) => {
+    const [row] = await tx<{ application: Application }>`
+      update career_postings
+      set application = application || jsonb_build_object('state', 'submitting', 'at', ${at}::text)
+      where id = ${id} and application->>'state' = 'approved'
+      returning application`;
+    return row;
+  });
+  if (!claimed || claimed === 'busy') return (await getPosting(sql, id))?.application ?? null;
   const app = claimed.application;
   await addEvent(sql, id, 'apply', 'submitting');
   const end = (patch: Partial<Application> & Pick<Application, 'state'>, status?: PostingStatus) =>
-    settle(sql, id, 'submitting', { ...app, ...patch, at: new Date().toISOString() }, status);
+    settle(sql, id, { state: 'submitting', at }, { ...app, ...patch, at: new Date().toISOString() }, status);
   if (!app.approved) return end({ state: 'failed', reason: 'There were no approved values to submit' });
 
   let result: Awaited<ReturnType<typeof runInApplySandbox>>;
@@ -215,27 +237,36 @@ export async function submitLost(id: number, reason: string): Promise<void> {
   const sql = getSql();
   const app = (await getPosting(sql, id))?.application;
   if (app?.state === 'submitting') {
-    await settle(sql, id, 'submitting', {
-      ...app,
-      state: 'unconfirmed',
-      at: new Date().toISOString(),
-      reason: `The submission stopped half-way (${reason}). It may have been sent: check before applying again`,
-    });
+    await settle(
+      sql,
+      id,
+      { state: 'submitting', at: app.at },
+      {
+        ...app,
+        state: 'unconfirmed',
+        at: new Date().toISOString(),
+        reason: `The submission stopped half-way (${reason}). It may have been sent: check before applying again`,
+      },
+    );
   } else if (app?.state === 'approved') {
-    await settle(sql, id, 'approved', { ...app, state: 'failed', at: new Date().toISOString(), reason });
+    await settle(
+      sql,
+      id,
+      { state: 'approved', at: app.at },
+      { ...app, state: 'failed', at: new Date().toISOString(), reason },
+    );
   }
 }
 
 /**
- * The next approved posting to submit; `busy` while a pre-fill holds the sandbox; null once none is left, after
+ * The next approved posting to submit; `busy` while another run holds the sandbox; null once none is left, after
  * clearing the queue's run id (only while none is approved, so an approval in between keeps the queue going).
  */
 export async function nextSubmit(): Promise<number | 'busy' | null> {
   'use step';
   const sql = getSql();
-  if (await applyBusy(sql)) return 'busy';
   const [next] = await approvedPostings(sql);
-  if (next !== undefined) return next;
+  if (next !== undefined) return (await applyBusy(sql, next)) ? 'busy' : next;
   const released = await sql`update career_settings set apply_queue_run_id = null
     where id = 1 and not exists (select 1 from career_postings where application->>'state' = 'approved')
     returning id`;
