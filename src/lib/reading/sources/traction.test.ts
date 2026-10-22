@@ -91,11 +91,12 @@ const SELECT =
 
 test('fetchTraction openalex adds api_key only when given', async () => {
   const prefs = openalexPrefs([{ id: 'subfields/1702', name: 'Artificial Intelligence' }]);
-  const url = `https://api.openalex.org/works?filter=primary_topic.subfield.id:1702,from_publication_date:2026-08-23&sort=cited_by_count:desc&per_page=50&${SELECT}`;
+  const url = `https://api.openalex.org/works?filter=primary_topic.subfield.id:1702,from_publication_date:2026-08-23,type:article|preprint|review,is_paratext:false&sort=cited_by_count:desc&per_page=50&${SELECT}`;
   const without = fake([['api.openalex.org/works', works]]);
   const papers = await fetchTraction('openalex', prefs, without.get, '2026-10-22');
   assert.deepEqual(without.urls, [url]);
-  assert.equal(papers.length, 3);
+  // The fixture's dataset is not a paper.
+  assert.equal(papers.length, 2);
   const withKey = fake([['api.openalex.org/works', works]]);
   await fetchTraction('openalex', prefs, withKey.get, '2026-10-22', 'k3y');
   assert.deepEqual(withKey.urls, [`${url}&api_key=k3y`]);
@@ -112,29 +113,78 @@ test('fetchTraction openalex queries fields and subfields separately', async () 
   assert.deepEqual(
     urls.map((u) => new URL(u).searchParams.get('filter')),
     [
-      'primary_topic.field.id:17,from_publication_date:2026-08-23',
-      'primary_topic.subfield.id:1702|2805,from_publication_date:2026-08-23',
+      'primary_topic.field.id:17,from_publication_date:2026-08-23,type:article|preprint|review,is_paratext:false',
+      'primary_topic.subfield.id:1702|2805,from_publication_date:2026-08-23,type:article|preprint|review,is_paratext:false',
     ],
   );
   // The same works from both requests: one paper per key.
-  assert.equal(papers.length, 3);
+  assert.equal(papers.length, 2);
   const none = fake([]);
   assert.deepEqual(await fetchTraction('openalex', openalexPrefs([]), none.get, '2026-10-22'), []);
   assert.deepEqual(none.urls, []);
 });
 
-test('fetchTraction asks Hugging Face and alphaXiv for their trending lists', async () => {
+test('fetchTraction asks Hugging Face for each of the last 7 days and alphaXiv for its hot list', async () => {
   const { urls, get } = fake([
     ['huggingface.co', () => fixture('reading/hf-daily.json')],
     ['alphaxiv.org', () => fixture('reading/alphaxiv-feed.json')],
   ]);
   const prefs = parseReadingPrefs({});
-  assert.equal((await fetchTraction('huggingface', prefs, get, '2026-10-22')).length, 3);
+  // Of the fixture's three, only the one submitted on 19 October is within the week.
+  const hf = await fetchTraction('huggingface', prefs, get, '2026-10-22');
+  assert.deepEqual(
+    hf.map((p) => p.key),
+    ['arxiv:2610.23374'],
+  );
   assert.equal((await fetchTraction('alphaxiv', prefs, get, '2026-10-22')).length, 3);
   assert.deepEqual(urls, [
-    'https://huggingface.co/api/daily_papers?sort=trending&limit=50',
+    ...['22', '21', '20', '19', '18', '17', '16'].map(
+      (d) => `https://huggingface.co/api/daily_papers?date=2026-10-${d}&limit=50`,
+    ),
     'https://api.alphaxiv.org/papers/v3/feed?pageNum=0&pageSize=50&sort=Hot&interval=7%20Days',
   ]);
+});
+
+test('fetchTraction keeps Hugging Face papers from the last 7 days only', async () => {
+  const entry = (id: string, since: string) => ({
+    paper: { id, title: `Paper ${id}`, upvotes: 10, submittedOnDailyAt: since },
+  });
+  const day = '2026-10-22';
+  const ago = (n: number) => new Date(Date.parse(`${day}T00:00:00Z`) - n * 86_400_000).toISOString();
+  const { get } = fake([
+    ['huggingface.co', () => JSON.stringify([entry('2610.00001', ago(2)), entry('2403.00002', ago(585))])],
+  ]);
+  const papers = await fetchTraction('huggingface', parseReadingPrefs({}), get, day);
+  assert.deepEqual(
+    papers.map((p) => p.key),
+    ['arxiv:2610.00001'],
+  );
+});
+
+test('fetchTraction drops OpenAlex works that are not papers or are older than 60 days', async () => {
+  const [dataset, preprint, article] = json('reading/openalex-works.json').results;
+  const old = {
+    ...article,
+    id: 'https://openalex.org/W1',
+    doi: 'https://doi.org/10.1/old',
+    publication_date: '2026-08-22',
+  };
+  const undated = {
+    ...article,
+    id: 'https://openalex.org/W2',
+    doi: 'https://doi.org/10.1/undated',
+    publication_date: null,
+  };
+  const paratext = { ...article, id: 'https://openalex.org/W3', doi: 'https://doi.org/10.1/journal', type: 'paratext' };
+  const { get } = fake([
+    ['api.openalex.org/works', () => JSON.stringify({ results: [dataset, preprint, article, old, undated, paratext] })],
+  ]);
+  const prefs = openalexPrefs([{ id: 'subfields/1702', name: 'Artificial Intelligence' }]);
+  const papers = await fetchTraction('openalex', prefs, get, '2026-10-22');
+  assert.deepEqual(
+    papers.map((p) => p.publishedAt),
+    [preprint.publication_date, article.publication_date],
+  );
 });
 
 test('blueskyCount marks a full page as capped', async () => {

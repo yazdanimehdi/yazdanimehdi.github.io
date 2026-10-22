@@ -17,9 +17,12 @@ const q = encodeURIComponent;
 const date = (iso: string | undefined) => iso?.slice(0, 10);
 const num = (v: unknown) => Number(v) || 0;
 
-/** `day` (YYYY-MM-DD) minus 60 days. */
-const sixtyDaysBefore = (d: string) =>
-  new Date(Date.parse(`${d}T00:00:00Z`) - 60 * 86_400_000).toISOString().slice(0, 10);
+/** `day` (YYYY-MM-DD) minus `n` days. */
+const daysBefore = (d: string, n: number) =>
+  new Date(Date.parse(`${d}T00:00:00Z`) - n * 86_400_000).toISOString().slice(0, 10);
+const sixtyDaysBefore = (d: string) => daysBefore(d, 60);
+/** OpenAlex types that are papers: no datasets, dissertations, paratext (journal records) or software. */
+const PAPER_TYPES = 'article|preprint|review';
 
 /** An arXiv paper with one source's signals. */
 function arxivPaper(
@@ -98,10 +101,16 @@ export async function fetchTraction(
   day: string,
   openAlexKey?: string,
 ): Promise<NewPaper[]> {
-  if (id === 'huggingface')
-    return unique(
-      parseHfDaily(JSON.parse(await get('https://huggingface.co/api/daily_papers?sort=trending&limit=50'))),
-    );
+  if (id === 'huggingface') {
+    // Each of the 7 days up to `day`, by upvotes: `sort=trending` mixes in papers years old and misses some of the
+    // week's most upvoted, and `week=` rejects ISO week 53.
+    const week = Array.from({ length: 7 }, (_, i) => daysBefore(day, i));
+    const papers: NewPaper[] = [];
+    for (const d of week)
+      papers.push(...parseHfDaily(JSON.parse(await get(`https://huggingface.co/api/daily_papers?date=${d}&limit=50`))));
+    const from = Date.parse(`${week[6]}T00:00:00Z`);
+    return unique(papers.filter((p) => Date.parse(p.signals!.huggingface!.since) >= from));
+  }
   if (id === 'alphaxiv')
     return unique(
       parseAlphaxiv(
@@ -116,9 +125,14 @@ export async function fetchTraction(
   for (const level of LEVELS) {
     const ids = prefs.sources.openalex.topics.flatMap((t) => (t.id.startsWith(`${level}s/`) ? t.id.split('/')[1] : []));
     if (!ids.length) continue;
-    const filter = `primary_topic.${level}.id:${ids.join('|')},from_publication_date:${from}`;
+    const filter = `primary_topic.${level}.id:${ids.join('|')},from_publication_date:${from},type:${PAPER_TYPES},is_paratext:false`;
     const url = `${OPENALEX}/works?filter=${filter}&sort=cited_by_count:desc&per_page=50&select=${WORK_FIELDS}${key}`;
-    papers.push(...parseOpenAlexTraction(JSON.parse(await get(url))));
+    // The filter asks for this already; a work that slips through anyway is dropped here.
+    const results = list(obj(JSON.parse(await get(url))).results).filter((w) => {
+      const { type, publication_date: date } = obj(w);
+      return PAPER_TYPES.split('|').includes(str(type) ?? '') && (str(date) ?? '') >= from;
+    });
+    papers.push(...parseOpenAlexTraction({ results }));
   }
   return unique(papers);
 }

@@ -20,6 +20,14 @@ let hosts: string[];
 let log: string[];
 
 const fixture = (path: string) => fs.readFileSync(`tests/fixtures/${path}`, 'utf8');
+/** The Hugging Face fixture as if each paper reached Daily Papers two days ago, inside the run's 7-day window. */
+const hfDaily = () =>
+  JSON.stringify(
+    JSON.parse(fixture('reading/hf-daily.json')).map((e: { paper: object }) => ({
+      ...e,
+      paper: { ...e.paper, submittedOnDailyAt: new Date(Date.now() - 2 * 86_400_000).toISOString() },
+    })),
+  );
 const savedKey = process.env.ANTHROPIC_API_KEY;
 const SLEEP = Symbol.for('WORKFLOW_SLEEP');
 setLookupForTests(async () => [{ address: '93.184.215.14', family: 4 }]);
@@ -164,7 +172,7 @@ test('a failing source is reported and the rest of the digest still appears', as
 test('a provider error stops ranking and lists the rest as not ranked tonight', async () => {
   await setPrefs({ area: 'speech', sources: { ...BIORXIV, ...HF } });
   routes['api.biorxiv.org'] = () => rxiv(15);
-  routes['huggingface.co'] = () => fixture('reading/hf-daily.json');
+  routes['huggingface.co'] = () => hfDaily();
   failScoreCall = 2;
   const run = await readingNightly();
   assert.match(run.stopped!, /credit balance is too low/);
@@ -193,7 +201,7 @@ test('the AI cap leaves the rest unranked without stopping', async () => {
 test('a second run the same day replaces today’s digest without rescoring', async () => {
   await setPrefs({ sources: { ...BIORXIV, ...HF } });
   routes['api.biorxiv.org'] = () => rxiv(3);
-  routes['huggingface.co'] = () => fixture('reading/hf-daily.json');
+  routes['huggingface.co'] = () => hfDaily();
   const first = await readingNightly();
   const before = await today();
   assert.equal(ai.score, 1);
@@ -208,7 +216,7 @@ test('a second run the same day replaces today’s digest without rescoring', as
 
 test('talked papers carry their numbers', async () => {
   await setPrefs({ area: 'machine learning', sources: HF });
-  routes['huggingface.co'] = () => fixture('reading/hf-daily.json');
+  routes['huggingface.co'] = () => hfDaily();
   const run = await readingNightly();
   assert.equal(run.talked, 3);
   assert.deepEqual([ai.area, run.aiCalls], [1, 1], 'one area check, counted');
@@ -221,7 +229,7 @@ test('talked papers carry their numbers', async () => {
 test('prefetch fetches arXiv HTML for digest papers only', async () => {
   await setPrefs({ sources: { ...ARXIV, ...HF } });
   routes['rss.arxiv.org'] = () => fixture('reading/arxiv-rss.xml');
-  routes['huggingface.co'] = () => fixture('reading/hf-daily.json');
+  routes['huggingface.co'] = () => hfDaily();
   const run = await readingNightly();
   assert.equal(run.inField, 1, 'only the speech paper scores high enough');
   assert.deepEqual(log, [

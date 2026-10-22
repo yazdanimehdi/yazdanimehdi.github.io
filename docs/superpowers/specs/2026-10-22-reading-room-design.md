@@ -198,12 +198,16 @@ Project 1 shipped as planned in `docs/superpowers/plans/2026-10-22-paper-digest.
   paper that newly trends on a second source is therefore not re-shown.
 - **Full text:** the arXiv HTML is stored raw in `reading_texts`, a failure as `404` or its message. Project 2 adds the
   passages table and splits it. The fetches are 15 seconds apart (arXiv's crawl delay).
-- **Hugging Face:** `sort=trending` without `week=`, the current trending list; the line counts days from the paper's
-  submission to Daily Papers. On 2026-10-22 that list held papers submitted up to 663 days earlier, so old papers can
-  appear; the line shows their age.
-- **OpenAlex:** `cited_by_count` within the last 60 days, sorted by citations. `counts_by_year` is not used: it counts
-  by calendar year, so it shows no velocity inside a 60-day window. On 2026-10-22 the subfield 1702 list included a
-  journal-level record and older works OpenAlex dates as recent; the area filter does not catch these.
+- **Hugging Face:** the Daily Papers of each of the 7 days up to the run's day (`date=<day>&limit=50`, 7 requests,
+  each day by upvotes), and only papers submitted to Daily Papers in those 7 days are kept. The planned
+  `sort=trending` without `week=` was replaced: on 2026-10-22 it held papers submitted up to 663 days earlier and
+  missed 6 of the week's 10 most upvoted. `week=` lists a week by upvotes too, but its API rejects ISO week 53
+  (2026-W53 is this December). The line counts days from the paper's submission to Daily Papers.
+- **OpenAlex:** `cited_by_count` within the last 60 days, sorted by citations, filtered to real papers with
+  `type:article|preprint|review,is_paratext:false` (checked live). A work of another type, or with no publication date
+  or one before the 60-day window, is dropped in code too. Without the filter, subfield 1702's list on 2026-10-22 was
+  led by a dataset with 463 citations, a journal-level record and old conference papers OpenAlex dates as recent.
+  `counts_by_year` is not used: it counts by calendar year, so it shows no velocity inside a 60-day window.
 - **bioRxiv and medRxiv categories:** the regex (lowercase words, `_` for spaces) was checked against the live API
   and not widened. Every real category fits; medRxiv's "HIV/AIDS" is `hiv_aids`, and a slash makes the API ignore the
   category and return every paper.
