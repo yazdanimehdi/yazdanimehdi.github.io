@@ -81,7 +81,7 @@ function toUrl(href: string, base?: URL): URL {
   }
 }
 
-async function readCapped(res: Response, host: string, maxBytes: number): Promise<string> {
+async function readCapped(res: Response, host: string, maxBytes: number): Promise<Buffer> {
   const chunks: Uint8Array[] = [];
   let size = 0;
   for await (const chunk of res.body ?? []) {
@@ -89,7 +89,7 @@ async function readCapped(res: Response, host: string, maxBytes: number): Promis
     if (size > maxBytes) throw new SourceError(`${host}: response is over ${maxBytes} bytes`);
     chunks.push(chunk);
   }
-  return Buffer.concat(chunks).toString('utf8');
+  return Buffer.concat(chunks);
 }
 
 /** Lets the connection go without reading the body. */
@@ -102,6 +102,11 @@ const fail = (url: URL) => (e: unknown) => {
 
 /** GET with the job-search User-Agent, a 15 s timeout, checked redirects, and a body cap (`init.maxBytes`, 5 MB by default). */
 export async function getText(url: string, init: FetchInit = {}): Promise<string> {
+  return (await getBytes(url, init)).toString('utf8');
+}
+
+/** getText's body as bytes (a PDF). */
+export async function getBytes(url: string, init: FetchInit = {}): Promise<Buffer> {
   const signal = AbortSignal.timeout(15_000);
   let headers: Record<string, string> = {
     'User-Agent': init.siteUrl ? `ScholarOS job search (+${init.siteUrl})` : 'ScholarOS job search',

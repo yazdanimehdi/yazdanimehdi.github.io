@@ -1,4 +1,4 @@
-import { SITE_MEDIA, assertAllowed, assertMediaPath } from './paths';
+import { SITE_MEDIA, assertAllowed, assertMediaPath, isMediaPath } from './paths';
 import { adminSettings } from './settings';
 import type { CommitResult, ContentStore, MediaFile, MediaFolder, UploadResult } from './store';
 
@@ -7,6 +7,14 @@ const IMAGE = /\.(png|jpe?g|webp|gif|avif|svg|ico)$/i;
 /** The repo folder and URL prefix of a media folder. */
 export function mediaFolder(folder: MediaFolder): { dir: string; url: string } {
   return folder === 'content' ? { dir: adminSettings().mediaFolder, url: adminSettings().publicFolder } : SITE_MEDIA;
+}
+
+/** The repo path of a PDF the site folder serves at `url` (`/images/…`), or null for any other URL. */
+export function sitePdfPath(url: string): string | null {
+  const prefix = `${SITE_MEDIA.url}/`;
+  if (!url.startsWith(prefix)) return null;
+  const path = `${SITE_MEDIA.dir}/${url.slice(prefix.length)}`;
+  return /\.pdf$/i.test(path) && isMediaPath(path) ? path : null;
 }
 
 /** Media as files in the repo: the git-backed stores (GitHub, memory) share this. */

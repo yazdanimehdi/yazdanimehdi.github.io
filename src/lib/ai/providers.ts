@@ -8,6 +8,8 @@ export interface TextInput {
   system: string;
   prompt: string;
   maxTokens: number;
+  /** A PDF the model reads along with the prompt (the owner's own paper; at most 4 MB). */
+  pdf?: { name: string; bytes: Uint8Array };
 }
 export interface ImageInput {
   prompt: string;
@@ -80,6 +82,8 @@ const nonEmpty = (label: string, text: unknown, why = ''): string => {
   throw new AiError(`${label} returned no text${why ? ` (${why})` : ''}`);
 };
 
+const pdf64 = (input: TextInput) => Buffer.from(input.pdf!.bytes).toString('base64');
+
 const fromBase64 = (label: string, b64: unknown): Uint8Array => {
   if (typeof b64 !== 'string' || !b64) throw new AiError(`${label} returned no image`);
   return new Uint8Array(Buffer.from(b64, 'base64'));
@@ -92,7 +96,18 @@ async function openaiText(key: string, model: string, input: TextInput, fetchFn 
       model,
       messages: [
         { role: 'system', content: input.system },
-        { role: 'user', content: input.prompt },
+        {
+          role: 'user',
+          content: input.pdf
+            ? [
+                {
+                  type: 'file',
+                  file: { filename: input.pdf.name, file_data: `data:application/pdf;base64,${pdf64(input)}` },
+                },
+                { type: 'text', text: input.prompt },
+              ]
+            : input.prompt,
+        },
       ],
       // max_tokens is deprecated and refused by reasoning models; this one counts their reasoning too.
       max_completion_tokens: input.maxTokens,
@@ -110,7 +125,17 @@ async function anthropicText(key: string, model: string, input: TextInput, fetch
       model,
       max_tokens: input.maxTokens,
       system: input.system,
-      messages: [{ role: 'user', content: input.prompt }],
+      messages: [
+        {
+          role: 'user',
+          content: input.pdf
+            ? [
+                { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: pdf64(input) } },
+                { type: 'text', text: input.prompt },
+              ]
+            : input.prompt,
+        },
+      ],
     },
     timeout: TEXT_TIMEOUT,
   });
@@ -135,7 +160,15 @@ async function googleText(key: string, model: string, input: TextInput, fetchFn 
     headers: { 'x-goog-api-key': key },
     body: {
       systemInstruction: { parts: [{ text: input.system }] },
-      contents: [{ role: 'user', parts: [{ text: input.prompt }] }],
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            ...(input.pdf ? [{ inline_data: { mime_type: 'application/pdf', data: pdf64(input) } }] : []),
+            { text: input.prompt },
+          ],
+        },
+      ],
       generationConfig: { maxOutputTokens: input.maxTokens },
     },
     timeout: TEXT_TIMEOUT,

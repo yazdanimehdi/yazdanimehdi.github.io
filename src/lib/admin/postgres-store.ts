@@ -1,7 +1,9 @@
 import { del, put } from '@vercel/blob';
 import { dangerouslyDeleteByTag } from '@vercel/functions';
 import { tagsForPaths } from '../cache-tags';
+import { getBytes } from '../career/sources/http';
 import { isUnreachable, type Sql } from '../db';
+import { MAX_UPLOAD } from './media';
 import { PathError } from './paths';
 import {
   ConflictError,
@@ -31,9 +33,11 @@ export interface PostgresDeps {
   purge(tags: string[]): Promise<void>;
   put(pathname: string, body: Buffer, contentType: string): Promise<{ url: string }>;
   del(url: string): Promise<void>;
+  /** A stored file's bytes from Blob (the capped safe fetch unless a test passes one). */
+  get?(url: string): Promise<Uint8Array>;
 }
 
-const defaultDeps: PostgresDeps = {
+const defaultDeps: Required<PostgresDeps> = {
   purge: (tags) => dangerouslyDeleteByTag(tags),
   put: (pathname, body, contentType) =>
     put(pathname, body, { access: 'public', contentType, addRandomSuffix: false, allowOverwrite: true }),
@@ -43,6 +47,7 @@ const defaultDeps: PostgresDeps = {
     if (import.meta.env?.DEV) return console.warn('[dev] Blob delete skipped', url);
     await del(url);
   },
+  get: (url) => getBytes(url, { maxBytes: MAX_UPLOAD }),
 };
 
 const blobFailure = (e: unknown) =>
@@ -229,6 +234,14 @@ export class PostgresStore implements ContentStore {
         values (${url}, ${filename}, ${bytes.length}, ${contentType}) on conflict (url) do nothing`,
     );
     return { path: url, url, version: '1', commit: { id: `blob:${filename}` } };
+  }
+
+  /** Only a URL with a PDF row in `media` (this site's own upload) is fetched. */
+  async readPdf(url: string): Promise<Uint8Array | null> {
+    const [row] = await this.db(
+      () => this.sql`select url from media where url = ${url} and content_type = 'application/pdf'`,
+    );
+    return row ? (this.deps.get ?? defaultDeps.get)(url) : null;
   }
 
   /** Only images this site uploaded (a row in `media`) can be deleted. */

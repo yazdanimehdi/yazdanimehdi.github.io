@@ -5,7 +5,10 @@ import { setLookupForTests, SourceError } from '../career/sources/http';
 import {
   completedFields,
   findPaper,
+  fromPdf,
+  fullAuthors,
   paperLookup,
+  proposeFor,
   proposeBatch,
   proposeChanges,
   PROPOSE_FOR_MS,
@@ -13,7 +16,10 @@ import {
   sameAuthors,
   surnames,
   type Lookup,
+  type PaperProposal,
+  type ReadPdf,
 } from './paper-complete';
+import type { TextInput } from '../ai/providers';
 
 const fixture = (name: string) =>
   fs.readFileSync(new URL(`../../../tests/fixtures/papers/${name}`, import.meta.url), 'utf8');
@@ -413,7 +419,7 @@ test('proposeBatch: one paper at least, none started after PROPOSE_FOR_MS, and i
       throw new SourceError('nothing here', 404);
     },
   };
-  const timed = await proposeBatch(entries, slow, {}, () => t);
+  const timed = await proposeBatch(entries, slow, {}, undefined, () => t);
   assert.deepEqual(
     timed.map((p) => [p.slug, p.noMatch]),
     [['a', true]],
@@ -429,4 +435,125 @@ test('proposeBatch: one paper at least, none started after PROPOSE_FOR_MS, and i
     failed.map((p) => [p.slug, p.error]),
     [['a', 'arXiv answered 503']],
   );
+});
+
+const MIRAGE = 'MIRAGE: Measuring Interpolation and Redundancy in Affinity GEneralization';
+const FULL = ['Mehdi Yazdani-Jahromi', 'Sanjay Padhi', 'Ivan Garibay'];
+const FROM_PDF = { source: 'pdf' as const, title: MIRAGE, authors: FULL, abstract: 'We introduce MIRAGE.', year: 2026 };
+const NOWHERE: Lookup = {
+  async get(url) {
+    throw new SourceError(`${url} answered 404`, 404);
+  },
+};
+/** Answers every read with `record` and records the URLs read. */
+const reader = (record: Awaited<ReturnType<ReadPdf>> = FROM_PDF): ReadPdf & { urls: string[] } => {
+  const urls: string[] = [];
+  return Object.assign(async (url: string) => (urls.push(url), record), { urls });
+};
+const byField = (p: PaperProposal) => Object.fromEntries(p.changes.map((c) => [c.field, c]));
+
+test('fullAuthors: every name needs a first name, not only initials', () => {
+  assert.ok(fullAuthors(['Mehdi Yazdani-Jahromi', 'Ozlem Ozmen Garibay', 'Núñez, José']));
+  for (const a of [['M Yazdani-Jahromi'], ['Mehdi Yazdani', 'AK Yalabadi'], ['Penker, S.'], ['Garibay'], [], undefined])
+    assert.ok(!fullAuthors(a), String(a));
+});
+
+test('fromPdf: the model reads the attached PDF; its JSON is a pdf-sourced record with cleaned strings', async () => {
+  const bytes = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d]);
+  let sent: TextInput | undefined;
+  const reply = `Here you go:\n\`\`\`json\n${JSON.stringify({
+    title: ` ${MIRAGE}\u200b `,
+    authors: ['Mehdi\u2028Yazdani-Jahromi', ' ', 'Sanjay Padhi', 7],
+    abstract: 'We intro\u00adduce MIRAGE.',
+    year: 2026,
+  })}\n\`\`\``;
+  const record = await fromPdf(bytes, async (input) => ((sent = input), reply));
+  assert.deepEqual(record, {
+    source: 'pdf',
+    title: MIRAGE,
+    authors: ['Mehdi Yazdani-Jahromi', 'Sanjay Padhi'],
+    abstract: 'We introduce MIRAGE.',
+    year: 2026,
+  });
+  assert.equal(sent!.pdf!.bytes, bytes);
+  assert.match(sent!.system, /JSON/);
+
+  await assert.rejects(
+    fromPdf(bytes, async () => 'Sorry, I cannot read that file.'),
+    /JSON/,
+  );
+  assert.equal(await fromPdf(bytes, async () => '{"title":" ","authors":[],"abstract":""}'), null, 'nothing usable');
+  assert.equal((await fromPdf(bytes, async () => '{"title":"T","year":"soon"}'))?.year, 0, 'no year');
+  assert.equal((await fromPdf(bytes, async () => '{"title":"T","year":3026}'))?.year, 0, 'no future year');
+});
+
+test('proposeFor: a paper no source knows is proposed from its uploaded PDF, every change marked pdf', async () => {
+  const data = { title: 'Mirage', authors: ['M Yazdani-Jahromi'], year: 2026, pdf: '/images/mirage-abc123.pdf' };
+  const read = reader();
+  const p = await proposeFor('m', data, NOWHERE, {}, read);
+  assert.deepEqual(read.urls, ['/images/mirage-abc123.pdf']);
+  assert.equal(p.noMatch, undefined);
+  assert.deepEqual(
+    p.changes.map((c) => [c.field, c.source, c.fill]),
+    [
+      ['title', 'pdf', false],
+      ['authors', 'pdf', false],
+      ['abstract', 'pdf', true],
+    ],
+    'year is unchanged, so not offered',
+  );
+  assert.equal(byField(p).abstract.to, 'We introduce MIRAGE.');
+
+  const declined = await proposeFor('m', data, NOWHERE, { abstract: JSON.stringify('We introduce MIRAGE.') }, reader());
+  assert.ok(!byField(declined).abstract, 'a declined PDF value is not offered again');
+
+  const none = await proposeFor('m', { ...data, pdf: undefined }, NOWHERE, {}, read);
+  assert.equal(none.noMatch, true);
+  assert.equal(read.urls.length, 1, 'no pdf, no read');
+  assert.equal((await proposeFor('m', data, NOWHERE, {}, reader(null))).noMatch, true, 'not an own PDF');
+  assert.equal((await proposeFor('m', data, NOWHERE)).noMatch, true, 'no reader');
+});
+
+test('proposeFor: a PDF the model fails on is the error only when nothing else was found', async () => {
+  const data = { title: 'Mirage', authors: ['M Yazdani-Jahromi'], pdf: '/images/mirage-abc123.pdf' };
+  const broken: ReadPdf = async () => {
+    throw new Error('The AI did not answer with JSON');
+  };
+  const alone = await proposeFor('m', data, NOWHERE, {}, broken);
+  assert.deepEqual([alone.changes, alone.noMatch], [[], undefined]);
+  assert.match(alone.error!, /your PDF.*did not answer with JSON/i);
+
+  const feed = fixture('arxiv-mirage.xml').replace(/<summary>[\s\S]*?<\/summary>/, '');
+  const look = fake({ 'https://export.arxiv.org/api/query?id_list=2609.14491': feed });
+  const matched = await proposeFor('m', { ...data, arxiv: '2609.14491' }, look, {}, broken);
+  assert.equal(matched.error, undefined);
+  assert.ok(byField(matched).bibtex, "the sources' changes stand");
+});
+
+test('proposeFor: a matched paper reads its PDF only for a missing abstract or initials-only authors', async () => {
+  const data = { title: MIRAGE, authors: ['M Yazdani-Jahromi'], arxiv: '2609.14491', pdf: '/images/mirage-abc123.pdf' };
+  const complete = fake({ 'https://export.arxiv.org/api/query?id_list=2609.14491': 'arxiv-mirage.xml' });
+  const read = reader();
+  const p = await proposeFor('m', data, complete, {}, read);
+  assert.equal(read.urls.length, 0, 'arXiv has the abstract and full authors');
+  assert.equal(byField(p).authors.source, 'arxiv');
+
+  const thin = fixture('arxiv-mirage.xml')
+    .replace(/<summary>[\s\S]*?<\/summary>/, '')
+    .replace(/<name>(\S)\S* /g, '<name>$1 ');
+  const look = fake({ 'https://export.arxiv.org/api/query?id_list=2609.14491': thin });
+  const q = await proposeFor('m', data, look, {}, read);
+  assert.equal(read.urls.length, 1);
+  const by = byField(q);
+  assert.deepEqual([by.abstract.source, by.authors.source, by.authors.to], ['pdf', 'pdf', FULL]);
+  assert.equal(by.bibtex.source, 'arxiv');
+  assert.deepEqual(
+    p.changes
+      .concat(q.changes)
+      .filter((c) => c.source === 'pdf')
+      .map((c) => c.field),
+    ['authors', 'abstract'],
+    "a matched paper takes only the missing fields from its PDF; its year stays arXiv's",
+  );
+  assert.equal(by.year.source, 'arxiv');
 });

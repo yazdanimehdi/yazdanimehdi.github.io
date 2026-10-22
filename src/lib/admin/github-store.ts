@@ -1,4 +1,4 @@
-import { deleteRepoMedia, listRepoMedia, putRepoMedia } from './git-media';
+import { deleteRepoMedia, listRepoMedia, putRepoMedia, sitePdfPath } from './git-media';
 import {
   ConflictError,
   UpstreamError,
@@ -58,18 +58,22 @@ export class GitHubStore implements ContentStore {
     private fetchFn: typeof fetch = fetch,
   ) {}
 
-  private async gh<T>(method: string, route: string, body?: unknown, allow404 = false): Promise<T | null> {
-    const res = await this.fetchFn(`https://api.github.com/repos/${this.cfg.owner}/${this.cfg.repo}${route}`, {
+  private request(method: string, route: string, body?: unknown, accept = 'application/vnd.github+json') {
+    return this.fetchFn(`https://api.github.com/repos/${this.cfg.owner}/${this.cfg.repo}${route}`, {
       method,
       headers: {
         Authorization: `Bearer ${this.cfg.token}`,
-        Accept: 'application/vnd.github+json',
+        Accept: accept,
         'X-GitHub-Api-Version': '2022-11-28',
         'User-Agent': 'ScholarOS-admin',
         ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
       },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+  }
+
+  private async gh<T>(method: string, route: string, body?: unknown, allow404 = false): Promise<T | null> {
+    const res = await this.request(method, route, body);
     if (allow404 && res.status === 404) return null;
     if (res.status === 204) return null;
     if (!res.ok) throw await this.error(res);
@@ -112,6 +116,21 @@ export class GitHubStore implements ContentStore {
     if (file.encoding !== 'base64')
       throw new UpstreamError(`${path} is larger than 1 MB and can't be edited here.`, 413);
     return { path, content: Buffer.from(file.content ?? '', 'base64').toString('utf8'), version: file.sha };
+  }
+
+  /** The raw media type, since the JSON one carries no content past 1 MB. */
+  async readPdf(url: string): Promise<Uint8Array | null> {
+    const path = sitePdfPath(url);
+    if (!path) return null;
+    const res = await this.request(
+      'GET',
+      `/contents/${encodePath(path)}${this.ref()}`,
+      undefined,
+      'application/vnd.github.raw+json',
+    );
+    if (res.status === 404) return null;
+    if (!res.ok) throw await this.error(res);
+    return new Uint8Array(await res.arrayBuffer());
   }
 
   async list(dir: string): Promise<{ path: string; version: string }[]> {

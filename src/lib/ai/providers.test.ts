@@ -341,3 +341,41 @@ test('resolveAiConfig: defaults fill the gaps; an unknown provider falls back wi
     'kling/v3/image-to-video',
   );
 });
+
+test('text with a pdf: each provider attaches it in its documented shape, ahead of the prompt', async () => {
+  const pdf = { name: 'mirage.pdf', bytes: new Uint8Array([0x25, 0x50, 0x44, 0x46, 0x2d, 0xff]) };
+  const data = Buffer.from(pdf.bytes).toString('base64');
+  const input = { ...INPUT, pdf };
+  const seen: Request[] = [];
+  const ok = fakeFetch(
+    {
+      'POST https://api.openai.com/v1/chat/completions': { body: { choices: [{ message: { content: 'Hi.' } }] } },
+      'POST https://api.anthropic.com/v1/messages': { body: { content: [{ type: 'text', text: 'Hi.' }] } },
+      'POST https://generativelanguage.googleapis.com/v1beta/models/g:generateContent': {
+        body: { candidates: [{ content: { parts: [{ text: 'Hi.' }] } }] },
+      },
+    },
+    seen,
+  );
+  for (const p of ['openai', 'anthropic', 'google'] as const) await TEXT_PROVIDERS[p].run('k', 'g', input, ok);
+  const [openai, anthropic, google] = await Promise.all(seen.map((r) => r.json()));
+  assert.deepEqual(openai.messages[1], {
+    role: 'user',
+    content: [
+      { type: 'file', file: { filename: 'mirage.pdf', file_data: `data:application/pdf;base64,${data}` } },
+      { type: 'text', text: 'Say hi.' },
+    ],
+  });
+  assert.deepEqual(anthropic.messages, [
+    {
+      role: 'user',
+      content: [
+        { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data } },
+        { type: 'text', text: 'Say hi.' },
+      ],
+    },
+  ]);
+  assert.deepEqual(google.contents, [
+    { role: 'user', parts: [{ inline_data: { mime_type: 'application/pdf', data } }, { text: 'Say hi.' }] },
+  ]);
+});

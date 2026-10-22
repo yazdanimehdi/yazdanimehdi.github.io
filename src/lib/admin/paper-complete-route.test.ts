@@ -1,4 +1,4 @@
-import test, { after, beforeEach } from 'node:test';
+import test, { after, afterEach, beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -15,9 +15,10 @@ import { GET, POST } from '../../admin/routes/api/papers/complete';
 const MIRAGE = 'MIRAGE: Measuring Interpolation and Redundancy in Affinity GEneralization';
 const SCHOLAR_URL = 'https://scholar.google.com/citations?view_op=view_citation&citation_for_view=AUTH:m';
 let store: MemoryStore;
+let root: string;
 
 beforeEach(() => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'complete-'));
+  root = fs.mkdtempSync(path.join(os.tmpdir(), 'complete-'));
   const dir = path.join(root, 'src/content/publications');
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(
@@ -143,4 +144,86 @@ test('POST writes nothing when the field was edited after the review', async () 
   assert.equal(res.status, 409);
   assert.equal((await readEntry(store, 'publications', SLUG))!.data.url, 'https://example.org/mirage');
   assert.equal(store.log.length, 1, 'only the owner edit');
+});
+
+const PDF = Buffer.from('%PDF-1.7 mirage');
+const PAPER = path.join('src/content/publications', `${SLUG}.md`);
+const ABSTRACT = 'We introduce MIRAGE, a plug-in benchmark.';
+const savedKey = process.env.ANTHROPIC_API_KEY;
+afterEach(() => {
+  mock.restoreAll();
+  if (savedKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+  else process.env.ANTHROPIC_API_KEY = savedKey;
+});
+
+/** Papers no source knows, each with `pdf` (the same uploaded file unless given); the model answers `reply`. */
+function pdfPapers(slugs: string[], pdf = '/images/mirage-abc123.pdf', reply: unknown = { abstract: ABSTRACT }) {
+  setPaperLookupForTests(arxivAnswers('<feed></feed>'));
+  fs.mkdirSync(path.join(root, 'public/images'), { recursive: true });
+  fs.writeFileSync(path.join(root, 'public/images/mirage-abc123.pdf'), PDF);
+  const md = fs.readFileSync(path.join(root, PAPER), 'utf8');
+  fs.rmSync(path.join(root, PAPER));
+  for (const slug of slugs)
+    fs.writeFileSync(
+      path.join(root, 'src/content/publications', `${slug}.md`),
+      md.replace('---\n\n', `pdf: '${pdf}'\n---\n\n`),
+    );
+  process.env.ANTHROPIC_API_KEY = 'ak';
+  const sent: Request[] = [];
+  mock.method(globalThis, 'fetch', async (input: string | URL | Request, init?: RequestInit) => {
+    sent.push(new Request(input, init));
+    const text = typeof reply === 'string' ? reply : JSON.stringify(reply);
+    return Response.json({ content: [{ type: 'text', text }] });
+  });
+  return sent;
+}
+
+test('GET proposes from the uploaded PDF of a paper no source knows; POST applies it without asking the AI again', async () => {
+  const sent = pdfPapers([SLUG]);
+  const [p] = (await (await call(GET)).json()).proposals as PaperProposal[];
+  assert.deepEqual(
+    p.changes.map((c) => [c.field, c.to, c.source, c.fill]),
+    [['abstract', ABSTRACT, 'pdf', true]],
+  );
+  assert.equal(p.noMatch, undefined);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].url, 'https://api.anthropic.com/v1/messages');
+  const block = (await sent[0].json()).messages[0].content[0];
+  assert.deepEqual(block.source, { type: 'base64', media_type: 'application/pdf', data: PDF.toString('base64') });
+
+  const res = await call(POST, { body: { slug: SLUG, apply: [{ field: 'abstract', value: ABSTRACT }], decline: [] } });
+  assert.equal(res.status, 200);
+  assert.equal((await readEntry(store, 'publications', SLUG))!.data.abstract, ABSTRACT);
+  assert.equal(sent.length, 1, 'the same PDF is not read by the AI twice');
+});
+
+test('GET reads at most 5 PDFs a batch', async () => {
+  const slugs = ['a2026x', 'b2026x', 'c2026x', 'd2026x', 'e2026x', 'f2026x'];
+  const sent = pdfPapers(slugs, '/images/mirage-abc123.pdf', { abstract: 'Budget.' });
+  // A PDF of its own for each paper, so each is a fresh reading.
+  for (const slug of slugs) {
+    fs.writeFileSync(path.join(root, `public/images/${slug}-abc123.pdf`), Buffer.from(`%PDF-1.7 ${slug}`));
+    const md = path.join(root, 'src/content/publications', `${slug}.md`);
+    fs.writeFileSync(md, fs.readFileSync(md, 'utf8').replace('mirage-abc123.pdf', `${slug}-abc123.pdf`));
+  }
+  const body = await (await call(GET)).json();
+  const read = (body.proposals as PaperProposal[]).map((p) => p.changes.some((c) => c.source === 'pdf'));
+  assert.deepEqual(read, [true, true, true, true, true, false]);
+  assert.equal((body.proposals as PaperProposal[])[5].noMatch, true);
+  assert.equal(sent.length, 5, 'five AI calls');
+});
+
+test('GET never reads a PDF off the site', async () => {
+  const elsewhere = pdfPapers([SLUG], 'https://example.org/mirage.pdf');
+  const [p] = (await (await call(GET)).json()).proposals as PaperProposal[];
+  assert.equal(p.noMatch, true);
+  assert.equal(elsewhere.length, 0, 'nothing fetched');
+});
+
+test("a reply that is not the JSON asked for is the paper's error, and nothing is offered", async () => {
+  pdfPapers([SLUG], '/images/mirage-abc123.pdf', 'I cannot help with that.');
+  fs.writeFileSync(path.join(root, 'public/images/mirage-abc123.pdf'), Buffer.from('%PDF-1.7 refused'));
+  const [p] = (await (await call(GET)).json()).proposals as PaperProposal[];
+  assert.deepEqual(p.changes, []);
+  assert.match(p.error!, /Reading your PDF failed: .*JSON/);
 });

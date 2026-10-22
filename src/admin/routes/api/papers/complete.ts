@@ -1,15 +1,53 @@
+import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
+import type { AiConfig } from '../../../../lib/ai/providers';
+import { generateText, readAiConfig } from '../../../../lib/admin/ai';
 import { entryChange, listEntries, readEntry } from '../../../../lib/admin/content';
 import { HttpError, commitChanges, json, readBody, route } from '../../../../lib/admin/http';
-import { COMPLETABLE, proposeBatch, proposeFor, type Completable } from '../../../../lib/admin/paper-complete';
+import { MAX_UPLOAD } from '../../../../lib/admin/media';
+import {
+  COMPLETABLE,
+  fromPdf,
+  proposeBatch,
+  proposeFor,
+  type Completable,
+  type ReadPdf,
+} from '../../../../lib/admin/paper-complete';
+import type { PaperRecord } from '../../../../lib/admin/paper-sources';
 import { paperLookupFor, parseState } from '../../../../lib/admin/papers';
 import { SCHOLAR_JSON, collectionPath } from '../../../../lib/admin/paths';
-import type { Change } from '../../../../lib/admin/store';
+import type { Change, ContentStore } from '../../../../lib/admin/store';
 
 export const prerender = false;
 
 const BATCH = 10;
+const PDF_READS = 5;
 const int = (v: string | null) => Number.parseInt(v ?? '', 10);
+
+// The model's reading of each PDF, by content hash: the apply re-proposes from the same reading the owner reviewed,
+// without a second AI call (a model can word a long abstract differently each time, and that would be a 409).
+// ponytail: per instance; an apply served by another instance asks the AI again and may 409 ("reload the review").
+const readings = new Map<string, PaperRecord | null>();
+
+/** Reads the owner's own uploaded PDFs (the store refuses any other URL) with the configured model, at most `budget`. */
+function pdfReader(store: ContentStore, budget = Infinity): ReadPdf {
+  let config: Promise<AiConfig> | undefined;
+  return async (url) => {
+    if (budget <= 0) return null;
+    const bytes = await store.readPdf(url);
+    if (!bytes) return null;
+    budget--;
+    if (bytes.length > MAX_UPLOAD) throw new Error('it is over 4 MB');
+    const key = createHash('sha256').update(bytes).digest('hex');
+    if (readings.has(key)) return readings.get(key) ?? null;
+    config ??= readAiConfig(store);
+    const ai = await config;
+    const record = await fromPdf(bytes, (input) => generateText(store, ai, input));
+    if (readings.size >= 100) readings.clear();
+    readings.set(key, record);
+    return record;
+  };
+}
 
 /** "Complete papers", read-only: proposals for up to 10 publications from `offset` (by slug); `offset` in the answer is where the next batch starts. */
 export const GET = route(async (ctx, store) => {
@@ -23,7 +61,7 @@ export const GET = route(async (ctx, store) => {
   // .mdx entries are never written, so there is nothing to propose for them.
   const pubs = entries.filter((e) => !e.readonly).sort((a, b) => (a.slug < b.slug ? -1 : a.slug > b.slug ? 1 : 0));
   const declined = parseState(stateFile?.content).declined ?? {};
-  const proposals = await proposeBatch(pubs.slice(from, from + limit), look, declined);
+  const proposals = await proposeBatch(pubs.slice(from, from + limit), look, declined, pdfReader(store, PDF_READS));
   return json({ total: pubs.length, offset: from + proposals.length, proposals });
 });
 
@@ -34,7 +72,7 @@ const blank = (v: unknown) => v === undefined || v === null || v === '' || (Arra
 /** Deep-equal, with every empty value (missing, null, '', []) alike: JSON drops a `from` that was undefined. */
 const same = (a: unknown, b: unknown) => (blank(a) && blank(b)) || isDeepStrictEqual(a, b);
 
-/** "Apply selected" for one paper: re-proposes from fresh lookups, writes the approved fields and records the declined ones in one commit. */
+/** "Apply selected" for one paper: re-proposes from fresh lookups (and the same reading of its PDF), writes the approved fields and records the declined ones in one commit. */
 export const POST = route(async (ctx, store) => {
   const { slug, apply, decline } = await readBody<{ slug?: unknown; apply?: unknown; decline?: unknown }>(ctx);
   if (typeof slug !== 'string' || !items(apply) || !items(decline))
@@ -50,7 +88,7 @@ export const POST = route(async (ctx, store) => {
   ]);
   if (!entry || entry.readonly) throw new HttpError(404, `No publication ${slug}`);
   const state = parseState(stateFile?.content);
-  const proposal = await proposeFor(slug, entry.data, look, state.declined?.[slug]);
+  const proposal = await proposeFor(slug, entry.data, look, state.declined?.[slug], pdfReader(store));
   if (proposal.error) throw new HttpError(502, proposal.error);
 
   // Only values recomputed here are written or declined, and only when they are exactly what the owner reviewed:

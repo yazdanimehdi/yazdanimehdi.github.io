@@ -335,3 +335,22 @@ test('latestCommitWith: the newest of the branch’s recent commits with the tra
   assert.equal(calls[0].path, '/commits?sha=main&per_page=100', 'the deployed branch');
   assert.equal(await store.latestCommitWith('Nope: never'), null);
 });
+
+test('readPdf: the raw bytes of a site-folder PDF on the branch; other URLs are never requested', async () => {
+  const pdf = new Uint8Array([0x25, 0x50, 0x44, 0x46, 0xff, 0x00]);
+  const seen: Request[] = [];
+  const fetchFn = (async (input: string | URL, init?: RequestInit) => {
+    const req = new Request(input, init);
+    seen.push(req);
+    return req.url.includes('/contents/public/images/mirage-abc123.pdf?ref=main')
+      ? new Response(pdf)
+      : new Response('{"message":"Not Found"}', { status: 404 });
+  }) as typeof fetch;
+  const store = new GitHubStore(cfg, author, fetchFn);
+  assert.deepEqual(new Uint8Array((await store.readPdf('/images/mirage-abc123.pdf'))!), pdf);
+  assert.equal(seen[0].url, 'https://api.github.com/repos/o/r/contents/public/images/mirage-abc123.pdf?ref=main');
+  assert.equal(seen[0].headers.get('accept'), 'application/vnd.github.raw+json');
+  assert.equal(await store.readPdf('/images/gone-abc123.pdf'), null);
+  assert.equal(await store.readPdf('https://example.com/images/x.pdf'), null);
+  assert.equal(seen.length, 2);
+});

@@ -29,3 +29,24 @@ test('repo media: upload once, list with URLs, delete with the version', async (
   assert.deepEqual(await store.listMedia('content'), []);
   await assert.rejects(store.deleteMedia('config/site.yml', 'x'), PathError);
 });
+
+test('readPdf: the bytes of a PDF the site folder serves, null for any other URL', async () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'git-media-'));
+  fs.mkdirSync(path.join(root, 'public/images/papers'), { recursive: true });
+  const onDisk = Buffer.from([0x25, 0x50, 0x44, 0x46, 0x2d, 0xff, 0x00]);
+  fs.writeFileSync(path.join(root, 'public/images/papers/old-abc123.pdf'), onDisk);
+  fs.writeFileSync(path.join(root, 'public/images/hero.png'), onDisk);
+  const store = new MemoryStore(root);
+  const up = await store.putMedia('site', 'mirage-abc123.pdf', onDisk.toString('base64'), 'application/pdf');
+  assert.deepEqual(Buffer.from((await store.readPdf(up.url))!), onDisk, 'uploaded (overlay)');
+  assert.deepEqual(Buffer.from((await store.readPdf('/images/papers/old-abc123.pdf'))!), onDisk, 'committed (disk)');
+  for (const url of [
+    '/images/missing.pdf',
+    '/images/hero.png',
+    '/images/../config/x.pdf',
+    '/images//papers/old-abc123.pdf',
+    'https://arxiv.org/pdf/2609.14491.pdf',
+    `${adminSettings().publicFolder}/x.pdf`,
+  ])
+    assert.equal(await store.readPdf(url), null, url);
+});
