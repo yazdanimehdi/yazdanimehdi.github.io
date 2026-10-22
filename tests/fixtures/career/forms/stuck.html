@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8" /><title>Stuck</title></head>
+<body>
+  <h1>Research Engineer</h1>
+  <form action="#thanks">
+    <label for="name">Full name</label>
+    <input id="name" name="name" oninput="this.value = this.value.slice(0, 3)" />
+    <button type="submit">Submit Application</button>
+  </form>
+<script>
+  document.querySelector("form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    await fetch("/submit", { method: "POST", body: new FormData(e.target) });
+    e.target.outerHTML = "<p id=\"thanks\">Thank you, your application was received</p>";
+  });
+</script>
+</body>
+</html>
