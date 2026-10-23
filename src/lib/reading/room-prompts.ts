@@ -231,7 +231,7 @@ export function chatPrompt(
   };
 }
 
-const CITE_TOKEN = /([ \t]*)\[(\d+:[A-Za-z0-9.]+(?:[,;]\s*\d+:[A-Za-z0-9.]+)*)\]/g;
+export const CITE_TOKEN = /([ \t]*)\[(\d+:[A-Za-z0-9.]+(?:[,;]\s*\d+:[A-Za-z0-9.]+)*)\]/g;
 
 /** The answer with citations to passages not in the prompt removed, and the kept ones in order of first use. */
 export function parseAnswer(reply: string, allowed: Set<string>): { body: string; cites: Cite[] } {

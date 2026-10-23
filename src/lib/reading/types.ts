@@ -139,12 +139,16 @@ export interface LibraryItem {
 
 export type NoteKind = 'paper' | 'chat' | 'free';
 
-/** A saved answer as a chat note keeps it, whatever happens to the chat. askedAt: the answer's time. */
+/**
+ * A saved answer as a chat note keeps it, whatever happens to the chat. askedAt: the answer's time; origin: a paper's
+ * chat (cites without surnames, as the room shows them) or a notebook's.
+ */
 export interface ChatSnapshot {
   question: string;
   answer: string;
   cites: Cite[];
   askedAt: string;
+  origin: 'paper' | 'notebook';
 }
 
 export interface VaultNote {

@@ -706,7 +706,13 @@ test('a saved answer becomes a chat note linked to its paper', async () => {
   assert.equal(c.body, `From [[${p.title}]]`);
   assert.equal(c.chat_id, a.id);
   assert.equal(c.paper_id, null);
-  assert.deepEqual(c.chat, { question: 'What is X?', answer: 'X is Y.', cites, askedAt: a.createdAt });
+  assert.deepEqual(c.chat, {
+    question: 'What is X?',
+    answer: 'X is Y.',
+    cites,
+    askedAt: a.createdAt,
+    origin: 'paper',
+  });
   const links = await sql<{ target: string }>`select target from vault_links where from_id = ${c.id}`;
   assert.deepEqual(
     links.map((l) => l.target),
@@ -731,6 +737,7 @@ test('a saved notebook answer links the papers it cites', async () => {
   const note = vault.find((n) => n.kind === 'chat')!;
   assert.equal(note.title, 'Compare them');
   assert.equal(note.body, `From [[${titleOf(b)}]], [[${titleOf(a)}]]`);
+  assert.equal(note.chat!.origin, 'notebook');
   assert.equal(
     vault.some((n) => n.paper_id === c),
     false,

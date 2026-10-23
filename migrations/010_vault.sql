@@ -69,7 +69,8 @@ candidate as (
   -- Chat notes: saved answers, titled by the question before them.
   select 2, a.id, 'chat', coalesce(q.body, ''), '', null, a.id, null,
     jsonb_build_object('question', coalesce(q.body, ''), 'answer', a.body, 'cites', a.cites,
-      'askedAt', to_char(a.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"')),
+      'askedAt', to_char(a.created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'),
+      'origin', case when a.notebook_id is not null then 'notebook' else 'paper' end),
     a.paper_id, case when a.notebook_id is not null then a.cites end
   from saved_answer a
   left join lateral (

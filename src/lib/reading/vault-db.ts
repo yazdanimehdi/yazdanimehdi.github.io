@@ -1,7 +1,11 @@
+import { HttpError } from '../admin/http';
 import type { Sql, Tx } from '../db';
-import type { Row } from './db';
-import type { ChatSnapshot, Cite, NoteKind, NoteRow, Target, VaultNote } from './types';
+import { getPapers, type Row } from './db';
+import { listHighlights } from './room-db';
+import type { ChatSnapshot, Cite, NoteKind, NoteRow, OutputBody, Target, VaultNote } from './types';
+import { noteFile, type NoteContext } from './vault-markdown';
 import { noteTitle, numberedTitle, rewriteLinks, wikiLinks } from './vault-links';
+import { zip } from './vault-zip';
 
 // The vault's SQL. Conventions as in room-db.ts: timestamps out as ISO strings. A link [[T]] resolves to the note
 // whose lower(title) is its vault_links target (lowercased in SQL, whitespace collapsed by wikiLinks).
@@ -205,7 +209,13 @@ export async function ensureChatNote(tx: Tx, chatId: number): Promise<{ id: numb
     titles.push((await getNote(tx, id))!.title);
   }
   const question = (a.question as string | null) ?? '';
-  const chat: ChatSnapshot = { question, answer: a.body as string, cites, askedAt: iso(a.created_at) };
+  const chat: ChatSnapshot = {
+    question,
+    answer: a.body as string,
+    cites,
+    askedAt: iso(a.created_at),
+    origin: a.paper_id != null ? 'paper' : 'notebook',
+  };
   const title = await freeTitle(tx, question);
   const [r] = await tx<Row>`
     insert into vault_notes (kind, title, chat, chat_id)
@@ -255,4 +265,59 @@ export async function saveRoomNote(tx: Tx, target: Target, body: string): Promis
   }
   await setBody(tx, id, body);
   return { id };
+}
+
+/**
+ * Each note's NoteContext, in four queries however many notes: a paper note's paper, ready summary and highlights; a
+ * notebook chat note's cited papers' authors; a notebook note's notebook title.
+ */
+export async function noteContexts(sql: Sql, notes: VaultNote[]): Promise<Map<number, NoteContext>> {
+  const paperIds = notes.flatMap((n) => (n.paperId == null ? [] : [n.paperId]));
+  const cited = notes.flatMap((n) => (n.chat?.origin === 'notebook' ? n.chat.cites.map((c) => c.paper) : []));
+  const notebookIds = notes.flatMap((n) => (n.notebookId == null ? [] : [n.notebookId]));
+  const [papers, summaries, highlights, notebooks] = await Promise.all([
+    getPapers(sql, [...new Set([...paperIds, ...cited])]),
+    sql<Row>`
+      select paper_id, body from reading_outputs
+      where kind = 'summary' and status = 'ready' and paper_id = any(${paperIds}::bigint[])`,
+    listHighlights(sql, paperIds),
+    sql<Row>`select id, title from reading_notebooks where id = any(${notebookIds}::bigint[])`,
+  ]);
+  const paper = new Map(papers.map((p) => [p.id, p]));
+  const summary = new Map(summaries.map((r) => [Number(r.paper_id), r.body as OutputBody]));
+  const notebook = new Map(notebooks.map((r) => [Number(r.id), r.title as string]));
+  return new Map(
+    notes.map((n) => {
+      const authors = new Map<number, { authors: string[] }>();
+      if (n.chat?.origin === 'notebook')
+        for (const c of n.chat.cites)
+          if (paper.has(c.paper)) authors.set(c.paper, { authors: paper.get(c.paper)!.authors });
+      const c: NoteContext = { authors };
+      if (n.paperId != null) {
+        c.paper = paper.get(n.paperId);
+        c.summary = summary.get(n.paperId) ?? null;
+        c.highlights = highlights
+          .filter((h) => h.paperId === n.paperId)
+          .map(({ pid, quote, comment }) => ({ pid, quote, comment }));
+      }
+      if (n.notebookId != null) c.notebook = notebook.get(n.notebookId);
+      return [n.id, c];
+    }),
+  );
+}
+
+/** Vercel's 4.5 MB response limit, less room for headers. */
+export const EXPORT_MAX = 4_400_000;
+
+/** Every note as an Obsidian file in one zip; refused (413) over `max`, never truncated. */
+export async function exportVault(sql: Sql, max = EXPORT_MAX): Promise<Uint8Array> {
+  const notes = (await sql<Row>`select * from vault_notes order by id`).map(toNote);
+  const ctx = await noteContexts(sql, notes);
+  const out = zip(notes.map((n) => noteFile(n, ctx.get(n.id)!)));
+  if (out.byteLength > max)
+    throw new HttpError(
+      413,
+      `The vault’s zip is ${(out.byteLength / 1e6).toFixed(1)} MB, over the 4.4 MB one download can carry.`,
+    );
+  return out;
 }

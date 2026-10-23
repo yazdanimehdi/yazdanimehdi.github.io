@@ -4,16 +4,32 @@ import { migrate } from '../db-migrate';
 import type { Sql } from '../db';
 import { pgliteSql } from '../pglite-sql';
 import { upsertPapers } from './db';
-import { addChat, setChatSaved } from './room-db';
+import { HttpError } from '../admin/http';
+import {
+  addChat,
+  addHighlight,
+  claimOutput,
+  createNotebook,
+  savePassages,
+  setChatSaved,
+  setOutput,
+  updateNotebook,
+} from './room-db';
+import { unzip } from './test-unzip';
 import {
   backlinks,
   createNote,
   deleteNote,
+  ensureChatNote,
+  ensurePaperNote,
+  exportVault,
+  noteContexts,
   freeTitle,
   getNote,
   graph,
   listNotes,
   renameNote,
+  saveRoomNote,
   setBody,
   withTitles,
 } from './vault-db';
@@ -122,7 +138,7 @@ test('deleting a chat note unsaves its answer', async () => {
   ).map((r) => r.id);
   const answer = await addChat(sql, { paper }, { role: 'assistant', body: 'yes', cites: [] });
   await setChatSaved(sql, answer.id, true);
-  const chat = { question: 'Q?', answer: 'yes', cites: [], askedAt: answer.createdAt };
+  const chat = { question: 'Q?', answer: 'yes', cites: [], askedAt: answer.createdAt, origin: 'paper' };
   const [{ id }] = await sql<{ id: number }>`
     insert into vault_notes (kind, title, chat, chat_id) values ('chat', 'Q', ${JSON.stringify(chat)}::text::jsonb,
       ${answer.id}) returning id`;
@@ -168,4 +184,111 @@ test('graph keeps the most-linked notes', async () => {
   assert.deepEqual(pairs, [`${a.id}-${b.id}`, `${a.id}-${c.id}`, `${b.id}-${c.id}`].sort());
   assert.equal(g.edges.length, 3); // A↔B once, no A→A, nothing to D
   assert.ok(!g.edges.flat().includes(d.id));
+});
+
+const paper = async (n: number, title: string, abstract?: string) =>
+  (
+    await upsertPapers(sql, [
+      {
+        key: `arxiv:${n}`,
+        arxiv: String(n),
+        source: 'arxiv',
+        title,
+        authors: [`Ann Author${n}`],
+        abstract,
+        url: `https://x.test/${n}`,
+        categories: [],
+      },
+    ])
+  )[0].id;
+const paperNote = (id: number) => withTitles(sql, (tx) => ensurePaperNote(tx, id));
+const readyOutput = async (target: { paper: number } | { notebook: number }, text: string, papers: number[]) => {
+  const id = (await claimOutput(sql, target, 'summary', null, 'run'))!;
+  await setOutput(sql, id, {
+    status: 'ready',
+    body: { papers, sections: [{ heading: 'Summary', claims: [{ text, cites: [] }] }] },
+  });
+};
+
+test("noteContexts gathers each note's paper, summary, highlights, cited authors and notebook", async () => {
+  const a = await paper(1, 'A');
+  const b = await paper(2, 'B');
+  const pa = await paperNote(a);
+  const pb = await paperNote(b);
+  await readyOutput({ paper: a }, 'A says.', [a]);
+  await claimOutput(sql, { paper: b }, 'summary', null, 'run'); // running: not ready
+  await addHighlight(sql, { paperId: a, pid: 'S1.p1', start: 0, end: 5, quote: 'quote', comment: 'c' });
+  const nb = await createNotebook(sql, 'Book');
+  await updateNotebook(sql, nb, { add: a });
+  await addChat(sql, { notebook: nb }, { role: 'user', body: 'Q?', cites: [] });
+  const nbAns = await addChat(
+    sql,
+    { notebook: nb },
+    { role: 'assistant', body: 'Yes [2:p1].', cites: [{ paper: b, pid: 'p1' }] },
+  );
+  await addChat(sql, { paper: a }, { role: 'user', body: 'R?', cites: [] });
+  const pAns = await addChat(
+    sql,
+    { paper: a },
+    { role: 'assistant', body: 'No [1:p1].', cites: [{ paper: a, pid: 'p1' }] },
+  );
+  const nc = await withTitles(sql, (tx) => ensureChatNote(tx, nbAns.id));
+  const pc = await withTitles(sql, (tx) => ensureChatNote(tx, pAns.id));
+  const { id: free } = await withTitles(sql, (tx) => saveRoomNote(tx, { notebook: nb }, 'nb'));
+
+  const notes = await Promise.all([pa.id, pb.id, nc.id, pc.id, free!].map((id) => getNote(sql, id)));
+  const ctx = await noteContexts(sql, notes as VaultNote[]);
+  assert.equal(ctx.get(pa.id)!.paper!.title, 'A');
+  assert.equal(ctx.get(pa.id)!.summary!.sections[0].claims[0].text, 'A says.');
+  assert.deepEqual(ctx.get(pa.id)!.highlights, [{ pid: 'S1.p1', quote: 'quote', comment: 'c' }]);
+  assert.equal(ctx.get(pb.id)!.summary, null);
+  assert.deepEqual(ctx.get(pb.id)!.highlights, []);
+  assert.deepEqual([...ctx.get(nc.id)!.authors], [[b, { authors: ['Ann Author2'] }]]);
+  assert.equal(ctx.get(pc.id)!.authors.size, 0, "a paper's chat cites without surnames");
+  assert.equal(ctx.get(free!)!.notebook, 'Book');
+  assert.deepEqual(await noteContexts(sql, []), new Map());
+});
+
+test('a title with a colon exports as the file its links name', async () => {
+  await paperNote(await paper(1, 'Attention: Is All?'));
+  const idea = await make('Idea', 'see [[Attention Is All]]');
+  const files = unzip(await exportVault(sql));
+  assert.deepEqual(files.map((f) => f.path).sort(), ['vault/notes/Idea.md', 'vault/papers/Attention Is All.md']);
+  assert.match(files.find((f) => f.path === 'vault/notes/Idea.md')!.text, /\[\[Attention Is All\]\]$/);
+  assert.deepEqual(titles(await backlinks(sql, (await listNotes(sql, { kind: 'paper' }))[0].id)), [idea.title]);
+});
+
+test('the export holds no paper text', async () => {
+  const id = await paper(1, 'P', 'Abstract FULL TEXT SENTINEL');
+  await savePassages(sql, id, [
+    { pid: 'abs.1', kind: 'p', body: 'Abstract FULL TEXT SENTINEL' },
+    { pid: 'S1.p1', kind: 'p', body: 'Body FULL TEXT SENTINEL with a short quote in it.' },
+  ]);
+  await addHighlight(sql, { paperId: id, pid: 'S1.p1', start: 36, end: 47, quote: 'short quote', comment: '' });
+  await readyOutput({ paper: id }, 'It finds things.', [id]);
+  await paperNote(id);
+  await addChat(sql, { paper: id }, { role: 'user', body: 'Q?', cites: [] });
+  const ans = await addChat(
+    sql,
+    { paper: id },
+    { role: 'assistant', body: 'A [1:S1.p1].', cites: [{ paper: id, pid: 'S1.p1' }] },
+  );
+  await withTitles(sql, (tx) => ensureChatNote(tx, ans.id));
+  const files = unzip(await exportVault(sql));
+  assert.equal(files.length, 2);
+  for (const f of files) assert.ok(!f.text.includes('SENTINEL'), f.path);
+  const p = files.find((f) => f.path === 'vault/papers/P.md')!;
+  assert.match(p.text, /“short quote” \(§1 ¶1\)/);
+  assert.match(p.text, /It finds things\. \(background\)/);
+});
+
+test('an export over the limit is refused', async () => {
+  await make('A', 'x');
+  await assert.rejects(exportVault(sql, 10), (e) => {
+    assert.ok(e instanceof HttpError);
+    assert.equal(e.status, 413);
+    assert.equal(e.message, 'The vault’s zip is 0.0 MB, over the 4.4 MB one download can carry.');
+    return true;
+  });
+  assert.ok((await exportVault(sql)).byteLength > 10);
 });

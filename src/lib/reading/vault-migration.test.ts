@@ -91,9 +91,11 @@ test("the migration moves Project 2's notes into the vault", async () => {
   assert.deepEqual(x.chat.cites, [{ paper: a, pid: 'p1' }]);
   const [asked] = await sql`select created_at from reading_chats where id = ${saved}`;
   assert.equal(x.chat.askedAt, new Date(asked.created_at).toISOString());
+  assert.equal(x.chat.origin, 'paper');
 
   assert.equal(byTitle['Why B'].body, 'From [[Paper B]]');
   assert.equal(Number(byTitle['Why B'].chat_id), nbSaved);
+  assert.equal(byTitle['Why B'].chat.origin, 'notebook');
 
   assert.equal(byTitle.N.kind, 'free');
   assert.equal(byTitle.N.body, 'nb');
