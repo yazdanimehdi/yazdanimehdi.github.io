@@ -167,11 +167,29 @@ function inert(n: Node): Node {
  * finds autolinks in text after escapes are resolved, and removing a node can join text into a new one, so the output
  * is parsed again until a pass removes nothing.
  */
+const INLINE = new Set(['emphasis', 'strong', 'delete']);
+// Writing Markdown back slows sharply with runs of emphasis (`*_*_…x…_*_*`), so emphasis deeper than MAX_INLINE, or
+// past MAX_RUN in one paragraph or heading, is unwrapped into its text.
+const MAX_INLINE = 4;
+const MAX_RUN = 64;
+// The parser recurses once per nested quote or list, so a line opening more than 16 of them is refused, and its time
+// grows with the square of emphasis and bracket runs, so a body with more of their characters than these is too.
+const MAX_MARKS = { attention: [/[*_~]/g, 1200], brackets: [/[[\]]/g, 600] } as const;
+const DEEP = /^(?:[ \t]*(?:>|[-*+](?=[ \t])|\d{1,9}[.)](?=[ \t]))[ \t]*){17}/m;
+// A cite the model put in a link's text, like `[12:S2.p3](…)`: unwrapped, it keeps its brackets.
+const CITE_ONLY = new RegExp(`^${CITE_TOKEN.source}$`);
+
 function sanitize(md: string): Node[] {
-  for (let pass = 0; pass < 10; pass++) {
+  if (DEEP.test(md))
+    throw new Error('The draft nested its quotes or lists too deeply, so it was dropped. Draft again.');
+  const bare = md.replace(CITE_TOKEN, '');
+  if (Object.values(MAX_MARKS).some(([marks, max]) => (bare.match(marks)?.length ?? 0) > max))
+    throw new Error('The draft had too much formatting to check, so it was dropped. Draft again.');
+  for (let pass = 0; pass < 4; pass++) {
     let changed = false;
-    const unlink = (nodes: Node[]): Node[] => {
+    const unlink = (nodes: Node[], inline = 0): Node[] => {
       const out: Node[] = [];
+      let run = 0;
       for (const n of nodes) {
         // GFM's own transform adds some autolinks without a position: those count as autolinks too.
         const autolink = n.type === 'link' && md[n.position?.start.offset ?? -1] !== '[';
@@ -179,10 +197,18 @@ function sanitize(md: string): Node[] {
           changed = true;
           continue;
         }
-        const children = n.children && unlink(n.children);
-        const unwrap = n.type === 'link' || n.type === 'linkReference';
+        const deep = INLINE.has(n.type);
+        const children = n.children && unlink(n.children, inline + Number(deep));
+        const link = n.type === 'link' || n.type === 'linkReference';
+        const unwrap = link || (deep && (inline >= MAX_INLINE || ++run > MAX_RUN));
         changed ||= unwrap;
-        for (const k of unwrap ? children! : [inert({ ...n, children })]) {
+        const only = link && children?.length === 1 && children[0].type === 'text' ? `[${children[0].value}]` : '';
+        const kept = !unwrap
+          ? [inert({ ...n, children })]
+          : CITE_ONLY.test(only)
+            ? [{ type: 'text', value: only }]
+            : children!;
+        for (const k of kept) {
           const last = out.at(-1);
           if (k.type === 'text' && last?.type === 'text')
             out[out.length - 1] = { ...last, value: last.value! + k.value };
@@ -214,7 +240,6 @@ function cite(nodes: Node[], links: (ids: string) => string): Node[] {
   });
 }
 
-const INLINE = new Set(['emphasis', 'strong', 'delete']);
 /** The text a reader sees: a citation, a line break and the edge of a block count as a space. */
 const plain = (nodes: Node[]): string =>
   nodes
@@ -316,10 +341,11 @@ export function parseDraft(
   const md = toMarkdown({ type: 'root', children } as never, WRITE).trim();
   const papers = list.length ? `\n\n## Papers\n\n${list.map((l) => `- ${l}`).join('\n')}` : '';
   return {
-    title: post.title.slice(0, 200),
-    subtitle: post.subtitle?.slice(0, 200),
-    excerpt: post.excerpt?.slice(0, 300),
-    tags: post.tags.map((t) => t.toLowerCase().slice(0, 40)),
+    // Shown as text on the post page, which MathJax typesets too.
+    title: noTex(visible(post.title)).slice(0, 200),
+    subtitle: post.subtitle && noTex(visible(post.subtitle)).slice(0, 200),
+    excerpt: post.excerpt && noTex(visible(post.excerpt)).slice(0, 300),
+    tags: post.tags.map((t) => noTex(visible(t)).toLowerCase().slice(0, 40)),
     body: `${md}${papers}\n`,
   };
 }

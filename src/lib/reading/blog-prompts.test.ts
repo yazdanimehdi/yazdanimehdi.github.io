@@ -291,3 +291,52 @@ test('a copy split over blocks or lines is still refused', () => {
     assert.throws(() => draft(body, { passages }), /copied a long passage/, body);
   assert.doesNotThrow(() => draft(`*${part(0, 20)}* other words here ${part(30, 49)}`, { passages }));
 });
+
+test('the title, subtitle, excerpt and tags can’t start MathJax either', () => {
+  const post = parseDraft(
+    JSON.stringify({
+      title: 'T \\(\\href{javascript:alert(1)}{click}\\)',
+      subtitle: '\\(\\style{position:fixed}{x}\\)',
+      excerpt: '\\[\\href{https://evil.test}{e}\\] \\begin{align}x\\end{align}',
+      tags: ['\\(\\href{x}{y}\\)'],
+      body: 'body $x$',
+    }),
+    ctx(),
+  );
+  for (const v of [post.title, post.subtitle, post.excerpt, ...post.tags]) assert.doesNotMatch(v!, /\\/, v);
+  assert.equal(post.title, 'T ＼(＼href{javascript:alert(1)}{click}＼)');
+});
+
+test('a cite inside a foreign link keeps its link to the paper', () => {
+  const body = draft('See ***[12:S2.p3](https://evil.test)*** and [[12:S2.p3]](https://evil.test).');
+  assert.doesNotMatch(body, /evil/);
+  assert.equal(body.split('[Vaswani et al.](<https://arxiv.org/abs/1706.03762>)').length, 3, body);
+});
+
+test('parseDraft stays fast on replies built to be slow, and refuses the extreme ones', () => {
+  const pad = (x: string) => x + ' filler words go here'.repeat(Math.max(0, Math.floor((19_900 - x.length) / 21)));
+  const prose = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed. '.repeat(330);
+  const passages = Array.from({ length: 100 }, (_, i) => `Passage ${i} ${prose.slice(i, 3000 + i)}`);
+  const cases: [string, string, RegExp | null][] = [
+    ['emphasis soup', '*_'.repeat(2000) + 'x' + '_*'.repeat(2000), /too much formatting/],
+    ['just over the cap', '*a* '.repeat(601), /too much formatting/],
+    ['brackets just over the cap', '[a] '.repeat(301), /too much formatting/],
+    ['emphasis soup at the cap', pad('*_'.repeat(300) + 'x' + '_*'.repeat(300)), null],
+    ['images at the cap', pad('!['.repeat(400) + 'x' + '](y)'.repeat(200)), null],
+    ['brackets at the cap', pad('['.repeat(300) + 'x' + ']'.repeat(300) + '(https://e.test)'), null],
+    ['deep quotes', '>'.repeat(10_000) + ' x', /nested its quotes or lists too deeply/],
+    ['deep list on one line', '- '.repeat(5000) + 'x', /nested its quotes or lists too deeply/],
+    ['many cites', 'x [12:S2.p3] '.repeat(1500), null],
+    ['joins by removal', 'www<!-- -->.e.test x '.repeat(1000), null],
+    ['prose against 300k of passages', 'Dolor amet sit lorem ipsum elit, my own words. '.repeat(400), null],
+  ];
+  for (const [name, body, refused] of cases) {
+    const t = performance.now();
+    if (refused) assert.throws(() => draft(body, { passages }), refused, name);
+    else assert.doesNotThrow(() => draft(body, { passages }), name);
+    const ms = performance.now() - t;
+    assert.ok(ms < 1000, `${name} took ${Math.round(ms)} ms`);
+  }
+  const list16 = Array.from({ length: 16 }, (_, i) => `${'  '.repeat(i)}- level ${i}`).join('\n');
+  assert.match(draft(list16), /level 15/, '16 levels of nesting are fine');
+});
