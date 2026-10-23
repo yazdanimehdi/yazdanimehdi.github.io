@@ -113,6 +113,7 @@ test("sources refuse what can't be drafted", async () => {
   for (const id of ids) await updateNotebook(sql, big, { add: id });
   await assert.rejects(draftSources(sql, { notebook: big }), refused(409, /this has 11/));
   await assert.rejects(draftSources(sql, { papers: [ids[0], 999] }), refused(404, 'Not found'));
+  await assert.rejects(draftSources(sql, { papers: [] }), refused(409, 'Pick at least one paper to draft from.'));
   await assert.rejects(draftSources(sql, { paper: 999 }), refused(404, 'Not found'));
   await assert.rejects(draftSources(sql, { notebook: 999 }), refused(404, 'Not found'));
   await assert.rejects(draftSources(sql, { note: 999 }), refused(404, 'Not found'));
@@ -124,14 +125,19 @@ test("notes hold the owner's writing, highlights and saved answers", async () =>
   const pa = await paperNote(a, 'my take');
   await paperNote(c, 'not this one');
   await addHighlight(sql, { paperId: a, pid: 'S1.p1', start: 0, end: 5, quote: 'short quote', comment: 'nice' });
+  await addHighlight(sql, { paperId: a, pid: 'S1.p2', start: 0, end: 5, quote: 'q'.repeat(2000), comment: '' });
   await chatNote({ paper: a }, 'An answer.', [a]);
   const idea = await freeNote('Idea', 'my idea');
 
-  const { notes, aids } = await draftNotes(sql, [a], [idea, pa]);
+  const { notes, aids, quotes } = await draftNotes(sql, [a], [idea, pa]);
   const all = [...notes, ...aids].join('\n');
   assert.match(notes.join('\n'), /my take/);
-  assert.match(notes.join('\n'), /short quote/);
-  assert.match(notes.join('\n'), /nice/);
+  assert.match(notes.join('\n'), /On a line I highlighted in the paper: nice/);
+  assert.deepEqual(quotes, [
+    { paperId: a, text: 'short quote', comment: 'nice' },
+    { paperId: a, text: 'q'.repeat(300) },
+  ]);
+  assert.doesNotMatch(all, /short quote|qqq/, "the papers' highlighted words are in neither notes nor aids");
   assert.match(aids.join('\n'), /An answer\./);
   assert.doesNotMatch(notes.join('\n'), /An answer\./, "a saved answer is an aid, not the owner's view");
   assert.doesNotMatch(notes.join('\n'), /^From \[\[/m, "a chat note's generated line is not the owner's");
@@ -140,17 +146,33 @@ test("notes hold the owner's writing, highlights and saved answers", async () =>
   assert.equal(notes.filter((n) => n.includes('my take')).length, 1, 'each note once');
 });
 
-test("a paper's summary is an aid", async () => {
-  const a = await paper('A');
-  await paperNote(a);
+const readySummary = async (a: number, text: string) => {
   const id = (await claimOutput(sql, { paper: a }, 'summary', null, 'run'))!;
   await setOutput(sql, id, {
     status: 'ready',
-    body: { papers: [a], sections: [{ heading: 'Summary', claims: [{ text: 'A says.', cites: [] }] }] },
+    body: { papers: [a], sections: [{ heading: 'Summary', claims: [{ text, cites: [] }] }] },
   });
+};
+
+test("a paper's summary is an aid", async () => {
+  const a = await paper('A');
+  await paperNote(a);
+  await readySummary(a, 'A says.');
   const { notes, aids } = await draftNotes(sql, [a], []);
   assert.deepEqual(notes, [], 'no writing of the owner: nothing in notes');
   assert.match(aids.join('\n'), /A says\./);
+});
+
+test('one note gives at most 4,000 chars in all', async () => {
+  const a = await paper('A');
+  await paperNote(a, 'b'.repeat(3000));
+  await readySummary(a, 's'.repeat(3000));
+  for (let i = 0; i < 5; i++)
+    await addHighlight(sql, { paperId: a, pid: `S${i}`, start: 0, end: 5, quote: 'q'.repeat(300), comment: '' });
+  const { notes, aids, quotes } = await draftNotes(sql, [a], []);
+  const total = [...notes, ...aids, ...quotes.map((q) => q.text)].join('').length;
+  assert.ok(total <= 4000, String(total));
+  assert.ok(notes[0].length > 3000, "the owner's writing first");
 });
 
 test('notes are capped', async () => {

@@ -4,7 +4,7 @@ import { HttpError } from '../admin/http';
 import type { ContentStore } from '../admin/store';
 import type { Sql } from '../db';
 import { isPublished } from '../utils';
-import { DRAFT_MAX_PAPERS } from './blog-prompts';
+import { DRAFT_MAX_PAPERS, type DraftQuote } from './blog-prompts';
 import { getPapers, type Row } from './db';
 import { getNotebook } from './room-db';
 import type { DraftFrom, VaultNote } from './types';
@@ -36,8 +36,10 @@ export async function draftSources(sql: Sql, from: DraftFrom): Promise<{ paperId
   let noteIds: number[] = [];
   let note: VaultNote | null = null;
   if ('paper' in from) ids = [from.paper];
-  else if ('papers' in from) ids = from.papers;
-  else if ('notebook' in from) {
+  else if ('papers' in from) {
+    if (!from.papers.length) throw new HttpError(409, 'Pick at least one paper to draft from.');
+    ids = from.papers;
+  } else if ('notebook' in from) {
     const nb = await getNotebook(sql, from.notebook);
     if (!nb) throw notFound();
     if (!nb.paperIds.length) throw new HttpError(409, 'This notebook has no papers yet.');
@@ -66,21 +68,37 @@ export async function draftSources(sql: Sql, from: DraftFrom): Promise<{ paperId
 
 const NOTE_MAX = 4_000;
 const NOTES_MAX = 24_000;
+const QUOTE_MAX = 300;
+
+/** The first `n` UTF-16 units, never ending on half a surrogate pair. */
+function cut(s: string, n: number): string {
+  if (s.length <= n) return s;
+  const last = s.charCodeAt(n - 1);
+  return s.slice(0, last >= 0xd800 && last < 0xdc00 ? n - 1 : n);
+}
+/** Cuts each text to what is left of `n` chars, in turn. */
+const budget = (n: number) => (t: string) => {
+  const s = cut(t, Math.max(n, 0));
+  n -= s.length;
+  return s;
+};
 
 /**
  * The notes `noteIds`, then the paper notes of `paperIds`, then the chat notes on those papers (newest first), each
- * once. `notes` is the owner's writing (bodies, highlights and their comments); `aids` the AI-made reading aids
- * (summaries, findings, saved answers). Each is cut to 4,000 chars, 24,000 in all, the owner's writing first.
+ * once, split three ways: `notes`, the owner's writing (bodies, highlight comments); `quotes`, the papers' lines the
+ * owner highlighted (each cut to 300 chars); `aids`, the AI-made reading aids (summaries, findings, saved answers).
+ * A note gives at most 4,000 chars in all, and all notes 24,000: the owner's writing first, then quotes, then aids.
  */
 export async function draftNotes(
   sql: Sql,
   paperIds: number[],
   noteIds: number[],
-): Promise<{ notes: string[]; aids: string[] }> {
+): Promise<{ notes: string[]; aids: string[]; quotes: DraftQuote[] }> {
   const [byPaper, chats] = await Promise.all([
     sql<Row>`
       select id from vault_notes where paper_id = any(${paperIds}::bigint[])
       order by array_position(${paperIds}::bigint[], paper_id)`,
+    // ponytail: the 50 newest saved answers; older ones would mostly fall past the 24,000-char cap anyway.
     sql<Row>`
       select id from vault_notes v
       where kind = 'chat' and (
@@ -88,33 +106,43 @@ export async function draftNotes(
           select 1 from jsonb_array_elements(v.chat->'cites') c
           where (c->>'paper')::bigint = any(${paperIds}::bigint[]))
         or chat_id in (select id from reading_chats where paper_id = any(${paperIds}::bigint[])))
-      order by created_at desc, id desc`,
+      order by created_at desc, id desc limit 50`,
   ]);
   const ids = [...new Set([...noteIds, ...[...byPaper, ...chats].map((r) => Number(r.id))])];
   const notes = (await Promise.all(ids.map((id) => getNote(sql, id)))).filter((n): n is VaultNote => n != null);
   const ctx = await noteContexts(sql, notes);
-  const join = (...t: string[]) => t.join('\n\n').trim();
-  const own: string[] = [];
-  const aids: string[] = [];
-  for (const n of notes) {
+  const join = (...t: string[]) => t.filter((x) => x.trim()).join('\n\n');
+  const parts = notes.map((n) => {
     const c = ctx.get(n.id)!;
+    const take = budget(NOTE_MAX);
+    const highlights = c.highlights ?? [];
+    let own = '';
+    let aid = '';
     if (n.kind === 'paper') {
-      if (n.body.trim() || c.highlights?.length) own.push(join(generatedMarkdown(n, { ...c, summary: null }), n.body));
-      if (c.summary) aids.push(generatedMarkdown(n, { ...c, highlights: [] }));
+      const comments = highlights
+        .filter((h) => h.comment.trim())
+        .map((h) => `- On a line I highlighted in the paper: ${h.comment.trim()}`)
+        .join('\n');
+      if (comments || n.body.trim()) own = join(`# ${n.title}`, comments, n.body.trim());
+      if (c.summary) aid = generatedMarkdown(n, { ...c, highlights: [] });
     } else if (n.kind === 'chat') {
-      const body = ownChatText(n.body);
-      if (body.trim()) own.push(join(`# ${n.title}`, body));
-      aids.push(generatedMarkdown(n, c));
-    } else if (n.body.trim()) own.push(n.body.trim());
-  }
-  let left = NOTES_MAX;
-  const cap = (texts: string[]) =>
-    texts.flatMap((t) => {
-      const s = t.slice(0, Math.min(NOTE_MAX, left));
-      left -= s.length;
-      return s ? [s] : [];
+      const body = ownChatText(n.body).trim();
+      if (body) own = join(`# ${n.title}`, body);
+      if (n.chat?.answer.trim()) aid = generatedMarkdown(n, c);
+    } else own = n.body.trim();
+    own = take(own);
+    const quotes = highlights.flatMap((h): DraftQuote[] => {
+      const text = take(cut(h.quote.trim(), QUOTE_MAX));
+      return text ? [{ paperId: n.paperId!, text, ...(h.comment.trim() ? { comment: h.comment.trim() } : {}) }] : [];
     });
-  return { notes: cap(own), aids: cap(aids) };
+    return { own, quotes, aid: take(aid) };
+  });
+  const take = budget(NOTES_MAX);
+  return {
+    notes: parts.map((p) => take(p.own)).filter(Boolean),
+    quotes: parts.flatMap((p) => p.quotes.map((q) => ({ ...q, text: take(q.text) }))).filter((q) => q.text),
+    aids: parts.map((p) => take(p.aid)).filter(Boolean),
+  };
 }
 
 /** The owner's 3 newest published posts, '# <title>\n\n<body>' cut to 2,000 chars; [] on any error. */
@@ -126,7 +154,9 @@ export async function voiceExamples(store: ContentStore, now = new Date()): Prom
       .sort((a, b) => time(b.data.date) - time(a.data.date) || a.slug.localeCompare(b.slug))
       .slice(0, 3);
     const entries = await Promise.all(posts.map((p) => readEntry(store, 'posts', p.slug)));
-    return entries.flatMap((e) => (e ? [`# ${e.data.title}\n\n${e.body.trim()}`.slice(0, 2000)] : []));
+    return entries.flatMap((e, i) =>
+      e ? [cut(`# ${String(e.data.title ?? posts[i].slug)}\n\n${e.body.trim()}`, 2000)] : [],
+    );
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('[reading] voice', e);
