@@ -317,7 +317,7 @@ export async function exportVault(sql: Sql, max = EXPORT_MAX): Promise<Uint8Arra
   if (out.byteLength > max)
     throw new HttpError(
       413,
-      `The vault’s zip is ${(out.byteLength / 1e6).toFixed(1)} MB, over the 4.4 MB one download can carry.`,
+      `The vault’s zip is ${(Math.ceil(out.byteLength / 1e5) / 10).toFixed(1)} MB, over the 4.4 MB one download can carry.`,
     );
   return out;
 }

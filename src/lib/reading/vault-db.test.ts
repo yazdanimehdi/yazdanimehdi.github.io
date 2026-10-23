@@ -287,7 +287,7 @@ test('an export over the limit is refused', async () => {
   await assert.rejects(exportVault(sql, 10), (e) => {
     assert.ok(e instanceof HttpError);
     assert.equal(e.status, 413);
-    assert.equal(e.message, 'The vault’s zip is 0.0 MB, over the 4.4 MB one download can carry.');
+    assert.equal(e.message, 'The vault’s zip is 0.1 MB, over the 4.4 MB one download can carry.');
     return true;
   });
   assert.ok((await exportVault(sql)).byteLength > 10);

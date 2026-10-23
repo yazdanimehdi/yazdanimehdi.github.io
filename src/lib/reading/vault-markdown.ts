@@ -85,7 +85,8 @@ export function noteFile(note: VaultNote, c: NoteContext): { path: string; text:
       : note.kind === 'chat'
         ? { id: note.id, kind: 'chat', question: note.chat?.question, asked: note.chat?.askedAt, ...times }
         : { id: note.id, kind: 'note', ...(c.notebook ? { notebook: c.notebook } : {}), ...times };
-  const generated = generatedMarkdown(note, c);
+  // A [[…]] inside a paper's title, a claim, a quote or an answer would be a link in Obsidian the owner never made.
+  const generated = generatedMarkdown(note, c).replaceAll('[[', '\\[\\[');
   const text = note.kind === 'free' ? note.body : generated + (note.body.trim() ? `\n\n## Notes\n\n${note.body}` : '');
   return {
     path: `vault/${FOLDER[note.kind]}/${note.title}.md`,

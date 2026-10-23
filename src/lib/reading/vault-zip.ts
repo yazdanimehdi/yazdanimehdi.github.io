@@ -31,8 +31,9 @@ export function zip(files: { path: string; text: string; date: Date }[]): Uint8A
     parts.push(local, common, name, data);
     const head = Buffer.alloc(6);
     head.writeUInt32LE(0x02014b50, 0);
-    head.writeUInt16LE(20, 4); // made by 2.0
-    const tail = Buffer.alloc(14); // comment length, disk, attributes 0; then the local header's offset
+    head.writeUInt16LE(0x0314, 4); // made by Unix, 2.0: Info-ZIP unzip reads a DOS host's names as CP437
+    const tail = Buffer.alloc(14); // comment length, disk, internal attributes 0; mode; the local header's offset
+    tail.writeUInt32LE((0o100644 << 16) >>> 0, 6); // a regular file, rw-r--r--
     tail.writeUInt32LE(offset, 10);
     central.push(head, common, tail, name);
     offset += 30 + name.length + data.length;

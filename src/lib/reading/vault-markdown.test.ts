@@ -178,3 +178,12 @@ test('front matter parses back', () => {
   assert.equal(free.rest, 'see [[Attention Is All You Need]]');
   assert.equal(frontMatter(noteFile(note({}), { authors: new Map() }).text).fm.notebook, undefined);
 });
+
+test('generated text makes no Obsidian links in the file, the owner’s writing does', () => {
+  const snap = { question: 'Q', answer: 'See [[X]] and ![[Y]].', cites: [], askedAt: '', origin: 'paper' as const };
+  const n = note({ kind: 'chat', title: 'Q', chat: snap, body: 'From [[P]]' });
+  assert.match(generatedMarkdown(n, { authors: new Map() }), /See \[\[X\]\] and !\[\[Y\]\]\./);
+  const { text } = noteFile(n, { authors: new Map() });
+  assert.match(text, /See \\\[\\\[X\]\] and !\\\[\\\[Y\]\]\./);
+  assert.ok(text.endsWith('## Notes\n\nFrom [[P]]'));
+});
