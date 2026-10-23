@@ -369,6 +369,14 @@ test('nesting is checked in one pass, and only past 16 levels', () => {
   assert.doesNotThrow(() => draft(quotes));
 });
 
+test('a lone \\r ends a line for the nesting check, as it does for the parser', () => {
+  const deep = /nested its quotes or lists too deeply/;
+  assert.equal(tooDeep('x\r' + '> '.repeat(17) + 'y'), true);
+  assert.throws(() => draft('x\r' + '> '.repeat(17) + 'y'), deep);
+  timed('6000 ordered after \\r', () => assert.throws(() => draft('x\r' + '1. '.repeat(6000) + 'y'), deep), 50);
+  assert.match(draft('x\r\n' + '> '.repeat(16) + 'y'), /y/);
+});
+
 test('no pattern backtracks on a long run of what it repeats', () => {
   const long = 80_000;
   const cases: [string, () => unknown][] = [

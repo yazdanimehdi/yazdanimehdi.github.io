@@ -180,7 +180,7 @@ const MAX_BRACKETS = 600;
 /** True when a line opens more than MAX_DEPTH quotes or list items: the parser recurses once for each. One pass. */
 export function tooDeep(md: string): boolean {
   const blank = (c: string | undefined) => c === ' ' || c === '\t';
-  for (const line of md.split('\n')) {
+  for (const line of md.split(/\r\n?|\n/)) {
     let depth = 0;
     let i = 0;
     while (i < line.length && depth <= MAX_DEPTH) {
@@ -380,7 +380,9 @@ export function parseDraft(
     });
     return entries.length ? `(${entries.join('; ')})` : '';
   };
-  const children = cite(sanitize(parseAnswer(visible(post.body), c.allowed).body), links);
+  // A lone \r ends a line for the parser too, so every check is made on the parser's lines.
+  const body = visible(post.body).replace(/\r\n?/g, '\n');
+  const children = cite(sanitize(parseAnswer(body, c.allowed).body), links);
   const text = plain(children);
   if (copies(text, c.passages))
     throw new Error('The draft copied a long passage from a paper, so it was dropped. Draft again.');
