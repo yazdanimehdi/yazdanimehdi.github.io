@@ -84,11 +84,19 @@ export async function listNotes(sql: Sql, o: { q?: string; kind?: NoteKind } = {
   return rows.map(toRow);
 }
 
+/** The longest body a note holds: the editor's and the room's limit, and no rewrite or accept goes past it. */
+export const MAX_BODY = 20_000;
+
 /**
  * The body, updated_at and the note's vault_links in one statement (atomic without a transaction of its own, so it
- * runs inside the caller's too). False when there is no such note.
+ * runs inside the caller's too). False when there is no such note; a 400 with a sentence when over MAX_BODY.
  */
 export async function setBody(sql: Tx, id: number, body: string): Promise<boolean> {
+  if (body.length > MAX_BODY) {
+    const [n] = await sql<Row>`select title from vault_notes where id = ${id}`;
+    if (!n) return false;
+    throw new HttpError(400, `That would make “${n.title}” longer than ${MAX_BODY.toLocaleString('en')} characters.`);
+  }
   const rows = await sql`
     with u as (update vault_notes set body = ${body}, updated_at = now() where id = ${id} returning id),
     t as (select distinct lower(x) as target from unnest(${wikiLinks(body)}::text[]) x),
@@ -99,21 +107,29 @@ export async function setBody(sql: Tx, id: number, body: string): Promise<boolea
 }
 
 /**
- * noteTitle(raw); 'taken' when another note holds it; else the new title, and every note linking to the old one has
- * its links rewritten, in the same transaction. null when there is no such note.
+ * noteTitle(raw); 'taken' when another note holds it; else the new title (and the given body, first), and every note
+ * linking to the old one has its links rewritten, in the same transaction. null when there is no such note. The
+ * notes it rewrites are row-locked as read, so a save landing meanwhile waits and then keeps its own text.
  */
-export async function renameNote(sql: Sql, id: number, raw: string): Promise<VaultNote | 'taken' | null> {
+export async function renameNote(
+  sql: Sql,
+  id: number,
+  raw: string,
+  body?: string,
+): Promise<VaultNote | 'taken' | null> {
   return withTitles(sql, async (tx) => {
     const [cur] = await tx<Row>`select title from vault_notes where id = ${id}`;
     if (!cur) return null;
     const title = noteTitle(raw);
     if (await taken(tx, title, id)) return 'taken';
     const old = cur.title as string;
-    await tx`update vault_notes set title = ${title}, updated_at = now() where id = ${id}`;
+    if (body !== undefined) await setBody(tx, id, body);
     const linking = await tx<Row>`
       select n.id, n.body from vault_notes n
-      where exists (select 1 from vault_links l where l.from_id = n.id and l.target = lower(${old}))`;
+      where exists (select 1 from vault_links l where l.from_id = n.id and l.target = lower(${old}))
+      for update`;
     for (const n of linking) await setBody(tx, Number(n.id), rewriteLinks(n.body as string, old, title));
+    await tx`update vault_notes set title = ${title}, updated_at = now() where id = ${id}`;
     return getNote(tx, id);
   });
 }

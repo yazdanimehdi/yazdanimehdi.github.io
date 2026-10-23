@@ -171,7 +171,7 @@ export async function answerSuggestion(sql: Sql, id: number, accept: boolean): P
         title = had?.title ?? (await freeTitle(tx, s.title as string));
         if (!had) await tx`insert into vault_notes (kind, title) values ('free', ${title})`;
       }
-      const [n] = await tx<{ body: string }>`select body from vault_notes where id = ${noteId}`;
+      const [n] = await tx<{ body: string }>`select body from vault_notes where id = ${noteId} for update`;
       await setBody(tx, noteId, addRelated(n.body, title));
     }
     return getNote(tx, noteId);

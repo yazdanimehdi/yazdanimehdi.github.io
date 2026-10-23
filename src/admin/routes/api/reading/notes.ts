@@ -5,11 +5,11 @@ import { getSql } from '../../../../lib/db';
 import { getPapers } from '../../../../lib/reading/db';
 import { TARGET, targetOf } from '../../../../lib/reading/library';
 import { getNotebook } from '../../../../lib/reading/room-db';
-import { saveRoomNote, withTitles } from '../../../../lib/reading/vault-db';
+import { MAX_BODY, saveRoomNote, withTitles } from '../../../../lib/reading/vault-db';
 
 export const prerender = false;
 
-const Body = z.strictObject({ ...TARGET, body: z.string().max(20_000) });
+const Body = z.strictObject({ ...TARGET, body: z.string().max(MAX_BODY) });
 
 /** `{ paper | notebook, body }` → `{ body }`: the paper's (or notebook's) vault note; a blank body creates none. */
 export const PUT = careerRoute(async (ctx) => {

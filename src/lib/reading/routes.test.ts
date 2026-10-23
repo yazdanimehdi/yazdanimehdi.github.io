@@ -24,6 +24,7 @@ import {
   updateNotebook,
   useAiCall,
 } from './room-db';
+import { lockProbe } from './test-locks';
 import { minimalPdf } from './test-pdf';
 import { createNote, ensurePaperNote, noteContexts, saveRoomNote, setBody, withTitles } from './vault-db';
 import { generatedMarkdown } from './vault-markdown';
@@ -905,6 +906,28 @@ test('PATCH with a title and a body rewrites the body’s links to the old title
   assert.equal((await call(vNote.PATCH, { params, body: { title: 'taken', body: 'changed' } })).status, 409);
   const [n] = await sql<{ body: string }>`select body from vault_notes where id = ${id}`;
   assert.equal(n.body, 'self [[New|me]]', 'a taken title changes nothing');
+});
+
+test('the editor’s PATCH writes bodies under the title lock, so it waits for a rename or an accept', async () => {
+  const id = await free('Old');
+  await free('Linking', 'see [[Old]]');
+  const params = { id: String(id) };
+  const p = lockProbe(sql);
+  setSqlForTests(p.sql);
+  await ok(await call(vNote.PATCH, { params, body: { body: 'mine' } }));
+  await ok(await call(vNote.PATCH, { params, body: { title: 'New', body: 'mine [[Old]]' } }));
+  assert.equal(p.writes.length, 4); // the body; then the rename's body, the linking note, the body's self-link
+  assert.ok(p.writes.every((w) => w.titleLock));
+});
+
+test('PATCH refuses a rename whose link rewrite would push the body past 20,000 characters', async () => {
+  const id = await free('Old');
+  const params = { id: String(id) };
+  const res = await call(vNote.PATCH, { params, body: { title: 'Longer', body: `${'x'.repeat(20_000 - 7)}[[Old]]` } });
+  assert.equal(res.status, 400);
+  assert.equal((await res.json()).error, 'That would make “Old” longer than 20,000 characters.');
+  const [n] = await sql<{ title: string; body: string }>`select title, body from vault_notes where id = ${id}`;
+  assert.deepEqual(n, { title: 'Old', body: '' });
 });
 
 test('notes GET filters by kind and searches', async () => {

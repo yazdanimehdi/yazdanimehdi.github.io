@@ -30,30 +30,31 @@ async function loadTitles() {
   titles.value = (await api<{ notes: NoteRow[] }>('reading/vault/notes')).notes;
 }
 
-// Title: renamed on change, with the body, so its links to itself follow; a taken title is refused in place and the
-// old one comes back.
+// Title: renamed on change, with the body, so its links to itself follow; a refused rename is shown in place and the
+// old title comes back. It queues with the body saves, so it never sends a body older than one already saved.
 const titleError = ref('');
 const titleDraft = ref('');
-async function rename() {
+function rename() {
   const old = note.value!.title;
   const title = titleDraft.value.trim();
   titleError.value = '';
   if (!title || title === old) return void (titleDraft.value = old);
-  await saving;
   clearTimeout(saveTimer);
-  const text = body.value;
-  try {
-    const res = await api<{ note: VaultNote }>(path, { method: 'PATCH', body: { title, body: text } });
-    note.value = res.note;
-    savedBody = res.note.body;
-    if (body.value === text) body.value = savedBody;
-    titleDraft.value = res.note.title;
-    titles.value = titles.value.map((t) => (t.id === id ? { ...t, title: res.note.title } : t));
-  } catch (err) {
-    titleError.value = (err as Error).message;
-    titleDraft.value = old;
-    void saveBody(); // the body that went with the refused rename
-  }
+  saving = saving.then(async () => {
+    const text = body.value;
+    try {
+      const res = await api<{ note: VaultNote }>(path, { method: 'PATCH', body: { title, body: text } });
+      note.value = res.note;
+      savedBody = res.note.body;
+      if (body.value === text) body.value = savedBody;
+      titleDraft.value = res.note.title;
+      titles.value = titles.value.map((t) => (t.id === id ? { ...t, title: res.note.title } : t));
+    } catch (err) {
+      titleError.value = (err as Error).message;
+      titleDraft.value = old;
+      void saveBody(); // the body that went with the refused rename, queued after this
+    }
+  });
 }
 
 // Your notes: saved on blur and a second after typing stops, one save at a time.
@@ -210,11 +211,13 @@ async function answer(s: Suggestion, accept: boolean) {
 // Delete: a confirm, then back to the list.
 const confirming = ref(false);
 const deleting = ref(false);
-const DELETE_MORE = {
-  paper: ' Its highlights stay in the reading room.',
-  chat: ' The answer stays in the paper’s chat, no longer saved.',
-  free: '',
-};
+const deleteMore = computed(() => {
+  const n = note.value!;
+  if (n.kind === 'paper') return ' Its highlights stay in the reading room.';
+  if (n.kind !== 'chat') return '';
+  if (n.chatId == null) return ' Its chat is gone, so this note is the answer’s only copy.';
+  return ` The answer stays in the ${n.chat?.origin === 'notebook' ? 'notebook’s' : 'paper’s'} chat, no longer saved.`;
+});
 async function remove() {
   deleting.value = true;
   try {
@@ -266,6 +269,7 @@ const NO_SET = new Set<never>();
           v-model="titleDraft"
           type="text"
           maxlength="200"
+          :readonly="answering"
           :aria-invalid="!!titleError || undefined"
           :aria-describedby="titleError ? 'adm-vault-title-error' : undefined"
           @change="rename"
@@ -409,7 +413,7 @@ const NO_SET = new Set<never>();
       >
         <div>
           <h2 id="adm-vault-delete" class="adm-h2">Delete “{{ visible(note.title) }}”?</h2>
-          <p>Links to it in other notes stay, unresolved.{{ DELETE_MORE[note.kind] }}</p>
+          <p>Links to it in other notes stay, unresolved.{{ deleteMore }}</p>
           <div class="adm-actions">
             <button type="button" class="adm-btn" data-autofocus @click="confirming = false">Cancel</button>
             <button type="button" class="adm-btn adm-btn-danger" :disabled="deleting" @click="remove">

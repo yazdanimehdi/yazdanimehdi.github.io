@@ -390,9 +390,10 @@ Project 3 shipped as planned in `docs/superpowers/plans/2026-10-22-vault.md`. De
   against it with emoji.
 - **Links resolve by title and are rewritten on rename,** the way Obsidian does it, so the stored Markdown is always
   exactly what Obsidian reads: `[[Old]]`, `[[old|shown]]`, `[[Old#Method]]`, `![[Old]]` and `[[ Old ]]` all follow
-  with their alias or heading, and `[[Old notes]]` is untouched. Renaming with an unsaved body renames first, then
-  saves the body with its links to the old title rewritten, so a refused rename saves nothing and a note's links to
-  itself follow. A `[[` inside generated text (a paper title, a claim, a quote) is escaped in the export, so only the
+  with their alias or heading, and `[[Old notes]]` is untouched. Renaming with an unsaved body saves the body and renames in
+  one transaction, the body's links to the old title rewritten too, so a refused rename saves nothing and a note's
+  links to itself follow. Every body write holds the title lock, and a rename or an accept row-locks the notes it
+  rewrites, so a save landing meanwhile waits and keeps its own text. A `[[` inside generated text (a paper title, a claim, a quote) is escaped in the export, so only the
   owner's writing links.
 - **Suggestions on first open in the vault, plus a button,** not on every add or Save as the spec says: Save stays
   instant, and no AI call is spent on a note never looked at. Reported to the owner. The automatic run happens only
@@ -407,7 +408,7 @@ Project 3 shipped as planned in `docs/superpowers/plans/2026-10-22-vault.md`. De
   answering it is a 404.
 - **A plain textarea, not Tiptap:** Tiptap's Markdown round trip may escape `[[` and reflow Obsidian syntax; a
   textarea keeps the file byte-exact and makes the `[[` combobox simple. The 20,000-character body limit is the
-  route's.
+  routes', and no link rewrite or accept goes past it: one that would is refused with a sentence naming the note.
 - **Graph: 200 nodes,** the most linked, drawn as SVG with a hand-written Fruchterman–Reingold layout from a
   golden-angle spiral. The API gives edges as note ids; the page maps them to positions and drops any edge whose ends
   aren't both kept. While building, gravity toward the centre (0.4), half the spacing and a fit to the box were added:
@@ -471,7 +472,5 @@ schema already includes the shared papers table (ids, metadata, state, digest me
 - PDF text extracted in code (a new dependency), so PDF papers get real passages like HTML ones.
 - Digest papers' text fetched overnight; summaries made on open with progress shown, not prefetched.
 - Highlighting is part of the reading room. A paper note appears on Save, highlight or note, never on a mere open.
-- Link suggestions run the first time a note is opened in the vault, plus a button, rather than when a note or paper
-  is added.
 - Pages: Today, Library, Notebooks, Vault, Settings.
 - A daily cap of 100 reading-room AI calls by default, editable.

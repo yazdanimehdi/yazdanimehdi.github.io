@@ -15,6 +15,7 @@ import {
   setOutput,
   updateNotebook,
 } from './room-db';
+import { lockProbe } from './test-locks';
 import { unzip } from './test-unzip';
 import {
   backlinks,
@@ -106,6 +107,29 @@ test('renaming a note rewrites the links to it', async () => {
   assert.deepEqual(titles(await backlinks(sql, old.id)), ['C']);
   assert.deepEqual(await links(c.id), ['new']);
   assert.equal(await renameNote(sql, old.id + 99, 'X'), null);
+});
+
+test('a rename row-locks the notes it rewrites before writing them, so a save landing meanwhile waits', async () => {
+  const old = await make('Old');
+  const c = await make('C', 'see [[Old]]');
+  const d = await make('D', '[[old]] too');
+  await make('E', 'unrelated');
+  const p = lockProbe(sql);
+  await renameNote(p.sql, old.id, 'New');
+  assert.deepEqual(p.writes[0], { titleLock: true, locked: [c.id, d.id] });
+});
+
+test('a rename that would push a linking note past 20,000 characters is refused and changes nothing', async () => {
+  const old = await make('Old');
+  const full = `${'x'.repeat(20_000 - 7)}[[Old]]`;
+  const c = await make('C', full);
+  await assert.rejects(
+    renameNote(sql, old.id, 'Longer'),
+    (e) =>
+      e instanceof HttpError && e.status === 400 && e.message === 'That would make “C” longer than 20,000 characters.',
+  );
+  assert.equal((await getNote(sql, old.id))!.title, 'Old');
+  assert.equal((await getNote(sql, c.id))!.body, full);
 });
 
 test("a rename onto another note's title is refused", async () => {

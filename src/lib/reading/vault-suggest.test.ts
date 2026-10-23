@@ -7,6 +7,7 @@ import { migrate } from '../db-migrate';
 import { pgliteSql } from '../pglite-sql';
 import { upsertPapers, writeReading } from './db';
 import { aiUse, useAiCall } from './room-db';
+import { lockProbe } from './test-locks';
 import type { VaultNote } from './types';
 import { backlinks, createNote, ensurePaperNote, getNote, listNotes, setBody, withTitles } from './vault-db';
 import { answerSuggestion, listSuggestions, parseSuggestions, suggestLinks } from './vault-suggest';
@@ -159,6 +160,33 @@ test('accepting links the note, and a new concept becomes a note', async () => {
   );
   assert.deepEqual(await listSuggestions(sql, self.id), []);
   assert.equal(await answerSuggestion(sql, sa.id, true), null);
+});
+
+test('accepting row-locks the note before rewriting it, so a save landing meanwhile waits', async () => {
+  const self = await make('My note', 'Text.');
+  await make('Paper B');
+  reply = links({ title: 'Paper B' });
+  const [s] = await suggestLinks(sql, store, self.id);
+  const p = lockProbe(sql);
+  await answerSuggestion(p.sql, s.id, true);
+  assert.deepEqual(p.writes, [{ titleLock: true, locked: [self.id] }]);
+});
+
+test('an accept that would push the note past 20,000 characters is refused and changes nothing', async () => {
+  const full = 'x'.repeat(20_000 - 5);
+  const self = await make('My note', full);
+  await make('Paper B');
+  reply = links({ title: 'Paper B' });
+  const [s] = await suggestLinks(sql, store, self.id);
+  await assert.rejects(
+    answerSuggestion(sql, s.id, true),
+    refused(400, 'That would make “My note” longer than 20,000 characters.'),
+  );
+  assert.equal((await getNote(sql, self.id))!.body, full);
+  assert.deepEqual(
+    (await listSuggestions(sql, self.id)).map((x) => x.id),
+    [s.id],
+  );
 });
 
 test('accepting a new concept that now exists links that note', async () => {
