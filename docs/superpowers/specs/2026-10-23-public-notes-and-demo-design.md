@@ -127,6 +127,45 @@ id in `graph.json` is a UUID added to each vault note, not its title.
 - `/notes/vault.zip`: the same public notes as an Obsidian-ready folder, built like the vault export.
 - Both are generated from the published copies only.
 
+### Built (2026-10-23)
+
+Part 1 shipped as planned in `docs/superpowers/plans/2026-10-23-public-readings-notes.md`. Decisions made while
+building it:
+
+- **What is stored:** migration 011 adds `vault_notes.uid` (a UUID, the id `graph.json` uses), `public`, `public_slug`
+  and `public_at` (both fixed at first publish and kept after unpublishing), a check that a chat note is never public,
+  and `reading_highlights.public`. Paper metadata is what `reading_papers` holds: title, authors, URL, arXiv id, DOI and
+  date. There is no venue field, so no venue is shown.
+- **One republish for every vault write:** `republish` builds every public note's copy and brings `documents` under
+  `src/content/readings|notes/` to exactly that set in one commit of the differences, retrying from fresh reads when it
+  loses a race; nothing changed commits nothing, so autosave doesn't churn the history. A failed republish never fails
+  the save: the response carries `publishWarning` and the admin offers Publish again. The copies are written only by
+  `republish` (`PUBLISHED` is a document path but not in the write allowlist), so the AI site editor can't edit them:
+  they would be rewritten from the vault.
+- **Private links:** a link to a note that isn't public keeps its alias or reads "(private note)", in the body, a
+  highlight's quote and its comment, repeated until nothing changes (an alias can hold the pieces of another link).
+  The copy keeps `[[links]]` to public notes, the shape the vault exports; the site turns them into links by title.
+- **db-seed does not seed the copies:** they derive from the vault, and the next republish would delete them in a
+  database whose notes aren't public. A fresh database starts with no copies until the owner saves a public note or
+  presses Publish again.
+- **The Visibility line:** "Visibility: public at <url>, with N of M highlights." with Make public / Make private, on
+  vault notes and in the paper and notebook rooms. It reads the page switches through the store, since admin routes
+  run outside the request context that `getSiteConfig()` needs in Postgres mode. The page-off hint ("The Readings page
+  is off; turn it on in Pages.") shows only on public items: on a private one it says nothing useful. The
+  300-character hint shows once above the highlight list, tied to each Public box by `aria-describedby`, not repeated
+  per row.
+- **Pages off until turned on:** `readings` and `notes` are `DEFAULT_OFF` `SITE_PAGES` entries, where absent means off.
+  Turning one on adds no menu item; the switch's hint points to Settings → Menu items.
+- **A public note's body renders as a post's does,** Markdown and raw HTML, through the same renderer.
+- **The graph:** the vault graph's layout and drawing moved into `src/components/vue/NoteGraph.vue`, used read-only by
+  `/notes` and by the vault. There is no Playwright case for the public graph: the e2e suite runs on the repo's own
+  content and `site.yml`, which must not ship sample copies or the pages turned on. It was covered by a manual browser
+  pass with temporary, uncommitted copies in both themes at desktop and phone widths.
+- **The open copy:** `graph.json` is `format: scholaros-notes`, `version: 1`; it includes papers only while Readings is
+  on, and both it and the zip answer 404 while Notes is off. The zip is named `<site>-notes.zip` (the site name's slug,
+  else `site`); the vault export had no site-name precedent. `EXPORT_MAX` moved to `src/lib/reading/limits.ts`, so the
+  public routes don't import the vault's database module.
+
 ## Part 2: imports
 
 ### From Obsidian
