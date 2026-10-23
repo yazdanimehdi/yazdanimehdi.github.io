@@ -1,6 +1,7 @@
-// Pure helpers for the vault's editor ([[ autocomplete, out-links) and graph (layout, picking).
+// Pure helpers for the vault's editor ([[ autocomplete, out-links, the Visibility line) and graph (layout, picking).
 import { wikiLinks } from '../lib/reading/vault-links';
 import type { NoteRow } from '../lib/reading/types';
+import type { Visibility } from '../lib/reading/visibility';
 
 type Point = { x: number; y: number };
 
@@ -145,3 +146,13 @@ export function nearestNode(pts: Point[], x: number, y: number, max: number): nu
 }
 
 export const KIND_NAMES = { paper: 'Paper', chat: 'Chat', free: 'Note' } as const;
+
+/** The Visibility line on a note; `shared` is the reading room's own count of the paper's public highlights. */
+export function visibilityText(v: Visibility, kind: 'paper' | 'free', shared?: { on: number; all: number }): string {
+  if (v.chat) return "Visibility: private. Chat notes can't be made public.";
+  if (!v.public) return 'Visibility: private.';
+  const hs = shared ?? v.highlights ?? { on: 0, all: 0 };
+  const counts = kind === 'paper' ? `, with ${hs.on} of ${hs.all} highlights` : '';
+  const off = v.pageOn ? '' : ` The ${kind === 'paper' ? 'Readings' : 'Notes'} page is off; turn it on in Pages.`;
+  return `Visibility: public at ${v.url}${counts}.${off}`;
+}

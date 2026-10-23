@@ -2,6 +2,7 @@
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import AdminShell from './AdminShell.vue';
 import ReadingDraftButton from './ReadingDraftButton.vue';
+import ReadingVisibility from './ReadingVisibility.vue';
 import { api, report } from './api';
 import { visible } from './career';
 import { formatDate, relativeTime } from './dates';
@@ -10,6 +11,7 @@ import { AnswerText } from './RoomText';
 import { KIND_NAMES, completeAt, linkQuery, matchTitles, outLinks } from './vault';
 import type { AdminCtx } from './types';
 import type { NoteRow, Suggestion, VaultNote } from '../lib/reading/types';
+import type { Visibility } from '../lib/reading/visibility';
 
 // Titles, generated text and suggestions (AI text) are shown with {{ }} or AnswerText only, never as HTML.
 const props = defineProps<{ ctx: AdminCtx; id: string }>();
@@ -26,6 +28,21 @@ const titles = ref<NoteRow[]>([]);
 const loadError = ref('');
 const body = ref('');
 let savedBody = ''; // the body as last loaded or saved
+
+// Public or private; every write answers with whether the public copies updated.
+const visibility = ref<Visibility | null>(null);
+const publishWarning = ref('');
+type Written = { note: VaultNote; visibility?: Visibility; publishWarning?: string };
+function written(res: Written) {
+  note.value = res.note;
+  if (res.visibility) visibility.value = res.visibility;
+  publishWarning.value = res.publishWarning ?? '';
+}
+const setPublic = async (on: boolean) => {
+  const res = await api<Written & { visibility: Visibility }>(path, { method: 'PATCH', body: { public: on } });
+  note.value = res.note;
+  return res;
+};
 
 async function loadTitles() {
   titles.value = (await api<{ notes: NoteRow[] }>('reading/vault/notes')).notes;
@@ -44,8 +61,8 @@ function rename() {
   saving = saving.then(async () => {
     const text = body.value;
     try {
-      const res = await api<{ note: VaultNote }>(path, { method: 'PATCH', body: { title, body: text } });
-      note.value = res.note;
+      const res = await api<Written>(path, { method: 'PATCH', body: { title, body: text } });
+      written(res);
       savedBody = res.note.body;
       if (body.value === text) body.value = savedBody;
       titleDraft.value = res.note.title;
@@ -68,7 +85,7 @@ function saveBody() {
     const text = body.value;
     if (text === savedBody) return;
     try {
-      note.value = (await api<{ note: VaultNote }>(path, { method: 'PATCH', body: { body: text } })).note;
+      written(await api<Written>(path, { method: 'PATCH', body: { body: text } }));
       savedBody = text;
       saveStatus.value = 'Saved';
       autoSuggest();
@@ -194,12 +211,13 @@ async function answer(s: Suggestion, accept: boolean) {
   }
   answering.value = true;
   try {
-    const res = await api<{ note: VaultNote }>(`reading/vault/suggestions/${s.id}`, {
+    const res = await api<Written>(`reading/vault/suggestions/${s.id}`, {
       method: 'PATCH',
       body: { accept },
     });
     note.value = res.note;
     if (accept) {
+      written(res);
       body.value = savedBody = res.note.body;
       await loadTitles(); // a new concept is a new note
     }
@@ -211,9 +229,10 @@ async function answer(s: Suggestion, accept: boolean) {
   }
 }
 
-// Delete: a confirm, then back to the list.
+// Delete: a confirm, then back to the list (or, when its public copy is left behind, Publish again here first).
 const confirming = ref(false);
 const deleting = ref(false);
+const deleted = ref(false);
 const deleteMore = computed(() => {
   const n = note.value!;
   if (n.kind === 'paper') return ' Its highlights stay in the reading room.';
@@ -224,9 +243,13 @@ const deleteMore = computed(() => {
 async function remove() {
   deleting.value = true;
   try {
-    await api(path, { method: 'DELETE' });
+    const res = await api<{ publishWarning?: string } | null>(path, { method: 'DELETE' });
     savedBody = body.value; // nothing left to flush
-    location.href = `${base}/reading/vault`;
+    if (!res?.publishWarning) return void (location.href = `${base}/reading/vault`);
+    publishWarning.value = res.publishWarning;
+    visibility.value = null;
+    confirming.value = false;
+    deleted.value = true;
   } catch (e) {
     report(e);
     deleting.value = false;
@@ -238,13 +261,20 @@ onMounted(async () => {
   document.addEventListener('visibilitychange', onHidden);
   try {
     const [res] = await Promise.all([
-      api<{ note: VaultNote; generated: string; backlinks: NoteRow[]; suggestions: Suggestion[] }>(path),
+      api<{
+        note: VaultNote;
+        generated: string;
+        backlinks: NoteRow[];
+        suggestions: Suggestion[];
+        visibility: Visibility;
+      }>(path),
       loadTitles(),
     ]);
     note.value = res.note;
     generated.value = res.generated;
     backlinks.value = res.backlinks;
     suggestions.value = res.suggestions;
+    visibility.value = res.visibility;
     body.value = savedBody = res.note.body;
     titleDraft.value = res.note.title;
     autoSuggest();
@@ -264,6 +294,16 @@ const NO_SET = new Set<never>();
 <template>
   <AdminShell :ctx="ctx" active="reading/vault" :title="note ? visible(note.title) : 'Note'">
     <p v-if="loadError" class="adm-err" role="alert">{{ loadError }}</p>
+    <template v-else-if="deleted">
+      <p>Note deleted. <a :href="`${base}/reading/vault`">Back to the vault</a></p>
+      <ReadingVisibility
+        v-model:visibility="visibility"
+        v-model:warning="publishWarning"
+        :ctx="ctx"
+        kind="free"
+        :send="setPublic"
+      />
+    </template>
     <template v-else-if="note">
       <div class="adm-field adm-room-title adm-vault-act">
         <label for="adm-vault-note-title">Title</label>
@@ -286,6 +326,13 @@ const NO_SET = new Set<never>();
       <p v-if="note.kind === 'paper' && note.paperId">
         <a :href="`${base}/reading/papers/${note.paperId}`">Open in the reading room</a>
       </p>
+      <ReadingVisibility
+        v-model:visibility="visibility"
+        v-model:warning="publishWarning"
+        :ctx="ctx"
+        :kind="note.kind === 'paper' ? 'paper' : 'free'"
+        :send="setPublic"
+      />
 
       <template v-if="note.kind !== 'free'">
         <h2 class="adm-h2">From the reading room</h2>

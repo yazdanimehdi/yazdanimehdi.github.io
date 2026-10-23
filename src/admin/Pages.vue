@@ -13,11 +13,16 @@ import type { AdminCtx, CommitResult, Entry } from './types';
 type Config = Record<string, any>;
 defineProps<{ ctx: AdminCtx }>();
 
+// Pages that stay off until the owner turns them on (moves beside SITE_PAGES with them).
+const DEFAULT_OFF: string[] = ['readings', 'notes'];
 const SWITCHES: FieldDef[] = Object.entries(SITE_PAGES).map(([id, href]) => ({
   key: `pages.${id}`,
   label: `${id === 'cv' ? 'CV' : id[0].toUpperCase() + id.slice(1)} (${href})`,
   type: 'checkbox',
-  default: true,
+  default: !DEFAULT_OFF.includes(id),
+  ...(DEFAULT_OFF.includes(id) && {
+    hint: 'Off until you turn it on. Add it to the menu under Settings → Menu items.',
+  }),
 }));
 
 const HOME: FieldDef[] = [

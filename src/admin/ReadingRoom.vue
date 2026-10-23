@@ -2,6 +2,7 @@
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import AdminShell from './AdminShell.vue';
 import ReadingDraftButton from './ReadingDraftButton.vue';
+import ReadingVisibility from './ReadingVisibility.vue';
 import { ApiError, api, report, toast } from './api';
 import { visible } from './career';
 import { formatDate } from './dates';
@@ -10,6 +11,7 @@ import { progressLine, selectionInPassage, textLabel } from './reading-room';
 import { AnswerText, ClaimList, PaperText } from './RoomText';
 import type { AdminCtx } from './types';
 import type { ChatMessage, Cite, Highlight, Output, OutputKind, Paper, Passage, TextState } from '../lib/reading/types';
+import type { Visibility } from '../lib/reading/visibility';
 
 // Paper text, titles and AI output are third-party: shown with {{ }} or through RoomText's text-node renderers only.
 const props = defineProps<{ ctx: AdminCtx; paper?: string; notebook?: string }>();
@@ -39,6 +41,8 @@ interface Room {
   inNotebooks: { id: number; title: string }[];
   /** the room's note in the vault, once there is one */
   vaultNote: number | null;
+  /** the paper's note on the public site (a paper's room only) */
+  visibility: Visibility | null;
 }
 type PaperRes = Omit<Room, 'title' | 'papers' | 'texts' | 'passages' | 'inNotebooks'> & {
   paper: Paper;
@@ -47,7 +51,10 @@ type PaperRes = Omit<Room, 'title' | 'papers' | 'texts' | 'passages' | 'inNotebo
   notebooks: Room['inNotebooks'];
   note: string;
 };
-type NotebookRes = Omit<Room, 'title' | 'inNotebooks'> & { notebook: { id: number; title: string }; note: string };
+type NotebookRes = Omit<Room, 'title' | 'inNotebooks' | 'visibility'> & {
+  notebook: { id: number; title: string };
+  note: string;
+};
 
 const room = ref<Room | null>(null);
 const loadError = ref('');
@@ -63,7 +70,7 @@ async function load(first = false) {
     let n: string;
     if (isNb) {
       const res = await api<NotebookRes>(`reading/notebooks/${target.notebook}${open}`);
-      r = { ...res, title: res.notebook.title, inNotebooks: [] };
+      r = { ...res, title: res.notebook.title, inNotebooks: [], visibility: null };
       n = res.note;
     } else {
       const res = await api<PaperRes>(`reading/papers/${target.paper}${open}`);
@@ -189,6 +196,34 @@ async function jump(c: Cite) {
   flash.value = c;
   clearTimeout(flashTimer);
   flashTimer = setTimeout(() => (flash.value = null), 2000);
+}
+
+// Public or private (a paper's room): the toggle gives the paper its note when it has none. Writes answer with whether
+// the public copies updated.
+const publishWarning = ref('');
+const warned = (res: { publishWarning?: string } | null) => (publishWarning.value = res?.publishWarning ?? '');
+const shared = computed(() => ({
+  on: room.value?.highlights.filter((x) => x.public).length ?? 0,
+  all: room.value?.highlights.length ?? 0,
+}));
+async function setPublic(on: boolean) {
+  const res = await api<{ visibility: Visibility; publishWarning?: string }>('reading/vault/publish', {
+    body: { paper: target.paper, public: on },
+  });
+  room.value!.vaultNote ??= res.visibility.noteId;
+  return res;
+}
+/** A highlight's Public box: ticked at once, unticked again (with the route's sentence beside it) when refused. */
+const hlError = ref<{ id: number; text: string } | null>(null);
+async function setHighlightPublic(hl: Highlight, on: boolean) {
+  hl.public = on;
+  hlError.value = null;
+  try {
+    warned(await api(`reading/highlights/${hl.id}`, { method: 'PATCH', body: { public: on } }));
+  } catch (e) {
+    hl.public = !on;
+    hlError.value = { id: hl.id, text: (e as Error).message };
+  }
 }
 
 /** After a save, highlight or note: reload so the link to the new vault note appears. */
@@ -342,7 +377,7 @@ async function saveComment() {
   const t = tool.value;
   if (t?.kind !== 'mark') return;
   try {
-    await api(`reading/highlights/${t.hl.id}`, { method: 'PATCH', body: { comment: t.comment.trim() } });
+    warned(await api(`reading/highlights/${t.hl.id}`, { method: 'PATCH', body: { comment: t.comment.trim() } }));
     const hl = room.value!.highlights.find((x) => x.id === t.hl.id); // a poll may have replaced t.hl
     if (hl) hl.comment = t.comment.trim();
     tool.value = null;
@@ -354,7 +389,7 @@ async function deleteHighlight() {
   const t = tool.value;
   if (t?.kind !== 'mark') return;
   try {
-    await api(`reading/highlights/${t.hl.id}`, { method: 'DELETE' });
+    warned(await api(`reading/highlights/${t.hl.id}`, { method: 'DELETE' }));
     room.value!.highlights = room.value!.highlights.filter((x) => x.id !== t.hl.id);
     tool.value = null;
   } catch (e) {
@@ -453,7 +488,7 @@ function saveNote() {
     const body = note.value;
     if (body === savedNote) return;
     try {
-      await api('reading/notes', { method: 'PUT', body: { ...target, body } });
+      warned(await api('reading/notes', { method: 'PUT', body: { ...target, body } }));
       savedNote = body;
       noteStatus.value = 'Saved';
       toVault();
@@ -537,8 +572,23 @@ onBeforeUnmount(() => {
               >{{ i ? ', ' : '' }}<a :href="`${base}/reading/notebooks/${n.id}`">{{ visible(n.title) }}</a></span
             >
           </p>
+          <ReadingVisibility
+            v-model:visibility="room.visibility"
+            v-model:warning="publishWarning"
+            :ctx="ctx"
+            kind="paper"
+            :shared="shared"
+            :send="setPublic"
+          />
         </template>
         <template v-else-if="isNb">
+          <ReadingVisibility
+            v-model:visibility="room.visibility"
+            v-model:warning="publishWarning"
+            :ctx="ctx"
+            kind="free"
+            :send="setPublic"
+          />
           <label class="adm-field adm-room-title">
             <span>Title</span>
             <input type="text" :value="room.title" maxlength="200" @change="rename" />
@@ -750,6 +800,7 @@ onBeforeUnmount(() => {
               <p class="adm-muted" role="status">{{ noteStatus }}</p>
               <template v-if="room.highlights.length">
                 <h3 class="adm-subhead">Highlights</h3>
+                <p id="room-hl-public-hint" class="adm-muted">Shown publicly up to 300 characters.</p>
                 <ul class="adm-rows">
                   <li v-for="hl in room.highlights" :key="hl.id">
                     <span class="adm-row-main">
@@ -758,7 +809,19 @@ onBeforeUnmount(() => {
                       </button>
                       <span v-if="hl.comment" class="adm-row-detail">{{ hl.comment }}</span>
                       <span v-if="isNb" class="adm-row-detail">{{ paperTitle(hl.paperId) }}</span>
+                      <span v-if="hlError?.id === hl.id" class="adm-row-detail adm-err" role="alert">{{
+                        hlError.text
+                      }}</span>
                     </span>
+                    <label class="adm-row-action adm-check">
+                      <input
+                        type="checkbox"
+                        :checked="hl.public"
+                        aria-describedby="room-hl-public-hint"
+                        @change="setHighlightPublic(hl, ($event.target as HTMLInputElement).checked)"
+                      />
+                      Public
+                    </label>
                   </li>
                 </ul>
               </template>
