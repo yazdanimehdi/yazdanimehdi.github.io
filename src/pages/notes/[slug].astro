@@ -1,0 +1,25 @@
+---
+import ClassicNote from '../../themes/classic/Note.astro';
+import EditorialNote from '../../themes/editorial/Note.astro';
+import { getTheme } from '../../lib/config';
+import { staticProps } from '../../lib/content';
+import { backlinksOf, excerpt, loadPublic, renderPublicBody, type NotePage } from '../../lib/public-notes';
+
+export async function getStaticPaths() {
+  const all = await loadPublic();
+  return all.filter((e) => e.kind === 'note').map((entry) => ({ params: { slug: entry.id }, props: { entry, all } }));
+}
+
+const props = await staticProps(Astro, getStaticPaths);
+if (!props) return new Response(null, { status: 404 });
+const { entry, all } = props;
+const page: NotePage = {
+  title: entry.data.title,
+  updated: entry.data.updated,
+  body: await renderPublicBody(entry, all),
+  backlinks: backlinksOf(entry, all).map((e) => ({ title: e.data.title, href: e.url })),
+  description: excerpt(entry.body, 160),
+};
+---
+
+{getTheme() === 'editorial' ? <EditorialNote {...page} /> : <ClassicNote {...page} />}

@@ -1,0 +1,39 @@
+---
+import ClassicReading from '../../themes/classic/Reading.astro';
+import EditorialReading from '../../themes/editorial/Reading.astro';
+import { getTheme } from '../../lib/config';
+import { staticProps } from '../../lib/content';
+import {
+  backlinksOf,
+  excerpt,
+  loadPublic,
+  renderPublicBody,
+  type ReadingPage,
+  type ReadingsData,
+} from '../../lib/public-notes';
+
+export async function getStaticPaths() {
+  const all = await loadPublic();
+  return all.filter((e) => e.kind === 'paper').map((entry) => ({ params: { slug: entry.id }, props: { entry, all } }));
+}
+
+const props = await staticProps(Astro, getStaticPaths);
+if (!props) return new Response(null, { status: 404 });
+const { entry, all } = props;
+const data = entry.data as ReadingsData;
+const page: ReadingPage = {
+  paper: data.paper,
+  notes: entry.body.trim() ? await renderPublicBody(entry, all) : '',
+  highlights: await Promise.all(
+    data.highlights.map(async (h) => ({
+      quote: h.quote,
+      where: h.where,
+      comment: h.comment ? await renderPublicBody({ ...entry, body: h.comment }, all) : '',
+    })),
+  ),
+  backlinks: backlinksOf(entry, all).map((e) => ({ title: e.data.title, href: e.url })),
+  description: excerpt(entry.body, 160),
+};
+---
+
+{getTheme() === 'editorial' ? <EditorialReading {...page} /> : <ClassicReading {...page} />}

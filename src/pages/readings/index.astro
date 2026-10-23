@@ -1,0 +1,19 @@
+---
+import ClassicReadings from '../../themes/classic/Readings.astro';
+import EditorialReadings from '../../themes/editorial/Readings.astro';
+import { getTheme } from '../../lib/config';
+import { excerpt, loadPublic, type ReadingItem, type ReadingsData } from '../../lib/public-notes';
+
+const readings = (await loadPublic()).filter((e) => e.kind === 'paper');
+const items: ReadingItem[] = readings
+  .map((e) => ({ e, data: e.data as ReadingsData }))
+  .sort((a, b) => b.data.shared.getTime() - a.data.shared.getTime())
+  .map(({ e, data }) => ({
+    href: e.url,
+    paper: data.paper,
+    excerpt: excerpt(e.body),
+    highlights: data.highlights.length,
+  }));
+---
+
+{getTheme() === 'editorial' ? <EditorialReadings {items} /> : <ClassicReadings {items} />}

@@ -1,0 +1,101 @@
+---
+import Layout from './Layout.astro';
+import { getSiteConfig } from '../../lib/config';
+import { bareArxiv, bareDoi } from '../../lib/editorial';
+import { formatNewsDate } from '../../lib/utils';
+import type { ReadingPage } from '../../lib/public-notes';
+import './readings.css';
+
+type Props = ReadingPage;
+
+const { paper, notes, highlights, backlinks, description } = Astro.props;
+const config = getSiteConfig();
+const label = config.nav.find((n) => n.href === '/readings')?.label ?? 'Readings';
+---
+
+<Layout title={paper.title} description={description || undefined}>
+  <article class="ed-article">
+    <a href="/readings" class="ed-back">
+      <span class="arr" aria-hidden="true">
+        ←
+      </span>{' '}
+      {label}
+    </a>
+    <header class="ed-article-head">
+      <h1 class="ed-article-title" dir="auto">
+        {paper.title}
+      </h1>
+      <span class="ed-byline" dir="auto">
+        {paper.authors.join(', ')}
+        {paper.published && (
+          <>
+            {' · '}
+            <time datetime={paper.published.toISOString()}>{formatNewsDate(paper.published, 'day', config.lang)}</time>
+          </>
+        )}
+      </span>
+      <div class="ed-rd-links">
+        <a href={paper.url} class="ul" rel="noopener">
+          Source
+        </a>
+        {paper.arxiv && (
+          <a href={`https://arxiv.org/abs/${bareArxiv(paper.arxiv)}`} class="ul" rel="noopener">
+            arXiv
+          </a>
+        )}
+        {paper.doi && (
+          <a href={`https://doi.org/${bareDoi(paper.doi)}`} class="ul" rel="noopener">
+            DOI
+          </a>
+        )}
+      </div>
+    </header>
+
+    {notes && (
+      <section class="ed-rd-section" aria-labelledby="notes">
+        <h2 id="notes" class="ed-eyebrow">
+          Notes
+        </h2>
+        <div class="ed-prose" dir="auto" set:html={notes} />
+      </section>
+    )}
+
+    {highlights.length > 0 && (
+      <section class="ed-rd-section" aria-labelledby="highlights">
+        <h2 id="highlights" class="ed-eyebrow">
+          Highlights
+        </h2>
+        <ol class="ed-rd-highlights">
+          {highlights.map((h) => (
+            <li>
+              <figure class="ed-rd-highlight">
+                <blockquote class="ed-rd-quote" dir="auto">
+                  “{h.quote}”
+                </blockquote>
+                <figcaption class="ed-rd-where">{h.where}</figcaption>
+              </figure>
+              {h.comment && <div class="ed-rd-comment" dir="auto" set:html={h.comment} />}
+            </li>
+          ))}
+        </ol>
+      </section>
+    )}
+
+    {backlinks.length > 0 && (
+      <section class="ed-rd-section" aria-labelledby="linked-from">
+        <h2 id="linked-from" class="ed-eyebrow">
+          Linked from
+        </h2>
+        <ul class="ed-rd-backlinks">
+          {backlinks.map((b) => (
+            <li>
+              <a href={b.href} dir="auto">
+                {b.title}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+  </article>
+</Layout>

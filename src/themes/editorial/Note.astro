@@ -1,0 +1,51 @@
+---
+import Layout from './Layout.astro';
+import { getSiteConfig } from '../../lib/config';
+import { formatNewsDate } from '../../lib/utils';
+import type { NotePage } from '../../lib/public-notes';
+import './readings.css';
+
+type Props = NotePage;
+
+const { title, updated, body, backlinks, description } = Astro.props;
+const config = getSiteConfig();
+const label = config.nav.find((n) => n.href === '/notes')?.label ?? 'Notes';
+---
+
+<Layout {title} description={description || undefined}>
+  <article class="ed-article">
+    <a href="/notes" class="ed-back">
+      <span class="arr" aria-hidden="true">
+        ←
+      </span>{' '}
+      {label}
+    </a>
+    <header class="ed-article-head">
+      <h1 class="ed-article-title" dir="auto">
+        {title}
+      </h1>
+      <span class="ed-byline">
+        Updated <time datetime={updated.toISOString()}>{formatNewsDate(updated, 'day', config.lang)}</time>
+      </span>
+    </header>
+
+    <div class="ed-prose" dir="auto" set:html={body} />
+
+    {backlinks.length > 0 && (
+      <section class="ed-rd-section" aria-labelledby="linked-from">
+        <h2 id="linked-from" class="ed-eyebrow">
+          Linked from
+        </h2>
+        <ul class="ed-rd-backlinks">
+          {backlinks.map((b) => (
+            <li>
+              <a href={b.href} dir="auto">
+                {b.title}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+  </article>
+</Layout>

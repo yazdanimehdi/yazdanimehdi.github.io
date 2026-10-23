@@ -1,0 +1,52 @@
+---
+import PageShell from './PageShell.astro';
+import FormattedDate from '../../components/astro/FormattedDate.astro';
+import { getSiteConfig } from '../../lib/config';
+import type { ReadingItem } from '../../lib/public-notes';
+
+interface Props {
+  /** Newest shared first. */
+  items: ReadingItem[];
+}
+
+const { items } = Astro.props;
+const label = getSiteConfig().nav.find((n) => n.href === '/readings')?.label ?? 'Readings';
+---
+
+<PageShell title={label}>
+  <h1 class="mb-6 font-serif text-2xl font-normal text-surface-900 sm:text-3xl dark:text-dm-heading">{label}</h1>
+
+  {items.length === 0 && <p class="text-sm text-surface-500 dark:text-dm-muted">Nothing shared yet.</p>}
+
+  <div class="divide-y divide-surface-100 dark:divide-dm-border">
+    {items.map(({ href, paper, excerpt, highlights }) => (
+      <div class="py-4 first:pt-0">
+        <h2 class="mb-0.5 text-base font-medium text-surface-900 dark:text-dm-heading" dir="auto">
+          <a href={href} class="hover:text-primary-600 dark:hover:text-accent-400">
+            {paper.title}
+          </a>
+        </h2>
+        <p class="text-sm text-surface-500 dark:text-dm-muted" dir="auto">
+          {paper.authors.join(', ')}
+          {paper.published && (
+            <>
+              {' '}
+              &middot; <FormattedDate date={paper.published} />
+            </>
+          )}
+        </p>
+        {excerpt && (
+          <p class="mt-1 text-sm text-surface-700 dark:text-dm-text" dir="auto">
+            {excerpt}
+          </p>
+        )}
+        <p class="mt-1 text-xs text-surface-400 dark:text-dm-faint">
+          {highlights} {highlights === 1 ? 'highlight' : 'highlights'} &middot;{' '}
+          <a href={paper.url} rel="noopener" class="text-primary-600 hover:underline dark:text-accent-400">
+            Source
+          </a>
+        </p>
+      </div>
+    ))}
+  </div>
+</PageShell>

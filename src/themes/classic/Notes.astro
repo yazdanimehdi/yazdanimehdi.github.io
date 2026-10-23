@@ -1,0 +1,59 @@
+---
+import PageShell from './PageShell.astro';
+import FormattedDate from '../../components/astro/FormattedDate.astro';
+import NoteGraph from '../../components/vue/NoteGraph.vue';
+import { getSiteConfig } from '../../lib/config';
+import type { GraphData, NoteItem } from '../../lib/public-notes';
+
+interface Props {
+  /** By title. */
+  notes: NoteItem[];
+  /** Null when nothing links. */
+  graph: GraphData | null;
+}
+
+const { notes, graph } = Astro.props;
+const label = getSiteConfig().nav.find((n) => n.href === '/notes')?.label ?? 'Notes';
+---
+
+<PageShell title={label}>
+  <h1 class="mb-6 font-serif text-2xl font-normal text-surface-900 sm:text-3xl dark:text-dm-heading">{label}</h1>
+
+  {graph && (
+    <div class="mb-8 [--graph-accent:var(--color-primary-600)] [--graph-ink:var(--color-surface-900)] [--graph-muted:var(--color-surface-500)] [--graph-paper:white] [--graph-rule:var(--color-surface-200)] dark:[--graph-accent:var(--color-accent-400)] dark:[--graph-ink:var(--color-dm-heading)] dark:[--graph-muted:var(--color-dm-muted)] dark:[--graph-paper:var(--color-dm)] dark:[--graph-rule:var(--color-dm-border-alt)]">
+      <NoteGraph client:visible nodes={graph.nodes} edges={graph.edges} />
+      <p class="mt-2 text-xs text-surface-400 dark:text-dm-faint">Circle: paper · Square: note</p>
+    </div>
+  )}
+
+  {notes.length === 0 && <p class="text-sm text-surface-500 dark:text-dm-muted">Nothing shared yet.</p>}
+
+  {notes.length > 0 && (
+    <ul class="divide-y divide-surface-100 dark:divide-dm-border">
+      {notes.map((n) => (
+        <li class="flex flex-wrap items-baseline justify-between gap-x-4 py-3 first:pt-0">
+          <a
+            href={n.href}
+            class="text-base font-medium text-surface-900 hover:text-primary-600 dark:text-dm-heading dark:hover:text-accent-400"
+            dir="auto"
+          >
+            {n.title}
+          </a>
+          <FormattedDate date={n.updated} class="text-xs text-surface-400 dark:text-dm-faint" />
+        </li>
+      ))}
+    </ul>
+  )}
+
+  {(notes.length > 0 || graph) && (
+    <p class="mt-8 text-sm text-surface-500 dark:text-dm-muted">
+      <a href="/notes/vault.zip" class="text-primary-600 hover:underline dark:text-accent-400">
+        Download these notes for Obsidian
+      </a>{' '}
+      &middot;{' '}
+      <a href="/notes/graph.json" class="text-primary-600 hover:underline dark:text-accent-400">
+        graph.json
+      </a>
+    </p>
+  )}
+</PageShell>

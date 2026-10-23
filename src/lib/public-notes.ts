@@ -102,3 +102,37 @@ export function excerpt(markdown: string, max = 280): string {
         .trimEnd()}…`
     : text;
 }
+
+// What the route files hand both themes' Readings and Notes pages.
+export type Paper = ReadingsData['paper'];
+export interface Linked {
+  title: string;
+  href: string;
+}
+export interface ReadingItem {
+  href: string;
+  paper: Paper;
+  excerpt: string;
+  highlights: number;
+}
+export interface ReadingPage {
+  paper: Paper;
+  notes: string; // HTML
+  highlights: { quote: string; where: string; comment: string }[]; // comment: HTML, '' when none
+  backlinks: Linked[];
+  description: string;
+}
+export interface NoteItem extends Linked {
+  updated: Date;
+}
+export interface NotePage {
+  title: string;
+  updated: Date;
+  body: string; // HTML
+  backlinks: Linked[];
+  description: string;
+}
+export type GraphData = {
+  nodes: { title: string; kind: 'paper' | 'free'; links: number; href: string }[];
+  edges: [number, number][];
+};

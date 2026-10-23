@@ -1,0 +1,44 @@
+---
+import PageShell from './PageShell.astro';
+import FormattedDate from '../../components/astro/FormattedDate.astro';
+import type { NotePage } from '../../lib/public-notes';
+
+type Props = NotePage;
+
+const { title, updated, body, backlinks, description } = Astro.props;
+---
+
+<PageShell {title} description={description || undefined}>
+  <article class="mx-auto max-w-3xl">
+    <header class="mb-8 border-b border-surface-100 pb-6 dark:border-dm-border">
+      <h1 class="mb-2 font-serif text-2xl font-normal text-surface-900 sm:text-3xl dark:text-dm-heading" dir="auto">
+        {title}
+      </h1>
+      <p class="text-sm text-surface-400 dark:text-dm-faint">
+        Updated <FormattedDate date={updated} />
+      </p>
+    </header>
+
+    <div class="prose" dir="auto" set:html={body} />
+
+    {backlinks.length > 0 && (
+      <section class="mt-10" aria-labelledby="linked-from">
+        <h2
+          id="linked-from"
+          class="mb-3 text-xs font-medium tracking-wide text-surface-400 uppercase dark:text-dm-faint"
+        >
+          Linked from
+        </h2>
+        <ul class="space-y-1 text-sm">
+          {backlinks.map((b) => (
+            <li>
+              <a href={b.href} class="text-primary-600 hover:underline dark:text-accent-400" dir="auto">
+                {b.title}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+  </article>
+</PageShell>

@@ -1,0 +1,98 @@
+---
+import PageShell from './PageShell.astro';
+import FormattedDate from '../../components/astro/FormattedDate.astro';
+import { bareArxiv, bareDoi } from '../../lib/editorial';
+import type { ReadingPage } from '../../lib/public-notes';
+
+type Props = ReadingPage;
+
+const { paper, notes, highlights, backlinks, description } = Astro.props;
+const links = [
+  { label: 'Source', href: paper.url },
+  paper.arxiv && { label: 'arXiv', href: `https://arxiv.org/abs/${bareArxiv(paper.arxiv)}` },
+  paper.doi && { label: 'DOI', href: `https://doi.org/${bareDoi(paper.doi)}` },
+].filter((l) => !!l);
+const heading = 'mb-3 text-xs font-medium tracking-wide text-surface-400 uppercase dark:text-dm-faint';
+---
+
+<PageShell title={paper.title} description={description || undefined}>
+  <article class="mx-auto max-w-3xl">
+    <header class="mb-8 border-b border-surface-100 pb-6 dark:border-dm-border">
+      <h1 class="mb-2 font-serif text-2xl font-normal text-surface-900 sm:text-3xl dark:text-dm-heading" dir="auto">
+        {paper.title}
+      </h1>
+      <p class="text-sm text-surface-500 dark:text-dm-muted" dir="auto">
+        {paper.authors.join(', ')}
+        {paper.published && (
+          <>
+            {' '}
+            &middot; <FormattedDate date={paper.published} />
+          </>
+        )}
+      </p>
+      <p class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-sm">
+        {links.map((l) => (
+          <a href={l.href} rel="noopener" class="text-primary-600 hover:underline dark:text-accent-400">
+            {l.label}
+          </a>
+        ))}
+      </p>
+    </header>
+
+    {notes && (
+      <section class="mb-8" aria-labelledby="notes">
+        <h2 id="notes" class={heading}>
+          Notes
+        </h2>
+        <div class="prose" dir="auto" set:html={notes} />
+      </section>
+    )}
+
+    {highlights.length > 0 && (
+      <section class="mb-8" aria-labelledby="highlights">
+        <h2 id="highlights" class={heading}>
+          Highlights
+        </h2>
+        <ol class="space-y-6">
+          {highlights.map((h) => (
+            <li>
+              <figure>
+                <blockquote
+                  class="border-l-2 border-surface-200 pl-4 font-serif text-[15px] leading-relaxed text-surface-600 italic dark:border-dm-border-alt dark:text-dm-muted"
+                  dir="auto"
+                >
+                  “{h.quote}”
+                </blockquote>
+                <figcaption class="mt-1 pl-[18px] text-xs text-surface-400 dark:text-dm-faint">{h.where}</figcaption>
+              </figure>
+              {h.comment && (
+                <div
+                  class="mt-2 pl-[18px] text-sm text-surface-800 dark:text-dm-text [&_a]:text-primary-600 [&_a]:underline dark:[&_a]:text-accent-400 [&_p+p]:mt-2"
+                  dir="auto"
+                  set:html={h.comment}
+                />
+              )}
+            </li>
+          ))}
+        </ol>
+      </section>
+    )}
+
+    {backlinks.length > 0 && (
+      <section aria-labelledby="linked-from">
+        <h2 id="linked-from" class={heading}>
+          Linked from
+        </h2>
+        <ul class="space-y-1 text-sm">
+          {backlinks.map((b) => (
+            <li>
+              <a href={b.href} class="text-primary-600 hover:underline dark:text-accent-400" dir="auto">
+                {b.title}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </section>
+    )}
+  </article>
+</PageShell>
