@@ -204,7 +204,7 @@ export async function pruneCandidates(sql: Sql): Promise<number> {
     where state = 'new' and found_at < now() - interval '30 days'
       and not exists (select 1 from reading_digest d where d.paper_id = p.id)
       and not exists (select 1 from reading_notebook_papers n where n.paper_id = p.id)
-      and not exists (select 1 from reading_notes o where o.paper_id = p.id)
+      and not exists (select 1 from vault_notes v where v.paper_id = p.id)
       and not exists (select 1 from reading_highlights h where h.paper_id = p.id)
       and not exists (select 1 from reading_chats c where c.paper_id = p.id)
       and not exists (select 1 from reading_outputs r where r.paper_id = p.id)

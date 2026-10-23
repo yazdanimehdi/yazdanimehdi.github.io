@@ -4,18 +4,17 @@ import { migrate } from '../db-migrate';
 import type { Sql } from '../db';
 import { pgliteSql } from '../pglite-sql';
 import { saveText, upsertPapers } from './db';
+import { ensurePaperNote, withTitles } from './vault-db';
 import {
   addChat,
   addHighlight,
   aiUse,
   claimOutput,
   createNotebook,
-  getNote,
   getOutputs,
   getPassages,
   readText,
   reserveArxivSlot,
-  saveNote,
   savePassages,
   searchPassages,
   setOutput,
@@ -154,19 +153,21 @@ test('deleting a paper keeps no orphans', async () => {
   await claimOutput(sql, { paper: a }, 'summary', null, 'r');
   await addChat(sql, { paper: a }, { role: 'user', body: 'q', cites: [] });
   await addHighlight(sql, { paperId: a, pid: 'abs.1', start: 0, end: 1, quote: 'x', comment: '' });
-  await saveNote(sql, { paper: a }, 'note');
-  await saveNote(sql, { notebook: nb }, 'nb note');
   await sql`delete from reading_papers where id = ${a}`;
   const [left] = await sql`
     select (select count(*)::int from reading_passages where paper_id = ${a}) as passages,
       (select count(*)::int from reading_outputs where paper_id = ${a}) as outputs,
       (select count(*)::int from reading_chats where paper_id = ${a}) as chats,
-      (select count(*)::int from reading_highlights where paper_id = ${a}) as highlights,
-      (select count(*)::int from reading_notes where paper_id = ${a}) as notes`;
-  assert.deepEqual(left, { passages: 0, outputs: 0, chats: 0, highlights: 0, notes: 0 });
+      (select count(*)::int from reading_highlights where paper_id = ${a}) as highlights`;
+  assert.deepEqual(left, { passages: 0, outputs: 0, chats: 0, highlights: 0 });
   assert.deepEqual(
     (await sql<{ paper_id: number }>`select paper_id from reading_notebook_papers`).map((r) => Number(r.paper_id)),
     [b],
   );
-  assert.equal(await getNote(sql, { notebook: nb }), 'nb note');
+});
+
+test("a paper with a vault note can't be deleted", async () => {
+  const [a] = await newPapers(1);
+  await withTitles(sql, (tx) => ensurePaperNote(tx, a));
+  await assert.rejects(sql`delete from reading_papers where id = ${a}`, /vault_notes_paper_id_fkey/);
 });

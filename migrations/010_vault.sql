@@ -119,3 +119,6 @@ where l.target <> '';
 
 drop function vault_title(text);
 drop function vault_cut(text, int);
+
+-- The vault holds the notes now.
+drop table reading_notes;

@@ -1,6 +1,6 @@
 import type { Sql, Tx } from '../db';
 import type { Row } from './db';
-import type { ChatSnapshot, NoteKind, NoteRow, VaultNote } from './types';
+import type { ChatSnapshot, Cite, NoteKind, NoteRow, Target, VaultNote } from './types';
 import { noteTitle, numberedTitle, rewriteLinks, wikiLinks } from './vault-links';
 
 // The vault's SQL. Conventions as in room-db.ts: timestamps out as ISO strings. A link [[T]] resolves to the note
@@ -163,4 +163,90 @@ export async function graph(
     edges: edges.map((r) => [Number(r.a), Number(r.b)]),
     total: rows.length ? (rows[0].total as number) : 0,
   };
+}
+
+/** The paper's note, created (its title made free, body '') when it has none. Inside withTitles. */
+export async function ensurePaperNote(tx: Tx, paperId: number): Promise<{ id: number; created: boolean }> {
+  const [had] = await tx<Row>`select id from vault_notes where paper_id = ${paperId}`;
+  if (had) return { id: Number(had.id), created: false };
+  const [p] = await tx<Row>`select title from reading_papers where id = ${paperId}`;
+  const title = await freeTitle(tx, p.title as string);
+  const [r] = await tx<Row>`
+    insert into vault_notes (kind, title, paper_id) values ('paper', ${title}, ${paperId}) returning id`;
+  return { id: Number(r.id), created: true };
+}
+
+/**
+ * A saved answer's note: titled by the question before it, its body 'From [[Paper]], [[…]]' for the chat's paper or
+ * the papers it cites (each given its paper note). Inside withTitles.
+ */
+export async function ensureChatNote(tx: Tx, chatId: number): Promise<{ id: number; created: boolean }> {
+  const [had] = await tx<Row>`select id from vault_notes where chat_id = ${chatId}`;
+  if (had) return { id: Number(had.id), created: false };
+  const [a] = await tx<Row>`
+    select a.paper_id, a.body, a.cites, a.created_at, q.body as question
+    from reading_chats a
+    left join lateral (
+      select u.body from reading_chats u
+      where u.role = 'user' and u.id < a.id and u.paper_id is not distinct from a.paper_id
+        and u.notebook_id is not distinct from a.notebook_id
+      order by u.id desc limit 1
+    ) q on true
+    where a.id = ${chatId}`;
+  const cites = a.cites as Cite[];
+  const wanted = a.paper_id != null ? [Number(a.paper_id)] : [...new Set(cites.map((c) => c.paper))];
+  // A cited paper may have left the notebook and been pruned since.
+  const live = new Set(
+    (await tx<Row>`select id from reading_papers where id = any(${wanted}::bigint[])`).map((r) => Number(r.id)),
+  );
+  const titles: string[] = [];
+  for (const p of wanted.filter((p) => live.has(p))) {
+    const { id } = await ensurePaperNote(tx, p);
+    titles.push((await getNote(tx, id))!.title);
+  }
+  const question = (a.question as string | null) ?? '';
+  const chat: ChatSnapshot = { question, answer: a.body as string, cites, askedAt: iso(a.created_at) };
+  const title = await freeTitle(tx, question);
+  const [r] = await tx<Row>`
+    insert into vault_notes (kind, title, chat, chat_id)
+    values ('chat', ${title}, ${JSON.stringify(chat)}::text::jsonb, ${chatId}) returning id`;
+  const id = Number(r.id);
+  if (titles.length) await setBody(tx, id, `From ${titles.map((t) => `[[${t}]]`).join(', ')}`);
+  return { id, created: true };
+}
+
+/** Unsaving an answer: its note goes, unless the owner wrote in it beyond the 'From [[…]]' line ('written'). */
+export async function dropChatNote(sql: Sql, chatId: number): Promise<'ok' | 'written'> {
+  const [n] = await sql<Row>`select id, body from vault_notes where chat_id = ${chatId}`;
+  if (!n) return 'ok';
+  const [first, ...more] = (n.body as string).split('\n');
+  const rest = first.startsWith('From [[') ? more.join('\n') : (n.body as string);
+  if (rest.trim()) return 'written';
+  await sql`delete from vault_notes where id = ${n.id}`;
+  return 'ok';
+}
+
+/** The room's note: the paper's note, or the free note of the notebook; body '' when there is none. */
+export async function roomNote(sql: Tx, target: Target): Promise<{ id: number | null; body: string }> {
+  const [r] = await sql<Row>`
+    select id, body from vault_notes
+    where paper_id = ${'paper' in target ? target.paper : null}::bigint
+      or notebook_id = ${'notebook' in target ? target.notebook : null}::bigint`;
+  return r ? { id: Number(r.id), body: r.body as string } : { id: null, body: '' };
+}
+
+/** Writes the room's note, creating it unless there is none and the body is blank. Inside withTitles. */
+export async function saveRoomNote(tx: Tx, target: Target, body: string): Promise<{ id: number | null }> {
+  let { id } = await roomNote(tx, target);
+  if (id == null && !body.trim()) return { id: null };
+  if ('paper' in target) id = (await ensurePaperNote(tx, target.paper)).id;
+  else if (id == null) {
+    const [nb] = await tx<Row>`select title from reading_notebooks where id = ${target.notebook}`;
+    const title = await freeTitle(tx, nb.title as string);
+    const [r] = await tx<Row>`
+      insert into vault_notes (kind, title, notebook_id) values ('free', ${title}, ${target.notebook}) returning id`;
+    id = Number(r.id);
+  }
+  await setBody(tx, id, body);
+  return { id };
 }

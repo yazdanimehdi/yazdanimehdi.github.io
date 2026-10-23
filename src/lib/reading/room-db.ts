@@ -346,22 +346,3 @@ export async function setHighlightComment(sql: Sql, id: number, comment: string)
 export async function deleteHighlight(sql: Sql, id: number): Promise<boolean> {
   return (await sql`delete from reading_highlights where id = ${id} returning id`).length > 0;
 }
-
-/** '' when there is no note yet. */
-export async function getNote(sql: Sql, target: Target): Promise<string> {
-  const [p, n] = owner(target);
-  const [r] = await sql<Row>`
-    select body from reading_notes where paper_id = ${p}::bigint or notebook_id = ${n}::bigint`;
-  return (r?.body as string | undefined) ?? '';
-}
-
-export async function saveNote(sql: Sql, target: Target, body: string): Promise<void> {
-  await ('paper' in target
-    ? sql`
-        insert into reading_notes (paper_id, body) values (${target.paper}, ${body})
-        on conflict (paper_id) where paper_id is not null do update set body = excluded.body, updated_at = now()`
-    : sql`
-        insert into reading_notes (notebook_id, body) values (${target.notebook}, ${body})
-        on conflict (notebook_id) where notebook_id is not null do update set body = excluded.body,
-          updated_at = now()`);
-}

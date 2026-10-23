@@ -13,6 +13,7 @@ import { normalizeArxiv, paperKey } from './match';
 import { aiUse, getOutputs } from './room-db';
 import type { ReadingPrefs } from './settings';
 import type { Target } from './types';
+import { ensurePaperNote, withTitles } from './vault-db';
 
 /** New-style (2401.01234) or old-style (hep-th/9901001) arXiv id, with an optional version. */
 const ARXIV_ID = /^(\d{4}\.\d{4,5}|[a-z-]+(\.[a-z]{2})?\/\d{7})(v\d+)?$/i;
@@ -31,7 +32,10 @@ export function parseRef(ref: string): { arxiv: string } | { doi: string } | nul
   return fromDoi && ARXIV_ID.test(fromDoi) ? { arxiv: normalizeArxiv(fromDoi) } : { doi };
 }
 
-/** Finds the paper by arXiv id or DOI and saves it to the library (a dismissed paper comes back saved). */
+/**
+ * Finds the paper by arXiv id or DOI and saves it to the library (a dismissed paper comes back saved), with its vault
+ * note.
+ */
 export async function addPaper(sql: Sql, store: PostgresStore, ref: string): Promise<{ id: number; added: boolean }> {
   const ids = parseRef(ref);
   if (!ids) throw new HttpError(400, 'Enter an arXiv id (2401.01234) or a DOI (10.1000/xyz)');
@@ -58,6 +62,7 @@ export async function addPaper(sql: Sql, store: PostgresStore, ref: string): Pro
     },
   ]);
   await setPaperState(sql, saved.id, 'saved');
+  await withTitles(sql, (tx) => ensurePaperNote(tx, saved.id));
   return saved;
 }
 

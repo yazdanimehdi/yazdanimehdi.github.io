@@ -20,12 +20,14 @@ import {
   getPassages,
   listHighlights,
   savePassages,
-  saveNote,
   setOutput,
   updateNotebook,
   useAiCall,
 } from './room-db';
 import { minimalPdf } from './test-pdf';
+import { saveRoomNote, setBody, withTitles } from './vault-db';
+import { noteTitle } from './vault-links';
+import type { ChatSnapshot } from './types';
 import { SourceError } from '../career/sources/http';
 import { setRoomRunsForTests, type RoomRuns } from '../../workflows/reading-room';
 import * as settings from '../../admin/routes/api/reading/settings';
@@ -340,7 +342,7 @@ test('the room GET returns passages, outputs and highlights but no PDF bytes', a
   const out = await claimOutput(sql, { paper: id }, 'summary', null, 'claim');
   await setOutput(sql, out!, { status: 'ready', body: { papers: [id], sections: [] }, runId: 'run-x' });
   await addHighlight(sql, { paperId: id, pid: 'S1.p1', start: 0, end: 5, quote: 'Hello', comment: 'hi' });
-  await saveNote(sql, { paper: id }, 'my note');
+  await withTitles(sql, (tx) => saveRoomNote(tx, { paper: id }, 'my note'));
   const nb = await createNotebook(sql, 'Proteins');
   await updateNotebook(sql, nb, { add: id });
   await useAiCall(sql, today(), 100);
@@ -600,4 +602,187 @@ test('saving a paper starts a text run once', async () => {
   } finally {
     logged.mock.restore();
   }
+});
+
+type NoteRec = {
+  id: number;
+  kind: string;
+  title: string;
+  body: string;
+  paper_id: number | null;
+  chat: ChatSnapshot | null;
+  chat_id: number | null;
+  notebook_id: number | null;
+};
+const vaultNotes = async () =>
+  (await sql<NoteRec>`select * from vault_notes order by id`).map((n) => ({
+    ...n,
+    id: Number(n.id),
+    paper_id: n.paper_id == null ? null : Number(n.paper_id),
+    chat_id: n.chat_id == null ? null : Number(n.chat_id),
+    notebook_id: n.notebook_id == null ? null : Number(n.notebook_id),
+  }));
+const UNSAVE_REFUSED = 'This answer’s vault note has your writing in it. Delete the note in the vault instead.';
+
+test('saving a paper creates its paper note once', async () => {
+  const [id] = await add(arxivPaper(1));
+  const params = { id: String(id) };
+  await ok(await call(papers.PATCH, { params, body: { state: 'saved' } }));
+  await ok(await call(papers.PATCH, { params, body: { state: 'saved' } }));
+  const notes = await vaultNotes();
+  assert.deepEqual(
+    notes.map((n) => [n.kind, n.title, n.paper_id, n.body]),
+    [['paper', noteTitle('Paper arxiv:2610.1'), id, '']],
+  );
+  assert.equal((await ok(await call(papers.GET, { params }))).vaultNote, notes[0].id);
+});
+
+test('opening a paper creates no note', async () => {
+  const [id] = await add(arxivPaper(1));
+  const body = await ok(await call(papers.GET, { params: { id: String(id) }, query: '?open=1' }));
+  assert.equal(body.note, '');
+  assert.equal(body.vaultNote, null);
+  assert.deepEqual(await vaultNotes(), []);
+});
+
+test('a highlight creates the paper note', async () => {
+  const [id] = await add(arxivPaper(1));
+  await savePassages(sql, id, [{ pid: 'S1.p1', kind: 'p', body: 'Hello world' }]);
+  await ok(await call(highlights.POST, { body: { paper: id, pid: 'S1.p1', start: 0, end: 5, quote: 'Hello' } }));
+  await ok(await call(highlights.POST, { body: { paper: id, pid: 'S1.p1', start: 6, end: 11, quote: 'world' } }));
+  assert.deepEqual(
+    (await vaultNotes()).map((n) => [n.kind, n.paper_id, n.body]),
+    [['paper', id, '']],
+  );
+});
+
+test('a blank note creates nothing, a written one creates the paper note', async () => {
+  const [id] = await add(arxivPaper(1));
+  const params = { id: String(id) };
+  await ok(await call(notes.PUT, { body: { paper: id, body: '  ' } }));
+  assert.deepEqual(await vaultNotes(), []);
+  await ok(await call(notes.PUT, { body: { paper: id, body: 'idea' } }));
+  const vault = await vaultNotes();
+  assert.deepEqual(
+    vault.map((n) => [n.kind, n.paper_id, n.body]),
+    [['paper', id, 'idea']],
+  );
+  const got = await ok(await call(papers.GET, { params }));
+  assert.equal(got.note, 'idea');
+  assert.equal(got.vaultNote, vault[0].id);
+});
+
+test('adding a paper to the library creates its note', async () => {
+  setPaperLookupForTests({
+    get: async (url) => {
+      if (url === 'https://api.datacite.org/dois/10.48550/arXiv.2609.14491')
+        return fs.readFileSync('tests/fixtures/papers/datacite-mirage.json', 'utf8');
+      throw new SourceError('Not found', 404);
+    },
+  });
+  const { id } = await ok(await call(library.POST, { body: { ref: '2609.14491' } }));
+  const [p] = await getPapers(sql, [id]);
+  assert.deepEqual(
+    (await vaultNotes()).map((n) => [n.kind, n.title, n.paper_id]),
+    [['paper', noteTitle(p.title), id]],
+  );
+});
+
+test('a saved answer becomes a chat note linked to its paper', async () => {
+  const [id] = await add(arxivPaper(1));
+  await addChat(sql, { paper: id }, { role: 'user', body: 'What is X?', cites: [] });
+  const cites = [{ paper: id, pid: 'S1.p1' }];
+  const a = await addChat(sql, { paper: id }, { role: 'assistant', body: 'X is Y.', cites });
+  await addChat(sql, { paper: id }, { role: 'user', body: 'And later?', cites: [] });
+  const params = { id: String(a.id) };
+  await ok(await call(chatMessage.PATCH, { params, body: { saved: true } }));
+  await ok(await call(chatMessage.PATCH, { params, body: { saved: true } }));
+  const [p, c, ...rest] = await vaultNotes();
+  assert.equal(rest.length, 0, 'one note each, however often it is saved');
+  assert.equal(p.kind, 'paper');
+  assert.equal(p.paper_id, id);
+  assert.equal(c.kind, 'chat');
+  assert.equal(c.title, 'What is X');
+  assert.equal(c.body, `From [[${p.title}]]`);
+  assert.equal(c.chat_id, a.id);
+  assert.equal(c.paper_id, null);
+  assert.deepEqual(c.chat, { question: 'What is X?', answer: 'X is Y.', cites, askedAt: a.createdAt });
+  const links = await sql<{ target: string }>`select target from vault_links where from_id = ${c.id}`;
+  assert.deepEqual(
+    links.map((l) => l.target),
+    [p.title.toLowerCase()],
+  );
+});
+
+test('a saved notebook answer links the papers it cites', async () => {
+  const [a, b, c] = await add(arxivPaper(1), arxivPaper(2), arxivPaper(3));
+  const nb = await createNotebook(sql, 'N');
+  for (const p of [a, b, c]) await updateNotebook(sql, nb, { add: p });
+  await addChat(sql, { notebook: nb }, { role: 'user', body: 'Compare them?', cites: [] });
+  const cites = [
+    { paper: b, pid: 'p1' },
+    { paper: a, pid: 'p1' },
+    { paper: b, pid: 'p2' },
+  ];
+  const ans = await addChat(sql, { notebook: nb }, { role: 'assistant', body: 'B, then A.', cites });
+  await ok(await call(chatMessage.PATCH, { params: { id: String(ans.id) }, body: { saved: true } }));
+  const vault = await vaultNotes();
+  const titleOf = (p: number) => vault.find((n) => n.paper_id === p)!.title;
+  const note = vault.find((n) => n.kind === 'chat')!;
+  assert.equal(note.title, 'Compare them');
+  assert.equal(note.body, `From [[${titleOf(b)}]], [[${titleOf(a)}]]`);
+  assert.equal(
+    vault.some((n) => n.paper_id === c),
+    false,
+    'a paper it does not cite gets no note',
+  );
+});
+
+const savedAnswer = async () => {
+  const [id] = await add(arxivPaper(1));
+  await addChat(sql, { paper: id }, { role: 'user', body: 'Why?', cites: [] });
+  const a = await addChat(sql, { paper: id }, { role: 'assistant', body: 'Because.', cites: [] });
+  await ok(await call(chatMessage.PATCH, { params: { id: String(a.id) }, body: { saved: true } }));
+  const savedAt = async () => (await sql`select saved_at from reading_chats where id = ${a.id}`)[0].saved_at;
+  return { id, a, savedAt, note: (await vaultNotes()).find((n) => n.kind === 'chat')! };
+};
+
+test('unsaving an answer with writing in its note is refused', async () => {
+  const { a, savedAt, note } = await savedAnswer();
+  assert.equal(note.body, 'From [[Paper arxiv 2610.1]]');
+  await setBody(sql, note.id, 'From [[P]]\n\nmy thought');
+  const res = await call(chatMessage.PATCH, { params: { id: String(a.id) }, body: { saved: false } });
+  assert.equal(res.status, 409);
+  assert.deepEqual(await res.json(), { error: UNSAVE_REFUSED });
+  assert.notEqual(await savedAt(), null);
+  assert.equal((await vaultNotes()).length, 2);
+});
+
+test('unsaving an untouched answer removes its note', async () => {
+  const { id, a, savedAt } = await savedAnswer();
+  assert.deepEqual(await ok(await call(chatMessage.PATCH, { params: { id: String(a.id) }, body: { saved: false } })), {
+    saved: false,
+  });
+  assert.equal(await savedAt(), null);
+  assert.deepEqual(
+    (await vaultNotes()).map((n) => [n.kind, n.paper_id]),
+    [['paper', id]],
+    'the paper note stays',
+  );
+  await ok(await call(chatMessage.PATCH, { params: { id: String(a.id) }, body: { saved: false } }));
+});
+
+test("a notebook's note outlives the notebook", async () => {
+  const nb = await createNotebook(sql, 'Proteins');
+  const params = { id: String(nb) };
+  await ok(await call(notes.PUT, { body: { notebook: nb, body: 'nb' } }));
+  const got = await ok(await call(notebook.GET, { params }));
+  assert.equal(got.note, 'nb');
+  const [n] = await vaultNotes();
+  assert.equal(got.vaultNote, n.id);
+  await ok(await call(notebook.DELETE, { params }), 204);
+  assert.deepEqual(
+    (await vaultNotes()).map((x) => [x.kind, x.title, x.body, x.notebook_id]),
+    [['free', 'Proteins', 'nb', null]],
+  );
 });

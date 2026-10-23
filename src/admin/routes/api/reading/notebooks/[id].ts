@@ -6,7 +6,6 @@ import { getPapers, readReading } from '../../../../../lib/reading/db';
 import { addPaper, fetchMissingTexts, idParam, shownOutputs, useToday } from '../../../../../lib/reading/library';
 import {
   deleteNotebook,
-  getNote,
   getNotebook,
   getPassages,
   listHighlights,
@@ -16,6 +15,7 @@ import {
 } from '../../../../../lib/reading/room-db';
 import { parseReadingPrefs } from '../../../../../lib/reading/settings';
 import type { Passage, TextState } from '../../../../../lib/reading/types';
+import { roomNote } from '../../../../../lib/reading/vault-db';
 
 export const prerender = false;
 
@@ -45,7 +45,7 @@ export const GET = careerRoute(async (ctx) => {
     getPassages(sql, ids),
     shownOutputs(sql, target),
     listHighlights(sql, ids),
-    getNote(sql, target),
+    roomNote(sql, target),
     readReading(sql),
   ]);
   const texts: Record<number, TextState> = {};
@@ -65,7 +65,8 @@ export const GET = careerRoute(async (ctx) => {
     passages,
     outputs,
     highlights,
-    note,
+    note: note.body,
+    vaultNote: note.id,
     use: await useToday(sql, parseReadingPrefs(reading.prefs)),
   });
 });

@@ -36,6 +36,8 @@ interface Room {
   use: Use;
   /** the notebooks a paper is in (a paper's room only) */
   inNotebooks: { id: number; title: string }[];
+  /** the room's note in the vault, once there is one */
+  vaultNote: number | null;
 }
 type PaperRes = Omit<Room, 'title' | 'papers' | 'texts' | 'passages' | 'inNotebooks'> & {
   paper: Paper;
@@ -188,6 +190,11 @@ async function jump(c: Cite) {
   flashTimer = setTimeout(() => (flash.value = null), 2000);
 }
 
+/** After a save, highlight or note: reload so the link to the new vault note appears. */
+function toVault() {
+  if (!room.value?.vaultNote) void load();
+}
+
 // Header actions.
 async function toggleSave() {
   const p = cur.value!;
@@ -198,6 +205,7 @@ async function toggleSave() {
         body: { state: p.state === 'saved' ? 'new' : 'saved' },
       })
     ).state;
+    toVault();
   } catch (e) {
     report(e);
   }
@@ -324,6 +332,7 @@ async function saveHighlight() {
     room.value!.highlights.push(highlight);
     getSelection()?.removeAllRanges();
     tool.value = null;
+    toVault();
   } catch (e) {
     report(e);
   }
@@ -422,6 +431,7 @@ async function toggleSaved(m: ChatMessage) {
     m.saved = (
       await api<{ saved: boolean }>(`reading/chat/${m.id}`, { method: 'PATCH', body: { saved: !m.saved } })
     ).saved;
+    toVault();
   } catch (e) {
     report(e);
   }
@@ -443,6 +453,7 @@ async function saveNote() {
     await api('reading/notes', { method: 'PUT', body: { ...target, body } });
     savedNote = body;
     noteStatus.value = 'Saved';
+    toVault();
   } catch (e) {
     report(e);
   }
@@ -744,7 +755,18 @@ onBeforeUnmount(() => {
                   @cite="jump"
                 />
               </template>
-              <p class="adm-muted">Project 3’s vault turns these into linked Markdown notes.</p>
+              <p v-if="room.vaultNote">
+                <a :href="`${base}/reading/vault/${room.vaultNote}`">{{
+                  isNb ? 'Open this notebook’s note in the vault' : 'Open this paper’s note in the vault'
+                }}</a>
+              </p>
+              <p v-else class="adm-muted">
+                {{
+                  isNb
+                    ? 'Writing a note here adds it to the vault.'
+                    : 'Saving, highlighting or writing a note here adds this paper to the vault.'
+                }}
+              </p>
             </template>
           </div>
         </div>

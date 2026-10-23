@@ -105,9 +105,11 @@ test("the migration moves Project 2's notes into the vault", async () => {
     'What is X → paper a',
     'Why B → paper b',
   ]);
-  // The SQL helpers are gone; reading_notes stays until Task 3.
+  // The SQL helpers and reading_notes are gone.
   const [fns] = await sql`select count(*)::int as n from pg_proc where proname like 'vault\\_%'`;
   assert.equal(fns.n, 0);
+  const [gone] = await sql`select to_regclass('reading_notes') as t`;
+  assert.equal(gone.t, null);
 });
 
 test("the migration's titles match noteTitle", async () => {

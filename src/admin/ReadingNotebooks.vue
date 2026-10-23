@@ -132,7 +132,10 @@ onMounted(async () => {
     >
       <div>
         <h2 id="adm-notebook-delete" class="adm-h2">Delete “{{ visible(confirming.title) }}”?</h2>
-        <p>Its summary, study aids, chat and note are deleted with it. The papers themselves are kept.</p>
+        <p>
+          Its summary, study aids and chat are deleted with it. Its note and saved answers stay in the vault, and the
+          papers themselves are kept.
+        </p>
         <div class="adm-actions">
           <button type="button" class="adm-btn" data-autofocus @click="confirming = null">Cancel</button>
           <button type="button" class="adm-btn adm-btn-danger" :disabled="deleting" @click="remove">

@@ -42,7 +42,6 @@ test('migrate creates the tables once; a second run applies nothing', async () =
       'reading_highlights',
       'reading_notebook_papers',
       'reading_notebooks',
-      'reading_notes',
       'reading_outputs',
       'reading_papers',
       'reading_passages',

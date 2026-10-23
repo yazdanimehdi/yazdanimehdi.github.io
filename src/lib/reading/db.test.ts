@@ -15,7 +15,8 @@ import {
   todayCount,
   upsertPapers,
 } from './db';
-import { addChat, addHighlight, claimOutput, createNotebook, saveNote, updateNotebook } from './room-db';
+import { addChat, addHighlight, claimOutput, createNotebook, updateNotebook } from './room-db';
+import { ensurePaperNote, saveRoomNote, withTitles } from './vault-db';
 import type { NewPaper } from './types';
 
 let sql: Sql;
@@ -142,7 +143,7 @@ test('pruneCandidates keeps an unsaved paper the owner has read in the room', as
   );
   await sql`update reading_papers set found_at = now() - interval '31 days'`;
   await updateNotebook(sql, await createNotebook(sql, 'N'), { add: inNotebook });
-  await saveNote(sql, { paper: noted }, 'mine');
+  await withTitles(sql, (tx) => saveRoomNote(tx, { paper: noted }, 'mine'));
   await addHighlight(sql, { paperId: highlighted, pid: 'abs.1', start: 0, end: 4, quote: 'This', comment: '' });
   await addChat(sql, { paper: chatted }, { role: 'user', body: 'Why?', cites: [] });
   await claimOutput(sql, { paper: summarized }, 'summary', null, 'claim');
@@ -150,6 +151,17 @@ test('pruneCandidates keeps an unsaved paper the owner has read in the room', as
   assert.deepEqual(
     (await getPapers(sql, [untouched, inNotebook, noted, highlighted, chatted, summarized])).map((p) => p.key),
     ['in-notebook', 'noted', 'highlighted', 'chatted', 'summarized'],
+  );
+});
+
+test('prune keeps a paper with a vault note', async () => {
+  const [untouched, noted] = await ids(paper('untouched'), paper('noted'));
+  await sql`update reading_papers set found_at = now() - interval '31 days'`;
+  await withTitles(sql, (tx) => ensurePaperNote(tx, noted)); // an empty note, as a cited paper gets
+  assert.equal(await pruneCandidates(sql), 1);
+  assert.deepEqual(
+    (await getPapers(sql, [untouched, noted])).map((p) => p.key),
+    ['noted'],
   );
 });
 
