@@ -848,6 +848,29 @@ span.adm-cite {
 .adm-reading-actions .adm-btn {
   min-height: var(--adm-touch);
 }
+/* Draft a blog post: the button, then its hint and error below it. In a row of actions the button joins the row and the
+   lines under it take a line each. The Library's row checkboxes are 44px targets. */
+.adm-draft .adm-btn {
+  min-height: var(--adm-touch);
+}
+.adm-draft > p {
+  max-inline-size: 65ch;
+  margin: 4px 0 0;
+}
+.adm-actions > .adm-draft {
+  display: contents;
+}
+.adm-actions > .adm-draft > p {
+  flex-basis: 100%;
+  max-inline-size: none;
+  margin: 0;
+}
+.adm-draft-pick {
+  justify-content: center;
+  min-inline-size: var(--adm-touch);
+  min-block-size: var(--adm-touch);
+  cursor: pointer;
+}
 /* Vault: the list's filters, the editor's [[ list under its textarea, and 44px targets at every width. */
 .adm-vault-filters {
   display: flex;
@@ -1049,7 +1072,8 @@ span.adm-cite {
   font-weight: 500;
 }
 .adm-field small,
-.adm-muted {
+.adm-muted,
+.adm-hint {
   color: var(--adm-muted);
   font-size: 13px;
 }

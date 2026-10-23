@@ -1,12 +1,14 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref } from 'vue';
+import { computed, nextTick, onMounted, ref } from 'vue';
 import AdminShell from './AdminShell.vue';
 import AdminTabLinks from './AdminTabLinks.vue';
+import ReadingDraftButton from './ReadingDraftButton.vue';
 import { api, report, toast } from './api';
 import { visible } from './career';
 import { formatDate } from './dates';
 import { SOURCE_NAMES, authorsLine } from './reading';
 import type { AdminCtx } from './types';
+import { DRAFT_MAX_PAPERS } from '../lib/reading/limits';
 import type { LibraryItem } from '../lib/reading/types';
 
 // Titles and authors are third-party text: shown with {{ }} only, never as HTML.
@@ -18,6 +20,17 @@ const papers = ref<LibraryItem[] | null>(null);
 const paperRef = ref('');
 const adding = ref(false);
 const addError = ref('');
+
+// Papers ticked for a draft, in the order ticked: 1 to DRAFT_MAX_PAPERS make a post.
+const selected = ref<number[]>([]);
+const draftFrom = computed(() =>
+  selected.value.length && selected.value.length <= DRAFT_MAX_PAPERS ? { papers: [...selected.value] } : null,
+);
+const draftHint = computed(() =>
+  selected.value.length > DRAFT_MAX_PAPERS
+    ? `A post can draw on up to ${DRAFT_MAX_PAPERS} papers.`
+    : 'Writes an unpublished draft in your voice from the selected papers (a roundup when there are several) and your notes, and opens it in the blog editor. One reading-room AI call.',
+);
 
 const meta = ({ paper, savedAt }: LibraryItem) =>
   [authorsLine(paper.authors), SOURCE_NAMES[paper.source] ?? paper.source, `saved ${formatDate(savedAt)}`]
@@ -54,6 +67,7 @@ async function unsave(item: LibraryItem) {
   const at = list.indexOf(item); // after the await: a double click's first unsave may have removed it already
   if (at < 0) return;
   list.splice(at, 1);
+  selected.value = selected.value.filter((id) => id !== item.paper.id);
   focusSave((list[at] ?? list[at - 1])?.paper.id ?? null);
   toast('Removed from the library', undefined, {
     label: 'Undo',
@@ -116,16 +130,30 @@ onMounted(async () => {
     <p v-else-if="!papers.length" class="adm-muted">
       No saved papers yet. Save one from Today, or add one by its arXiv id or DOI.
     </p>
-    <ul v-else class="adm-rows">
-      <li v-for="item in papers" :key="item.paper.id" :data-row="item.paper.id">
-        <span class="adm-row-main">
-          <a :href="room(item.paper.id)">{{ visible(item.paper.title) }}</a>
-          <span class="adm-row-detail">{{ meta(item) }}</span>
-        </span>
-        <span class="adm-row-action adm-reading-actions">
-          <button type="button" class="adm-btn" aria-pressed="true" @click="unsave(item)">Saved</button>
-        </span>
-      </li>
-    </ul>
+    <template v-else>
+      <div class="adm-actions">
+        <span class="adm-muted" role="status">{{ selected.length }} selected</span>
+        <ReadingDraftButton :ctx="ctx" :from="draftFrom" :hint="draftHint" />
+      </div>
+      <ul class="adm-rows">
+        <li v-for="item in papers" :key="item.paper.id" :data-row="item.paper.id">
+          <span class="adm-row-main">
+            <a :href="room(item.paper.id)">{{ visible(item.paper.title) }}</a>
+            <span class="adm-row-detail">{{ meta(item) }}</span>
+          </span>
+          <span class="adm-row-action adm-reading-actions">
+            <label class="adm-check adm-draft-pick">
+              <input
+                v-model="selected"
+                type="checkbox"
+                :value="item.paper.id"
+                :aria-label="`Select “${visible(item.paper.title)}”`"
+              />
+            </label>
+            <button type="button" class="adm-btn" aria-pressed="true" @click="unsave(item)">Saved</button>
+          </span>
+        </li>
+      </ul>
+    </template>
   </AdminShell>
 </template>

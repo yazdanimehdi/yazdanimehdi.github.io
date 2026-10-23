@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 import AdminShell from './AdminShell.vue';
+import ReadingDraftButton from './ReadingDraftButton.vue';
 import { api, report } from './api';
 import { visible } from './career';
 import { formatDate, relativeTime } from './dates';
@@ -390,11 +391,16 @@ const NO_SET = new Set<never>();
           </span>
         </li>
       </ul>
-      <p class="adm-vault-act">
+      <div class="adm-actions adm-vault-act">
         <button type="button" class="adm-btn" :disabled="suggesting" @click="suggest()">
           {{ suggesting ? 'Suggesting…' : 'Suggest links' }}
         </button>
-      </p>
+        <ReadingDraftButton
+          :ctx="ctx"
+          :from="{ note: id }"
+          hint="Writes an unpublished draft in your voice from this note and the papers it is about or links, and opens it in the blog editor. One reading-room AI call."
+        />
+      </div>
       <p class="adm-muted" role="status">{{ suggestStatus }}</p>
       <p v-if="suggestError" class="adm-err" role="alert">{{ suggestError }}</p>
 

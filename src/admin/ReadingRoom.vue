@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, h, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 import AdminShell from './AdminShell.vue';
+import ReadingDraftButton from './ReadingDraftButton.vue';
 import { ApiError, api, report, toast } from './api';
 import { visible } from './career';
 import { formatDate } from './dates';
@@ -517,6 +518,11 @@ onBeforeUnmount(() => {
               <option v-for="n in addable" :key="n.id" :value="n.id">{{ n.title }}</option>
               <option value="new">New notebook…</option>
             </select>
+            <ReadingDraftButton
+              :ctx="ctx"
+              :from="{ paper: cur.id }"
+              hint="Writes an unpublished draft in your voice from this paper, your notes and saved answers, and opens it in the blog editor. One reading-room AI call."
+            />
           </div>
           <p v-if="room.inNotebooks.length" class="adm-muted">
             In
@@ -560,6 +566,11 @@ onBeforeUnmount(() => {
             />
             <button type="submit" class="adm-btn" :disabled="adding">{{ adding ? 'Adding…' : 'Add a paper' }}</button>
           </form>
+          <ReadingDraftButton
+            :ctx="ctx"
+            :from="target"
+            hint="Writes an unpublished draft in your voice from this notebook’s papers (a roundup when it has several), its note and your saved answers, and opens it in the blog editor. One reading-room AI call."
+          />
         </template>
       </div>
 

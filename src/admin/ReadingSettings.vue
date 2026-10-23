@@ -58,7 +58,7 @@ const ROOM_FIELDS: FieldDef[] = [
     key: 'roomAiCalls',
     label: 'AI calls per day',
     type: 'number',
-    hint: 'Summaries, study aids, chat turns and vault link suggestions in the reading room (1–1000). Resets at midnight UTC.',
+    hint: 'Summaries, study aids, chat turns, vault link suggestions and blog drafts in the reading room (1–1000). Resets at midnight UTC.',
   },
 ];
 const EMAIL_FIELDS: FieldDef[] = [
