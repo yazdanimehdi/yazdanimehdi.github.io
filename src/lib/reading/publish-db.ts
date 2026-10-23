@@ -47,6 +47,8 @@ export async function publicNotes(sql: Sql): Promise<PublicNote[]> {
 const DIRS = Object.values(COPY_DIRS);
 const ATTEMPTS = 3;
 
+export const VAULT_AUTHOR = { name: 'Vault', email: 'scholaros-vault@users.noreply.github.com' };
+
 /**
  * Brings `documents` under COPY_DIRS to exactly the copies publicNotes gives, in one commit of the differences. A
  * run that loses a race to another (ConflictError) starts over from fresh reads. `warning`: the copies are saved but
@@ -56,7 +58,7 @@ export async function republish(
   sql: Sql,
   deps?: PostgresDeps,
 ): Promise<{ changed: number; warning?: 'cache-purge-failed' }> {
-  const store = new PostgresStore(sql, { name: 'Vault', email: 'scholaros-vault@users.noreply.github.com' }, deps);
+  const store = new PostgresStore(sql, VAULT_AUTHOR, deps);
   for (let attempt = 1; ; attempt++) {
     const notes = await publicNotes(sql);
     const targets = new Map(notes.map((n) => [linkKey(n.title), n.uid]));

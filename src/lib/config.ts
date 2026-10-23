@@ -61,7 +61,7 @@ function parseSiteConfig(): SiteConfig {
 }
 
 /** False when `path` is a built-in page that `pages` turns off, or under one (/blog/a-post when blog is off). */
-export function isPageOn(path: string, config: SiteConfig = getSiteConfig()): boolean {
+export function isPageOn(path: string, config: Pick<SiteConfig, 'pages'> = getSiteConfig()): boolean {
   return !Object.entries(SITE_PAGES).some(
     ([id, href]) => config.pages?.[id as SitePageId] === false && (path === href || path.startsWith(`${href}/`)),
   );

@@ -203,3 +203,24 @@ test('Publish again is the owner’s, in Postgres mode', async () => {
   setStoreForTests(() => new MemoryStore());
   assert.equal((await call(publish.POST, { body: {} })).status, 404);
 });
+
+test('the visibility routes answer in Postgres mode, where admin routes run outside a request context', async (t) => {
+  // getMode() is static in the other tests, so site.yml came from disk and the missing request context never showed.
+  const env = { VERCEL: process.env.VERCEL, DATABASE_URL: process.env.DATABASE_URL };
+  Object.assign(process.env, { VERCEL: '1', DATABASE_URL: 'postgres://unused.test/db' });
+  t.after(() => {
+    for (const [k, v] of Object.entries(env))
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+  });
+  const n = await free('Plain');
+  const paperId = await addPaper();
+  const got = await ok(await call(vNote.GET, { params: { id: String(n.id) } }));
+  assert.equal(got.visibility.pageOn, true);
+  assert.equal((await ok(await patchNote(n.id, { public: true }))).visibility.url, '/notes/plain/');
+  assert.equal((await ok(await call(papers.GET, { params: { id: String(paperId) } }))).visibility.noteId, null);
+  assert.equal(
+    (await ok(await call(publish.POST, { body: { paper: paperId, public: true } }))).visibility.public,
+    true,
+  );
+});

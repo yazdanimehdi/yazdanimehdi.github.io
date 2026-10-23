@@ -1,8 +1,11 @@
 // What the owner sees of a note's public side, and the republish every vault write runs.
+import { readConfig } from '../admin/content';
+import { getStore } from '../admin/get-store';
 import { HttpError } from '../admin/http';
 import { isPageOn } from '../config';
 import type { Sql } from '../db';
-import { republish } from './publish-db';
+import type { SiteConfig } from '../types';
+import { VAULT_AUTHOR, republish } from './publish-db';
 import { listHighlights } from './room-db';
 import type { Highlight, VaultNote } from './types';
 
@@ -17,14 +20,29 @@ export interface Visibility {
   highlights?: { on: number; all: number };
 }
 
+type Pages = SiteConfig['pages'];
+
+/**
+ * site.yml's page switches, read through the store: admin routes run outside the request context that
+ * getSiteConfig() reads in Postgres mode.
+ */
+export async function sitePages(): Promise<Pages> {
+  const { data } = await readConfig(getStore(VAULT_AUTHOR), 'site');
+  return data.pages as Pages;
+}
+
 /** A null note is a paper's that doesn't exist yet. */
-export function visibilityOf(note: VaultNote | null, highlights?: { on: number; all: number }): Visibility {
+export function visibilityOf(
+  note: VaultNote | null,
+  pages: Pages,
+  highlights?: { on: number; all: number },
+): Visibility {
   const page = !note || note.kind === 'paper' ? '/readings' : '/notes';
   return {
     noteId: note?.id ?? null,
     public: note?.public ?? false,
     url: note?.public && note.publicSlug ? `${page}/${note.publicSlug}/` : null,
-    pageOn: isPageOn(page),
+    pageOn: isPageOn(page, { pages }),
     chat: note?.kind === 'chat',
     ...(highlights && { highlights }),
   };
@@ -34,7 +52,8 @@ export const highlightCounts = (hs: Highlight[]) => ({ on: hs.filter((h) => h.pu
 
 /** visibilityOf, with the paper's highlight counts for a paper's note (`paperId` when there is no note yet). */
 export async function noteVisibility(sql: Sql, note: VaultNote | null, paperId = note?.paperId): Promise<Visibility> {
-  return visibilityOf(note, paperId == null ? undefined : highlightCounts(await listHighlights(sql, [paperId])));
+  const [pages, hs] = await Promise.all([sitePages(), paperId == null ? null : listHighlights(sql, [paperId])]);
+  return visibilityOf(note, pages, hs ? highlightCounts(hs) : undefined);
 }
 
 let testRepublish: typeof republish | null = null;
