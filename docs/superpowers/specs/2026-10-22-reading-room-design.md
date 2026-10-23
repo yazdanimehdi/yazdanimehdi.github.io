@@ -437,6 +437,69 @@ Project 3 shipped as planned in `docs/superpowers/plans/2026-10-22-vault.md`. De
 - **Roundups.** Several papers can be drafted together as a roundup post, such as "what I read this week".
 - **What it reuses.** The existing paper-post prompt is extended rather than duplicated.
 
+### Built (2026-10-23)
+
+Project 4 shipped as planned in `docs/superpowers/plans/2026-10-22-blog-from-paper.md`. Decisions made while building it:
+
+- **In the request, not a workflow:** one route (`POST reading/draft`, owner-only through `careerRoute`) makes one
+  `generateText` call with the provider's 90 s timeout, a few queries and one commit, well inside the 300 s function
+  limit. There is no arXiv wait to sit through: a paper whose text isn't fetched yet is refused before any AI call, as
+  chat refuses it, and a failure writes nothing, so nothing needs resuming. `maxTokens` is 8000, as for the owner's own
+  paper posts, not the planned 3000, which cut roundups and reasoning models short. A provider slower
+  than about 30 tokens a second on a long roundup (some 2,500 tokens), or a reasoning model that thinks at length, can
+  hit the 90 s timeout, and the 502 says so. Move it to a workflow if that is ever seen.
+- **Always unpublished:** code sets `draft: true` on every draft, whatever the reply says, the flag the editor's Save
+  draft and the Scholar import already use, so the public site, its lists and the sitemap hide it with nothing new.
+  The post goes through the editor's store path (`entryChange` and `commitChanges`, as a new post's save does), so it
+  lands in `documents`, the history, the backup and `db:export` like any post; no reading table is written. The slug
+  comes from the title, `reading-notes` when the title makes none, with `-2`, `-3`… when taken (`uniqueSlug`, now
+  shared with the Scholar import).
+- **The paper-post contract and parser, reused:** the editor's system line, the JSON reply (`postJson`, which the
+  Scholar import's prompt now builds its byte-identical text from) and `parsePaperPost` serve both. Only the draft
+  clamps the title (200), subtitle (200), excerpt (300) and tags (40 each); the import is unchanged.
+- **Every link is code's:** the model cites passage ids, code turns each kept cite into a link to its paper's source
+  page and closes the post with a `## Papers` list (title, authors, year), and no list when a note drafts without
+  papers. A link is written only from a paper's own URL, only when it parses as http(s), as `[label](<url>)` with
+  `<`, `>`, spaces, parentheses and backslashes percent-encoded and the label escaped. Everything else the model wrote
+  that could make a link is removed at the Markdown level, with the parser the site renders with (micromark with GFM
+  and math, promoted from transitive to direct dependencies, nothing downloaded): its links and link references become
+  their text, and its images, definitions, HTML and autolinks (`<scheme:…>`, `www.…`, bare URLs, email addresses) are
+  dropped, parsing again until a pass removes nothing. Math that uses a TeX command outside a short allowlist (the
+  site's MathJax loads `\href`, `\style` and `\class` on demand) becomes code; a backslash in prose and paper
+  metadata is shown as the lookalike ＼ so MathJax can't typeset `\(`… there (an intended backslash must be retyped);
+  and a Mermaid, chart or TikZ block becomes plain code, since the browser would draw it.
+- **Short quotes only:** a draft with 40 or more consecutive words that also appear in one passage, or in a line the
+  owner highlighted, is refused with a sentence and nothing is saved; it is never shortened. The check runs over what
+  the prompt actually held (the passages picked to fit the context, and the highlighted lines), across block
+  boundaries. A scan is drafted from its abstract and never sent as a PDF, so the check sees everything the model saw;
+  a scanned paper's draft rests on its abstract only.
+- **Bounded parse time:** the Markdown parser's time grows with the square of nesting and of emphasis or bracket runs,
+  so a reply with more than 16 nested quote or list openers on a line, more than 1,200 `*`, `_` or `~` or more than
+  600 brackets in its text (cites, code and math not counted) is refused; emphasis deeper than 4 is unwrapped, at most
+  4 sanitizing passes run, line endings are normalized first so every check sees the parser's lines, and the body is
+  cut at 20,000 characters. The tests check that each check's time grows linearly. A very code-heavy or link-heavy
+  draft can be refused.
+- **Voice:** the owner's 3 newest published posts (2,000 characters each) as examples of tone only, drafts left out,
+  and the owner's notes; the post is written as "I", while the Scholar import keeps "we". The prompt keeps the owner's
+  writing (note bodies, highlight comments, in `<notes>`) apart from the AI's reading aids (summaries, key findings,
+  saved answers, in `<aids>`, background only, never the owner's view) and the highlighted lines (the papers' words,
+  in `<quotes>`, without their comments, which are already in the notes). Every fence is named in the prompt as data
+  whose instructions are never followed, and defanged.
+- **Roundups need no mode of their own:** a draft of more than one paper is a roundup, from a notebook or a Library
+  selection. A draft takes at most 10 papers (`DRAFT_MAX_PAPERS`, in a constants module with no server imports, so
+  the Library's Vue page shares it without pulling server code into the client bundle).
+- **Where it starts:** a paper's room, a notebook's room (its papers, its note and the answers saved on its papers), a
+  vault note (a paper note's paper, a chat note's cited papers or else its chat's paper, a free note's notebook's papers
+  and the papers it `[[links]]`; a chat note's saved answer counts as content), and up to 10 papers ticked in the
+  Library. The room and the vault save the latest note first and refuse when it didn't save, since a draft from stale
+  text wastes a capped call; the room's note saves now queue one at a time.
+- **No cover image:** that would be a second paid call and up to another minute; the editor's AI image button is one
+  click away.
+- **Cost:** the key is checked first (a missing key spends nothing), then one call against the reading room's daily
+  cap; the provider is the one configured, with no fallback and no tools.
+- **Not checked live:** there is no AI key locally, so no real draft has been written; the tests fake the provider.
+  `VERCEL=1 pnpm build` bundles the workflows, which reach none of this.
+
 ## Planning
 
 Each project gets its own implementation plan, written when the one before ships. Project 1's plan comes first. Its

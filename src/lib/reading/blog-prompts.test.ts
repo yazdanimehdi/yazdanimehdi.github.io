@@ -419,18 +419,24 @@ test('no pattern backtracks on a long run of what it repeats', () => {
   const long = 160_000;
   const cases: [string, (n: number) => unknown][] = [
     ['defang: < then spaces', (n) => prompt({ notes: [`<${' '.repeat(n)}x`.repeat(3)] })],
-    ['cites: a run of spaces', (n) => draft(`a${' '.repeat(n)}b`)],
-    ['cites: an unclosed id', (n) => draft(`a [12:${'S'.repeat(n)}`)],
     ['literals: a long word in a title', (n) => draft('Q [13:S1.p1].', { papers: [{ ...B, title: 'a'.repeat(n) }] })],
     [
       'literals: a long dotted domain',
       (n) => draft('Q [13:S1.p1].', { papers: [{ ...B, title: `a@${'b.'.repeat(n / 16)}` }] }),
     ],
-    ['tex: backslash runs', (n) => draft(`$${'\\'.repeat(n)}$`)],
-    ['words: one long word', (n) => draft('w'.repeat(n), { passages: ['w'.repeat(n)] })],
-    ['depth: digits and spaces', (n) => draft(`${'123456789 '.repeat(n / 40)}x`)],
   ];
   for (const [name, f] of cases) grows(name, f, long / 4);
+  // A reply's body is cut to 20,000 characters (parseAnswer), so body-side cases grow from 4,000 to 16,000: past the
+  // cut both sizes would check the same text, and at the cut a case loses its closing characters (a `$`) and is
+  // parsed as something else.
+  const body: [string, (n: number) => unknown][] = [
+    ['cites: a run of spaces', (n) => draft(`a${' '.repeat(n)}b`)],
+    ['cites: an unclosed id', (n) => draft(`a [12:${'S'.repeat(n)}`)],
+    ['tex: backslash runs', (n) => draft(`$${'\\'.repeat(n)}$`)],
+    ['words: one long word', (n) => draft('w'.repeat(n), { passages: ['w'.repeat(n)] })],
+    ['depth: digits and spaces', (n) => draft(`${'123456789 '.repeat(n / 10)}x`)],
+  ];
+  for (const [name, f] of body) grows(name, f, 4_000);
   // GFM's own parse is a little superlinear here, and the body is cut to 20,000 characters, so only the ceiling.
   timed('cites: many ids', () => draft(`a [${'12:S2.p3, '.repeat(2000)}`));
 });

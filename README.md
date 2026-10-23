@@ -968,7 +968,7 @@ Every arXiv HTML or PDF fetch on the site, nightly or on open, takes a slot 15 s
 
 **Scans.** A PDF with no text layer (fewer than 50 characters a page on average) has no passages to show. When it is 4 MB or less it is kept and sent to the AI as a PDF, and citations name a page only ("p. 3"); a bigger one leaves the abstract. In a notebook of several papers a scan contributes only its abstract.
 
-**AI calls per day.** Summaries, study aids, chat turns and the vault's link suggestions count against **Reading → Settings → Reading room → AI calls per day** (default 100, 1 to 1,000, reset at midnight UTC); the section shows today's use. At the cap, chat says so plainly and a summary fails with the reason; the paper, highlights and notes still work. The reading room uses the AI provider you configured, with no fallback; the model gets no tools, and paper text is marked as untrusted data in every prompt and shown only as text.
+**AI calls per day.** Summaries, study aids, chat turns, the vault's link suggestions and [blog drafts](#blog-from-a-paper) count against **Reading → Settings → Reading room → AI calls per day** (default 100, 1 to 1,000, reset at midnight UTC); the section shows today's use. At the cap, chat says so plainly and a summary fails with the reason; the paper, highlights and notes still work. The reading room uses the AI provider you configured, with no fallback; the model gets no tools, and paper text is marked as untrusted data in every prompt and shown only as text.
 
 **Where the data lives.** `reading_settings`, `reading_papers`, `reading_digest` and `reading_texts` (migration `008_reading.sql`), and the reading room's `reading_passages`, `reading_notebooks`, `reading_notebook_papers`, `reading_outputs`, `reading_chats`, `reading_highlights` and `reading_ai_use` (migration `009_reading_room.sql`), and the vault's `vault_notes`, `vault_links` and `vault_suggestions` (migration `010_vault.sql`, which moves the notes 009 kept in `reading_notes` into the vault and drops that table), not `documents`, so they never reach the git backup or `db:export`. As with the job search, a Vercel preview shares the production database: a run or a chat on a preview writes the live data and spends your real AI credits.
 
@@ -993,6 +993,18 @@ Every arXiv HTML or PDF fetch on the site, nightly or on open, takes a slot 15 s
 **Graph.** **Graph** draws the notes and their links: circles are papers, squares your notes, diamonds chats, larger with more links. Hovering, focusing or tapping near a note lights its links and lists its neighbours under the graph. Past 200 notes it shows the 200 most-linked and says how many there are.
 
 **Export.** **Export as a zip** downloads the whole vault, one `<title>.md` per note in `vault/papers/`, `vault/notes/` and `vault/chats/`, which Obsidian opens as a vault. Front matter carries the note's id, kind and dates, a paper's title, authors, source link, arXiv id or DOI and date, and a chat's question and when it was asked. It holds your writing, highlights and the generated summary and findings, never a paper's full text. A zip over 4.4 MB (Vercel's response limit) is refused with its size, never cut short.
+
+#### Blog from a paper
+
+**Draft a blog post** writes a blog post from what you read, in your voice. It is on a paper's room (that paper), a notebook's room (its papers), a vault note (the paper it is about, the papers a chat note cites, or a free note's notebook and the papers it `[[links]]`; a free note that links no paper drafts from its own text), and the Library, where you tick up to 10 saved papers. A draft of more than one paper is a roundup ("what I read this week"): a short opening, a section per paper and a short close. The room and the vault save your latest note first, so the draft reads it.
+
+**What it draws on.** The papers' passages; your notes, highlight comments and the lines you highlighted; the summaries, key findings and chat answers you saved (as background, never as your view); and your 3 newest published posts, for voice only. It is written as "I". A paper whose text is still being fetched is refused before any AI call, and a scan is drafted from its abstract.
+
+**What you get.** Always an unpublished draft (`draft: true`, whatever the AI replies), and the blog editor opens on it. The AI cites passages and code turns each cite into a link to the paper's source page; every other link, image and HTML tag in its reply is removed, and the post ends with a `## Papers` list of the papers linked to their source pages. A draft that copies 40 or more consecutive words from a paper is refused and nothing is saved; draft again. There is no cover image: the editor's AI image button adds one.
+
+**Cost.** One AI call per draft, counted against the reading room's **AI calls per day**; a missing AI key spends nothing. A draft takes up to a minute, and a failure says why under the button and writes nothing.
+
+**Where it lives.** A draft is an ordinary post in the posts collection, so it is in the history, the git backup and `db:export` like any other; the reading data it was drawn from is not.
 
 ### Cookie Consent (GDPR)
 
