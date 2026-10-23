@@ -88,9 +88,10 @@ const SNAPSHOT = { question: 'Why?', answer: 'Because.', cites: [], askedAt: '20
 test('a chat note cannot be made public', async () => {
   const [{ id }] = await sql<{ id: number }>`
     insert into vault_notes (kind, title, chat) values ('chat', 'Why?', ${JSON.stringify(SNAPSHOT)}::jsonb) returning id`;
-  const res = await patchNote(Number(id), { public: true });
+  const res = await patchNote(Number(id), { public: true, body: 'mine' });
   assert.equal(res.status, 400);
   assert.equal((await res.json()).error, "Chat notes can't be made public: they are mostly AI text.");
+  assert.equal((await getNote(sql, Number(id)))!.body, '', 'a body sent with the refused toggle is not saved');
   const { visibility } = await ok(await call(vNote.GET, { params: { id: String(id) } }));
   assert.equal(visibility.chat, true);
 });
@@ -132,6 +133,19 @@ test('a failed republish never fails the save', async () => {
   const again = await call(publish.POST, { body: {} });
   assert.equal(again.status, 502);
   assert.equal((await again.json()).error, WARNING);
+  err.mock.restore();
+});
+
+test('a failed cache purge keeps the save and the copy, with a warning', async () => {
+  const err = mock.method(console, 'error', () => {});
+  setRepublishForTests((s) => republish(s, { ...deps, purge: async () => Promise.reject(new Error('purge down')) }));
+  const STALE = 'Your public pages were saved but the cache didn’t refresh. Publish again to retry.';
+  const n = await free('My Note');
+  const res = await ok(await patchNote(n.id, { public: true, body: 'hello' }));
+  assert.equal(res.publishWarning, STALE);
+  assert.match((await doc('src/content/notes/my-note.md'))!, /hello$/);
+  await sql`delete from documents`;
+  assert.deepEqual(await ok(await call(publish.POST, { body: {} })), { changed: 1, publishWarning: STALE });
   err.mock.restore();
 });
 

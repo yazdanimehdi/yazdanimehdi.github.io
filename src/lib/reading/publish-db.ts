@@ -49,9 +49,13 @@ const ATTEMPTS = 3;
 
 /**
  * Brings `documents` under COPY_DIRS to exactly the copies publicNotes gives, in one commit of the differences. A
- * run that loses a race to another (ConflictError) starts over from fresh reads.
+ * run that loses a race to another (ConflictError) starts over from fresh reads. `warning`: the copies are saved but
+ * the CDN cache wasn't purged.
  */
-export async function republish(sql: Sql, deps?: PostgresDeps): Promise<{ changed: number }> {
+export async function republish(
+  sql: Sql,
+  deps?: PostgresDeps,
+): Promise<{ changed: number; warning?: 'cache-purge-failed' }> {
   const store = new PostgresStore(sql, { name: 'Vault', email: 'scholaros-vault@users.noreply.github.com' }, deps);
   for (let attempt = 1; ; attempt++) {
     const notes = await publicNotes(sql);
@@ -71,8 +75,8 @@ export async function republish(sql: Sql, deps?: PostgresDeps): Promise<{ change
     for (const [path, content] of want) changes.push({ path, content });
     if (changes.length === 0) return { changed: 0 };
     try {
-      await store.commit(changes, 'Vault: published copies', base);
-      return { changed: changes.length };
+      const { warning } = await store.commit(changes, 'Vault: published copies', base);
+      return { changed: changes.length, ...(warning === 'cache-purge-failed' && { warning }) };
     } catch (e) {
       if (!(e instanceof ConflictError) || attempt === ATTEMPTS) throw e;
     }

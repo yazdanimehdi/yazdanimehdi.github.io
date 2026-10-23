@@ -1,4 +1,4 @@
-import test, { beforeEach } from 'node:test';
+import test, { beforeEach, mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { ConflictError } from '../admin/store';
 import { migrate } from '../db-migrate';
@@ -44,6 +44,16 @@ test('publishing writes the copy; nothing else changes on a second run', async (
   assert.deepEqual(await republish(sql, deps), { changed: 0 });
   assert.equal(await revisions(), revs);
   assert.deepEqual(purged, []);
+});
+
+test('a failed cache purge keeps the copy and says so', async () => {
+  const n = await make('My Note', 'hello');
+  await setNotePublic(sql, n.id, true);
+  const err = mock.method(console, 'error', () => {});
+  const failing = { ...deps, purge: async () => Promise.reject(new Error('purge down')) };
+  assert.deepEqual(await republish(sql, failing), { changed: 1, warning: 'cache-purge-failed' });
+  err.mock.restore();
+  assert.match((await doc('src/content/notes/my-note.md'))!, /hello$/);
 });
 
 test('a commit purges the copy and its collection', async () => {

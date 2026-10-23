@@ -44,23 +44,29 @@ export function setRepublishForTests(fn: typeof republish | null): void {
   testRepublish = fn;
 }
 
-/** "Publish again": republish, its failure logged and a 502 with a sentence. */
-export async function publishAgain(sql: Sql): Promise<{ changed: number }> {
+const STALE = 'Your public pages were saved but the cache didn’t refresh. Publish again to retry.';
+
+/**
+ * "Publish again": republish, its failure logged and a 502 with a sentence; `publishWarning` when the copies are
+ * saved but the cache wasn't refreshed.
+ */
+export async function publishAgain(sql: Sql): Promise<{ changed: number; publishWarning?: string }> {
   try {
-    return await (testRepublish ?? republish)(sql);
+    const { changed, warning } = await (testRepublish ?? republish)(sql);
+    return { changed, ...(warning && { publishWarning: STALE }) };
   } catch (e) {
     // eslint-disable-next-line no-console
     console.error('[reading] republish', e);
-    throw new HttpError(502, `Your public pages weren’t updated: ${(e as Error).message}`);
+    throw new HttpError(502, `Your public pages weren’t updated: ${e instanceof Error ? e.message : String(e)}`);
   }
 }
 
 /** Runs republish; a failure is logged and returned as a sentence, never thrown. */
 export async function afterVaultWrite(sql: Sql): Promise<{ publishWarning?: string }> {
   try {
-    await publishAgain(sql);
-    return {};
+    const { publishWarning } = await publishAgain(sql);
+    return publishWarning ? { publishWarning } : {};
   } catch (e) {
-    return { publishWarning: (e as Error).message };
+    return { publishWarning: (e as HttpError).message };
   }
 }

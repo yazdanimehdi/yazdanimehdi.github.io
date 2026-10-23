@@ -21,6 +21,8 @@ import { afterVaultWrite, noteVisibility } from '../../../../../../lib/reading/v
 
 export const prerender = false;
 
+const CHAT_REFUSED = "Chat notes can't be made public: they are mostly AI text.";
+
 const Patch = z.strictObject({
   title: z.string().trim().min(1).max(200).optional(),
   body: z.string().max(MAX_BODY).optional(),
@@ -55,6 +57,8 @@ export const PATCH = careerRoute(async (ctx) => {
   const id = idParam(ctx.params.id);
   const { title, body, public: on } = Patch.parse(await readBody(ctx));
   const sql = getSql();
+  // Refused before any write, so a body sent with it isn't saved either.
+  if (on && (await getNote(sql, id))?.kind === 'chat') throw new HttpError(400, CHAT_REFUSED);
   if (title !== undefined) {
     const renamed = await renameNote(sql, id, title, body);
     if (renamed === 'taken') throw new HttpError(409, `A note called “${noteTitle(title)}” already exists`);
@@ -62,7 +66,7 @@ export const PATCH = careerRoute(async (ctx) => {
   } else if (body !== undefined && !(await withTitles(sql, (tx) => setBody(tx, id, body))))
     throw new HttpError(404, 'Not found');
   const toggled = on === undefined ? undefined : await setNotePublic(sql, id, on);
-  if (toggled === 'chat') throw new HttpError(400, "Chat notes can't be made public: they are mostly AI text.");
+  if (toggled === 'chat') throw new HttpError(400, CHAT_REFUSED);
   const warning = await afterVaultWrite(sql);
   const note = await getNote(sql, id);
   if (!note) throw new HttpError(404, 'Not found');
