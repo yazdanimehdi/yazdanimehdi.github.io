@@ -438,27 +438,33 @@ async function toggleSaved(m: ChatMessage) {
   }
 }
 
-// Notes: saved on blur and a second after typing stops.
+// Notes: saved on blur and a second after typing stops, one save at a time.
 let noteTimer: ReturnType<typeof setTimeout> | undefined;
+let noteSaving = Promise.resolve();
 const noteStatus = ref('');
 function onNoteInput() {
   noteStatus.value = '';
   clearTimeout(noteTimer);
   noteTimer = setTimeout(saveNote, 1000);
 }
-async function saveNote() {
+function saveNote() {
   clearTimeout(noteTimer);
-  const body = note.value;
-  if (body === savedNote) return;
-  try {
-    await api('reading/notes', { method: 'PUT', body: { ...target, body } });
-    savedNote = body;
-    noteStatus.value = 'Saved';
-    toVault();
-  } catch (e) {
-    report(e);
-  }
+  noteSaving = noteSaving.then(async () => {
+    const body = note.value;
+    if (body === savedNote) return;
+    try {
+      await api('reading/notes', { method: 'PUT', body: { ...target, body } });
+      savedNote = body;
+      noteStatus.value = 'Saved';
+      toVault();
+    } catch (e) {
+      report(e);
+    }
+  });
+  return noteSaving;
 }
+/** Before a draft: the room's latest note is saved, so the draft reads it. */
+const noteSaved = async () => (await saveNote(), note.value === savedNote);
 /** Leaving the page: the last edit goes with a keepalive request, which outlives the page. */
 function flushNote() {
   if (note.value === savedNote) return;
@@ -521,6 +527,7 @@ onBeforeUnmount(() => {
             <ReadingDraftButton
               :ctx="ctx"
               :from="{ paper: cur.id }"
+              :before="noteSaved"
               hint="Writes an unpublished draft in your voice from this paper, your notes and saved answers, and opens it in the blog editor. One reading-room AI call."
             />
           </div>
@@ -569,6 +576,7 @@ onBeforeUnmount(() => {
           <ReadingDraftButton
             :ctx="ctx"
             :from="target"
+            :before="noteSaved"
             hint="Writes an unpublished draft in your voice from this notebook’s papers (a roundup when it has several), its note and your saved answers, and opens it in the blog editor. One reading-room AI call."
           />
         </template>

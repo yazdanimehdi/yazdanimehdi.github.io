@@ -182,6 +182,8 @@ function autoSuggest() {
   const n = note.value!;
   if (!n.suggestedAt && !suggesting.value && (n.kind !== 'free' || savedBody.trim())) void suggest(true);
 }
+/** Before a draft: this note's latest writing is saved, so the draft reads it. */
+const bodySaved = async () => (await saveBody(), body.value === savedBody);
 const answering = ref(false);
 async function answer(s: Suggestion, accept: boolean) {
   suggestError.value = '';
@@ -398,6 +400,7 @@ const NO_SET = new Set<never>();
         <ReadingDraftButton
           :ctx="ctx"
           :from="{ note: id }"
+          :before="bodySaved"
           hint="Writes an unpublished draft in your voice from this note and the papers it is about or links, and opens it in the blog editor. One reading-room AI call."
         />
       </div>
