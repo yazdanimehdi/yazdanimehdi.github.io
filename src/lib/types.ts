@@ -106,8 +106,12 @@ export const SITE_PAGES = {
   join: '/join',
   repositories: '/repositories',
   contact: '/contact',
+  readings: '/readings',
+  notes: '/notes',
 } as const;
 export type SitePageId = keyof typeof SITE_PAGES;
+/** Pages that stay off until the owner turns them on: for these, a missing setting means off. */
+export const DEFAULT_OFF: SitePageId[] = ['readings', 'notes'];
 
 export type ImageShape = 'rectangular' | 'circular' | 'oval';
 

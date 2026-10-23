@@ -8,6 +8,8 @@ const ENTRY_ROUTES = [
   ['people', '/people'],
   ['projects', '/projects'],
   ['positions', '/positions'],
+  ['readings', '/readings'],
+  ['notes', '/notes'],
 ] as const;
 
 const escapeXml = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');

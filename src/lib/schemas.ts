@@ -176,6 +176,31 @@ export const feedItemSchema = z.object({
   tags: z.array(z.string()).optional(),
 });
 
+// The published copies of public notes (src/lib/reading/publish.ts writes them); the admin never edits them.
+const publicCopy = {
+  id: z.string().uuid(),
+  title: z.string(),
+  shared: z.coerce.date(),
+  updated: z.coerce.date(),
+  links: z.array(z.string()),
+};
+
+export const notesSchema = z.object({ ...publicCopy, kind: z.literal('note') });
+
+export const readingsSchema = z.object({
+  ...publicCopy,
+  kind: z.literal('paper'),
+  paper: z.object({
+    title: z.string(),
+    authors: z.array(z.string()),
+    url: z.url({ protocol: /^https?$/ }),
+    arxiv: z.string().optional(),
+    doi: z.string().optional(),
+    published: z.coerce.date().optional(),
+  }),
+  highlights: z.array(z.object({ quote: z.string(), where: z.string(), comment: z.string().optional() })),
+});
+
 /** Collections the admin edits, keyed like src/content/<name>/. */
 export const adminCollections = {
   posts: postsSchema(stringImage),

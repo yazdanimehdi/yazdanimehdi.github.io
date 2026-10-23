@@ -1,9 +1,14 @@
 import type { z } from 'astro/zod';
 import { parseMarkdown } from '../admin/serialize';
-import { adminCollections, feedItemSchema } from '../schemas';
+import { adminCollections, feedItemSchema, notesSchema, readingsSchema } from '../schemas';
 
 /** The public collections in Postgres mode. Image fields are URL strings (images live in Vercel Blob). */
-export const documentSchemas = { ...adminCollections, feeds: feedItemSchema };
+export const documentSchemas = {
+  ...adminCollections,
+  feeds: feedItemSchema,
+  readings: readingsSchema,
+  notes: notesSchema,
+};
 export type DocumentCollection = keyof typeof documentSchemas;
 
 export interface DocumentEntry {

@@ -23,9 +23,13 @@ type Handler = (ctx: never) => Response | Promise<Response>;
 
 let sql: Sql;
 const deps = { purge: async () => {}, put: async () => ({ url: '' }), del: async () => {} };
+const siteYml = (yml: string) =>
+  sql`insert into documents (path, content) values ('config/site.yml', ${yml})
+    on conflict (path) do update set content = excluded.content`;
 beforeEach(async () => {
   sql = pgliteSql();
   await migrate(sql);
+  await siteYml('pages:\n  readings: true\n  notes: true\n');
   setSqlForTests(sql);
   setStoreForTests((author) => new PostgresStore(sql, author));
   setRepublishForTests((s) => republish(s, deps));
@@ -195,6 +199,17 @@ test('publishing a paper from the room creates its note; Publish again reruns re
   for (const body of [{ paper: paperId }, { public: true }])
     assert.equal((await call(publish.POST, { body })).status, 400, JSON.stringify(body));
   assert.equal((await call(publish.POST, { body: { paper: 999, public: true } })).status, 404);
+});
+
+test('the Visibility line says the page is off while site.yml leaves it off', async () => {
+  const n = await free('My Note');
+  const pageOn = async () => (await ok(await call(vNote.GET, { params: { id: String(n.id) } }))).visibility.pageOn;
+  await siteYml('pages:\n  notes: false\n');
+  assert.equal(await pageOn(), false);
+  await siteYml('title: A\n');
+  assert.equal(await pageOn(), false, 'no setting means off');
+  await siteYml('pages:\n  notes: true\n');
+  assert.equal(await pageOn(), true);
 });
 
 test('Publish again is the owner’s, in Postgres mode', async () => {
