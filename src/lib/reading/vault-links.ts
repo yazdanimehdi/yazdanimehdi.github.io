@@ -31,6 +31,22 @@ export function wikiLinks(body: string): string[] {
   return [...new Set([...body.matchAll(LINK)].map((m) => collapse(m[2])).filter(Boolean))];
 }
 
+/** The key a link target is matched by (vault_links.target): case and whitespace runs ignored. */
+export const linkKey = (target: string) => collapse(target).toLowerCase();
+
+/** Each [[link]] replaced by `fn` of its parts, `target` whitespace collapsed. */
+export function mapLinks(
+  body: string,
+  fn: (l: { target: string; alias: string | null; heading: string | null; embed: boolean }) => string,
+): string {
+  return body.replace(LINK, (_, bang: string, target: string, rest: string) => {
+    const bar = rest.indexOf('|');
+    const alias = bar >= 0 ? rest.slice(bar + 1) : null;
+    const heading = rest.startsWith('#') ? rest.slice(1, bar >= 0 ? bar : undefined) : null;
+    return fn({ target: collapse(target), alias, heading, embed: bang === '!' });
+  });
+}
+
 /** Every link to `from` (case and whitespace runs ignored) now names `to`, keeping its `!`, heading and alias. */
 export function rewriteLinks(body: string, from: string, to: string): string {
   const key = collapse(from).toLowerCase();
