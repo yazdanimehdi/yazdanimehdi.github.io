@@ -902,6 +902,75 @@ span.adm-cite {
 .adm-vault-delete {
   margin-block-start: 32px;
 }
+/* Vault graph: kind by shape and color; a selection lights its edges and neighbours and dims the rest. */
+.adm-graph {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+  touch-action: manipulation;
+}
+.adm-graph-edges line {
+  stroke: var(--adm-rule);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+.adm-graph-edges line.adm-graph-on {
+  stroke: var(--adm-accent);
+  stroke-width: 2px;
+}
+.adm-graph-paper {
+  fill: var(--adm-accent);
+}
+.adm-graph-free {
+  fill: var(--adm-ink);
+}
+.adm-graph-chat {
+  fill: var(--adm-muted);
+}
+.adm-graph a:focus {
+  outline: none;
+}
+.adm-graph-selected > * {
+  stroke: var(--adm-paper);
+  stroke-width: 2px;
+  outline: 2px solid var(--adm-accent);
+  outline-offset: 2px;
+}
+.adm-graph-picked a:not(.adm-graph-on),
+.adm-graph-picked .adm-graph-labels text:not(.adm-graph-on) {
+  opacity: 0.35;
+}
+.adm-graph-labels {
+  fill: var(--adm-ink);
+  font-family: var(--font-sans);
+  paint-order: stroke;
+  stroke: var(--adm-paper);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+.adm-graph-strip {
+  min-block-size: var(--adm-touch);
+}
+.adm-graph-strip p {
+  margin-block-end: 4px;
+}
+.adm-graph-neighbours {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.adm-graph-neighbours a {
+  display: inline-flex;
+  align-items: center;
+  min-block-size: var(--adm-touch);
+  overflow-wrap: anywhere;
+}
 .adm-filter-row {
   display: flex;
   flex-wrap: wrap;

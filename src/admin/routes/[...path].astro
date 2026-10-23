@@ -10,6 +10,7 @@ import ReadingNotebooks from '../ReadingNotebooks.vue';
 import ReadingRoom from '../ReadingRoom.vue';
 import ReadingVault from '../ReadingVault.vue';
 import ReadingVaultNote from '../ReadingVaultNote.vue';
+import ReadingVaultGraph from '../ReadingVaultGraph.vue';
 import Collection from '../Collection.vue';
 import Cv from '../Cv.vue';
 import CvStyles from '../CvStyles.vue';
@@ -170,6 +171,7 @@ if (screen === 'login' && error === 'denied') Astro.response.status = 403;
     {screen === 'reading' && arg === 'vault' && /^\d+$/.test(sub) && (
       <ReadingVaultNote client:only="vue" ctx={ctx} id={sub} />
     )}
+    {screen === 'reading' && arg === 'vault' && sub === 'graph' && <ReadingVaultGraph client:only="vue" ctx={ctx} />}
     {screen === 'cv' && <Cv client:only="vue" ctx={ctx} />}
     {screen === 'cv-styles' && <CvStyles client:only="vue" ctx={ctx} />}
     {screen === '' && <Dashboard client:only="vue" ctx={ctx} />}

@@ -59,6 +59,8 @@ export function outLinks(body: string, notes: NoteRow[]): { title: string; id: n
 }
 
 const MARGIN = 24;
+/** A spring from each node to the centre, so separate clusters don't drift onto the walls and pile up there. */
+const GRAVITY = 0.4;
 const GOLDEN = Math.PI * (3 - Math.sqrt(5));
 
 /**
@@ -73,7 +75,8 @@ export function layout(n: number, edges: [number, number][], w: number, h: numbe
     const r = spread * Math.sqrt((i + 0.5) / n);
     return { x: cx + r * Math.cos(i * GOLDEN), y: cy + r * Math.sin(i * GOLDEN) };
   });
-  const k = Math.sqrt((w * h) / Math.max(n, 1));
+  // Half the textbook spacing, with gravity, keeps the graph off the walls (where clamping piles it); `fit` fills the box.
+  const k = 0.5 * Math.sqrt((w * h) / Math.max(n, 1));
   for (let it = 0; it < iterations; it++) {
     const t = (w / 10) * (1 - it / iterations);
     const dx = new Array<number>(n).fill(0);
@@ -100,6 +103,13 @@ export function layout(n: number, edges: [number, number][], w: number, h: numbe
       dy[b] += ey * f;
     }
     for (let i = 0; i < n; i++) {
+      const gx = pts[i].x - cx;
+      const gy = pts[i].y - cy;
+      const f = (GRAVITY * Math.hypot(gx, gy)) / k;
+      dx[i] -= gx * f;
+      dy[i] -= gy * f;
+    }
+    for (let i = 0; i < n; i++) {
       const len = Math.hypot(dx[i], dy[i]);
       if (!len) continue;
       const step = Math.min(len, t) / len;
@@ -107,7 +117,20 @@ export function layout(n: number, edges: [number, number][], w: number, h: numbe
       pts[i].y = Math.min(h - MARGIN, Math.max(MARGIN, pts[i].y + dy[i] * step));
     }
   }
-  return pts;
+  return fit(pts, w, h);
+}
+
+/** Scaled (both axes alike) and centred to fill the box inside the margin. */
+function fit(pts: Point[], w: number, h: number): Point[] {
+  if (!pts.length) return pts;
+  const xs = pts.map((p) => p.x);
+  const ys = pts.map((p) => p.y);
+  const [x0, y0] = [Math.min(...xs), Math.min(...ys)];
+  const [bw, bh] = [Math.max(...xs) - x0, Math.max(...ys) - y0];
+  const s = Math.min(bw ? (w - 2 * MARGIN) / bw : Infinity, bh ? (h - 2 * MARGIN) / bh : Infinity);
+  if (!Number.isFinite(s)) return pts;
+  const [ox, oy] = [(w - bw * s) / 2, (h - bh * s) / 2];
+  return pts.map((p) => ({ x: ox + (p.x - x0) * s, y: oy + (p.y - y0) * s }));
 }
 
 /** The index of the point nearest (x, y) within `max`, or null. */

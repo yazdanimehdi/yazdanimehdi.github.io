@@ -100,6 +100,24 @@ test('linked nodes end closer than unlinked ones', () => {
   assert.ok(edge < across / 9, `${edge} < ${across / 9}`);
 });
 
+test('layout spreads a graph over the box instead of piling it on the edges', () => {
+  for (const [n, h] of [
+    [37, 625],
+    [200, 1000],
+  ]) {
+    const edges: [number, number][] = [];
+    // chains of five, apart from one another, as a vault's topics are
+    for (let i = 0; i < n; i++) if (i % 5 !== 4 && i + 1 < n) edges.push([i, i + 1]);
+    const p = layout(n, edges, 1000, h);
+    const onEdge = p.filter((q) => q.x <= 25 || q.x >= 975 || q.y <= 25 || q.y >= h - 25);
+    assert.ok(onEdge.length <= 4, `${onEdge.length} of ${n} on the edge`);
+    const xs = p.map((q) => q.x);
+    const ys = p.map((q) => q.y);
+    const span = Math.max((Math.max(...xs) - Math.min(...xs)) / 952, (Math.max(...ys) - Math.min(...ys)) / (h - 48));
+    assert.ok(span > 0.95, `spans ${span}`);
+  }
+});
+
 test('nearestNode picks within reach only', () => {
   const pts = [
     { x: 0, y: 0 },
