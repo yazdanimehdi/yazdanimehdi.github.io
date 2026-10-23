@@ -1,12 +1,18 @@
-// What a blog draft draws on: its papers and notes, and the owner's past posts for voice.
-import { listEntries, readEntry } from '../admin/content';
-import { HttpError } from '../admin/http';
+// A blog draft from papers and notes, in the request: what it draws on (its papers and notes, the owner's past posts
+// for voice), one AI call against the reading room's daily cap, and the post saved as an unpublished draft.
+import { errorText } from '../../workflows/runs';
+import { generateText, missingAiKey, readAiConfig } from '../admin/ai';
+import { entryChange, listEntries, readEntry } from '../admin/content';
+import { commitChanges, HttpError } from '../admin/http';
+import type { PostgresStore } from '../admin/postgres-store';
 import type { ContentStore } from '../admin/store';
 import type { Sql } from '../db';
-import { isPublished } from '../utils';
-import { DRAFT_MAX_PAPERS, type DraftQuote } from './blog-prompts';
+import { isPublished, suggestSlug, uniqueSlug } from '../utils';
+import { DRAFT_MAX_PAPERS, type DraftQuote, draftPrompt, parseDraft } from './blog-prompts';
 import { getPapers, type Row } from './db';
-import { getNotebook } from './room-db';
+import { allowedCites, loadGrounding } from './ground';
+import { getNotebook, useAiCall } from './room-db';
+import { CONTEXT_CHARS, pickPassages } from './room-prompts';
 import type { DraftFrom, VaultNote } from './types';
 import { getNote, noteContexts, ownChatText } from './vault-db';
 import { wikiLinks } from './vault-links';
@@ -162,4 +168,80 @@ export async function voiceExamples(store: ContentStore, now = new Date()): Prom
     console.error('[reading] voice', e);
     return [];
   }
+}
+
+/**
+ * Drafts a post from `from` and saves it as an unpublished post. Nothing is spent before the sources, the key and the
+ * daily cap are checked, and nothing is written unless the reply passes every check of parseDraft.
+ */
+export async function draftPost(
+  sql: Sql,
+  store: PostgresStore,
+  from: DraftFrom,
+  o: { now?: Date; budget?: number } = {},
+): Promise<{ slug: string }> {
+  const now = o.now ?? new Date();
+  const day = now.toISOString().slice(0, 10);
+  const { paperIds, noteIds } = await draftSources(sql, from);
+  // With no papers this still reads the prefs and the profile (readReading, readProfile + profileText).
+  const g = await loadGrounding(sql, store, paperIds);
+  if (g.unread.length)
+    throw new HttpError(
+      409,
+      `${paperIds.length > 1 ? 'A' : 'The'} paper’s text is still being fetched. Try again in a minute.`,
+    );
+  const [{ notes, aids, quotes }, examples, meta] = await Promise.all([
+    draftNotes(sql, paperIds, noteIds),
+    voiceExamples(store, now),
+    getPapers(sql, paperIds),
+  ]);
+
+  const ai = await readAiConfig(store);
+  const missing = await missingAiKey(sql, ai);
+  if (missing) throw new HttpError(400, missing);
+  const cap = g.prefs.roomAiCalls;
+  if (!(await useAiCall(sql, day, cap)))
+    throw new HttpError(429, `Today’s ${cap} reading-room AI calls are used up. Drafting is back tomorrow.`);
+
+  const papers = pickPassages(g.papers, null, o.budget ?? CONTEXT_CHARS);
+  let reply: string;
+  try {
+    reply = await generateText(
+      store,
+      ai,
+      draftPrompt({ papers, profile: g.profile, notes, aids, quotes, examples, scan: g.scan }),
+    );
+  } catch (e) {
+    throw new HttpError(502, errorText(e));
+  }
+  let post: ReturnType<typeof parseDraft>;
+  try {
+    post = parseDraft(reply, {
+      allowed: allowedCites(papers, g.scan),
+      papers: meta,
+      // What the prompt showed of the papers' words: the passages picked, and the highlighted lines.
+      passages: [
+        ...papers.flatMap((p) => p.passages.filter((q) => !/^h\d$/.test(q.kind)).map((q) => q.body)),
+        ...quotes.map((q) => q.text),
+      ],
+    });
+  } catch (e) {
+    throw new HttpError(502, errorText(e));
+  }
+
+  // ponytail: a post created under this slug between the listing and the commit gets the store's 409 (ConflictError);
+  // drafting again picks the next number.
+  const taken = new Set((await listEntries(store, 'posts')).map((e) => e.slug));
+  const slug = uniqueSlug(suggestSlug(post.title) || 'reading-notes', taken);
+  const data = {
+    title: post.title,
+    subtitle: post.subtitle,
+    excerpt: post.excerpt,
+    tags: post.tags.length ? post.tags : undefined,
+    date: day,
+    draft: true,
+  };
+  const change = entryChange('posts', slug, data, post.body);
+  await commitChanges(store, [change], `Draft post from the reading room: ${slug}`, { [change.path]: null });
+  return { slug };
 }

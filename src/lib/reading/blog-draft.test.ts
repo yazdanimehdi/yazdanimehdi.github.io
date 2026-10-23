@@ -2,26 +2,70 @@ import assert from 'node:assert/strict';
 import test, { afterEach, beforeEach, mock } from 'node:test';
 import { HttpError } from '../admin/http';
 import { PostgresStore } from '../admin/postgres-store';
-import type { Sql } from '../db';
+import { listEntries, readEntry } from '../admin/content';
+import { setSqlForTests, type Sql } from '../db';
 import { migrate } from '../db-migrate';
 import { pgliteSql } from '../pglite-sql';
-import { draftNotes, draftSources, voiceExamples } from './blog-draft';
-import { upsertPapers } from './db';
-import { addChat, addHighlight, claimOutput, createNotebook, setOutput, updateNotebook } from './room-db';
+import { isPublished } from '../utils';
+import { draftNotes, draftPost, draftSources, voiceExamples } from './blog-draft';
+import { upsertPapers, writeReading } from './db';
+import {
+  addChat,
+  addHighlight,
+  aiUse,
+  claimOutput,
+  createNotebook,
+  savePassages,
+  setOutput,
+  updateNotebook,
+  useAiCall,
+} from './room-db';
 import { createNote, ensureChatNote, ensurePaperNote, saveRoomNote, setBody, withTitles } from './vault-db';
 
 let sql: Sql;
 let store: PostgresStore;
+let requests: { system: string; prompt: string }[];
+let reply: string;
+let providerError: string | null;
+const savedKey = process.env.ANTHROPIC_API_KEY;
+const day = () => new Date().toISOString().slice(0, 10);
+const draftReply = (o: Record<string, unknown> = {}) =>
+  JSON.stringify({ title: 'My post', subtitle: 'Sub', excerpt: 'Ex', tags: ['ml'], body: 'I read it.', ...o });
+
 beforeEach(async () => {
   sql = pgliteSql();
   await migrate(sql);
+  setSqlForTests(sql);
   store = new PostgresStore(
     sql,
     { name: 'Owner', email: 'owner@x.test' },
     { purge: async () => {}, put: async () => ({ url: '' }), del: async () => {} },
   );
+  process.env.ANTHROPIC_API_KEY = 'test-key';
+  requests = [];
+  reply = draftReply();
+  providerError = null;
+  mock.method(globalThis, 'fetch', async (input: string | URL, init?: RequestInit) => {
+    assert.ok(String(input).startsWith('https://api.anthropic.com/'));
+    const body = JSON.parse(String(init!.body));
+    const content = body.messages[0].content;
+    const blocks = typeof content === 'string' ? [{ text: content }] : content;
+    requests.push({ system: body.system, prompt: blocks.map((b: { text?: string }) => b.text ?? '').join('\n') });
+    if (providerError)
+      return Response.json(
+        { type: 'error', error: { type: 'invalid_request_error', message: providerError } },
+        { status: 400 },
+      );
+    assert.match(body.system, /^You draft blog posts/);
+    return Response.json({ content: [{ type: 'text', text: reply }] });
+  });
 });
-afterEach(() => mock.restoreAll());
+afterEach(() => {
+  mock.restoreAll();
+  setSqlForTests(null);
+  if (savedKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+  else process.env.ANTHROPIC_API_KEY = savedKey;
+});
 
 const paper = async (k: string) =>
   (
@@ -252,4 +296,131 @@ test('a broken post gives no voice and never stops a draft', async () => {
   });
   assert.deepEqual(await voiceExamples(store), []);
   assert.equal(err.mock.calls[0].arguments[0], '[reading] voice');
+});
+
+/** A paper whose text is fetched: one passage. */
+const ready = async (k: string, body = `Paper ${k} shows that X works.`) => {
+  const id = await paper(k);
+  await savePassages(sql, id, [{ pid: 'S1.p1', kind: 'p', body }]);
+  return id;
+};
+const slugs = async () => (await listEntries(store, 'posts')).map((e) => e.slug).sort();
+
+test("a paper's draft is an unpublished post in documents", async () => {
+  const a = await ready('A');
+  const { slug } = await draftPost(sql, store, { paper: a });
+  assert.equal(slug, 'my-post');
+  const e = (await readEntry(store, 'posts', slug))!;
+  assert.equal(e.data.draft, true);
+  assert.equal(String(e.data.date).slice(0, 10), day());
+  assert.equal(e.data.title, 'My post');
+  assert.equal(isPublished({ data: e.data as { draft?: boolean; date: string } }), false);
+  const [doc] = await sql`select path from documents where path = ${`src/content/posts/${slug}.md`}`;
+  assert.ok(doc, 'the post is a document, in the backup like any other');
+  assert.equal(await aiUse(sql, day()), 1);
+});
+
+test('a draft is always unpublished, whatever the reply says', async () => {
+  const a = await ready('A');
+  reply = draftReply({ draft: false });
+  const { slug } = await draftPost(sql, store, { paper: a });
+  assert.equal((await readEntry(store, 'posts', slug))!.data.draft, true);
+});
+
+test("the prompt holds the passages, the owner's notes and past posts", async () => {
+  const a = await ready('A', 'The passage of A.');
+  await paperNote(a, 'my take');
+  await post('pub', 'title: Published one\ndate: 2026-01-01');
+  await post('unpub', 'title: Unpublished one\ndate: 2026-01-02\ndraft: true');
+  await draftPost(sql, store, { paper: a });
+  assert.equal(requests.length, 1);
+  const { prompt } = requests[0];
+  assert.match(prompt, /The passage of A\./);
+  assert.match(prompt, /my take/);
+  assert.match(prompt, /Published one/);
+  assert.doesNotMatch(prompt, /Unpublished one/);
+});
+
+test('a roundup links every paper', async () => {
+  const a = await ready('A');
+  const b = await ready('B');
+  const { slug } = await draftPost(sql, store, { papers: [a, b] });
+  const { body } = (await readEntry(store, 'posts', slug))!;
+  const list = body.slice(body.indexOf('## Papers'));
+  assert.ok(list.includes('https://x.test/A') && list.includes('https://x.test/B'), body);
+  assert.match(requests[0].system, /roundup/);
+});
+
+test("a note with no papers is a post from the note, with no papers' list", async () => {
+  const idea = await freeNote('Idea', 'an idea of mine');
+  const { slug } = await draftPost(sql, store, { note: idea });
+  assert.match(requests[0].prompt, /Papers: none\./);
+  assert.match(requests[0].prompt, /an idea of mine/);
+  assert.doesNotMatch((await readEntry(store, 'posts', slug))!.body, /## Papers/);
+});
+
+test('a taken slug gets the next number', async () => {
+  const a = await ready('A');
+  await post('my-post', 'title: Mine\ndate: 2026-01-01');
+  assert.deepEqual(await draftPost(sql, store, { paper: a }), { slug: 'my-post-2' });
+  reply = draftReply({ title: '注意力' });
+  assert.deepEqual(await draftPost(sql, store, { paper: a }), { slug: 'reading-notes' });
+});
+
+test('unfetched text is refused before any AI call', async () => {
+  const a = await paper('A');
+  await assert.rejects(
+    draftPost(sql, store, { paper: a }),
+    refused(409, 'The paper’s text is still being fetched. Try again in a minute.'),
+  );
+  const b = await ready('B');
+  await assert.rejects(
+    draftPost(sql, store, { papers: [b, a] }),
+    refused(409, 'A paper’s text is still being fetched. Try again in a minute.'),
+  );
+  assert.equal(requests.length, 0);
+  assert.equal(await aiUse(sql, day()), 0);
+});
+
+test('at the cap no AI call is made', async () => {
+  const a = await ready('A');
+  await writeReading(sql, { prefs: { roomAiCalls: 1 } }, 'test');
+  assert.equal(await useAiCall(sql, day(), 1), true);
+  await assert.rejects(
+    draftPost(sql, store, { paper: a }),
+    refused(429, 'Today’s 1 reading-room AI calls are used up. Drafting is back tomorrow.'),
+  );
+  // The cap holds for a draft from a note alone too.
+  const idea = await freeNote('Idea', 'an idea');
+  await assert.rejects(draftPost(sql, store, { note: idea }), refused(429, /used up/));
+  assert.equal(requests.length, 0);
+});
+
+test('a missing key costs no call', async () => {
+  const a = await ready('A');
+  delete process.env.ANTHROPIC_API_KEY;
+  await assert.rejects(draftPost(sql, store, { paper: a }), refused(400, /ANTHROPIC_API_KEY/));
+  assert.equal(await aiUse(sql, day()), 0);
+  assert.equal(requests.length, 0);
+});
+
+test('a provider error writes no post, and a refused draft writes no post', async () => {
+  const forty = Array.from({ length: 45 }, (_, i) => `w${i}`).join(' ');
+  const a = await ready('A', `${forty}.`);
+  await post('kept', 'title: Kept\ndate: 2026-01-01');
+  const before = await slugs();
+
+  providerError = 'Your credit balance is too low.';
+  await assert.rejects(draftPost(sql, store, { paper: a }), refused(502, /credit balance is too low/));
+  providerError = null;
+  reply = draftReply({ body: `As they say, ${forty}.` });
+  await assert.rejects(draftPost(sql, store, { paper: a }), refused(502, /copied a long passage/));
+  // A highlighted line is the paper's words too.
+  const b = await ready('B');
+  await paperNote(b);
+  const quote = Array.from({ length: 45 }, (_, i) => `q${i}`).join(' ');
+  await addHighlight(sql, { paperId: b, pid: 'S1.p1', start: 0, end: 5, quote, comment: '' });
+  reply = draftReply({ body: `They wrote ${quote}.` });
+  await assert.rejects(draftPost(sql, store, { paper: b }), refused(502, /copied a long passage/));
+  assert.deepEqual(await slugs(), before);
 });
