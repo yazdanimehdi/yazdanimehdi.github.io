@@ -25,7 +25,9 @@ import {
   useAiCall,
 } from './room-db';
 import { minimalPdf } from './test-pdf';
-import { saveRoomNote, setBody, withTitles } from './vault-db';
+import { createNote, ensurePaperNote, noteContexts, saveRoomNote, setBody, withTitles } from './vault-db';
+import { generatedMarkdown } from './vault-markdown';
+import { unzip } from './test-unzip';
 import { noteTitle } from './vault-links';
 import type { ChatSnapshot } from './types';
 import { SourceError } from '../career/sources/http';
@@ -46,6 +48,12 @@ import * as chatMessage from '../../admin/routes/api/reading/chat/[id]';
 import * as highlights from '../../admin/routes/api/reading/highlights';
 import * as highlight from '../../admin/routes/api/reading/highlights/[id]';
 import * as notes from '../../admin/routes/api/reading/notes';
+import * as vNotes from '../../admin/routes/api/reading/vault/notes';
+import * as vNote from '../../admin/routes/api/reading/vault/notes/[id]';
+import * as vSuggest from '../../admin/routes/api/reading/vault/suggest';
+import * as vSuggestion from '../../admin/routes/api/reading/vault/suggestions/[id]';
+import * as vGraph from '../../admin/routes/api/reading/vault/graph';
+import * as vExport from '../../admin/routes/api/reading/vault/export';
 
 type User = ReturnType<typeof ownerUser>;
 type Handler = (ctx: never) => Response | Promise<Response>;
@@ -127,6 +135,15 @@ const HANDLERS: [string, Handler][] = [
   ['highlights/[id] PATCH', highlight.PATCH],
   ['highlights/[id] DELETE', highlight.DELETE],
   ['notes PUT', notes.PUT],
+  ['vault/notes GET', vNotes.GET],
+  ['vault/notes POST', vNotes.POST],
+  ['vault/notes/[id] GET', vNote.GET],
+  ['vault/notes/[id] PATCH', vNote.PATCH],
+  ['vault/notes/[id] DELETE', vNote.DELETE],
+  ['vault/suggest POST', vSuggest.POST],
+  ['vault/suggestions/[id] PATCH', vSuggestion.PATCH],
+  ['vault/graph GET', vGraph.GET],
+  ['vault/export GET', vExport.GET],
 ];
 
 test('every reading route is 404 for a non-owner and in git mode', async () => {
@@ -811,4 +828,111 @@ test("a notebook's note outlives the notebook", async () => {
     'the note and the saved answer stay',
   );
   assert.equal(left[1].chat!.answer, 'Because.');
+});
+
+const free = async (title: string, body = '') => {
+  const n = await createNote(sql, title);
+  assert.notEqual(n, 'taken');
+  if (body) await setBody(sql, (n as { id: number }).id, body);
+  return (n as { id: number }).id;
+};
+
+test('a new note with a taken title is refused', async () => {
+  const { id } = await ok(await call(vNotes.POST, { body: { title: 'Ideas' } }));
+  assert.equal(typeof id, 'number');
+  const res = await call(vNotes.POST, { body: { title: 'ideas' } });
+  assert.equal(res.status, 409);
+  assert.equal((await res.json()).error, 'A note called “ideas” already exists');
+  assert.equal((await call(vNotes.POST, { body: { title: '' } })).status, 400);
+});
+
+test("a note's GET has its generated text, backlinks and open suggestions", async () => {
+  const [paperId] = await add(arxivPaper(1));
+  const { id } = await withTitles(sql, (tx) => ensurePaperNote(tx, paperId));
+  const other = await free('Other');
+  const thoughts = await free('Thoughts', 'see [[Paper arxiv 2610.1]]');
+  const [open] = await sql<{ id: string }>`
+    insert into vault_suggestions (note_id, target_id, title, reason) values (${id}, ${other}, 'Other', 'same topic')
+    returning id`;
+  await sql`insert into vault_suggestions (note_id, title, reason, status) values (${id}, 'Gone', 'no', 'dismissed')`;
+  const params = { id: String(id) };
+  const got = await ok(await call(vNote.GET, { params }));
+  assert.equal(got.note.title, 'Paper arxiv 2610.1');
+  const note = got.note;
+  assert.equal(got.generated, generatedMarkdown(note, (await noteContexts(sql, [note])).get(id)!));
+  assert.match(got.generated, /^# Paper arxiv:2610\.1/);
+  assert.deepEqual(
+    got.backlinks.map((n: { id: number }) => n.id),
+    [thoughts],
+  );
+  assert.deepEqual(got.suggestions, [{ id: Number(open.id), targetId: other, title: 'Other', reason: 'same topic' }]);
+
+  const accepted = await ok(await call(vSuggestion.PATCH, { params: { id: String(open.id) }, body: { accept: true } }));
+  assert.equal(accepted.note.body, 'Related: [[Other]]', 'the note’s new body, for the editor');
+  assert.equal(
+    (await call(vSuggestion.PATCH, { params: { id: String(open.id) }, body: { accept: false } })).status,
+    404,
+  );
+  assert.equal((await call(vNote.GET, { params: { id: '999' } })).status, 404);
+});
+
+test('PATCH renames and saves the body', async () => {
+  const id = await free('Old');
+  const linking = await free('Linking', 'see [[Old|it]]');
+  await free('Taken');
+  const params = { id: String(id) };
+  const { note } = await ok(await call(vNote.PATCH, { params, body: { title: 'New', body: 'mine [[Taken]]' } }));
+  assert.equal(note.title, 'New');
+  assert.equal(note.body, 'mine [[Taken]]');
+  const [l] = await sql<{ body: string }>`select body from vault_notes where id = ${linking}`;
+  assert.equal(l.body, 'see [[New|it]]');
+  const taken = await call(vNote.PATCH, { params, body: { title: 'taken' } });
+  assert.equal(taken.status, 409);
+  assert.equal((await taken.json()).error, 'A note called “taken” already exists');
+  assert.equal((await call(vNote.PATCH, { params, body: { body: 'x'.repeat(20_001) } })).status, 400);
+  assert.equal((await call(vNote.PATCH, { params: { id: '999' }, body: { body: 'x' } })).status, 404);
+  await ok(await call(vNote.DELETE, { params }), 204);
+  assert.equal((await call(vNote.DELETE, { params })).status, 404);
+});
+
+test('notes GET filters by kind and searches', async () => {
+  const [paperId] = await add(arxivPaper(1));
+  const { id: paperNote } = await withTitles(sql, (tx) => ensurePaperNote(tx, paperId));
+  const alpha = await free('Alpha');
+  const beta = await free('Beta', 'about alpha particles');
+  const ids = async (query: string) =>
+    (await ok(await call(vNotes.GET, { query }))).notes.map((n: { id: number }) => n.id);
+  assert.deepEqual((await ids('')).sort(), [paperNote, alpha, beta].sort());
+  assert.deepEqual((await ids('?kind=free')).sort(), [alpha, beta].sort());
+  assert.deepEqual(await ids('?kind=paper'), [paperNote]);
+  assert.deepEqual(await ids('?q=alpha'), [alpha, beta], 'title matches first');
+  assert.deepEqual(await ids('?q=alpha&kind=paper'), []);
+  assert.equal((await call(vNotes.GET, { query: '?kind=notes' })).status, 400);
+  assert.equal((await call(vNotes.GET, { query: `?q=${'a'.repeat(201)}` })).status, 400);
+});
+
+test('the export is a zip with one file per note', async () => {
+  const [paperId] = await add(arxivPaper(1));
+  await withTitles(sql, (tx) => ensurePaperNote(tx, paperId));
+  await free('Alpha', 'hello');
+  const res = await call(vExport.GET);
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('Content-Type'), 'application/zip');
+  assert.equal(
+    res.headers.get('Content-Disposition'),
+    `attachment; filename="vault-${new Date().toISOString().slice(0, 10)}.zip"`,
+  );
+  assert.equal(res.headers.get('Cache-Control'), 'no-store');
+  const files = unzip(new Uint8Array(await res.arrayBuffer()));
+  assert.deepEqual(files.map((f) => f.path).sort(), ['vault/notes/Alpha.md', 'vault/papers/Paper arxiv 2610.1.md']);
+  assert.equal(files.find((f) => f.path === 'vault/notes/Alpha.md')!.text.endsWith('hello'), true);
+});
+
+test('the graph and suggest routes answer', async () => {
+  const a = await free('A', '[[B]]');
+  const b = await free('B');
+  const g = await ok(await call(vGraph.GET));
+  assert.equal(g.total, 2);
+  assert.deepEqual(g.edges, [[Math.min(a, b), Math.max(a, b)]]);
+  assert.equal((await call(vSuggest.POST, { body: { note: 999 } })).status, 404);
 });
