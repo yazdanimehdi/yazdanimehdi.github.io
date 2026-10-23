@@ -165,6 +165,14 @@ building it:
   on, and both it and the zip answer 404 while Notes is off. The zip is named `<site>-notes.zip` (the site name's slug,
   else `site`); the vault export had no site-name precedent. `EXPORT_MAX` moved to `src/lib/reading/limits.ts`, so the
   public routes don't import the vault's database module.
+- **A public link whose alias or heading holds `[[` is published bare** as `[[Target]]` (`[[Pub|[[Secret]]]]`): the
+  wikilink pattern reads the inner link as part of the alias, so the alias can't be trusted. What follows the inner
+  `]]` stays as text.
+- **Verified (2026-10-23):** a privacy sweep on a throwaway local Postgres, with private notes, a private paper, a chat
+  note and AI text holding a marker, public notes linking the private ones every way (alias, no alias, case and
+  spaces, `#heading`, embed, code span, and nested in a public link's alias or heading) and a private highlight holding
+  it, found the marker 0 times in `/readings/`, the reading's page, `/notes/`, both notes' pages, `/notes/graph.json`,
+  the unzipped `/notes/vault.zip`, the sitemap and `select content from documents`.
 
 ## Part 2: imports
 
