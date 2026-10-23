@@ -39,9 +39,14 @@ export function rewriteLinks(body: string, from: string, to: string): string {
   );
 }
 
-/** Adds `[[title]]` to the body's closing `Related:` line, starting one when there is none. */
+/** Adds `[[title]]` to the body's (last) `Related:` line wherever it is, starting one at the end when there is none. */
 export function addRelated(body: string, title: string): string {
   const b = body.trimEnd();
-  if (b.slice(b.lastIndexOf('\n') + 1).startsWith('Related: ')) return `${b}, [[${title}]]`;
+  const lines = b.split('\n');
+  const at = lines.findLastIndex((l) => l.startsWith('Related: '));
+  if (at >= 0) {
+    lines[at] += `, [[${title}]]`;
+    return lines.join('\n');
+  }
   return b ? `${b}\n\nRelated: [[${title}]]` : `Related: [[${title}]]`;
 }

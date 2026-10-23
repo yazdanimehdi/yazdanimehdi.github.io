@@ -47,4 +47,9 @@ test('addRelated starts one Related line and extends it', () => {
   assert.equal(addRelated('My note.\n\n', 'A'), 'My note.\n\nRelated: [[A]]');
   assert.equal(addRelated('My note.\n\nRelated: [[A]]\n', 'B'), 'My note.\n\nRelated: [[A]], [[B]]');
   assert.equal(addRelated('Related: [[A]]', 'B'), 'Related: [[A]], [[B]]');
+  assert.equal(
+    addRelated('Related: [[A]]\n\nMore thoughts.', 'B'),
+    'Related: [[A]], [[B]]\n\nMore thoughts.',
+    'the Related line wherever it is, never a second one',
+  );
 });

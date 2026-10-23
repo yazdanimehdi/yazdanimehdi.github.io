@@ -26,6 +26,22 @@ export function completeLink(
   return { text: head + (closed ? after.slice(2) : after), caret: head.length };
 }
 
+/**
+ * Enter or Tab in the editor: the `pick`-th title matching the link open at `caret` now, completed; null when no link
+ * is open there or nothing is at `pick`, so the key does its usual thing. Never a link start read before the caret moved.
+ */
+export function completeAt(
+  text: string,
+  caret: number,
+  notes: NoteRow[],
+  self: number,
+  pick: number,
+): { text: string; caret: number } | null {
+  const link = linkQuery(text, caret);
+  const row = link && matchTitles(notes, link.query, self)[pick];
+  return row ? completeLink(text, caret, link.start, row.title) : null;
+}
+
 /** Titles containing the query (case ignored), those starting with it first, each by title; `self` left out. */
 export function matchTitles(notes: NoteRow[], query: string, self: number, limit = 8): NoteRow[] {
   const q = query.toLowerCase();

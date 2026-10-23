@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { completeLink, layout, linkQuery, matchTitles, nearestNode, outLinks } from './vault';
+import { completeAt, completeLink, layout, linkQuery, matchTitles, nearestNode, outLinks } from './vault';
 import type { NoteRow } from '../lib/reading/types';
 
 const note = (id: number, title: string): NoteRow => ({ id, kind: 'free', title, updatedAt: '2026-10-22T00:00:00Z' });
@@ -17,6 +17,19 @@ test('linkQuery finds an open [[ before the caret', () => {
 test('completeLink closes the link once', () => {
   assert.deepEqual(completeLink('see [[Att', 9, 6, 'Attention'), { text: 'see [[Attention]]', caret: 17 });
   assert.deepEqual(completeLink('see [[Att]] x', 9, 6, 'Attention'), { text: 'see [[Attention]] x', caret: 17 });
+});
+
+test('completeAt reads the link at the caret now, so a moved caret never loses text', () => {
+  const notes = [note(1, 'Attention'), note(2, 'Attention heads')];
+  const text = 'see [[ and my important thought';
+  // [[ typed mid-line: the list opens at caret 6; then End or Home moves the caret before Enter.
+  assert.equal(completeAt(text, text.length, notes, 9, 0), null, 'End: nothing matches, Enter is a new line');
+  assert.equal(completeAt(text, 0, notes, 9, 0), null, 'Home: no link open, Enter is a new line');
+  assert.deepEqual(completeAt(text, 6, notes, 9, 1), {
+    text: 'see [[Attention heads]] and my important thought',
+    caret: 23,
+  });
+  assert.equal(completeAt('see [[Att', 9, notes, 1, 5), null, 'no such option');
 });
 
 test('matchTitles puts prefix matches first and leaves out the note itself', () => {

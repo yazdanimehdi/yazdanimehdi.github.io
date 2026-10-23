@@ -6,7 +6,7 @@ import { visible } from './career';
 import { formatDate, relativeTime } from './dates';
 import { vDialog } from './dialog';
 import { AnswerText } from './RoomText';
-import { KIND_NAMES, completeLink, linkQuery, matchTitles, outLinks } from './vault';
+import { KIND_NAMES, completeAt, linkQuery, matchTitles, outLinks } from './vault';
 import type { AdminCtx } from './types';
 import type { NoteRow, Suggestion, VaultNote } from '../lib/reading/types';
 
@@ -80,13 +80,16 @@ function saveBody() {
 function flushBody() {
   if (body.value === savedBody) return;
   clearTimeout(saveTimer);
+  const text = body.value;
   void fetch(`/api/admin/${path}`, {
     method: 'PATCH',
     keepalive: true,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ body: body.value }),
-  });
-  savedBody = body.value;
+    body: JSON.stringify({ body: text }),
+  }).then(
+    (res) => res.ok && (savedBody = text),
+    () => {}, // unsent: the next save sends it again
+  );
 }
 const onHidden = () => document.visibilityState === 'hidden' && flushBody();
 
@@ -107,9 +110,11 @@ function onInput() {
   saveTimer = setTimeout(saveBody, 1000);
   findLink();
 }
-async function pick(row: NoteRow) {
+/** The i-th option, completed at the caret where it is now. */
+async function pick(i: number) {
   const ta = textarea.value!;
-  const done = completeLink(body.value, ta.selectionStart, link.value!.start, row.title);
+  const done = completeAt(body.value, ta.selectionStart, titles.value, id, i);
+  if (!done) return;
   body.value = done.text;
   link.value = null;
   await nextTick();
@@ -124,13 +129,20 @@ function onKey(e: KeyboardEvent) {
     active.value = (active.value + (e.key === 'ArrowDown' ? 1 : n - 1)) % n;
     void nextTick(() => document.getElementById(`adm-vault-opt-${active.value}`)?.scrollIntoView({ block: 'nearest' }));
   } else if (e.key === 'Enter' || (e.key === 'Tab' && !e.shiftKey)) {
+    findLink(); // the caret may have moved since the list opened
+    if (!options.value.length) return; // no link there now: the key does its usual thing
     e.preventDefault();
-    void pick(options.value[active.value]);
+    void pick(active.value);
   } else if (e.key === 'Escape') {
     e.preventDefault();
     e.stopPropagation();
     link.value = null;
   }
+}
+/** A caret moved by keyboard reads the link again (the same link keeps its active option). */
+const CARET_KEYS = /^(Arrow(Left|Right|Up|Down)|Home|End|Page(Up|Down))$/;
+function onKeyUp(e: KeyboardEvent) {
+  if (CARET_KEYS.test(e.key)) findLink();
 }
 function onBlur() {
   link.value = null;
@@ -292,6 +304,7 @@ const NO_SET = new Set<never>();
             @input="onInput"
             @click="findLink"
             @keydown="onKey"
+            @keyup="onKeyUp"
             @blur="onBlur"
           />
           <ul
@@ -308,7 +321,7 @@ const NO_SET = new Set<never>();
               role="option"
               :aria-selected="i === active"
               @mousedown.prevent
-              @click="pick(o)"
+              @click="pick(i)"
             >
               {{ visible(o.title) }}
             </li>
