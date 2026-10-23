@@ -11,7 +11,7 @@ import {
   renameNote,
   setBody,
 } from '../../../../../../lib/reading/vault-db';
-import { noteTitle } from '../../../../../../lib/reading/vault-links';
+import { noteTitle, rewriteLinks } from '../../../../../../lib/reading/vault-links';
 import { generatedMarkdown } from '../../../../../../lib/reading/vault-markdown';
 import { listSuggestions } from '../../../../../../lib/reading/vault-suggest';
 
@@ -36,17 +36,23 @@ export const GET = careerRoute(async (ctx) => {
   return json({ note, generated: generatedMarkdown(note, ctxs.get(id)!), backlinks: links, suggestions });
 });
 
-/** `{ title?, body? }` → `{ note }`: a rename rewrites the links to the note; a taken title changes nothing. */
+/**
+ * `{ title?, body? }` → `{ note }`: a rename rewrites the links to the note, the given body's own links included; a
+ * taken title changes nothing.
+ */
 export const PATCH = careerRoute(async (ctx) => {
   const id = idParam(ctx.params.id);
   const { title, body } = Patch.parse(await readBody(ctx));
   const sql = getSql();
+  let text = body;
   if (title !== undefined) {
+    const old = (await getNote(sql, id))?.title;
     const renamed = await renameNote(sql, id, title);
     if (renamed === 'taken') throw new HttpError(409, `A note called “${noteTitle(title)}” already exists`);
-    if (!renamed) throw new HttpError(404, 'Not found');
+    if (!renamed || old === undefined) throw new HttpError(404, 'Not found');
+    if (text !== undefined) text = rewriteLinks(text, old, renamed.title);
   }
-  if (body !== undefined && !(await setBody(sql, id, body))) throw new HttpError(404, 'Not found');
+  if (text !== undefined && !(await setBody(sql, id, text))) throw new HttpError(404, 'Not found');
   const note = await getNote(sql, id);
   if (!note) throw new HttpError(404, 'Not found');
   return json({ note });

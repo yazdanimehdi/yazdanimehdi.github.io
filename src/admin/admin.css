@@ -848,6 +848,60 @@ span.adm-cite {
 .adm-reading-actions .adm-btn {
   min-height: var(--adm-touch);
 }
+/* Vault: the list's filters, the editor's [[ list under its textarea, and 44px targets at every width. */
+.adm-vault-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 16px;
+}
+.adm-vault-filters > .adm-field:first-child {
+  flex: 1 1 16rem;
+}
+.adm-vault-filters :is(.adm-btn, input, select),
+.adm-vault-act :is(.adm-btn, input) {
+  min-height: var(--adm-touch);
+}
+.adm-vault-export {
+  align-items: flex-start;
+}
+.adm-vault-editor {
+  position: relative;
+}
+.adm-vault-editor textarea {
+  display: block;
+}
+.adm-vault-options {
+  position: absolute;
+  inset-inline: 0;
+  inset-block-start: calc(100% + 4px);
+  z-index: 2;
+  max-block-size: 22rem;
+  overflow-y: auto;
+  list-style: none;
+  margin: 0;
+  padding: 4px;
+  border: 1px solid var(--adm-rule);
+  border-radius: 6px;
+  background: var(--adm-paper);
+  box-shadow: var(--adm-float);
+}
+.adm-vault-options li {
+  display: flex;
+  align-items: center;
+  min-height: var(--adm-touch);
+  padding: 0 10px;
+  border-radius: 6px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.adm-vault-options li[aria-selected='true'] {
+  background: var(--adm-selected);
+}
+.adm-vault-delete {
+  margin-block-start: 32px;
+}
 .adm-filter-row {
   display: flex;
   flex-wrap: wrap;

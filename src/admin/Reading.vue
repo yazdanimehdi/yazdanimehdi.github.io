@@ -192,6 +192,7 @@ onBeforeUnmount(stop);
         { href: `${base}/reading`, label: 'Today', current: true },
         { href: `${base}/reading/library`, label: 'Library' },
         { href: `${base}/reading/notebooks`, label: 'Notebooks' },
+        { href: `${base}/reading/vault`, label: 'Vault' },
         { href: `${base}/reading/settings`, label: 'Settings' },
       ]"
     />

@@ -299,6 +299,6 @@ test('reading is hidden outside Postgres mode', async ({ page }) => {
   await expect(page.locator('.adm-nav-label', { hasText: 'Reading' })).toHaveCount(0);
   expect((await page.goto(`${ADMIN}/reading`))!.status()).toBe(404);
   expect((await page.goto(`${ADMIN}/reading/settings`))!.status()).toBe(404);
-  for (const path of ['library', 'notebooks', 'papers/1'])
+  for (const path of ['library', 'notebooks', 'papers/1', 'vault', 'vault/graph', 'vault/1'])
     expect((await page.goto(`${ADMIN}/reading/${path}`))!.status()).toBe(404);
 });

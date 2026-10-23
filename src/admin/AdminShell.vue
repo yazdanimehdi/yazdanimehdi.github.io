@@ -53,6 +53,7 @@ const GROUPS = computed(() => {
               ['reading', 'Today'],
               ['reading/library', 'Library'],
               ['reading/notebooks', 'Notebooks'],
+              ['reading/vault', 'Vault'],
               ['reading/settings', 'Settings'],
             ],
             more: [],

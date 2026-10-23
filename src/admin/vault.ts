@@ -104,3 +104,5 @@ export function nearestNode(pts: Point[], x: number, y: number, max: number): nu
   });
   return best;
 }
+
+export const KIND_NAMES = { paper: 'Paper', chat: 'Chat', free: 'Note' } as const;

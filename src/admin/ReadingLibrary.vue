@@ -86,6 +86,7 @@ onMounted(async () => {
         { href: `${base}/reading`, label: 'Today' },
         { href: `${base}/reading/library`, label: 'Library', current: true },
         { href: `${base}/reading/notebooks`, label: 'Notebooks' },
+        { href: `${base}/reading/vault`, label: 'Vault' },
         { href: `${base}/reading/settings`, label: 'Settings' },
       ]"
     />

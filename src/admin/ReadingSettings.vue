@@ -58,7 +58,7 @@ const ROOM_FIELDS: FieldDef[] = [
     key: 'roomAiCalls',
     label: 'AI calls per day',
     type: 'number',
-    hint: 'Summaries, study aids and chat turns in the reading room (1–1000). Resets at midnight UTC.',
+    hint: 'Summaries, study aids, chat turns and vault link suggestions in the reading room (1–1000). Resets at midnight UTC.',
   },
 ];
 const EMAIL_FIELDS: FieldDef[] = [
@@ -159,6 +159,7 @@ onMounted(async () => {
         { href: `${base}/reading`, label: 'Today' },
         { href: `${base}/reading/library`, label: 'Library' },
         { href: `${base}/reading/notebooks`, label: 'Notebooks' },
+        { href: `${base}/reading/vault`, label: 'Vault' },
         { href: `${base}/reading/settings`, label: 'Settings', current: true },
       ]"
     />

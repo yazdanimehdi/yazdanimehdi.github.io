@@ -895,6 +895,18 @@ test('PATCH renames and saves the body', async () => {
   assert.equal((await call(vNote.DELETE, { params })).status, 404);
 });
 
+test('PATCH with a title and a body rewrites the body’s links to the old title', async () => {
+  const id = await free('Old');
+  const params = { id: String(id) };
+  const { note } = await ok(await call(vNote.PATCH, { params, body: { title: 'New', body: 'self [[Old|me]]' } }));
+  assert.equal(note.title, 'New');
+  assert.equal(note.body, 'self [[New|me]]');
+  await free('Taken');
+  assert.equal((await call(vNote.PATCH, { params, body: { title: 'taken', body: 'changed' } })).status, 409);
+  const [n] = await sql<{ body: string }>`select body from vault_notes where id = ${id}`;
+  assert.equal(n.body, 'self [[New|me]]', 'a taken title changes nothing');
+});
+
 test('notes GET filters by kind and searches', async () => {
   const [paperId] = await add(arxivPaper(1));
   const { id: paperNote } = await withTitles(sql, (tx) => ensurePaperNote(tx, paperId));

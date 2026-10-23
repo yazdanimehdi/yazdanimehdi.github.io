@@ -8,6 +8,8 @@ import ReadingSettings from '../ReadingSettings.vue';
 import ReadingLibrary from '../ReadingLibrary.vue';
 import ReadingNotebooks from '../ReadingNotebooks.vue';
 import ReadingRoom from '../ReadingRoom.vue';
+import ReadingVault from '../ReadingVault.vue';
+import ReadingVaultNote from '../ReadingVaultNote.vue';
 import Collection from '../Collection.vue';
 import Cv from '../Cv.vue';
 import CvStyles from '../CvStyles.vue';
@@ -72,8 +74,9 @@ if (
     !isOwner(Astro.locals.user, adminSettings()) ||
     rest.length > 0 ||
     !(
-      ((!arg || ['settings', 'library', 'notebooks'].includes(arg)) && !sub) ||
-      ((arg === 'papers' || arg === 'notebooks') && /^\d{1,9}$/.test(sub))
+      ((!arg || ['settings', 'library', 'notebooks', 'vault'].includes(arg)) && !sub) ||
+      (['papers', 'notebooks', 'vault'].includes(arg) && /^\d{1,9}$/.test(sub)) ||
+      (arg === 'vault' && sub === 'graph')
     ))
 )
   return new Response('Not found', { status: 404 });
@@ -163,6 +166,10 @@ if (screen === 'login' && error === 'denied') Astro.response.status = 403;
     {screen === 'reading' && arg === 'notebooks' && !sub && <ReadingNotebooks client:only="vue" ctx={ctx} />}
     {screen === 'reading' && arg === 'papers' && <ReadingRoom client:only="vue" ctx={ctx} paper={sub} />}
     {screen === 'reading' && arg === 'notebooks' && sub && <ReadingRoom client:only="vue" ctx={ctx} notebook={sub} />}
+    {screen === 'reading' && arg === 'vault' && !sub && <ReadingVault client:only="vue" ctx={ctx} />}
+    {screen === 'reading' && arg === 'vault' && /^\d+$/.test(sub) && (
+      <ReadingVaultNote client:only="vue" ctx={ctx} id={sub} />
+    )}
     {screen === 'cv' && <Cv client:only="vue" ctx={ctx} />}
     {screen === 'cv-styles' && <CvStyles client:only="vue" ctx={ctx} />}
     {screen === '' && <Dashboard client:only="vue" ctx={ctx} />}
