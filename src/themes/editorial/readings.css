@@ -1,0 +1,117 @@
+/*
+ * Readings and Notes: the paper's highlights set apart from the owner's notes, backlinks, the notes graph.
+ * Scoped like editorial.css.
+ */
+:root[data-theme='editorial'] {
+  & .ed-rd-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 20px;
+    font-size: 15px;
+  }
+  & .ed-rd-links a {
+    display: inline-block;
+    padding-block: 11px;
+    margin-block: -11px;
+    background-origin: content-box;
+    background-clip: content-box;
+  }
+  & .ed-rd-section {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding-top: 24px;
+    border-top: 1px solid var(--ed-rule);
+  }
+  /* The header's rule already divides it from the first section. */
+  & .ed-article-head + .ed-rd-section {
+    padding-top: 0;
+    border-top: 0;
+  }
+  /* The paper's words: a quiet italic quote on a rule; the owner's comment below it, in the owner's voice. */
+  & .ed-rd-highlights {
+    display: flex;
+    flex-direction: column;
+    gap: 28px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  & .ed-rd-highlight {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin: 0;
+  }
+  & .ed-rd-quote {
+    margin: 0;
+    padding-inline-start: 18px;
+    border-inline-start: 2px solid var(--ed-rule-strong);
+    font-family: var(--font-serif);
+    font-size: 18px;
+    font-style: italic;
+    line-height: 1.65;
+    color: var(--ed-body-2);
+    overflow-wrap: break-word;
+  }
+  & .ed-rd-where {
+    padding-inline-start: 20px;
+    font-size: 13px;
+    color: var(--ed-caption);
+  }
+  & .ed-rd-comment {
+    padding-inline-start: 20px;
+    font-size: 15px;
+    line-height: 1.6;
+    color: var(--ed-ink);
+    overflow-wrap: break-word;
+  }
+  & .ed-rd-comment > * {
+    margin: 0 0 8px;
+  }
+  & .ed-rd-comment > :last-child {
+    margin-bottom: 0;
+  }
+  & .ed-rd-comment a,
+  & .ed-rd-backlinks a {
+    text-decoration: underline;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+  }
+  & .ed-rd-backlinks {
+    display: flex;
+    flex-direction: column;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 16px;
+  }
+  & .ed-rd-backlinks a {
+    display: inline-block;
+    padding-block: 11px;
+  }
+  & .ed-rd-graph {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    --graph-ink: var(--ed-ink);
+    --graph-muted: var(--ed-caption);
+    --graph-rule: var(--ed-rule);
+    --graph-accent: var(--ed-accent);
+    --graph-paper: var(--ed-paper);
+  }
+  & .ed-rd-legend,
+  & .ed-rd-foot {
+    margin: 0;
+    font-size: 14px;
+    color: var(--ed-caption);
+  }
+  & .ed-rd-foot a {
+    display: inline-block;
+    padding-block: 11px;
+    margin-block: -11px;
+    background-origin: content-box;
+    background-clip: content-box;
+    color: var(--ed-body-2);
+  }
+}

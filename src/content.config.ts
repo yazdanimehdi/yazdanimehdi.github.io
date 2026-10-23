@@ -3,11 +3,13 @@ import { file, glob } from 'astro/loaders';
 import {
   announcementsSchema,
   feedItemSchema,
+  notesSchema,
   peopleSchema,
   positionsSchema,
   postsSchema,
   projectsSchema,
   publicationsSchema,
+  readingsSchema,
   talksSchema,
 } from './lib/schemas';
 
@@ -28,4 +30,6 @@ export const collections = {
   talks: defineCollection({ loader: markdown('talks'), schema: talksSchema }),
   feeds: defineCollection({ loader: file('src/data/feeds.json'), schema: feedItemSchema }),
   positions: defineCollection({ loader: markdown('positions'), schema: positionsSchema }),
+  readings: defineCollection({ loader: markdown('readings'), schema: readingsSchema }),
+  notes: defineCollection({ loader: markdown('notes'), schema: notesSchema }),
 };

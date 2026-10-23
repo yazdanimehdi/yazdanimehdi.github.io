@@ -69,7 +69,7 @@ test("the migration moves Project 2's notes into the vault", async () => {
     ],
   });
 
-  assert.deepEqual(await migrate(sql), ['010_vault.sql']);
+  assert.deepEqual(await migrate(sql), ['010_vault.sql', '011_public_notes.sql']);
 
   const notes = await sql`
     select id, kind, title, body, paper_id, chat, chat_id, notebook_id from vault_notes order by id`;

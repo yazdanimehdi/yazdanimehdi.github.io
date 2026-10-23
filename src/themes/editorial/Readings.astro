@@ -1,0 +1,52 @@
+---
+import Layout from './Layout.astro';
+import { getSiteConfig } from '../../lib/config';
+import { formatNewsDate } from '../../lib/utils';
+import type { ReadingItem } from '../../lib/public-notes';
+import './readings.css';
+
+interface Props {
+  /** Newest shared first. */
+  items: ReadingItem[];
+}
+
+const { items } = Astro.props;
+const config = getSiteConfig();
+const label = config.nav.find((n) => n.href === '/readings')?.label ?? 'Readings';
+---
+
+<Layout title={label}>
+  <div class="ed-wrap ed-main ed-main--narrow">
+    <h1 class="ed-h1">{label}</h1>
+
+    {items.length === 0 && <p class="ed-intro">Nothing shared yet.</p>}
+
+    <ol class="ed-entries">
+      {items.map(({ href, paper, excerpt, highlights }) => (
+        <li class="ed-entry">
+          <div class="ed-entry-body">
+            <a href={href} class="ed-entry-title" dir="auto">
+              {paper.title}
+            </a>
+            <span class="ed-entry-meta" dir="auto">
+              {[paper.authors.join(', '), paper.published && formatNewsDate(paper.published, 'day', config.lang)]
+                .filter(Boolean)
+                .join(' · ')}
+            </span>
+            {excerpt && (
+              <p class="ed-entry-excerpt" dir="auto">
+                {excerpt}
+              </p>
+            )}
+            <span class="ed-entry-meta">
+              {highlights} {highlights === 1 ? 'highlight' : 'highlights'} ·{' '}
+              <a href={paper.url} class="ul" rel="noopener">
+                Source
+              </a>
+            </span>
+          </div>
+        </li>
+      ))}
+    </ol>
+  </div>
+</Layout>

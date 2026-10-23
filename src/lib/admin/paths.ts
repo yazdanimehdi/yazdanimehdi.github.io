@@ -116,9 +116,15 @@ export function assertAllowed(path: string): void {
 export const CV_JSON = 'src/data/cv.json';
 export const DATA_FILES = [CV_JSON, 'src/data/cv-people.json'];
 
-/** A file Postgres mode stores as a document: the write allowlist without images, plus MDX entries and DATA_FILES. */
+/** A public vault note's published copy: only `republish` writes it, so it is not in the write allowlist. */
+export const PUBLISHED = /^src\/content\/(readings|notes)\/([a-z0-9-]{1,80})\.md$/;
+
+/**
+ * A file Postgres mode stores as a document: the write allowlist without images, plus MDX entries, DATA_FILES and
+ * PUBLISHED copies.
+ */
 export function isDocumentPath(path: string): boolean {
-  if (DATA_FILES.includes(path)) return true;
+  if (DATA_FILES.includes(path) || PUBLISHED.test(path)) return true;
   const mdx = /^src\/content\/([^/]+)\/([^/]+)\.mdx$/.exec(path);
   if (mdx) return COLLECTIONS.includes(mdx[1] as CollectionName) && SLUG.test(mdx[2]);
   try {

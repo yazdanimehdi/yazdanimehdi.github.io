@@ -17,6 +17,7 @@ test('migrate creates the tables once; a second run applies nothing', async () =
     '008_reading.sql',
     '009_reading_room.sql',
     '010_vault.sql',
+    '011_public_notes.sql',
   ]);
   assert.deepEqual(await migrate(sql), []);
   await sql`insert into documents (path, content) values ('config/site.yml', 'title: A')`;

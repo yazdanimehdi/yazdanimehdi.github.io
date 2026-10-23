@@ -7,7 +7,7 @@ import FormFields from './FormFields.vue';
 import { api, report } from './api';
 import { resolveOptions, text, type FieldDef, type Option } from './fields';
 import { useDocument } from './useDocument';
-import { SITE_PAGES } from '../lib/types';
+import { DEFAULT_OFF, SITE_PAGES, type SitePageId } from '../lib/types';
 import type { AdminCtx, CommitResult, Entry } from './types';
 
 type Config = Record<string, any>;
@@ -17,7 +17,10 @@ const SWITCHES: FieldDef[] = Object.entries(SITE_PAGES).map(([id, href]) => ({
   key: `pages.${id}`,
   label: `${id === 'cv' ? 'CV' : id[0].toUpperCase() + id.slice(1)} (${href})`,
   type: 'checkbox',
-  default: true,
+  default: !DEFAULT_OFF.includes(id as SitePageId),
+  ...(DEFAULT_OFF.includes(id as SitePageId) && {
+    hint: 'Off until you turn it on. Add it to the menu under Settings → Menu items.',
+  }),
 }));
 
 const HOME: FieldDef[] = [

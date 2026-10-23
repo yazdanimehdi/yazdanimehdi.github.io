@@ -48,3 +48,12 @@ test('isPageOn: a page turned off is off with everything under it; other pages a
     assert.equal(isPageOn(path, config), true, path);
   assert.equal(isPageOn('/blog', {} as SiteConfig), true, 'absent means on');
 });
+
+test('isPageOn: readings and notes are off until turned on; other pages stay on when absent', () => {
+  assert.equal(isPageOn('/notes', { pages: {} }), false);
+  assert.equal(isPageOn('/readings/a-paper/', {}), false);
+  assert.equal(isPageOn('/notes/x/', { pages: { notes: true } }), true);
+  assert.equal(isPageOn('/readings', { pages: { notes: true } }), false, 'one switch at a time');
+  assert.equal(isPageOn('/blog', { pages: {} }), true);
+  assert.equal(isPageOn('/notesy', { pages: {} }), true, 'a look-alike path is not under /notes');
+});

@@ -3,6 +3,7 @@ import { memo, readSiteFile } from './content/context';
 import { getMode } from './mode';
 import { NIGHT_PALETTES, type NightPalette } from './colors';
 import {
+  DEFAULT_OFF,
   NEWS_ART_STYLES,
   SITE_PAGES,
   type NewsArtStyle,
@@ -60,10 +61,15 @@ function parseSiteConfig(): SiteConfig {
   return config;
 }
 
-/** False when `path` is a built-in page that `pages` turns off, or under one (/blog/a-post when blog is off). */
-export function isPageOn(path: string, config: SiteConfig = getSiteConfig()): boolean {
+/**
+ * False when `path` is a built-in page that `pages` turns off, or under one (/blog/a-post when blog is off).
+ * A DEFAULT_OFF page with no setting is off.
+ */
+export function isPageOn(path: string, config: Pick<SiteConfig, 'pages'> = getSiteConfig()): boolean {
   return !Object.entries(SITE_PAGES).some(
-    ([id, href]) => config.pages?.[id as SitePageId] === false && (path === href || path.startsWith(`${href}/`)),
+    ([id, href]) =>
+      !(config.pages?.[id as SitePageId] ?? !DEFAULT_OFF.includes(id as SitePageId)) &&
+      (path === href || path.startsWith(`${href}/`)),
   );
 }
 

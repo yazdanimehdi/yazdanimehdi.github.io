@@ -187,7 +187,7 @@ test('PaperText renders passages, highlights and figure links as text', async ()
           { pid: 'S1.p1', kind: 'p', body: 'abc <b>def</b>' },
           { pid: 'S1.F1', kind: 'figure', body: 'A cat' },
         ],
-        highlights: [{ id: 3, paperId: 7, pid: 'S1.p1', start: 0, end: 3, quote: 'abc', comment: '' }],
+        highlights: [{ id: 3, paperId: 7, pid: 'S1.p1', start: 0, end: 3, quote: 'abc', comment: '', public: false }],
         arxiv: '2401.01234',
         flash: 'S1.p1',
       }),

@@ -170,6 +170,10 @@ const THEME_PAGES: Record<string, string> = {
   Projects: 'projects/index',
   Project: 'projects/[id]',
   ProjectsDetail: 'projects/[id]',
+  Readings: 'readings/index',
+  Reading: 'readings/[slug]',
+  Notes: 'notes/index',
+  Note: 'notes/[slug]',
 };
 /** Content collections and the page that lists them. */
 const COLLECTION_PAGES: Record<string, string> = {

@@ -1,0 +1,61 @@
+---
+import Layout from './Layout.astro';
+import NoteGraph from '../../components/vue/NoteGraph.vue';
+import { getSiteConfig } from '../../lib/config';
+import { formatNewsDate } from '../../lib/utils';
+import type { GraphData, NoteItem } from '../../lib/public-notes';
+import './readings.css';
+
+interface Props {
+  /** By title. */
+  notes: NoteItem[];
+  /** Null when nothing links. */
+  graph: GraphData | null;
+}
+
+const { notes, graph } = Astro.props;
+const config = getSiteConfig();
+const label = config.nav.find((n) => n.href === '/notes')?.label ?? 'Notes';
+---
+
+<Layout title={label}>
+  <div class="ed-wrap ed-main ed-main--narrow">
+    <h1 class="ed-h1">{label}</h1>
+
+    {graph && (
+      <div class="ed-rd-graph">
+        <NoteGraph client:visible nodes={graph.nodes} edges={graph.edges} />
+        <p class="ed-rd-legend">Circle: paper · Square: note</p>
+      </div>
+    )}
+
+    {notes.length === 0 && <p class="ed-intro">Nothing shared yet.</p>}
+
+    {notes.length > 0 && (
+      <ol class="ed-entries">
+        {notes.map((n) => (
+          <li class="ed-entry">
+            <div class="ed-entry-body">
+              <a href={n.href} class="ed-entry-title" dir="auto">
+                {n.title}
+              </a>
+              <span class="ed-entry-meta">{formatNewsDate(n.updated, 'day', config.lang)}</span>
+            </div>
+          </li>
+        ))}
+      </ol>
+    )}
+
+    {(notes.length > 0 || graph) && (
+      <p class="ed-rd-foot">
+        <a href="/notes/vault.zip" class="ul">
+          Download these notes for Obsidian
+        </a>{' '}
+        ·{' '}
+        <a href="/notes/graph.json" class="ul">
+          graph.json
+        </a>
+      </p>
+    )}
+  </div>
+</Layout>

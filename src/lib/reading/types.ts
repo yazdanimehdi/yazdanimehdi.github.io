@@ -133,6 +133,8 @@ export interface Highlight {
   end: number;
   quote: string;
   comment: string;
+  /** Shared on the paper's public reading (at most PUBLIC_HIGHLIGHTS_MAX a paper). */
+  public: boolean;
 }
 
 export interface LibraryItem {
@@ -166,6 +168,13 @@ export interface VaultNote {
   suggestedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  /** The note's id on the public site (graph.json), never its title. */
+  uid: string;
+  public: boolean;
+  /** Fixed at first publish and kept after unpublish, so a public address never changes. */
+  publicSlug: string | null;
+  /** First publish; kept. */
+  publicAt: string | null;
 }
 
 export interface NoteRow {

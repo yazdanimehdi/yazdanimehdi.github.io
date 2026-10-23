@@ -904,7 +904,7 @@ Do this once, as the owner, after a preview deploys:
 
 ### Reading (Postgres mode)
 
-A private paper digest and reading room inside the admin. Each night it collects the day's new papers from the sources you turn on, ranks them against your field, adds the papers people in your wider area are talking about, and saves the result under **Reading → Today**. Any paper opens in the reading room: its full text beside a cited summary, chat and your notes. What you save, highlight or write there becomes a linked Markdown note in **Reading → Vault**, which exports for Obsidian. Nothing in it reaches the public site.
+A private paper digest and reading room inside the admin. Each night it collects the day's new papers from the sources you turn on, ranks them against your field, adds the papers people in your wider area are talking about, and saves the result under **Reading → Today**. Any paper opens in the reading room: its full text beside a cited summary, chat and your notes. What you save, highlight or write there becomes a linked Markdown note in **Reading → Vault**, which exports for Obsidian. Nothing in it reaches the public site unless you make it public: a paper with your note and the highlights you pick, or a note of your own (see [Public Readings and Notes](#public-readings-and-notes)).
 
 **Owner only, Postgres mode only.** The same rule as the [job search](#job-search-postgres-mode): only the owner sees the screens and the data, anyone else gets a 404, and in static and git mode every Reading screen and route answers 404 and the sidebar's Reading group is hidden.
 
@@ -970,7 +970,7 @@ Every arXiv HTML or PDF fetch on the site, nightly or on open, takes a slot 15 s
 
 **AI calls per day.** Summaries, study aids, chat turns, the vault's link suggestions and [blog drafts](#blog-from-a-paper) count against **Reading → Settings → Reading room → AI calls per day** (default 100, 1 to 1,000, reset at midnight UTC); the section shows today's use. At the cap, chat says so plainly and a summary fails with the reason; the paper, highlights and notes still work. The reading room uses the AI provider you configured, with no fallback; the model gets no tools, and paper text is marked as untrusted data in every prompt and shown only as text.
 
-**Where the data lives.** `reading_settings`, `reading_papers`, `reading_digest` and `reading_texts` (migration `008_reading.sql`), and the reading room's `reading_passages`, `reading_notebooks`, `reading_notebook_papers`, `reading_outputs`, `reading_chats`, `reading_highlights` and `reading_ai_use` (migration `009_reading_room.sql`), and the vault's `vault_notes`, `vault_links` and `vault_suggestions` (migration `010_vault.sql`, which moves the notes 009 kept in `reading_notes` into the vault and drops that table), not `documents`, so they never reach the git backup or `db:export`. As with the job search, a Vercel preview shares the production database: a run or a chat on a preview writes the live data and spends your real AI credits.
+**Where the data lives.** `reading_settings`, `reading_papers`, `reading_digest` and `reading_texts` (migration `008_reading.sql`), and the reading room's `reading_passages`, `reading_notebooks`, `reading_notebook_papers`, `reading_outputs`, `reading_chats`, `reading_highlights` and `reading_ai_use` (migration `009_reading_room.sql`), and the vault's `vault_notes`, `vault_links` and `vault_suggestions` (migration `010_vault.sql`, which moves the notes 009 kept in `reading_notes` into the vault and drops that table), and what is public: `vault_notes.uid`, `public`, `public_slug` and `public_at`, and `reading_highlights.public` (migration `011_public_notes.sql`). None of it is in `documents`, so it never reaches the git backup or `db:export`; only the [published copies](#public-readings-and-notes) of what you make public are. As with the job search, a Vercel preview shares the production database: a run or a chat on a preview writes the live data and spends your real AI credits.
 
 #### Vault
 
@@ -993,6 +993,24 @@ Every arXiv HTML or PDF fetch on the site, nightly or on open, takes a slot 15 s
 **Graph.** **Graph** draws the notes and their links: circles are papers, squares your notes, diamonds chats, larger with more links. Hovering, focusing or tapping near a note lights its links and lists its neighbours under the graph. Past 200 notes it shows the 200 most-linked and says how many there are.
 
 **Export.** **Export as a zip** downloads the whole vault, one `<title>.md` per note in `vault/papers/`, `vault/notes/` and `vault/chats/`, which Obsidian opens as a vault. Front matter carries the note's id, kind and dates, a paper's title, authors, source link, arXiv id or DOI and date, and a chat's question and when it was asked. It holds your writing, highlights and the generated summary and findings, never a paper's full text. A zip over 4.4 MB (Vercel's response limit) is refused with its size, never cut short.
+
+#### Public Readings and Notes
+
+Two public pages share what you choose from the vault: **Readings** (`/readings`) for papers and **Notes** (`/notes`) for your own notes, with a graph of how they link. Everything is private until you make it public, one item at a time.
+
+**What can be public.** A paper: its title, authors, date, a link to its source and its arXiv id or DOI, your note on it (**Your notes**, your own text only) and the highlights you tick. A free note: its title and text. Never a chat note (**Make public** isn't offered on one), and never AI text: summaries, key findings, study aids and chat answers stay private.
+
+**Making something public.** A **Visibility** line sits on each note in the vault and at the top of a paper's or notebook's room: "Visibility: private." with **Make public**, or "Visibility: public at /readings/deep-folds/, with 2 of 5 highlights." with **Make private**. Making a paper public from its room gives it its note if it has none; a notebook's room offers **Make public** once its note exists (once you write in its **Notes**). Highlights are private on their own: tick **Public** beside a highlight under the room's **Notes** tab. A public highlight shows at most 300 characters of the paper's words (cut with "…"), a paper shares at most 10, and its comment is public with it. A ticked highlight shows only while its paper is public.
+
+**Links to private notes.** A public note's `[[link]]` to another public note links its page. A link to a note that isn't public keeps only what it shows: `[[Title|shown text]]` becomes "shown text", and `[[Title]]` (also with `#heading`, also `![[…]]`) becomes "(private note)", so a private title never appears, in a highlight's comment too.
+
+**Addresses.** A note's address comes from its title the first time it is made public (`/readings/<slug>/` or `/notes/<slug>/`; a title with no Latin letters or digits gets `note-` and 8 characters of its id) and is kept through renames and through making it private and public again. Saving a public note updates its page; making it private, or deleting it, removes its page, and links to it in other public notes become plain text.
+
+**Turning the pages on.** Both pages are off until you turn them on in **Pages** (or `pages: { readings: true, notes: true }` in `site.yml`); while one is off, a public item's Visibility line says so. Turning a page on doesn't add it to the menu: add a menu item under **Settings → Menu items**. **Readings** lists papers newest first (by when you first shared them), each with the start of your note and its highlight count; a paper's page shows the paper, your note, its highlights and the public notes that link to it. **Notes** shows the graph (papers too, when Readings is on), then your notes by title; a note's page shows its text and its public backlinks. A public note's text renders Markdown and raw HTML the way a blog post does.
+
+**`graph.json` and `vault.zip`.** `/notes/graph.json` is the public graph as a document other sites and tools can read (`format: scholaros-notes`, `version: 1`): the site's name, address and owner, each public note and paper with a stable id (a UUID, not its title), kind, title, address, dates, Markdown body, paper details and highlights, and the links between them. `/notes/vault.zip` (`<site>-notes.zip`) is the same notes as a folder Obsidian opens, `readings/` and `notes/` by title, each with a `source:` line naming its public page; like the vault export it is refused over 4.4 MB. Both answer 404 while Notes is off, leave papers out while Readings is off, and are built from the published copies only.
+
+**The published copies.** Each public item is written as a Markdown file with front matter, `src/content/readings/<slug>.md` or `src/content/notes/<slug>.md`, into `documents`: ordinary site content, so it is in the history, the git backup and `db:export`, and a static or git-mode build serves the copies you commit. They are rewritten from the vault on every save, so edit the note, not the copy; in Postgres mode the [site editor](#site-editor) can't change them. A save whose copies didn't update still saves your note and says "Saved, but the public copy didn't update", with **Publish again**.
 
 #### Blog from a paper
 
@@ -1190,7 +1208,7 @@ pages:
   repositories: false
 ```
 
-A page that is off leaves the menu, the footer and the sitemap, and its address (with everything under it, such as `/blog/a-post`) shows Not found. Its content stays. Turning off `news` or `blog` also hides that home-page section. The pages are `research`, `people`, `publications`, `cv`, `projects`, `news`, `blog`, `talks`, `positions`, `join`, `repositories` and `contact`.
+A page that is off leaves the menu, the footer and the sitemap, and its address (with everything under it, such as `/blog/a-post`) shows Not found. Its content stays. Turning off `news` or `blog` also hides that home-page section. The pages are `research`, `people`, `publications`, `cv`, `projects`, `news`, `blog`, `talks`, `positions`, `join`, `repositories`, `contact`, `readings` and `notes`. `readings` and `notes` are the other way round: off until set to `true` (see [Public Readings and Notes](#public-readings-and-notes)).
 
 ---
 
@@ -1371,6 +1389,11 @@ ScholarOS/
 | `/repositories` | GitHub totals, pinned repos, languages and recent activity |
 | `/cv` | CV page with PDF download |
 | `/contact` | Contact form |
+| `/readings` | Papers you made public (off until turned on) |
+| `/readings/[slug]` | A public paper with your note and highlights |
+| `/notes` | Your public notes and their graph (off until turned on) |
+| `/notes/[slug]` | A public note with its backlinks |
+| `/notes/graph.json`, `/notes/vault.zip` | The public notes as a graph document and an Obsidian folder |
 | `/join` | Lab recruitment page |
 | `/feed.xml` | RSS feed |
 | `/admin` | CMS admin panel |

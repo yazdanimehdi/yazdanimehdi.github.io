@@ -1,0 +1,27 @@
+---
+import ClassicNotes from '../../themes/classic/Notes.astro';
+import EditorialNotes from '../../themes/editorial/Notes.astro';
+import { getTheme } from '../../lib/config';
+import { loadPublic, publicGraph, type GraphData, type NoteItem } from '../../lib/public-notes';
+
+const all = await loadPublic();
+const notes: NoteItem[] = all
+  .filter((e) => e.kind === 'note')
+  .map((e) => ({ title: e.data.title, href: e.url, updated: e.data.updated }))
+  .sort((a, b) => a.title.localeCompare(b.title));
+const g = publicGraph(all);
+// NoteGraph labels the first nodes: most-linked first.
+const order = g.nodes.map((_, i) => i).sort((a, b) => g.nodes[b].links - g.nodes[a].links);
+const at = new Map(order.map((i, k) => [i, k]));
+const graph: GraphData | null = g.edges.length
+  ? {
+      nodes: order.map((i) => {
+        const { title, kind, links, href } = g.nodes[i];
+        return { title, kind, links, href };
+      }),
+      edges: g.edges.map(([a, b]) => [at.get(a)!, at.get(b)!]),
+    }
+  : null;
+---
+
+{getTheme() === 'editorial' ? <EditorialNotes {notes} {graph} /> : <ClassicNotes {notes} {graph} />}

@@ -1,5 +1,6 @@
 import type { Sql, Tx } from '../db';
 import { j, type Row } from './db';
+import { PUBLIC_HIGHLIGHTS_MAX } from './limits';
 import type {
   ChatMessage,
   Cite,
@@ -321,26 +322,45 @@ const toHighlight = (r: Row): Highlight => ({
   end: r.end_at as number,
   quote: r.quote as string,
   comment: r.comment as string,
+  public: r.public as boolean,
 });
 
 /** By `paperIds` order, then oldest first. */
 export async function listHighlights(sql: Sql, paperIds: number[]): Promise<Highlight[]> {
   const rows = await sql<Row>`
-    select id, paper_id, pid, start_at, end_at, quote, comment from reading_highlights
+    select id, paper_id, pid, start_at, end_at, quote, comment, public from reading_highlights
     where paper_id = any(${paperIds}::bigint[]) order by array_position(${paperIds}::bigint[], paper_id), id`;
   return rows.map(toHighlight);
 }
 
-export async function addHighlight(sql: Tx, h: Omit<Highlight, 'id'>): Promise<Highlight> {
+export async function addHighlight(sql: Tx, h: Omit<Highlight, 'id' | 'public'>): Promise<Highlight> {
   const [r] = await sql<Row>`
     insert into reading_highlights (paper_id, pid, start_at, end_at, quote, comment)
     values (${h.paperId}, ${h.pid}, ${h.start}, ${h.end}, ${h.quote}, ${h.comment})
-    returning id, paper_id, pid, start_at, end_at, quote, comment`;
+    returning id, paper_id, pid, start_at, end_at, quote, comment, public`;
   return toHighlight(r);
 }
 
 export async function setHighlightComment(sql: Sql, id: number, comment: string): Promise<boolean> {
   return (await sql`update reading_highlights set comment = ${comment} where id = ${id} returning id`).length > 0;
+}
+
+/**
+ * False when there is no such highlight; 'full' when turning it on would make its paper's public highlights more than
+ * PUBLIC_HIGHLIGHTS_MAX. The count is taken with the paper's highlights row-locked, so two toggles can't both pass.
+ */
+export async function setHighlightPublic(sql: Sql, id: number, on: boolean): Promise<boolean | 'full'> {
+  return sql.begin(async (tx) => {
+    const rows = await tx<Row>`
+      select id, public from reading_highlights
+      where paper_id = (select paper_id from reading_highlights where id = ${id})
+      order by id for update`;
+    const self = rows.find((r) => Number(r.id) === id);
+    if (!self) return false;
+    if (on && !self.public && rows.filter((r) => r.public).length >= PUBLIC_HIGHLIGHTS_MAX) return 'full';
+    await tx`update reading_highlights set public = ${on} where id = ${id}`;
+    return true;
+  });
 }
 
 export async function deleteHighlight(sql: Sql, id: number): Promise<boolean> {

@@ -18,6 +18,10 @@ const note = (o: Partial<VaultNote>): VaultNote => ({
   suggestedAt: null,
   createdAt: '2026-10-20T08:00:00.000Z',
   updatedAt: '2026-10-21T09:30:00.000Z',
+  uid: '00000000-0000-4000-8000-000000000005',
+  public: false,
+  publicSlug: null,
+  publicAt: null,
   ...o,
 });
 const paperNote = note({ kind: 'paper', title: 'Attention Is All You Need', paperId: 12, body: 'mine' });

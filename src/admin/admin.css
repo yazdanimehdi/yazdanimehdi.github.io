@@ -925,59 +925,13 @@ span.adm-cite {
 .adm-vault-delete {
   margin-block-start: 32px;
 }
-/* Vault graph: kind by shape and color; a selection lights its edges and neighbours and dims the rest. */
-.adm-graph {
-  display: block;
-  width: 100%;
-  height: auto;
-  border: 1px solid var(--adm-rule);
-  border-radius: 6px;
-  touch-action: manipulation;
-}
-.adm-graph-edges line {
-  stroke: var(--adm-rule);
-  stroke-width: 1px;
-  vector-effect: non-scaling-stroke;
-}
-.adm-graph-edges line.adm-graph-on {
-  stroke: var(--adm-accent);
-  stroke-width: 2px;
-}
-.adm-graph-paper {
-  fill: var(--adm-accent);
-}
-.adm-graph-free {
-  fill: var(--adm-ink);
-}
-.adm-graph-chat {
-  fill: var(--adm-muted);
-}
-/* The ring is a stroke, not an outline, which WebKit does not paint on SVG shapes. */
-.adm .adm-graph a:focus {
-  outline: none;
-}
-.adm-graph-ring {
-  fill: none;
-  stroke: none;
-  stroke-width: 2px;
-  vector-effect: non-scaling-stroke;
-  pointer-events: none;
-}
-.adm-graph a:focus-visible > .adm-graph-ring,
-.adm-graph-selected > .adm-graph-ring {
-  stroke: var(--adm-accent);
-}
-.adm-graph-picked a:not(.adm-graph-on, :focus-visible) {
-  opacity: 0.35;
-}
-.adm-graph-labels {
-  fill: var(--adm-ink);
-  font-family: var(--font-sans);
-  paint-order: stroke;
-  stroke: var(--adm-paper);
-  stroke-width: 3px;
-  stroke-linejoin: round;
-  pointer-events: none;
+/* Vault graph (NoteGraph.vue): its colors. */
+.adm {
+  --graph-ink: var(--adm-ink);
+  --graph-muted: var(--adm-muted);
+  --graph-rule: var(--adm-rule);
+  --graph-accent: var(--adm-accent);
+  --graph-paper: var(--adm-paper);
 }
 .adm-graph-strip {
   min-block-size: var(--adm-touch);
