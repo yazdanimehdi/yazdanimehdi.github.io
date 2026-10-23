@@ -904,7 +904,7 @@ Do this once, as the owner, after a preview deploys:
 
 ### Reading (Postgres mode)
 
-A private paper digest and reading room inside the admin. Each night it collects the day's new papers from the sources you turn on, ranks them against your field, adds the papers people in your wider area are talking about, and saves the result under **Reading → Today**. Any paper opens in the reading room: its full text beside a cited summary, chat and your notes. Nothing in it reaches the public site.
+A private paper digest and reading room inside the admin. Each night it collects the day's new papers from the sources you turn on, ranks them against your field, adds the papers people in your wider area are talking about, and saves the result under **Reading → Today**. Any paper opens in the reading room: its full text beside a cited summary, chat and your notes. What you save, highlight or write there becomes a linked Markdown note in **Reading → Vault**, which exports for Obsidian. Nothing in it reaches the public site.
 
 **Owner only, Postgres mode only.** The same rule as the [job search](#job-search-postgres-mode): only the owner sees the screens and the data, anyone else gets a 404, and in static and git mode every Reading screen and route answers 404 and the sidebar's Reading group is hidden.
 
@@ -947,14 +947,14 @@ A private paper digest and reading room inside the admin. Each night it collects
 
 #### Reading room
 
-**Library and Notebooks.** **Reading → Library** lists the papers you saved and adds one by its arXiv id (`2401.01234`, an arXiv link) or DOI; it is saved and opens in the reading room. **Reading → Notebooks** groups papers: add a paper from its room (**Add to notebook…**) or by arXiv id or DOI inside the notebook. Deleting a notebook deletes its summary, study aids, chat and note, never its papers.
+**Library and Notebooks.** **Reading → Library** lists the papers you saved and adds one by its arXiv id (`2401.01234`, an arXiv link) or DOI; it is saved and opens in the reading room. **Reading → Notebooks** groups papers: add a paper from its room (**Add to notebook…**) or by arXiv id or DOI inside the notebook. Deleting a notebook deletes its summary, study aids and chat, never its papers; its note and saved answers stay in the [vault](#vault).
 
 **The page.** The paper on the left, in passages you can read and highlight; **Summary**, **Chat** and **Notes** tabs on the right. Below 1024px it is one column, with the paper as a fourth tab. A notebook works the same across its papers, with a picker for the paper shown.
 
 - **Summary.** Written the first time the Summary tab is shown, as a background run that shows its progress: a short summary; what they did, what they found and why it matters; and how it relates to your work, naming your own papers and research areas. **Briefing**, **FAQ** and **Glossary** are written on demand; each is kept and can be regenerated.
 - **Citations.** Every claim and chat answer cites passages ("§3.2 ¶4", "Figure 2", "Abstract", "p. 4 ¶2"; in a notebook led by the first author's surname). Following one scrolls the paper to the passage and flashes it. A citation to a passage the paper doesn't have is dropped.
 - **Chat.** Questions about the paper or notebook, answered in the request with the paper's text, your profile and the last 12 turns. History is kept per paper and per notebook; **Save to notes** keeps an answer under Notes.
-- **Notes.** One free note per paper or notebook, your highlights (select text within one paragraph, then **Highlight** or **Comment**) and your saved answers. Project 3's vault will turn them into linked Markdown notes.
+- **Notes.** One free note per paper or notebook, your highlights (select text within one paragraph, then **Highlight** or **Comment**) and your saved answers. Writing here, highlighting or saving the paper adds its note to the [vault](#vault), and the tab then links to it.
 
 <a id="reading-room-text"></a>**Text sources.** A paper's text is fetched the first time you open, save or add it (or overnight, for a digest paper), in this order:
 
@@ -968,9 +968,31 @@ Every arXiv HTML or PDF fetch on the site, nightly or on open, takes a slot 15 s
 
 **Scans.** A PDF with no text layer (fewer than 50 characters a page on average) has no passages to show. When it is 4 MB or less it is kept and sent to the AI as a PDF, and citations name a page only ("p. 3"); a bigger one leaves the abstract. In a notebook of several papers a scan contributes only its abstract.
 
-**AI calls per day.** Summaries, study aids and chat turns count against **Reading → Settings → Reading room → AI calls per day** (default 100, 1 to 1,000, reset at midnight UTC); the section shows today's use. At the cap, chat says so plainly and a summary fails with the reason; the paper, highlights and notes still work. The reading room uses the AI provider you configured, with no fallback; the model gets no tools, and paper text is marked as untrusted data in every prompt and shown only as text.
+**AI calls per day.** Summaries, study aids, chat turns and the vault's link suggestions count against **Reading → Settings → Reading room → AI calls per day** (default 100, 1 to 1,000, reset at midnight UTC); the section shows today's use. At the cap, chat says so plainly and a summary fails with the reason; the paper, highlights and notes still work. The reading room uses the AI provider you configured, with no fallback; the model gets no tools, and paper text is marked as untrusted data in every prompt and shown only as text.
 
-**Where the data lives.** `reading_settings`, `reading_papers`, `reading_digest` and `reading_texts` (migration `008_reading.sql`), and the reading room's `reading_passages`, `reading_notebooks`, `reading_notebook_papers`, `reading_outputs`, `reading_chats`, `reading_highlights`, `reading_notes` and `reading_ai_use` (migration `009_reading_room.sql`), not `documents`, so they never reach the git backup or `db:export`. As with the job search, a Vercel preview shares the production database: a run or a chat on a preview writes the live data and spends your real AI credits.
+**Where the data lives.** `reading_settings`, `reading_papers`, `reading_digest` and `reading_texts` (migration `008_reading.sql`), and the reading room's `reading_passages`, `reading_notebooks`, `reading_notebook_papers`, `reading_outputs`, `reading_chats`, `reading_highlights` and `reading_ai_use` (migration `009_reading_room.sql`), and the vault's `vault_notes`, `vault_links` and `vault_suggestions` (migration `010_vault.sql`, which moves the notes 009 kept in `reading_notes` into the vault and drops that table), not `documents`, so they never reach the git backup or `db:export`. As with the job search, a Vercel preview shares the production database: a run or a chat on a preview writes the live data and spends your real AI credits.
+
+#### Vault
+
+**Reading → Vault** holds Markdown notes on what you read, with YAML front matter and `[[wikilinks]]`, the format [Obsidian](https://obsidian.md) uses. The list searches titles and text and filters by kind (Papers, Chats, Notes).
+
+**Notes it makes.** A paper gets its note when you save it (from Today, its room or the Library), highlight it, or write in its Notes tab; merely opening a paper makes nothing, and unsaving it keeps the note. A saved chat answer (**Save to notes**) becomes a chat note titled by its question, starting `From [[Paper]]`; a notebook's answer names each paper it cites, and each gets its note. A notebook's note joins the vault as a free note once you write in it.
+
+**What a note shows.** A paper note's title, authors, link, summary, key findings, how it relates to your work and your highlights are written from the reading room each time the note is shown or exported, so they never go stale and nothing you type overwrites them. **Your notes** under them is yours, up to 20,000 characters, saved a second after you stop typing. A chat note keeps its own copy of the question and answer, so it outlives the chat.
+
+**Free notes.** **New note** starts one of your own: a concept, an idea, a reading list.
+
+**Titles are file names.** A title drops what a file name or a link can't hold (`\ / : * ? " < > | # ^ [ ]` and control characters), is cut to 100 characters (200 bytes), and is unique ignoring case: a second paper with the same title becomes "Title (2)". A title you type that another note holds is refused.
+
+**Links.** Type `[[` in a note to pick another note by title (arrow keys, then Enter or Tab). `[[Title]]` links the note with that title, ignoring case and extra spaces; `[[Title|shown]]`, `[[Title#Heading]]` and `![[Title]]` work as in Obsidian. Renaming a note rewrites every link to it, keeping aliases and headings, so the files stay exactly what Obsidian reads. Each note lists the notes it links to (a title with no note yet says so) and its **Backlinks**. Deleting a note leaves the links to it unresolved; deleting a paper note keeps its highlights in the room, and deleting a chat note unsaves the answer.
+
+**Undoing in the room.** Unsaving an answer deletes its note, unless you wrote in it beyond its `From` line: then unsaving is refused, and you delete the note in the vault instead. Deleting a notebook keeps its note, as a free note, and its saved answers.
+
+**Suggested links.** The first time you open a note in the vault (a free note once it has text), one AI call suggests up to 5 notes it could link to, each with a one-line reason, and at most 2 new concept notes worth starting; **Suggest links** asks again. **Link** adds `[[Title]]` to the note's `Related:` line (a new concept becomes an empty free note); **Dismiss** drops it for good. Nothing links itself. Suggestions count against the reading room's **AI calls per day**, and a missing AI key spends nothing. The automatic run is tried once and fails silently (no key, the cap reached, a provider error); the button shows why.
+
+**Graph.** **Graph** draws the notes and their links: circles are papers, squares your notes, diamonds chats, larger with more links. Hovering, focusing or tapping near a note lights its links and lists its neighbours under the graph. Past 200 notes it shows the 200 most-linked and says how many there are.
+
+**Export.** **Export as a zip** downloads the whole vault, one `<title>.md` per note in `vault/papers/`, `vault/notes/` and `vault/chats/`, which Obsidian opens as a vault. Front matter carries the note's id, kind and dates, a paper's title, authors, source link, arXiv id or DOI and date, and a chat's question and when it was asked. It holds your writing, highlights and the generated summary and findings, never a paper's full text. A zip over 4.4 MB (Vercel's response limit) is refused with its size, never cut short.
 
 ### Cookie Consent (GDPR)
 

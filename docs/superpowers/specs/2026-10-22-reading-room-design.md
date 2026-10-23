@@ -361,6 +361,72 @@ Project 2 shipped as planned in `docs/superpowers/plans/2026-10-22-reading-room.
 - **Export.** A zip of the vault: one `.md` per note, folders `papers/`, `notes/`, `chats/`. Front matter carries ids,
   source links and dates. It holds no full paper text.
 
+### Built (2026-10-22)
+
+Project 3 shipped as planned in `docs/superpowers/plans/2026-10-22-vault.md`. Decisions made while building it:
+
+- **One table for every note:** `vault_notes` (kind `paper`, `chat` or `free`) holds the owner's writing; `vault_links`
+  is derived from the bodies and only speeds up backlinks and the graph; `vault_suggestions` holds the AI's. The
+  generated parts (a paper's metadata, summary, findings and highlights) stay in the reading tables and are rendered
+  into the note when it is shown or exported, never copied, so they never go stale and an edit never overwrites them.
+  A chat note keeps a snapshot of its question and answer (`chat` jsonb), since a notebook's chat is deleted with the
+  notebook; the snapshot records whether the answer was a paper's or a notebook's, and only a notebook's cites carry
+  author surnames, as in the room.
+- **Project 2's notes moved in:** migration `010_vault.sql` makes a paper note for every paper saved, written in,
+  highlighted or with a saved answer, a chat note for every saved answer and a free note for every notebook note with
+  text, then drops `reading_notes` in the same transaction, so nothing is lost or kept in two places. A paper note
+  keeps its paper (`on delete restrict`, and the prune now skips a paper with a note, since one would otherwise make
+  the whole prune fail); a notebook's note becomes a plain free note when the notebook goes (`on delete set null`).
+- **When notes appear:** saving a paper (from Today, the room or the Library), highlighting it, writing in its Notes
+  tab, or saving an answer, each in one transaction with the note; merely opening a paper makes nothing. A saved answer's
+  note starts with the line `From [[Paper]]` (a notebook's answer names each cited paper, giving each its note).
+  Unsaving an answer deletes its note unless the owner wrote in it beyond that exact generated line; then unsaving is
+  refused with a sentence. Any other first line counts as the owner's writing.
+- **Titles are file names:** `noteTitle` replaces `\ / : * ? " < > | # ^ [ ]` and control characters with spaces,
+  collapses whitespace, trims spaces and dots at the ends, and keeps the first 100 code points (50 when those are over
+  200 UTF-8 bytes), never splitting a surrogate pair; an empty result is "Untitled". Titles are unique ignoring case:
+  a generated note gets " (2)", " (3)"… with the base trimmed so the whole still fits the cap, and a title the owner
+  types that another note holds is refused. The migration's SQL title function matches `noteTitle` and is tested
+  against it with emoji.
+- **Links resolve by title and are rewritten on rename,** the way Obsidian does it, so the stored Markdown is always
+  exactly what Obsidian reads: `[[Old]]`, `[[old|shown]]`, `[[Old#Method]]`, `![[Old]]` and `[[ Old ]]` all follow
+  with their alias or heading, and `[[Old notes]]` is untouched. Renaming with an unsaved body renames first, then
+  saves the body with its links to the old title rewritten, so a refused rename saves nothing and a note's links to
+  itself follow. A `[[` inside generated text (a paper title, a claim, a quote) is escaped in the export, so only the
+  owner's writing links.
+- **Suggestions on first open in the vault, plus a button,** not on every add or Save as the spec says: Save stays
+  instant, and no AI call is spent on a note never looked at. Reported to the owner. The automatic run happens only
+  while the note has never had a suggestion run (a free note once it has text); every attempt, success or failure, is
+  stamped, so a missing key, a spent cap or a provider error is not retried on every open, and the automatic run's
+  errors are silent while the **Suggest links** button shows them. At most 5 suggestions, at most 2 of them new
+  concepts (60 characters or fewer); only existing titles (in their stored spelling) survive otherwise, never the note
+  itself, a note it already links or a dismissed one. One call over the note and up to 300 titles, counted against
+  the reading room's daily cap, the key checked first. Accepting adds `[[Title]]` to the note's existing `Related:`
+  line wherever it is (or starts one at the end), and the editor takes the saved body back, refusing with a sentence
+  while the owner's latest edit is unsaved. A suggestion whose target note is deleted goes with it (cascade), so
+  answering it is a 404.
+- **A plain textarea, not Tiptap:** Tiptap's Markdown round trip may escape `[[` and reflow Obsidian syntax; a
+  textarea keeps the file byte-exact and makes the `[[` combobox simple. The 20,000-character body limit is the
+  route's.
+- **Graph: 200 nodes,** the most linked, drawn as SVG with a hand-written Fruchterman–Reingold layout from a
+  golden-angle spiral. The API gives edges as note ids; the page maps them to positions and drops any edge whose ends
+  aren't both kept. While building, gravity toward the centre (0.4), half the spacing and a fit to the box were added:
+  without them separate clusters piled up on the walls. A tap picks the nearest node within 24 px, a bigger target on
+  a phone than the dot.
+- **Export: deflated in memory, one response, refused past 4.4 MB** (Vercel's 4.5 MB response limit) with its size,
+  never truncated; a vault without paper text compresses to a small fraction of that, and streaming isn't worth its
+  complexity until one gets near it. The zip is written with `node:zlib` (`deflateRawSync`, `crc32`), names flagged
+  UTF-8 and marked made-by-Unix, since macOS's `unzip` otherwise reads a non-ASCII name as CP437.
+- **Transactions:** postgres.js 3.4.9's transaction handle has no `begin`, so every helper called inside one takes the
+  handle and never opens its own; the tests' pglite adapter now lacks `begin` too, so a nested one fails in tests as it
+  would in production.
+- **Live check (local Postgres):** migrations 008 to 010 on a copy of the dev database rolled back to before 010 and
+  given Project 2 data (notes on a saved and an unsaved paper, a blank note, a highlight on an unsaved paper, two saved
+  paper answers and a saved notebook answer citing two papers, a notebook note) made 6 paper notes, 3 chat notes and 1
+  free note; every note body, highlight and saved answer was kept, and the blank note made nothing. The export
+  unzipped and tested clean with `/usr/bin/unzip` (10 files), and no sentence of a stored passage was in it. Link
+  suggestions are unverified against a real provider: there is no AI key locally, and the tests fake it.
+
 ## Project 4: blog from a paper
 
 - **Drafting.** From a paper, a notebook or a note, "Draft a blog post" writes a draft in the owner's voice. It is grounded
@@ -405,5 +471,7 @@ schema already includes the shared papers table (ids, metadata, state, digest me
 - PDF text extracted in code (a new dependency), so PDF papers get real passages like HTML ones.
 - Digest papers' text fetched overnight; summaries made on open with progress shown, not prefetched.
 - Highlighting is part of the reading room. A paper note appears on Save, highlight or note, never on a mere open.
+- Link suggestions run the first time a note is opened in the vault, plus a button, rather than when a note or paper
+  is added.
 - Pages: Today, Library, Notebooks, Vault, Settings.
 - A daily cap of 100 reading-room AI calls by default, editable.
