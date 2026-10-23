@@ -1,4 +1,5 @@
 import { HttpError } from '../admin/http';
+import { suggestSlug, uniqueSlug } from '../utils';
 import type { Sql, Tx } from '../db';
 import { getPapers, type Row } from './db';
 import { listHighlights } from './room-db';
@@ -23,6 +24,10 @@ const toNote = (r: Row): VaultNote => ({
   suggestedAt: r.suggested_at == null ? null : iso(r.suggested_at),
   createdAt: iso(r.created_at),
   updatedAt: iso(r.updated_at),
+  uid: r.uid as string,
+  public: r.public as boolean,
+  publicSlug: (r.public_slug as string | null) ?? null,
+  publicAt: r.public_at == null ? null : iso(r.public_at),
 });
 const toRow = (r: Row): NoteRow => ({
   id: Number(r.id),
@@ -131,6 +136,33 @@ export async function renameNote(
     for (const n of linking) await setBody(tx, Number(n.id), rewriteLinks(n.body as string, old, title));
     await tx`update vault_notes set title = ${title}, updated_at = now() where id = ${id}`;
     return getNote(tx, id);
+  });
+}
+
+/** The address a note takes at first publish: its title's slug, or 'note-<uid>' when that has no ASCII letters. */
+export function publicSlug(title: string, uid: string, taken: Set<string>): string {
+  return uniqueSlug(suggestSlug(title) || 'note-' + uid.slice(0, 8), taken);
+}
+
+/**
+ * null when there is no such note; 'chat' for a chat note turned on (a saved answer stays private). The first
+ * publish fixes its public_slug and public_at, under the title lock so two can't take one slug; unpublish keeps both.
+ */
+export async function setNotePublic(sql: Sql, id: number, on: boolean): Promise<VaultNote | 'chat' | null> {
+  return withTitles(sql, async (tx) => {
+    const [n] = await tx<Row>`select kind, title, uid, public_slug from vault_notes where id = ${id}`;
+    if (!n) return null;
+    if (on && n.kind === 'chat') return 'chat';
+    let slug: string | null = null;
+    if (on && n.public_slug == null) {
+      const rows = await tx<Row>`select public_slug from vault_notes where public_slug is not null`;
+      slug = publicSlug(n.title as string, n.uid as string, new Set(rows.map((r) => r.public_slug as string)));
+    }
+    const [r] = await tx<Row>`
+      update vault_notes set public = ${on}, public_slug = coalesce(public_slug, ${slug}::text),
+        public_at = coalesce(public_at, case when ${slug}::text is not null then now() end)
+      where id = ${id} returning *`;
+    return toNote(r);
   });
 }
 
