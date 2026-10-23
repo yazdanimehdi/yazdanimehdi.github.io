@@ -76,7 +76,7 @@ export function report(e: unknown): void {
 
 export async function api<T = unknown>(
   path: string,
-  opts: { method?: string; body?: unknown; form?: FormData } = {},
+  opts: { method?: string; body?: unknown; form?: FormData | Blob } = {}, // a Blob is sent as the raw body
 ): Promise<T> {
   const res = await fetch(`/api/admin/${path}`, {
     method: opts.method ?? (opts.body !== undefined || opts.form ? 'POST' : 'GET'),

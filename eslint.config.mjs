@@ -65,6 +65,12 @@ export default [
     },
   },
 
+  // The core rule can't see <script setup> bindings that only the template reads, so it flags every one of them.
+  {
+    files: ['**/*.vue'],
+    rules: { 'no-useless-assignment': 'off' },
+  },
+
   // Astro files: add Astro global types + disable rules that conflict with is:inline scripts
   {
     files: ['**/*.astro'],

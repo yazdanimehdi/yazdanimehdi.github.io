@@ -1,11 +1,15 @@
 import postgres from 'postgres';
 
-/** The slice of postgres.js the app uses: tagged-template queries, transactions, raw multi-statement SQL. */
-export interface Sql {
+/** A transaction's handle: postgres.js 3.4.9 gives it queries and unsafe, no begin (so helpers that take one never begin). */
+export interface Tx {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any -- rows are typed per query
   <T = any>(strings: TemplateStringsArray, ...values: unknown[]): Promise<T[]>;
-  begin<T>(fn: (tx: Sql) => Promise<T>): Promise<T>;
   unsafe(query: string): Promise<unknown>;
+}
+
+/** The slice of postgres.js the app uses: tagged-template queries, transactions, raw multi-statement SQL. */
+export interface Sql extends Tx {
+  begin<T>(fn: (tx: Tx) => Promise<T>): Promise<T>;
 }
 
 let pool: Sql | null = null;

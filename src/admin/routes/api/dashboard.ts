@@ -10,6 +10,7 @@ import { CV_JSON, FEEDS_JSON, JOBS_JSON, SCHOLAR_JSON, collectionDir, configPath
 import { readCareer, readyCount } from '../../../lib/career/db';
 import { readCvMeta } from '../../../lib/cv-pdf/generate';
 import { getSql } from '../../../lib/db';
+import { readReading, todayCount } from '../../../lib/reading/db';
 import { feedSources, type FeedsConfig } from '../../../lib/feeds';
 import { getMode, type Mode } from '../../../lib/mode';
 import { postStatus } from '../../../lib/utils';
@@ -87,6 +88,16 @@ async function ownerCareer(): Promise<NonNullable<DashboardData['career']>> {
   return { ready, ...(lastRun?.stopped ? { stopped: lastRun.stopped } : {}) };
 }
 
+/** The owner's paper digest: today's papers (a UTC day, as the nightly run counts it) and why ranking stopped. */
+async function ownerReading(): Promise<NonNullable<DashboardData['reading']>> {
+  const sql = getSql();
+  const [today, { lastRun }] = await Promise.all([
+    todayCount(sql, new Date().toISOString().slice(0, 10)),
+    readReading(sql),
+  ]);
+  return { today, ...(lastRun?.stopped ? { stopped: lastRun.stopped } : {}) };
+}
+
 export const GET = route(async (_ctx, store, user) => {
   const mode = getMode();
   const gh = store instanceof GitHubStore ? store : null;
@@ -108,6 +119,7 @@ export const GET = route(async (_ctx, store, user) => {
     head,
     review,
     ownCareer,
+    ownReading,
   ] = await Promise.all([
     listEntries(store, 'posts'),
     listEntries(store, 'announcements'),
@@ -126,12 +138,13 @@ export const GET = route(async (_ctx, store, user) => {
     // A call to act, so publishers only.
     canPublish(user, adminSettings()) ? waitingForReview() : [],
     owner ? ownerCareer() : null,
+    owner ? ownerReading() : null,
   ]);
   const items = jsonField(feedsJson?.content, 'length');
   const authors = Array.isArray(scholar.data.authors) ? scholar.data.authors : [];
   const lastRun = jsonField(scholarJson?.content, 'lastRun');
-  // Job search is the owner's alone: nobody else learns it exists.
-  const { career, ...daily } = jobs ? parseJobs(jobs.content) : {};
+  // Job search and reading are the owner's alone: nobody else learns they exist.
+  const { career, reading, ...daily } = jobs ? parseJobs(jobs.content) : {};
   const data: DashboardData = {
     mode,
     posts,
@@ -149,11 +162,12 @@ export const GET = route(async (_ctx, store, user) => {
     },
     news: { count: news.length, latest: newestDate(news) },
     people,
-    runs: jobs ? { ...daily, ...(career && owner ? { career } : {}) } : runs.runs,
+    runs: jobs ? (owner ? { ...daily, career, reading } : daily) : runs.runs,
     hiddenRuns: runs.hiddenRuns,
     lastCommit: head,
     review,
     ...(ownCareer ? { career: ownCareer } : {}),
+    ...(ownReading ? { reading: ownReading } : {}),
   };
   return json(data);
 });

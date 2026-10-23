@@ -44,7 +44,22 @@ const GROUPS = computed(() => {
         ['content/positions', 'Positions'],
       ],
     },
-    ...(props.ctx.isOwner && postgres ? [{ label: 'Career', links: [['career', 'Job search']], more: [] }] : []),
+    ...(props.ctx.isOwner && postgres
+      ? [
+          { label: 'Career', links: [['career', 'Job search']], more: [] },
+          {
+            label: 'Reading',
+            links: [
+              ['reading', 'Today'],
+              ['reading/library', 'Library'],
+              ['reading/notebooks', 'Notebooks'],
+              ['reading/vault', 'Vault'],
+              ['reading/settings', 'Settings'],
+            ],
+            more: [],
+          },
+        ]
+      : []),
     {
       label: 'Site',
       links: [

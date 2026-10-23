@@ -14,6 +14,9 @@ test('migrate creates the tables once; a second run applies nothing', async () =
     '005_career.sql',
     '006_apply.sql',
     '007_apply_lock.sql',
+    '008_reading.sql',
+    '009_reading_room.sql',
+    '010_vault.sql',
   ]);
   assert.deepEqual(await migrate(sql), []);
   await sql`insert into documents (path, content) values ('config/site.yml', 'title: A')`;
@@ -33,9 +36,23 @@ test('migrate creates the tables once; a second run applies nothing', async () =
       'documents',
       'login_attempts',
       'media',
+      'reading_ai_use',
+      'reading_chats',
+      'reading_digest',
+      'reading_highlights',
+      'reading_notebook_papers',
+      'reading_notebooks',
+      'reading_outputs',
+      'reading_papers',
+      'reading_passages',
+      'reading_settings',
+      'reading_texts',
       'revisions',
       'schema_migrations',
       'secrets',
+      'vault_links',
+      'vault_notes',
+      'vault_suggestions',
     ],
   );
 });
@@ -60,7 +77,7 @@ test('isUnreachable: connection errors yes, query errors no', () => {
   assert.equal(isUnreachable('nope'), false);
 });
 
-test('pgliteSql: array params and nested begin behave like postgres.js', async () => {
+test('pgliteSql: array params, and a transaction handle without begin, as in postgres.js 3.4.9', async () => {
   const sql = pgliteSql();
   await migrate(sql);
   await sql`insert into documents (path, content) values ('a', '1'), ('b', '2'), ('c', '3')`;
@@ -71,6 +88,9 @@ test('pgliteSql: array params and nested begin behave like postgres.js', async (
     rows.map((r) => r.path),
     ['a', 'c'],
   );
-  await sql.begin((tx) => tx.begin((t2) => t2`delete from documents where path = ${'a'}`));
+  await sql.begin(async (tx) => {
+    assert.equal('begin' in tx, false);
+    await tx`delete from documents where path = ${'a'}`;
+  });
   assert.equal((await sql`select * from documents`).length, 2);
 });

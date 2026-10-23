@@ -11,6 +11,7 @@ import {
   readingTime,
   safeHref,
   suggestSlug,
+  uniqueSlug,
   withoutCrossPosted,
   withoutHidden,
 } from './utils';
@@ -158,4 +159,14 @@ test('suggestSlug: at most 80 characters with no trailing dash; empty for a titl
   assert.ok(suggestSlug('word '.repeat(40)).length <= 80);
   assert.match(suggestSlug('word '.repeat(40)), /^[a-z0-9-]{1,80}$/);
   assert.equal(suggestSlug('سلام دنیا'), '');
+});
+
+test('uniqueSlug numbers a taken slug', () => {
+  assert.equal(uniqueSlug('a', new Set(['a'])), 'a-2');
+  const taken = new Set(['a', 'a-2']);
+  assert.equal(uniqueSlug('a', taken), 'a-3');
+  assert.ok(taken.has('a-3'), 'the slug it returns is taken from then on');
+  const long = 'x'.repeat(80);
+  assert.equal(uniqueSlug(long, new Set([long])), `${'x'.repeat(76)}-2`);
+  assert.equal(uniqueSlug('free', new Set()), 'free');
 });

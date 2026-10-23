@@ -11,6 +11,7 @@ import { PostgresStore } from './postgres-store';
 import { JOBS_JSON } from './paths';
 import { JOBS, dailySteps, parseJobs, releaseScheduled, releaseSince, runJobs, type Steps } from './jobs';
 import { writeCareer } from '../career/db';
+import { writeReading } from '../reading/db';
 import { setRunsForTests } from '../../workflows/career-nightly';
 import { GET as cron } from '../../admin/routes/api/cron/daily';
 import { POST as runNow } from '../../admin/routes/api/jobs/run';
@@ -78,6 +79,10 @@ test('runJobs: a failing step is recorded and the others still run; jobs.json ho
       ran.push('career');
       return { detail: 'done' };
     },
+    reading: async () => {
+      ran.push('reading');
+      return { detail: 'done' };
+    },
     backup: async () => {
       ran.push('backup');
       return { detail: '2 file(s) changed', url: 'https://github.com/o/r/commit/c' };
@@ -90,7 +95,7 @@ test('runJobs: a failing step is recorded and the others still run; jobs.json ho
   } finally {
     console.error = original;
   }
-  assert.deepEqual(ran, ['scheduled', 'feeds', 'papers', 'github', 'career', 'backup']);
+  assert.deepEqual(ran, ['scheduled', 'feeds', 'papers', 'github', 'career', 'reading', 'backup']);
   const at = '2026-10-07T03:00:00.000Z';
   assert.deepEqual(await jobs(), {
     feeds: { ok: false, at, detail: 'feed down' },
@@ -98,6 +103,7 @@ test('runJobs: a failing step is recorded and the others still run; jobs.json ho
     papers: { ok: true, at, detail: 'skipped: no SERPAPI_KEY' },
     github: { ok: true, at, detail: 'skipped: no GitHub username' },
     career: { ok: true, at, detail: 'done' },
+    reading: { ok: true, at, detail: 'done' },
     backup: { ok: true, at, detail: '2 file(s) changed', url: 'https://github.com/o/r/commit/c' },
   });
 });
@@ -178,6 +184,7 @@ test('cron in Postgres mode: runs every step, releases due posts, records jobs.j
         papers: [true, 'skipped: no SERPAPI_KEY'],
         github: [true, 'skipped: no GitHub username'],
         career: [true, 'done'],
+        reading: [true, 'done'],
         backup: [true, 'skipped: no GITHUB_TOKEN'],
       },
     );
@@ -201,7 +208,15 @@ test('Run now: Postgres only; runs the same jobs as the signed-in user', async (
     await sql`insert into documents (path, content) values ('config/feeds.yml', ${'feeds: []\n'})`;
     const res = await call();
     assert.equal(res.status, 200);
-    assert.deepEqual(Object.keys(await res.json()), ['scheduled', 'feeds', 'papers', 'github', 'career', 'backup']);
+    assert.deepEqual(Object.keys(await res.json()), [
+      'scheduled',
+      'feeds',
+      'papers',
+      'github',
+      'career',
+      'reading',
+      'backup',
+    ]);
     setStoreForTests(() => new MemoryStore());
     assert.equal((await call()).status, 404);
   } finally {
@@ -341,7 +356,7 @@ test('papers step: not due on the wrong day, recorded ok, never reaching the syn
 });
 
 test('career runs after github and before backup; an empty search is skipped', async () => {
-  assert.deepEqual(JOBS.slice(JOBS.indexOf('github')), ['github', 'career', 'backup']);
+  assert.deepEqual(JOBS.slice(JOBS.indexOf('github')), ['github', 'career', 'reading', 'backup']);
   let starts = 0;
   const steps = (nightly: () => Promise<{ runId: string } | { running: string }>) =>
     dailySteps(store(), async () => (starts++, nightly()));
@@ -404,4 +419,38 @@ test('Run now starts the job search for the owner only', async () => {
     setRunsForTests(null);
     restore();
   }
+});
+
+test('reading runs after career and before backup', () => {
+  assert.deepEqual(JOBS.slice(JOBS.indexOf('career')), ['career', 'reading', 'backup']);
+});
+
+test('the reading step is skipped with no source on', async () => {
+  let starts = 0;
+  const run = (reading: () => Promise<{ runId: string } | { running: string }>) =>
+    dailySteps(store(), undefined, async () => (starts++, reading())).reading({}, new Date());
+  const started = async () => ({ runId: 'wrun_1' });
+
+  const fresh = await run(started);
+  assert.equal(starts, 0, 'the defaults (Bluesky alone, which only adds counts) start nothing');
+  await writeReading(
+    sql,
+    { prefs: { sources: { bluesky: { on: true }, arxiv: { on: false, categories: ['cs.CL'] } } } },
+    't',
+  );
+  const off = await run(started);
+  assert.equal(starts, 0, 'a source with settings but off starts nothing');
+
+  await writeReading(sql, { prefs: { sources: { arxiv: { on: true, categories: ['cs.CL'] } } } }, 't');
+  const ran = await run(started);
+  const busy = await run(async () => ({ running: 'wrun_1' }));
+  assert.equal(starts, 2);
+  for (const r of [fresh, off, ran, busy]) assert.deepEqual(r, { detail: 'done' });
+
+  await assert.rejects(
+    run(async () => {
+      throw new Error('secret detail');
+    }),
+    (e: Error) => e.message === 'failed' && /secret detail/.test((e.cause as Error).message),
+  );
 });

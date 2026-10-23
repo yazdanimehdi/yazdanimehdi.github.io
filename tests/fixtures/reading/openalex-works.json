@@ -1,0 +1,1253 @@
+{
+  "meta": {
+    "count": 77293,
+    "page": 1,
+    "per_page": 50
+  },
+  "results": [
+    {
+      "id": "https://openalex.org/W4286892945",
+      "doi": "https://doi.org/10.5281/zenodo.23236017",
+      "display_name": "Socratic guiding questions in synthetic arithmetic data: matched LoRA runs (revision v2)",
+      "authorships": [
+        {
+          "author_position": "first",
+          "author": {
+            "id": null,
+            "display_name": "O'Grady, Jake"
+          }
+        },
+        {
+          "author_position": "middle",
+          "author": {
+            "id": null,
+            "display_name": "Gürhan, Asena Isik"
+          }
+        },
+        {
+          "author_position": "middle",
+          "author": {
+            "id": null,
+            "display_name": "Chee, Fong Ting"
+          }
+        }
+      ],
+      "publication_year": 2026,
+      "publication_date": "2026-10-08",
+      "created_date": "2026-10-08T00:00:00",
+      "cited_by_count": 463,
+      "abstract_inverted_index": {
+        "Supporting": [
+          0
+        ],
+        "data,": [
+          1
+        ],
+        "adapters,": [
+          2
+        ],
+        "predictions": [
+          3
+        ],
+        "and": [
+          4,
+          29,
+          44,
+          58,
+          65,
+          74,
+          82,
+          93,
+          108
+        ],
+        "code": [
+          5
+        ],
+        "for": [
+          6,
+          16,
+          103
+        ],
+        "the": [
+          7,
+          104
+        ],
+        "article": [
+          8
+        ],
+        "*Low-Cost": [
+          9
+        ],
+        "LoRA": [
+          10,
+          70
+        ],
+        "Fine-Tuning": [
+          11
+        ],
+        "of": [
+          12,
+          33,
+          80
+        ],
+        "Small": [
+          13
+        ],
+        "Language": [
+          14
+        ],
+        "Models": [
+          15
+        ],
+        "Multi-Step": [
+          17
+        ],
+        "Arithmetic": [
+          18
+        ],
+        "Reasoning*": [
+          19
+        ],
+        "by": [
+          20
+        ],
+        "Jake": [
+          21
+        ],
+        "O'Grady,": [
+          22
+        ],
+        "Asena": [
+          23
+        ],
+        "Isik": [
+          24
+        ],
+        "Gürhan,": [
+          25
+        ],
+        "Chee": [
+          26
+        ],
+        "Fong": [
+          27
+        ],
+        "Ting": [
+          28
+        ],
+        "Effirul": [
+          30
+        ],
+        "Ramlan": [
+          31
+        ],
+        "(University": [
+          32
+        ],
+        "Galway).": [
+          34
+        ],
+        "We": [
+          35
+        ],
+        "generated": [
+          36
+        ],
+        "20,000": [
+          37
+        ],
+        "GSM8K-derived": [
+          38
+        ],
+        "arithmetic": [
+          39
+        ],
+        "problems": [
+          40
+        ],
+        "with": [
+          41,
+          49,
+          69
+        ],
+        "step-by-step": [
+          42
+        ],
+        "solutions": [
+          43
+        ],
+        "rendered": [
+          45
+        ],
+        "each": [
+          46
+        ],
+        "solution": [
+          47
+        ],
+        "twice:": [
+          48
+        ],
+        "a": [
+          50,
+          96
+        ],
+        "guiding": [
+          51
+        ],
+        "question": [
+          52
+        ],
+        "before": [
+          53,
+          99
+        ],
+        "every": [
+          54,
+          112
+        ],
+        "reasoning": [
+          55
+        ],
+        "step": [
+          56
+        ],
+        "(Socratic)": [
+          57
+        ],
+        "without": [
+          59
+        ],
+        "those": [
+          60
+        ],
+        "questions": [
+          61
+        ],
+        "(non-Socratic).": [
+          62
+        ],
+        "Qwen3-0.6B,": [
+          63
+        ],
+        "Qwen3-1.7B": [
+          64
+        ],
+        "Llama-3.2-1B-Instruct": [
+          66
+        ],
+        "were": [
+          67,
+          87
+        ],
+        "fine-tuned": [
+          68
+        ],
+        "on": [
+          71,
+          77,
+          89
+        ],
+        "both": [
+          72
+        ],
+        "versions,": [
+          73
+        ],
+        "Qwen3-0.6B": [
+          75
+        ],
+        "also": [
+          76
+        ],
+        "nested": [
+          78
+        ],
+        "subsets": [
+          79
+        ],
+        "5,000": [
+          81
+        ],
+        "10,000": [
+          83
+        ],
+        "examples.": [
+          84
+        ],
+        "All": [
+          85
+        ],
+        "models": [
+          86
+        ],
+        "evaluated": [
+          88
+        ],
+        "GSM8K,": [
+          90
+        ],
+        "MultiArith,": [
+          91
+        ],
+        "SVAMP": [
+          92
+        ],
+        "GSM-Hard": [
+          94
+        ],
+        "under": [
+          95
+        ],
+        "protocol": [
+          97
+        ],
+        "fixed": [
+          98
+        ],
+        "any": [
+          100
+        ],
+        "run.See": [
+          101
+        ],
+        "README.md": [
+          102
+        ],
+        "file": [
+          105
+        ],
+        "list,": [
+          106
+        ],
+        "licences": [
+          107
+        ],
+        "how": [
+          109
+        ],
+        "to": [
+          110
+        ],
+        "verify": [
+          111
+        ],
+        "number.": [
+          113
+        ]
+      },
+      "primary_location": {
+        "landing_page_url": "https://doi.org/10.5281/zenodo.23236017",
+        "pdf_url": null,
+        "source": {
+          "id": "https://openalex.org/S4306400562",
+          "display_name": "Zenodo (CERN European Organization for Nuclear Research)",
+          "type": "repository"
+        }
+      },
+      "best_oa_location": {
+        "landing_page_url": "https://doi.org/10.5281/zenodo.23236017",
+        "pdf_url": null
+      },
+      "type": "dataset"
+    },
+    {
+      "id": "https://openalex.org/W2557026499",
+      "doi": "https://doi.org/10.48550/arxiv.2610.14004",
+      "display_name": "Showing versus Doing: Teaching by Demonstration",
+      "authorships": [
+        {
+          "author_position": "first",
+          "author": {
+            "id": "https://openalex.org/A5083477814",
+            "display_name": "Mark K. Ho"
+          }
+        },
+        {
+          "author_position": "middle",
+          "author": {
+            "id": "https://openalex.org/A5009722403",
+            "display_name": "Michael L. Littman"
+          }
+        },
+        {
+          "author_position": "middle",
+          "author": {
+            "id": "https://openalex.org/A5050915835",
+            "display_name": "James MacGlashan"
+          }
+        }
+      ],
+      "publication_year": 2026,
+      "publication_date": "2026-09-27",
+      "created_date": "2026-09-27T00:00:00",
+      "cited_by_count": 71,
+      "abstract_inverted_index": {
+        "People": [
+          0
+        ],
+        "often": [
+          1
+        ],
+        "learn": [
+          2
+        ],
+        "from": [
+          3,
+          88
+        ],
+        "others'": [
+          4
+        ],
+        "demonstrations,": [
+          5
+        ],
+        "and": [
+          6
+        ],
+        "inverse": [
+          7
+        ],
+        "reinforcement": [
+          8
+        ],
+        "learning": [
+          9,
+          87
+        ],
+        "(IRL)": [
+          10
+        ],
+        "techniques": [
+          11
+        ],
+        "have": [
+          12
+        ],
+        "realized": [
+          13
+        ],
+        "this": [
+          14
+        ],
+        "capacity": [
+          15
+        ],
+        "in": [
+          16
+        ],
+        "machines.": [
+          17
+        ],
+        "In": [
+          18,
+          58
+        ],
+        "contrast,": [
+          19
+        ],
+        "teaching": [
+          20,
+          36,
+          46,
+          68
+        ],
+        "by": [
+          21,
+          37
+        ],
+        "demonstration": [
+          22
+        ],
+        "has": [
+          23
+        ],
+        "been": [
+          24
+        ],
+        "less": [
+          25
+        ],
+        "well": [
+          26
+        ],
+        "studied": [
+          27
+        ],
+        "computationally.": [
+          28
+        ],
+        "Here,": [
+          29
+        ],
+        "we": [
+          30,
+          61,
+          78
+        ],
+        "develop": [
+          31
+        ],
+        "a": [
+          32,
+          49,
+          56
+        ],
+        "Bayesian": [
+          33
+        ],
+        "model": [
+          34
+        ],
+        "for": [
+          35
+        ],
+        "demonstration.": [
+          38
+        ],
+        "Stark": [
+          39
+        ],
+        "differences": [
+          40
+        ],
+        "arise": [
+          41
+        ],
+        "when": [
+          42,
+          86
+        ],
+        "demonstrators": [
+          43
+        ],
+        "are": [
+          44
+        ],
+        "intentionally": [
+          45
+        ],
+        "(i.e.": [
+          47,
+          54
+        ],
+        "showing)": [
+          48
+        ],
+        "task": [
+          50
+        ],
+        "versus": [
+          51,
+          90
+        ],
+        "simply": [
+          52
+        ],
+        "performing": [
+          53
+        ],
+        "doing)": [
+          55
+        ],
+        "task.": [
+          57
+        ],
+        "two": [
+          59
+        ],
+        "experiments,": [
+          60
+        ],
+        "show": [
+          62,
+          79
+        ],
+        "that": [
+          63,
+          80
+        ],
+        "human": [
+          64
+        ],
+        "participants": [
+          65
+        ],
+        "modify": [
+          66
+        ],
+        "their": [
+          67
+        ],
+        "behavior": [
+          69
+        ],
+        "consistent": [
+          70
+        ],
+        "with": [
+          71
+        ],
+        "the": [
+          72
+        ],
+        "predictions": [
+          73
+        ],
+        "of": [
+          74
+        ],
+        "our": [
+          75
+        ],
+        "model.": [
+          76
+        ],
+        "Further,": [
+          77
+        ],
+        "even": [
+          81
+        ],
+        "standard": [
+          82
+        ],
+        "IRL": [
+          83
+        ],
+        "algorithms": [
+          84
+        ],
+        "benefit": [
+          85
+        ],
+        "showing": [
+          89
+        ],
+        "doing.": [
+          91
+        ]
+      },
+      "primary_location": {
+        "landing_page_url": "https://arxiv.org/abs/2610.14004",
+        "pdf_url": "https://arxiv.org/pdf/2610.14004",
+        "source": {
+          "id": "https://openalex.org/S4306400194",
+          "display_name": "arXiv (Cornell University)",
+          "type": "repository"
+        }
+      },
+      "best_oa_location": {
+        "landing_page_url": "https://arxiv.org/abs/2610.14004",
+        "pdf_url": "https://arxiv.org/pdf/2610.14004"
+      },
+      "type": "preprint"
+    },
+    {
+      "id": "https://openalex.org/W4390529182",
+      "doi": "https://doi.org/10.1145/3845797",
+      "display_name": "Beyond Efficiency: A Systematic Survey of Resource-Efficient Large Language Models",
+      "authorships": [
+        {
+          "author_position": "first",
+          "author": {
+            "id": "https://openalex.org/A5076947075",
+            "display_name": "Guangji Bai"
+          }
+        },
+        {
+          "author_position": "middle",
+          "author": {
+            "id": "https://openalex.org/A5081043925",
+            "display_name": "Zheng Chai"
+          }
+        },
+        {
+          "author_position": "middle",
+          "author": {
+            "id": "https://openalex.org/A5100411139",
+            "display_name": "Ling Chen"
+          }
+        }
+      ],
+      "publication_year": 2026,
+      "publication_date": "2026-09-15",
+      "created_date": "2026-09-15T00:00:00",
+      "cited_by_count": 47,
+      "abstract_inverted_index": {
+        "The": [
+          0
+        ],
+        "burgeoning": [
+          1
+        ],
+        "field": [
+          2,
+          195
+        ],
+        "of": [
+          3,
+          32,
+          59,
+          67,
+          89,
+          108,
+          134,
+          158,
+          208,
+          216
+        ],
+        "Large": [
+          4
+        ],
+        "Language": [
+          5
+        ],
+        "Models": [
+          6
+        ],
+        "(LLMs),": [
+          7
+        ],
+        "exemplified": [
+          8
+        ],
+        "by": [
+          9,
+          54,
+          112
+        ],
+        "sophisticated": [
+          10
+        ],
+        "models": [
+          11,
+          150
+        ],
+        "like": [
+          12
+        ],
+        "OpenAI’s": [
+          13
+        ],
+        "ChatGPT,": [
+          14
+        ],
+        "represents": [
+          15
+        ],
+        "a": [
+          16,
+          56,
+          105,
+          155,
+          171,
+          188,
+          205,
+          212,
+          222,
+          225
+        ],
+        "significant": [
+          17
+        ],
+        "advancement": [
+          18
+        ],
+        "in": [
+          19,
+          29,
+          40,
+          180,
+          187
+        ],
+        "artificial": [
+          20
+        ],
+        "intelligence.": [
+          21
+        ],
+        "These": [
+          22
+        ],
+        "models,": [
+          23
+        ],
+        "however,": [
+          24
+        ],
+        "bring": [
+          25
+        ],
+        "forth": [
+          26
+        ],
+        "substantial": [
+          27
+        ],
+        "challenges": [
+          28,
+          53
+        ],
+        "high": [
+          30
+        ],
+        "consumption": [
+          31
+        ],
+        "computational,": [
+          33,
+          77
+        ],
+        "memory,": [
+          34,
+          78
+        ],
+        "energy,": [
+          35,
+          79
+        ],
+        "and": [
+          36,
+          81,
+          98,
+          122,
+          127,
+          137,
+          145,
+          151,
+          162,
+          176,
+          184,
+          211
+        ],
+        "financial": [
+          37
+        ],
+        "resources,": [
+          38
+        ],
+        "especially": [
+          39
+        ],
+        "environments": [
+          41
+        ],
+        "with": [
+          42
+        ],
+        "limited": [
+          43
+        ],
+        "resource": [
+          44,
+          65,
+          109,
+          115
+        ],
+        "capabilities.": [
+          45
+        ],
+        "This": [
+          46
+        ],
+        "survey": [
+          47,
+          103,
+          168
+        ],
+        "aims": [
+          48
+        ],
+        "to": [
+          49,
+          62,
+          142,
+          198
+        ],
+        "systematically": [
+          50
+        ],
+        "address": [
+          51
+        ],
+        "these": [
+          52
+        ],
+        "reviewing": [
+          55
+        ],
+        "broad": [
+          57
+        ],
+        "spectrum": [
+          58
+        ],
+        "techniques": [
+          60,
+          111
+        ],
+        "designed": [
+          61
+        ],
+        "enhance": [
+          63
+        ],
+        "the": [
+          64,
+          102,
+          119,
+          159,
+          194
+        ],
+        "efficiency": [
+          66,
+          110
+        ],
+        "LLMs.": [
+          68
+        ],
+        "We": [
+          69
+        ],
+        "categorize": [
+          70
+        ],
+        "methods": [
+          71
+        ],
+        "based": [
+          72
+        ],
+        "on": [
+          73
+        ],
+        "their": [
+          74,
+          84,
+          113
+        ],
+        "optimization": [
+          75,
+          129
+        ],
+        "focus—covering": [
+          76
+        ],
+        "financial,": [
+          80
+        ],
+        "network": [
+          82
+        ],
+        "resources—and": [
+          83
+        ],
+        "applicability": [
+          85
+        ],
+        "across": [
+          86,
+          148
+        ],
+        "various": [
+          87,
+          125
+        ],
+        "stages": [
+          88
+        ],
+        "an": [
+          90
+        ],
+        "LLM’s": [
+          91
+        ],
+        "lifecycle,": [
+          92
+        ],
+        "including": [
+          93,
+          224
+        ],
+        "architecture": [
+          94
+        ],
+        "design,": [
+          95
+        ],
+        "pre-training,": [
+          96
+        ],
+        "fine-tuning,": [
+          97
+        ],
+        "system": [
+          99
+        ],
+        "design.": [
+          100
+        ],
+        "Additionally,": [
+          101
+        ],
+        "introduces": [
+          104
+        ],
+        "nuanced": [
+          106
+        ],
+        "categorization": [
+          107
+        ],
+        "specific": [
+          114
+        ],
+        "types,": [
+          116
+        ],
+        "which": [
+          117
+        ],
+        "uncovers": [
+          118
+        ],
+        "intricate": [
+          120
+        ],
+        "relationships": [
+          121
+        ],
+        "mappings": [
+          123
+        ],
+        "between": [
+          124
+        ],
+        "resources": [
+          126
+        ],
+        "corresponding": [
+          128
+        ],
+        "techniques.": [
+          130,
+          152
+        ],
+        "A": [
+          131
+        ],
+        "standardized": [
+          132
+        ],
+        "set": [
+          133
+        ],
+        "evaluation": [
+          135
+        ],
+        "metrics": [
+          136
+        ],
+        "datasets": [
+          138
+        ],
+        "is": [
+          139
+        ],
+        "also": [
+          140,
+          220
+        ],
+        "presented": [
+          141
+        ],
+        "facilitate": [
+          143
+        ],
+        "consistent": [
+          144
+        ],
+        "fair": [
+          146
+        ],
+        "comparisons": [
+          147
+        ],
+        "different": [
+          149
+        ],
+        "By": [
+          153
+        ],
+        "offering": [
+          154
+        ],
+        "comprehensive": [
+          156
+        ],
+        "overview": [
+          157
+        ],
+        "current": [
+          160
+        ],
+        "state-of-the-art": [
+          161
+        ],
+        "identifying": [
+          163
+        ],
+        "open": [
+          164
+        ],
+        "research": [
+          165
+        ],
+        "avenues,": [
+          166
+        ],
+        "this": [
+          167
+        ],
+        "serves": [
+          169
+        ],
+        "as": [
+          170
+        ],
+        "foundational": [
+          172
+        ],
+        "reference": [
+          173
+        ],
+        "for": [
+          174
+        ],
+        "researchers": [
+          175
+        ],
+        "practitioners,": [
+          177
+        ],
+        "aiding": [
+          178
+        ],
+        "them": [
+          179
+        ],
+        "developing": [
+          181
+        ],
+        "more": [
+          182,
+          196
+        ],
+        "sustainable": [
+          183
+        ],
+        "efficient": [
+          185
+        ],
+        "LLMs": [
+          186,
+          218
+        ],
+        "rapidly": [
+          189
+        ],
+        "evolving": [
+          190
+        ],
+        "landscape.": [
+          191
+        ],
+        "To": [
+          192
+        ],
+        "make": [
+          193,
+          204
+        ],
+        "accessible": [
+          197
+        ],
+        "interested": [
+          199
+        ],
+        "beginners,": [
+          200
+        ],
+        "we": [
+          201
+        ],
+        "not": [
+          202
+        ],
+        "only": [
+          203
+        ],
+        "systematic": [
+          206
+        ],
+        "review": [
+          207
+        ],
+        "existing": [
+          209
+        ],
+        "works": [
+          210
+        ],
+        "highly": [
+          213
+        ],
+        "structured": [
+          214
+        ],
+        "taxonomy": [
+          215
+        ],
+        "resource-efficient": [
+          217
+        ],
+        "but": [
+          219
+        ],
+        "release": [
+          221
+        ],
+        "website": [
+          223
+        ],
+        "constantly-updated": [
+          226
+        ],
+        "article": [
+          227
+        ],
+        "list": [
+          228
+        ],
+        "https://github.com/tiingweii-shii/Awesome-Resource-Efficient-LLM-Papers.": [
+          229
+        ]
+      },
+      "primary_location": {
+        "landing_page_url": "https://doi.org/10.1145/3845797",
+        "pdf_url": null,
+        "source": {
+          "id": "https://openalex.org/S157921468",
+          "display_name": "ACM Computing Surveys",
+          "type": "journal"
+        }
+      },
+      "best_oa_location": {
+        "landing_page_url": "https://doi.org/10.1145/3845797",
+        "pdf_url": null
+      },
+      "type": "article"
+    }
+  ]
+}

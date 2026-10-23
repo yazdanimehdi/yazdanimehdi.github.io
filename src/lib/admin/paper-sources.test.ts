@@ -4,6 +4,7 @@ import fs from 'node:fs';
 import {
   arxivBibtex,
   parseArxivFeed,
+  parseArxivRss,
   parseBiorxiv,
   parseCrossrefWorks,
   parseDatacite,
@@ -140,6 +141,47 @@ test('parsePubmed reads full names, abstract and DOI', () => {
   assert.equal(r.venue, 'Briefings in bioinformatics');
   assert.equal(r.year, 2023);
   assert.equal(r.type, 'journal');
+});
+
+test('parsePubmed reads the PMID', () => {
+  assert.equal(parsePubmed(fixture('pubmed.xml'))[0].pmid, '37096593');
+});
+
+test('parsePubmed dates a record by its PubMed entry date', () => {
+  assert.equal(parsePubmed(fixture('pubmed.xml'))[0].date, '2023-04-25');
+  assert.equal(parsePubmed('<PubmedArticle><ArticleTitle>T</ArticleTitle></PubmedArticle>')[0].date, undefined);
+});
+
+test('parseBiorxiv dates a record by its posting date', () => {
+  assert.equal(parseBiorxiv(JSON.parse(fixture('biorxiv.json')), 'biorxiv')[0].date, '2024-01-01');
+  assert.equal(parseBiorxiv({ collection: [{ title: 'T', date: 'NA' }] }, 'biorxiv')[0].date, undefined);
+});
+
+test('parseArxivRss reads id, authors, abstract, categories and announce type', () => {
+  const xml = fs.readFileSync(new URL('../../../tests/fixtures/reading/arxiv-rss.xml', import.meta.url), 'utf8');
+  const items = parseArxivRss(xml);
+  assert.deepEqual(
+    items.map((i) => [i.arxiv, i.announce]),
+    [
+      ['2610.28673', 'new'],
+      ['2610.28710', 'new'],
+      ['2610.26542', 'cross'],
+      ['2503.00128', 'replace'],
+    ],
+  );
+  const [r] = items;
+  assert.equal(r.source, 'arxiv');
+  assert.match(r.title, /^How Far Can the Gemma 4 Speech Encoder Go/);
+  assert.deepEqual(r.authors, ['Amr Abdelkhalik']);
+  assert.deepEqual(items[1].authors, ['Joss Moorkens', 'Monja Jannet']);
+  assert.match(r.abstract ?? '', /^We study the 305M-parameter audio encoder/);
+  assert.doesNotMatch(r.abstract ?? '', /Announce Type|\n/);
+  assert.deepEqual(r.categories, ['cs.CL', 'cs.SD', 'eess.AS']);
+  assert.equal(r.year, 2026);
+  assert.equal(r.date, '2026-10-22');
+  // The announcement day as written, not shifted to UTC.
+  const late = xml.replace(/<pubDate>[^<]*<\/pubDate>/, '<pubDate>Thu, 22 Oct 2026 23:30:00 -0400</pubDate>');
+  assert.equal(parseArxivRss(late)[0].date, '2026-10-22');
 });
 
 test('parseOpenAlex rebuilds the abstract and maps fields', () => {

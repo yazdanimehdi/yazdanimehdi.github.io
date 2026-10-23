@@ -16,6 +16,7 @@ export const SECRETS = {
   ADZUNA_APP_KEY: 'Adzuna app key',
   USAJOBS_API_KEY: 'USAJobs API key',
   RESEND_API_KEY: 'Resend (email digest)',
+  OPENALEX_API_KEY: 'OpenAlex (paper digest)',
   CLAUDE_CODE_OAUTH_TOKEN: 'Claude Code subscription token',
   CODEX_AUTH_JSON: 'Codex sign-in (auth.json)',
 } as const;

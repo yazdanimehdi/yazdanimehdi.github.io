@@ -1,10 +1,10 @@
 import { z } from 'astro/zod';
 
 /** One definition, two schemas: lenient (`.catch`: stored junk falls back to defaults) and strict (`.default`: a PUT with junk throws). */
-const field = <T extends z.ZodType>(lenient: boolean, schema: T, fallback: z.output<T>) =>
+export const field = <T extends z.ZodType>(lenient: boolean, schema: T, fallback: z.output<T>) =>
   (lenient ? schema.catch(fallback) : schema.default(fallback as never)) as z.ZodType<z.output<T>>;
 
-const httpUrl = z.string().refine((v) => {
+export const httpUrl = z.string().refine((v) => {
   try {
     return ['http:', 'https:'].includes(new URL(v).protocol);
   } catch {
@@ -13,7 +13,7 @@ const httpUrl = z.string().refine((v) => {
 }, 'Must be an http(s) URL');
 
 /** Lenient: invalid entries are dropped, the rest kept. Strict: any invalid entry is a field error. */
-const list = <T extends z.ZodType>(lenient: boolean, item: T) =>
+export const list = <T extends z.ZodType>(lenient: boolean, item: T) =>
   (lenient
     ? z
         .array(z.unknown())
@@ -22,7 +22,7 @@ const list = <T extends z.ZodType>(lenient: boolean, item: T) =>
     : z.array(item).default([])) as z.ZodType<z.output<T>[]>;
 
 /** Lenient `.catch`es the whole object; strict only defaults a missing one, so inner field errors surface. */
-const lenientOnly = <T extends z.ZodType>(lenient: boolean, schema: T, fallback: () => z.output<T>) =>
+export const lenientOnly = <T extends z.ZodType>(lenient: boolean, schema: T, fallback: () => z.output<T>) =>
   (lenient ? schema.catch(fallback as never) : schema.default(fallback() as never)) as z.ZodType<z.output<T>>;
 
 const strings = (l: boolean) => field(l, z.array(z.string()), []);

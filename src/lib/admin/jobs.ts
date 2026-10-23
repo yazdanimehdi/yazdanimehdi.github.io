@@ -5,6 +5,9 @@ import { feedSources, syncFeeds, type FeedsConfig } from '../feeds';
 import type { FeedItem, SiteConfig } from '../types';
 import { becameDue } from '../utils';
 import { startNightly } from '../../workflows/career-nightly';
+import { readReading } from '../reading/db';
+import { parseReadingPrefs } from '../reading/settings';
+import { startReading } from '../../workflows/reading-nightly';
 import { BACKUP_BRANCH, backupToGit } from './backup';
 import { listEntries, readConfig } from './content';
 import { GitHubStore, githubConfig } from './github-store';
@@ -18,8 +21,8 @@ import type { PostgresStore } from './postgres-store';
 import type { CommitResult, ContentStore } from './store';
 
 // Scheduled first: it is cheap and time-sensitive, while feeds can take 15 s per source. Papers and GitHub before the
-// backup, so it includes what they wrote. Career only starts the job search workflow, which writes nothing backed up.
-export const JOBS = ['scheduled', 'feeds', 'papers', 'github', 'career', 'backup'] as const;
+// backup, so it includes what they wrote. Career and reading only start their workflows, which write nothing backed up.
+export const JOBS = ['scheduled', 'feeds', 'papers', 'github', 'career', 'reading', 'backup'] as const;
 export type JobName = (typeof JOBS)[number];
 export interface StepResult {
   ok: boolean;
@@ -142,8 +145,12 @@ export async function releaseScheduled(store: PostgresStore, since: Date, now: D
   return due;
 }
 
-/** The daily cron's steps (Postgres mode). `nightly` starts the job search run; tests pass their own. */
-export function dailySteps(store: PostgresStore, nightly = () => startNightly(getSql())): Steps {
+/** The daily cron's steps (Postgres mode). `nightly` starts the job search run, `reading` the paper digest; tests pass their own. */
+export function dailySteps(
+  store: PostgresStore,
+  nightly = () => startNightly(getSql()),
+  reading = () => startReading(getSql()),
+): Steps {
   return {
     feeds: async () => {
       const config = await readConfig(store, 'feeds');
@@ -180,6 +187,16 @@ export function dailySteps(store: PostgresStore, nightly = () => startNightly(ge
         if (terms.length || prefs.watched.length || prefs.feeds.length) await nightly();
       } catch (e) {
         // runJobs logs the cause and records only the message.
+        throw new Error('failed', { cause: e });
+      }
+      return { detail: 'done' };
+    },
+    // Like career: always 'done'. Bluesky only adds counts to papers found elsewhere, so it alone is no digest.
+    reading: async () => {
+      try {
+        const { sources } = parseReadingPrefs((await readReading(getSql())).prefs);
+        if (Object.entries(sources).some(([id, s]) => id !== 'bluesky' && s.on)) await reading();
+      } catch (e) {
         throw new Error('failed', { cause: e });
       }
       return { detail: 'done' };
