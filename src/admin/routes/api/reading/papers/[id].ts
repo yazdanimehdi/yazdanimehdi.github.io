@@ -6,7 +6,8 @@ import { fetchMissingTexts, idParam, shownOutputs, useToday } from '../../../../
 import { getPassages, listHighlights, notebooksOf, readText } from '../../../../../lib/reading/room-db';
 import { parseReadingPrefs } from '../../../../../lib/reading/settings';
 import type { PaperState } from '../../../../../lib/reading/types';
-import { ensurePaperNote, roomNote, withTitles } from '../../../../../lib/reading/vault-db';
+import { ensurePaperNote, getNote, roomNote, withTitles } from '../../../../../lib/reading/vault-db';
+import { highlightCounts, visibilityOf } from '../../../../../lib/reading/visibility';
 
 export const prerender = false;
 
@@ -41,6 +42,7 @@ export const GET = careerRoute(async (ctx) => {
     highlights,
     note: note.body,
     vaultNote: note.id,
+    visibility: visibilityOf(note.id == null ? null : await getNote(sql, note.id), highlightCounts(highlights)),
     notebooks,
     use: await useToday(sql, parseReadingPrefs(reading.prefs)),
   });
