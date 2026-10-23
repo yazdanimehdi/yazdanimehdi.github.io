@@ -133,7 +133,7 @@ export async function draftNotes(
     own = take(own);
     const quotes = highlights.flatMap((h): DraftQuote[] => {
       const text = take(cut(h.quote.trim(), QUOTE_MAX));
-      return text ? [{ paperId: n.paperId!, text, ...(h.comment.trim() ? { comment: h.comment.trim() } : {}) }] : [];
+      return text ? [{ paperId: n.paperId!, text }] : [];
     });
     return { own, quotes, aid: take(aid) };
   });

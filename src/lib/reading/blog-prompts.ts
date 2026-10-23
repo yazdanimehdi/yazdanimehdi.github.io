@@ -31,11 +31,10 @@ export interface DraftPaper {
   publishedAt: string | null;
 }
 
-/** A line the owner highlighted in a paper: the paper's words, with the owner's comment on it. */
+/** A line the owner highlighted in a paper: the paper's words (the owner's comment on it is in `notes`). */
 export interface DraftQuote {
   paperId: number;
   text: string;
-  comment?: string;
 }
 
 // `(?:\/\s*)?` rather than `\/?\s*`: two adjacent `\s*` would backtrack quadratically on a long run of spaces.
@@ -101,9 +100,7 @@ export function draftPrompt(o: {
       fence('aids', o.aids),
       fence(
         'quotes',
-        o.quotes.map(
-          (q) => `[paper ${q.paperId}] “${q.text}”${q.comment ? `\nThe owner’s comment: ${q.comment}` : ''}`,
-        ),
+        o.quotes.map((q) => `[paper ${q.paperId}] “${q.text}”`),
       ),
       ...o.examples.map((e) => `<example>\n${defang(e)}\n</example>`),
     ]

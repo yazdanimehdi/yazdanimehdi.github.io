@@ -134,7 +134,7 @@ test("notes hold the owner's writing, highlights and saved answers", async () =>
   assert.match(notes.join('\n'), /my take/);
   assert.match(notes.join('\n'), /On a line I highlighted in the paper: nice/);
   assert.deepEqual(quotes, [
-    { paperId: a, text: 'short quote', comment: 'nice' },
+    { paperId: a, text: 'short quote' },
     { paperId: a, text: 'q'.repeat(300) },
   ]);
   assert.doesNotMatch(all, /short quote|qqq/, "the papers' highlighted words are in neither notes nor aids");
@@ -163,6 +163,10 @@ test("a paper's summary is an aid", async () => {
   assert.match(aids.join('\n'), /A says\./);
 });
 
+/** Every char draftNotes hands the prompt. */
+const text = (d: Awaited<ReturnType<typeof draftNotes>>) =>
+  [...d.notes, ...d.aids, ...d.quotes.map((q) => q.text)].join('');
+
 test('one note gives at most 4,000 chars in all', async () => {
   const a = await paper('A');
   await paperNote(a, 'b'.repeat(3000));
@@ -170,9 +174,36 @@ test('one note gives at most 4,000 chars in all', async () => {
   for (let i = 0; i < 5; i++)
     await addHighlight(sql, { paperId: a, pid: `S${i}`, start: 0, end: 5, quote: 'q'.repeat(300), comment: '' });
   const { notes, aids, quotes } = await draftNotes(sql, [a], []);
-  const total = [...notes, ...aids, ...quotes.map((q) => q.text)].join('').length;
-  assert.ok(total <= 4000, String(total));
+  assert.ok(text({ notes, aids, quotes }).length <= 4000);
   assert.ok(notes[0].length > 3000, "the owner's writing first");
+});
+
+test('long highlight comments count toward both caps', async () => {
+  const ids: number[] = [];
+  for (let i = 0; i < 8; i++) {
+    const a = await paper(`H${i}`);
+    ids.push(a);
+    await paperNote(a, 'b'.repeat(1000));
+    await readySummary(a, 's'.repeat(3000));
+    for (let k = 0; k < 5; k++)
+      await addHighlight(sql, {
+        paperId: a,
+        pid: `S${k}`,
+        start: 0,
+        end: 5,
+        quote: 'q'.repeat(300),
+        comment: 'c'.repeat(2000),
+      });
+  }
+  const one = await draftNotes(sql, [ids[0]], []);
+  assert.ok(text(one).length <= 4000, String(text(one).length));
+  assert.ok(
+    one.quotes.every((q) => Object.keys(q).join() === 'paperId,text'),
+    'no comment rides on a quote',
+  );
+  const all = await draftNotes(sql, ids, []);
+  assert.equal(text(all).length, 24_000);
+  assert.ok(all.notes.every((n) => n.length <= 4000));
 });
 
 test('notes are capped', async () => {
