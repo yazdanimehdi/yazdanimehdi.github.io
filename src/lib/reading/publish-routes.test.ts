@@ -9,7 +9,7 @@ import { PostgresStore } from '../admin/postgres-store';
 import { nonOwnerUser, ownerUser } from '../career/test-owner';
 import { upsertPapers } from './db';
 import { republish } from './publish-db';
-import { addHighlight, listHighlights } from './room-db';
+import { addHighlight, createNotebook, listHighlights } from './room-db';
 import type { VaultNote } from './types';
 import { createNote, getNote } from './vault-db';
 import { setRepublishForTests } from './visibility';
@@ -17,6 +17,7 @@ import * as vNote from '../../admin/routes/api/reading/vault/notes/[id]';
 import * as highlight from '../../admin/routes/api/reading/highlights/[id]';
 import * as notes from '../../admin/routes/api/reading/notes';
 import * as papers from '../../admin/routes/api/reading/papers/[id]';
+import * as notebook from '../../admin/routes/api/reading/notebooks/[id]';
 import * as publish from '../../admin/routes/api/reading/vault/publish';
 
 type Handler = (ctx: never) => Response | Promise<Response>;
@@ -62,7 +63,7 @@ const failing = () => {
   });
   return mock.method(console, 'error', () => {});
 };
-const WARNING = 'Your public pages weren’t updated: the database went away';
+const WARNING = "Saved, but the public copy didn't update: the database went away";
 const free = async (title: string) => (await createNote(sql, title)) as VaultNote;
 const patchNote = (id: number, body: unknown) => call(vNote.PATCH, { params: { id: String(id) }, body });
 const addPaper = async () =>
@@ -136,14 +137,14 @@ test('a failed republish never fails the save', async () => {
 
   const again = await call(publish.POST, { body: {} });
   assert.equal(again.status, 502);
-  assert.equal((await again.json()).error, WARNING);
+  assert.equal((await again.json()).error, 'Your public pages weren’t updated: the database went away');
   err.mock.restore();
 });
 
 test('a failed cache purge keeps the save and the copy, with a warning', async () => {
   const err = mock.method(console, 'error', () => {});
   setRepublishForTests((s) => republish(s, { ...deps, purge: async () => Promise.reject(new Error('purge down')) }));
-  const STALE = 'Your public pages were saved but the cache didn’t refresh. Publish again to retry.';
+  const STALE = 'Saved. The public pages’ cache didn’t refresh; Publish again to retry.';
   const n = await free('My Note');
   const res = await ok(await patchNote(n.id, { public: true, body: 'hello' }));
   assert.equal(res.publishWarning, STALE);
@@ -199,6 +200,20 @@ test('publishing a paper from the room creates its note; Publish again reruns re
   for (const body of [{ paper: paperId }, { public: true }])
     assert.equal((await call(publish.POST, { body })).status, 400, JSON.stringify(body));
   assert.equal((await call(publish.POST, { body: { paper: 999, public: true } })).status, 404);
+});
+
+test("a notebook's room has its note's Visibility: private and note-less until it has a note", async () => {
+  const id = await createNotebook(sql, 'Folds');
+  const get = async () => (await ok(await call(notebook.GET, { params: { id: String(id) } }))).visibility;
+  assert.deepEqual(await get(), { noteId: null, public: false, url: null, pageOn: true, chat: false });
+  await siteYml('pages:\n  readings: true\n  notes: false\n');
+  assert.equal((await get()).pageOn, false, "a notebook's note goes on the Notes page");
+  await ok(await call(notes.PUT, { body: { notebook: id, body: 'mine' } }));
+  const noteId = (await get()).noteId;
+  assert.ok(noteId);
+  const { visibility } = await ok(await patchNote(noteId, { public: true }));
+  assert.deepEqual(await get(), visibility);
+  assert.equal(visibility.url, '/notes/folds/');
 });
 
 test('the Visibility line says the page is off while site.yml leaves it off', async () => {

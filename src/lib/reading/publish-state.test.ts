@@ -1,7 +1,7 @@
 import test, { beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { migrate } from '../db-migrate';
-import type { Sql } from '../db';
+import type { Sql, Tx } from '../db';
 import { pgliteSql } from '../pglite-sql';
 import { upsertPapers } from './db';
 import { addChat, addHighlight, setHighlightPublic } from './room-db';
@@ -83,6 +83,21 @@ test('a chat note cannot be public', async () => {
   assert.equal(await setNotePublic(sql, id, true), 'chat');
   assert.equal(((await setNotePublic(sql, id, false)) as VaultNote).public, false);
   await assert.rejects(sql`update vault_notes set public = true where id = ${id}`, /check/);
+});
+
+test('a note deleted between the toggle’s read and its write answers null', async () => {
+  const n = await make('Gone');
+  const s = ((strings: TemplateStringsArray, ...values: unknown[]) => sql(strings, ...values)) as Sql;
+  s.unsafe = (q) => sql.unsafe(q);
+  s.begin = (fn) =>
+    sql.begin((tx) => {
+      const t = (async (strings: TemplateStringsArray, ...values: unknown[]) => {
+        if (strings.join('').includes('update vault_notes')) await tx`delete from vault_notes where id = ${n.id}`;
+        return tx(strings, ...values);
+      }) as unknown as Tx;
+      return fn(t);
+    });
+  assert.equal(await setNotePublic(s, n.id, true), null);
 });
 
 test('a paper shares at most 10 highlights', async () => {

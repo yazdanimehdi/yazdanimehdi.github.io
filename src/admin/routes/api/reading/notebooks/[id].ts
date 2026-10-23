@@ -15,7 +15,8 @@ import {
 } from '../../../../../lib/reading/room-db';
 import { parseReadingPrefs } from '../../../../../lib/reading/settings';
 import type { Passage, TextState } from '../../../../../lib/reading/types';
-import { roomNote } from '../../../../../lib/reading/vault-db';
+import { getNote, roomNote } from '../../../../../lib/reading/vault-db';
+import { sitePages, visibilityOf } from '../../../../../lib/reading/visibility';
 
 export const prerender = false;
 
@@ -29,7 +30,7 @@ const Patch = z.strictObject({
 });
 
 /**
- * The reading room's data for a notebook. On opening (`?open=1`, not a poll), papers whose text was never fetched or
+ * The reading room's data for a notebook, with its note's Visibility. On opening (`?open=1`, not a poll), papers whose text was never fetched or
  * whose fetch failed are fetched, unless an output's run is on them.
  */
 export const GET = careerRoute(async (ctx) => {
@@ -67,6 +68,12 @@ export const GET = careerRoute(async (ctx) => {
     highlights,
     note: note.body,
     vaultNote: note.id,
+    visibility: visibilityOf(
+      note.id == null ? null : await getNote(sql, note.id),
+      await sitePages(),
+      undefined,
+      'free',
+    ),
     use: await useToday(sql, parseReadingPrefs(reading.prefs)),
   });
 });

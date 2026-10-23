@@ -106,6 +106,9 @@ export interface GraphDocument {
   links: [string, string][]; // [from id, to id], each once, both ends present in notes
 }
 
+/** A paper's publication date, as its copy writes it. */
+const day = (d: Date) => d.toISOString().slice(0, 10);
+
 /** Notes by title, links sorted; a link to an unknown uid is dropped. */
 export function graphDocument(all: PublicEntry[], site: GraphDocument['site']): GraphDocument {
   const ids = new Set(all.map((e) => e.data.id));
@@ -130,7 +133,7 @@ export function graphDocument(all: PublicEntry[], site: GraphDocument['site']): 
       };
       if (d.kind === 'paper') {
         const { published, ...paper } = d.paper;
-        note.paper = { ...paper, ...(published ? { published: published.toISOString() } : {}) };
+        note.paper = { ...paper, ...(published ? { published: day(published) } : {}) };
         note.highlights = d.highlights;
       }
       return note;
@@ -144,6 +147,8 @@ export function publicZipFiles(all: PublicEntry[], siteUrl: string): { path: str
   return all.map((e) => {
     // Through JSON: Dates become ISO strings. id and kind first, as in the copy.
     const d = JSON.parse(JSON.stringify(e.data)) as Record<string, unknown>;
+    if (e.data.kind === 'paper' && e.data.paper.published)
+      (d.paper as Record<string, unknown>).published = day(e.data.paper.published);
     const fm = { id: d.id, kind: d.kind, ...d, source: siteUrl + e.url };
     return {
       path: `${e.kind === 'paper' ? 'readings' : 'notes'}/${e.data.title}.md`,

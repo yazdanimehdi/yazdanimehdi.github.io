@@ -149,7 +149,8 @@ building it:
   database whose notes aren't public. A fresh database starts with no copies until the owner saves a public note or
   presses Publish again.
 - **The Visibility line:** "Visibility: public at <url>, with N of M highlights." with Make public / Make private, on
-  vault notes and in the paper and notebook rooms. It reads the page switches through the store, since admin routes
+  vault notes and in the paper and notebook rooms. A notebook with no note yet shows "Visibility: private." with no
+  button (its note is made by writing in its Notes, not by the toggle); the toggle PATCHes the note. It reads the page switches through the store, since admin routes
   run outside the request context that `getSiteConfig()` needs in Postgres mode. The page-off hint ("The Readings page
   is off; turn it on in Pages.") shows only on public items: on a private one it says nothing useful. The
   300-character hint shows once above the highlight list, tied to each Public box by `aria-describedby`, not repeated

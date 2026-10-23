@@ -6,7 +6,8 @@ import type { AdminCtx } from './types';
 import type { Visibility } from '../lib/reading/visibility';
 
 // The Visibility line with its toggle, and the warning a write's failed republish leaves (with Publish again).
-// `send` makes the note public or private; the line updates from its answer, and a failure leaves it as it was.
+// `send` makes the note public or private; the line updates from its answer, and a failure leaves it as it was. A
+// paper's toggle creates its note; a free note's needs the note (a notebook's, before it has one, has no toggle).
 const props = defineProps<{
   ctx: AdminCtx;
   kind: 'paper' | 'free';
@@ -59,12 +60,18 @@ async function publishAgain() {
   <p v-if="line" class="adm-muted adm-vault-act">
     {{ line.head }}<a v-if="line.url" :href="line.url" target="_blank" rel="noopener">{{ line.url }}</a
     >{{ line.mid }}<template v-if="line.pages"><a :href="`/${ctx.adminPath}/pages`">Pages</a>.</template>
-    <button v-if="!visibility!.chat" type="button" class="adm-btn" :disabled="busy" @click="toggle">
+    <button
+      v-if="!visibility!.chat && (kind === 'paper' || visibility!.noteId)"
+      type="button"
+      class="adm-btn"
+      :disabled="busy"
+      @click="toggle"
+    >
       {{ visibility!.public ? 'Make private' : 'Make public' }}
     </button>
   </p>
   <p v-if="warning" class="adm-err adm-vault-act" role="alert">
-    Saved, but the public copy didn't update: {{ warning }}
+    {{ warning }}
     <button type="button" class="adm-btn" :disabled="publishing" @click="publishAgain">Publish again</button>
   </p>
 </template>

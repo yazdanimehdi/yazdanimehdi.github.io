@@ -41,8 +41,8 @@ interface Room {
   inNotebooks: { id: number; title: string }[];
   /** the room's note in the vault, once there is one */
   vaultNote: number | null;
-  /** the paper's note on the public site (a paper's room only) */
-  visibility: Visibility | null;
+  /** the room's note on the public site */
+  visibility: Visibility;
 }
 type PaperRes = Omit<Room, 'title' | 'papers' | 'texts' | 'passages' | 'inNotebooks'> & {
   paper: Paper;
@@ -51,7 +51,7 @@ type PaperRes = Omit<Room, 'title' | 'papers' | 'texts' | 'passages' | 'inNotebo
   notebooks: Room['inNotebooks'];
   note: string;
 };
-type NotebookRes = Omit<Room, 'title' | 'inNotebooks' | 'visibility'> & {
+type NotebookRes = Omit<Room, 'title' | 'inNotebooks'> & {
   notebook: { id: number; title: string };
   note: string;
 };
@@ -70,7 +70,7 @@ async function load(first = false) {
     let n: string;
     if (isNb) {
       const res = await api<NotebookRes>(`reading/notebooks/${target.notebook}${open}`);
-      r = { ...res, title: res.notebook.title, inNotebooks: [], visibility: null };
+      r = { ...res, title: res.notebook.title, inNotebooks: [] };
       n = res.note;
     } else {
       const res = await api<PaperRes>(`reading/papers/${target.paper}${open}`);
@@ -198,8 +198,8 @@ async function jump(c: Cite) {
   flashTimer = setTimeout(() => (flash.value = null), 2000);
 }
 
-// Public or private (a paper's room): the toggle gives the paper its note when it has none. Writes answer with whether
-// the public copies updated.
+// Public or private: in a paper's room the toggle gives the paper its note when it has none; a notebook's room has
+// the toggle once its note exists. Writes answer with whether the public copies updated.
 const publishWarning = ref('');
 const warned = (res: { publishWarning?: string } | null) => (publishWarning.value = res?.publishWarning ?? '');
 const shared = computed(() => ({
@@ -213,6 +213,15 @@ async function setPublic(on: boolean) {
   room.value!.vaultNote ??= res.visibility.noteId;
   return res;
 }
+const setNotebookPublic = (on: boolean) =>
+  api<{ visibility: Visibility; publishWarning?: string }>(`reading/vault/notes/${room.value!.vaultNote}`, {
+    method: 'PATCH',
+    body: { public: on },
+  });
+const publicLabel = (hl: Highlight) => {
+  const q = visible(hl.quote);
+  return `Public: “${q.length > 40 ? `${q.slice(0, 40)}…` : q}”`;
+};
 /** A highlight's Public box: ticked at once, unticked again (with the route's sentence beside it) when refused. */
 const hlError = ref<{ id: number; text: string } | null>(null);
 async function setHighlightPublic(hl: Highlight, on: boolean) {
@@ -587,7 +596,7 @@ onBeforeUnmount(() => {
             v-model:warning="publishWarning"
             :ctx="ctx"
             kind="free"
-            :send="setPublic"
+            :send="setNotebookPublic"
           />
           <label class="adm-field adm-room-title">
             <span>Title</span>
@@ -817,6 +826,7 @@ onBeforeUnmount(() => {
                       <input
                         type="checkbox"
                         :checked="hl.public"
+                        :aria-label="publicLabel(hl)"
                         aria-describedby="room-hl-public-hint"
                         @change="setHighlightPublic(hl, ($event.target as HTMLInputElement).checked)"
                       />

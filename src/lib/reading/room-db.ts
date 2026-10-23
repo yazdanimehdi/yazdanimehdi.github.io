@@ -354,7 +354,7 @@ export async function setHighlightPublic(sql: Sql, id: number, on: boolean): Pro
     const rows = await tx<Row>`
       select id, public from reading_highlights
       where paper_id = (select paper_id from reading_highlights where id = ${id})
-      for update`;
+      order by id for update`;
     const self = rows.find((r) => Number(r.id) === id);
     if (!self) return false;
     if (on && !self.public && rows.filter((r) => r.public).length >= PUBLIC_HIGHLIGHTS_MAX) return 'full';

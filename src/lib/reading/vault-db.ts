@@ -163,7 +163,7 @@ export async function setNotePublic(sql: Sql, id: number, on: boolean): Promise<
       update vault_notes set public = ${on}, public_slug = coalesce(public_slug, ${slug}::text),
         public_at = coalesce(public_at, case when ${slug}::text is not null then now() end)
       where id = ${id} returning *`;
-    return toNote(r);
+    return r ? toNote(r) : null; // deleted since the select
   });
 }
 

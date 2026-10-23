@@ -158,7 +158,13 @@ test('a published copy parses as a notes or readings document', () => {
 const three = () => {
   const p = entry('Paper', { kind: 'paper', body: 'On [[B]].' });
   if (p.data.kind === 'paper') {
-    p.data.paper = { title: 'Deep Folds', authors: ['A. Author'], url: 'https://arxiv.org/abs/1', arxiv: '1' };
+    p.data.paper = {
+      title: 'Deep Folds',
+      authors: ['A. Author'],
+      url: 'https://arxiv.org/abs/1',
+      arxiv: '1',
+      published: new Date('2024-05-06'),
+    };
     p.data.highlights = [{ quote: 'A quote', where: 'p. 1', comment: 'Mine' }];
   }
   const b = entry('B', { body: 'Plain.' });
@@ -196,6 +202,7 @@ test("graphDocument: version 1, notes by title with absolute urls, the paper's h
     authors: ['A. Author'],
     url: 'https://arxiv.org/abs/1',
     arxiv: '1',
+    published: '2024-05-06',
   });
   assert.deepEqual(doc.notes[2].highlights, [{ quote: 'A quote', where: 'p. 1', comment: 'Mine' }]);
   assert.deepEqual(
@@ -218,6 +225,8 @@ test('publicZipFiles: notes/ and readings/ by vault title, each its front matter
   const paper = files.find((f) => f.path === 'readings/Paper.md')!;
   const [parsed] = parseDocuments('readings', [{ path: paper.path, content: paper.text }]);
   assert.equal((parsed.data.highlights as unknown[]).length, 1);
+  assert.match(paper.text, /\n {2}published: 2024-05-06\n/);
+  assert.deepEqual((parsed.data.paper as { published: Date }).published, new Date('2024-05-06'));
   assert.match(paper.text, /\nsource: https:\/\/jane\.test\/readings\/paper\/\n/);
 });
 
