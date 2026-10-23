@@ -6,7 +6,7 @@ import { mathFromMarkdown } from 'mdast-util-math';
 import { gfm } from 'micromark-extension-gfm';
 import { math } from 'micromark-extension-math';
 import { parsePaperPost } from '../ai/prompts';
-import { type DraftPaper, draftPrompt, parseDraft } from './blog-prompts';
+import { type DraftPaper, draftPrompt, parseDraft, tooDeep } from './blog-prompts';
 import type { GroundPaper } from './room-prompts';
 
 const A: DraftPaper = {
@@ -308,9 +308,11 @@ test('the title, subtitle, excerpt and tags can’t start MathJax either', () =>
 });
 
 test('a cite inside a foreign link keeps its link to the paper', () => {
-  const body = draft('See ***[12:S2.p3](https://evil.test)*** and [[12:S2.p3]](https://evil.test).');
-  assert.doesNotMatch(body, /evil/);
-  assert.equal(body.split('[Vaswani et al.](<https://arxiv.org/abs/1706.03762>)').length, 3, body);
+  const body = draft(
+    'See ***[12:S2.p3](https://evil.test)*** and [[12:S2.p3]](https://evil.test) and [ 12:S2.p3 ](x).',
+  );
+  assert.doesNotMatch(body, /evil|&#x20;/);
+  assert.equal(body.split('[Vaswani et al.](<https://arxiv.org/abs/1706.03762>)').length, 4, body);
 });
 
 test('parseDraft stays fast on replies built to be slow, and refuses the extreme ones', () => {
@@ -339,4 +341,70 @@ test('parseDraft stays fast on replies built to be slow, and refuses the extreme
   }
   const list16 = Array.from({ length: 16 }, (_, i) => `${'  '.repeat(i)}- level ${i}`).join('\n');
   assert.match(draft(list16), /level 15/, '16 levels of nesting are fine');
+});
+
+const timed = (name: string, f: () => unknown, ms: number) => {
+  const t = performance.now();
+  try {
+    f();
+  } catch (e) {
+    // A refusal counts as done, since the time is what's checked; a failed assertion doesn't.
+    if (e instanceof assert.AssertionError) throw e;
+  }
+  const took = performance.now() - t;
+  assert.ok(took < ms, `${name} took ${Math.round(took)} ms`);
+};
+
+test('nesting is checked in one pass, and only past 16 levels', () => {
+  const deep = /nested its quotes or lists too deeply/;
+  timed('spaced markers', () => assert.equal(tooDeep(`${'-    '.repeat(16)}x`), false), 50);
+  assert.doesNotThrow(() => draft(`${'-    '.repeat(16)}x`));
+  for (const body of ['>'.repeat(17) + ' x', '- '.repeat(17) + 'x', '1. '.repeat(17) + 'x', '> - '.repeat(9) + 'x']) {
+    timed(body, () => assert.equal(tooDeep(body), true), 50);
+    assert.throws(() => draft(body), deep, body);
+  }
+  const quotes = `${'> '.repeat(16)}line\n`.repeat(500);
+  timed('500 lines 16 deep', () => assert.equal(tooDeep(quotes), false), 50);
+  timed('500 lines 16 deep, parsed', () => draft(quotes), 250);
+  assert.doesNotThrow(() => draft(quotes));
+});
+
+test('no pattern backtracks on a long run of what it repeats', () => {
+  const long = 80_000;
+  const cases: [string, () => unknown][] = [
+    ['defang: < then spaces', () => prompt({ notes: [`<${' '.repeat(long)}x`.repeat(3)] })],
+    ['cites: a run of spaces', () => draft(`a${' '.repeat(long)}b`)],
+    ['cites: an unclosed id', () => draft(`a [12:${'S'.repeat(long)}`)],
+    ['cites: many ids', () => draft(`a [${'12:S2.p3, '.repeat(2000)}`)],
+    ['literals: a long word in a title', () => draft('Q [13:S1.p1].', { papers: [{ ...B, title: 'a'.repeat(long) }] })],
+    [
+      'literals: a long dotted domain',
+      () => draft('Q [13:S1.p1].', { papers: [{ ...B, title: `a@${'b.'.repeat(5000)}` }] }),
+    ],
+    ['tex: backslash runs', () => draft(`$${'\\'.repeat(long)}$`)],
+    ['words: one long word', () => draft('w'.repeat(long), { passages: ['w'.repeat(long)] })],
+    ['depth: digits and spaces', () => draft(`${'123456789 '.repeat(2000)}x`)],
+  ];
+  for (const [name, f] of cases) timed(name, f, 600);
+});
+
+test('formatting inside code and math is not counted against the cap', () => {
+  const python = 'def snake_case_name(arg_one, arg_two):\n    return arg_one * arg_two ** __magic__\n';
+  const code = python.repeat(Math.ceil(10_000 / python.length));
+  assert.ok(code.length >= 10_000);
+  assert.ok(draft(`Some prose.\n\n\`\`\`python\n${code}\`\`\`\n`).includes('snake_case_name'));
+  assert.doesNotThrow(() => draft(`Inline \`${'a_b '.repeat(700)}\` and $${'x_1 '.repeat(700)}$ here.`));
+  assert.throws(() => draft(`Prose ${'a_b '.repeat(1300)}`), /too much formatting/);
+});
+
+test('a cite spelled with entities is checked against the prompt’s passages too', () => {
+  const body = draft('See [12&#58;S99.p1](https://evil.test) and [12&#58;S99.p1] here.');
+  assert.doesNotMatch(body.split('## Papers')[0], /Vaswani|evil/);
+  assert.match(draft('Ok [12&#58;S2.p3].'), /^Ok \(\[Vaswani et al\.\]/);
+});
+
+test('a cite opening emphasis has no stray space', () => {
+  const body = draft('*[12:S2.p3]* and ***[12:S2.p3](https://evil.test)*** and x*[12:S2.p3]*');
+  assert.doesNotMatch(body, /&#x20;/);
+  assert.match(body, /^\*\(\[Vaswani et al\.\]\(<https:\/\/arxiv\.org\/abs\/1706\.03762>\)\)\* and \*\*\*\(\[Vaswani/);
 });

@@ -31,7 +31,8 @@ export interface DraftPaper {
   publishedAt: string | null;
 }
 
-const defang = (t: string) => t.replace(/<\s*(\/?\s*(?:paper|notes|aids|example))/gi, '‹$1');
+// `(?:\/\s*)?` rather than `\/?\s*`: two adjacent `\s*` would backtrack quadratically on a long run of spaces.
+const defang = (t: string) => t.replace(/<(\s*(?:\/\s*)?(?:paper|notes|aids|example))/gi, '‹$1');
 const fence = (tag: string, texts: string[]) =>
   texts.length ? `<${tag}>\n${texts.map(defang).join('\n\n---\n\n')}\n</${tag}>` : '';
 
@@ -172,19 +173,61 @@ const INLINE = new Set(['emphasis', 'strong', 'delete']);
 // past MAX_RUN in one paragraph or heading, is unwrapped into its text.
 const MAX_INLINE = 4;
 const MAX_RUN = 64;
-// The parser recurses once per nested quote or list, so a line opening more than 16 of them is refused, and its time
-// grows with the square of emphasis and bracket runs, so a body with more of their characters than these is too.
-const MAX_MARKS = { attention: [/[*_~]/g, 1200], brackets: [/[[\]]/g, 600] } as const;
-const DEEP = /^(?:[ \t]*(?:>|[-*+](?=[ \t])|\d{1,9}[.)](?=[ \t]))[ \t]*){17}/m;
+const MAX_DEPTH = 16;
+const MAX_ATTENTION = 1200;
+const MAX_BRACKETS = 600;
+
+/** True when a line opens more than MAX_DEPTH quotes or list items: the parser recurses once for each. One pass. */
+export function tooDeep(md: string): boolean {
+  const blank = (c: string | undefined) => c === ' ' || c === '\t';
+  for (const line of md.split('\n')) {
+    let depth = 0;
+    let i = 0;
+    while (i < line.length && depth <= MAX_DEPTH) {
+      const c = line[i];
+      let j = i;
+      while (j < line.length && j - i < 9 && line[j] >= '0' && line[j] <= '9') j++;
+      if (blank(c)) i++;
+      else if (c === '>' || ('-*+'.includes(c) && blank(line[i + 1]))) [depth, i] = [depth + 1, i + 1];
+      else if (j > i && (line[j] === '.' || line[j] === ')') && blank(line[j + 1])) [depth, i] = [depth + 1, j + 1];
+      else break;
+    }
+    if (depth > MAX_DEPTH) return true;
+  }
+  return false;
+}
+
+// The parser's time grows with the square of the emphasis and bracket runs in text, so they are counted first in a
+// parse without those constructs (linear), where code, math and HTML aren't text: only what would be parsed counts.
+const COUNT = {
+  extensions: [
+    gfm(),
+    math(),
+    { disable: { null: ['attention', 'labelStartImage', 'labelStartLink', 'labelEnd', 'strikethrough'] } },
+  ],
+  mdastExtensions: [gfmFromMarkdown(), mathFromMarkdown()],
+};
+function tooMarked(md: string): boolean {
+  let attention = 0;
+  let brackets = 0;
+  const walk = (n: Node) => {
+    if (n.type === 'text') {
+      const v = n.value!.replace(CITE_TOKEN, '');
+      for (const ch of v)
+        if (ch === '*' || ch === '_' || ch === '~') attention++;
+        else if (ch === '[' || ch === ']') brackets++;
+    }
+    n.children?.forEach(walk);
+  };
+  walk(fromMarkdown(md, COUNT as never) as Node);
+  return attention > MAX_ATTENTION || brackets > MAX_BRACKETS;
+}
 // A cite the model put in a link's text, like `[12:S2.p3](…)`: unwrapped, it keeps its brackets.
 const CITE_ONLY = new RegExp(`^${CITE_TOKEN.source}$`);
 
 function sanitize(md: string): Node[] {
-  if (DEEP.test(md))
-    throw new Error('The draft nested its quotes or lists too deeply, so it was dropped. Draft again.');
-  const bare = md.replace(CITE_TOKEN, '');
-  if (Object.values(MAX_MARKS).some(([marks, max]) => (bare.match(marks)?.length ?? 0) > max))
-    throw new Error('The draft had too much formatting to check, so it was dropped. Draft again.');
+  if (tooDeep(md)) throw new Error('The draft nested its quotes or lists too deeply, so it was dropped. Draft again.');
+  if (tooMarked(md)) throw new Error('The draft had too much formatting to check, so it was dropped. Draft again.');
   for (let pass = 0; pass < 4; pass++) {
     let changed = false;
     const unlink = (nodes: Node[], inline = 0): Node[] => {
@@ -202,7 +245,8 @@ function sanitize(md: string): Node[] {
         const link = n.type === 'link' || n.type === 'linkReference';
         const unwrap = link || (deep && (inline >= MAX_INLINE || ++run > MAX_RUN));
         changed ||= unwrap;
-        const only = link && children?.length === 1 && children[0].type === 'text' ? `[${children[0].value}]` : '';
+        const only =
+          link && children?.length === 1 && children[0].type === 'text' ? `[${children[0].value!.trim()}]` : '';
         const kept = !unwrap
           ? [inert({ ...n, children })]
           : CITE_ONLY.test(only)
@@ -224,15 +268,21 @@ function sanitize(md: string): Node[] {
   throw new Error('The draft’s links could not be checked, so it was dropped. Draft again.');
 }
 
-/** Each kept citation in a text node as a `cite` node holding its links. */
+/**
+ * Each kept citation in a text node as a `cite` node holding its links, after a space unless it opens its parent
+ * (a space there would read as `&#x20;` inside emphasis).
+ */
 function cite(nodes: Node[], links: (ids: string) => string): Node[] {
-  return nodes.flatMap((n) => {
+  return nodes.flatMap((n, k) => {
     if (n.children) return [{ ...n, children: cite(n.children, links) }];
     if (n.type !== 'text') return [n];
     const out: Node[] = [];
     let at = 0;
     for (const m of n.value!.matchAll(CITE_TOKEN)) {
-      out.push({ type: 'text', value: n.value!.slice(at, m.index) }, { type: 'cite', value: links(m[2]) });
+      const before = n.value!.slice(at, m.index);
+      const space = before ? !/\s$/.test(before) : m.index > 0 || k > 0;
+      const value = links(m[2]);
+      out.push({ type: 'text', value: before }, { type: 'cite', value: value && `${space ? ' ' : ''}${value}` });
       at = m.index + m[0].length;
     }
     out.push({ type: 'text', value: n.value!.slice(at) });
@@ -254,8 +304,9 @@ const plain = (nodes: Node[]): string =>
     )
     .join('');
 
-// What GFM turns into a link even when escaped: a URL, `www.…` or an email address.
-const LITERAL = /(?:https?:\/\/|www\.)[^\s`]*|[-.\w+]+@[-\w]+(?:\.[-\w]+)+/gi;
+// What GFM turns into a link even when escaped: a URL, `www.…` or an email address. The lookbehind starts an address
+// only where its run of name characters begins, so a long word isn't rescanned from each letter.
+const LITERAL = /(?:https?:\/\/|www\.)[^\s`]*|(?<![-.\w+])[-.\w+]+@[-\w]+(?:\.[-\w]+)+/gi;
 // `&` so metadata can't spell an entity, `$` so it can't open math, `|` so it can't end a table cell.
 const backslash = (s: string) => s.replace(/[[\]<>*_`&$|]/g, '\\$&');
 
@@ -319,13 +370,15 @@ export function parseDraft(
 ): PaperPost {
   const post = parsePaperPost(reply);
   const byId = new Map(c.papers.map((p) => [p.id, p]));
+  // Checked again here: an id spelled with entities (`12&#58;S9`) only reads as one once the Markdown is parsed.
   const links = (ids: string) => {
-    const cited = [...new Set(ids.split(/[,;]\s*/).map((id) => Number(id.slice(0, id.indexOf(':')))))];
+    const kept = ids.split(/[,;]\s*/).filter((id) => c.allowed.has(id));
+    const cited = [...new Set(kept.map((id) => Number(id.slice(0, id.indexOf(':')))))];
     const entries = cited.flatMap((id) => {
       const p = byId.get(id);
       return p ? [linked(surname(p), p.url)] : [];
     });
-    return entries.length ? ` (${entries.join('; ')})` : '';
+    return entries.length ? `(${entries.join('; ')})` : '';
   };
   const children = cite(sanitize(parseAnswer(visible(post.body), c.allowed).body), links);
   const text = plain(children);
