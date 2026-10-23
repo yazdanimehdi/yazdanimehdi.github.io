@@ -27,11 +27,17 @@ export const COPY_DIRS = { paper: 'src/content/readings', free: 'src/content/not
 
 /** A link to a note not in `targets` keeps only its alias, else reads "(private note)". */
 export function stripPrivateLinks(body: string, targets: Map<string, string>): string {
-  return mapLinks(body, ({ target, alias, heading, embed }) =>
-    targets.has(linkKey(target))
-      ? `${embed ? '!' : ''}[[${target}${heading !== null ? `#${heading}` : ''}${alias !== null ? `|${alias}` : ''}]]`
-      : alias?.trim() || '(private note)',
-  );
+  // An alias can hold the pieces of another link (`[[A|[[Secret]]]]`), so repeat until nothing changes. It ends: each
+  // private link removed takes a `]` with it, and a public one rebuilt is stable.
+  for (;;) {
+    const out = mapLinks(body, ({ target, alias, heading, embed }) =>
+      targets.has(linkKey(target))
+        ? `${embed ? '!' : ''}[[${target}${heading !== null ? `#${heading}` : ''}${alias !== null ? `|${alias}` : ''}]]`
+        : alias?.trim() || '(private note)',
+    );
+    if (out === body) return out;
+    body = out;
+  }
 }
 
 const cut = (q: string) => {
@@ -72,9 +78,9 @@ export function publishedCopy(n: PublicNote, targets: Map<string, string>): { pa
     ...(n.kind === 'paper'
       ? {
           highlights: (n.highlights ?? []).slice(0, PUBLIC_HIGHLIGHTS_MAX).map((h) => ({
-            quote: cut(h.quote),
+            quote: cut(stripPrivateLinks(h.quote, targets)),
             where: pidLabel(h.pid),
-            ...(h.comment ? { comment: h.comment } : {}),
+            ...(h.comment ? { comment: stripPrivateLinks(h.comment, targets) } : {}),
           })),
         }
       : {}),
