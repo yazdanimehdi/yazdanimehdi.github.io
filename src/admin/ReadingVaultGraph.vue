@@ -4,6 +4,7 @@ import AdminShell from './AdminShell.vue';
 import AdminTabLinks from './AdminTabLinks.vue';
 import { api, report } from './api';
 import { visible } from './career';
+import { plural } from './status';
 import { KIND_NAMES, layout, nearestNode } from './vault';
 import type { AdminCtx } from './types';
 import type { NoteRow } from '../lib/reading/types';
@@ -31,7 +32,8 @@ const kindName = (n: GraphNode) => KIND_NAMES[n.kind].toLowerCase();
 const byTitle = computed(() =>
   (nodes.value ?? []).map((_, i) => i).sort((a, b) => nodes.value![a].title.localeCompare(nodes.value![b].title)),
 );
-const radius = (n: GraphNode) => 5 + Math.min(n.links, 10) * 0.6;
+// A phone draws 1000 units in ~360 px: nodes 2.5× bigger stay ~9–20 px across.
+const radius = (n: GraphNode) => (5 + Math.min(n.links, 10) * 0.6) * (narrow.value ? 2.5 : 1);
 const neighbours = computed(() => {
   const s = selected.value;
   const out = new Set<number>();
@@ -42,22 +44,36 @@ const neighbours = computed(() => {
   }
   return out;
 });
-/** The API orders nodes most-linked first. */
+/**
+ * The most-linked (the API's order; 5 on a phone) until a node is selected, then it and its neighbours only. A label
+ * that would overlap one already placed is left out (the strip names every neighbour).
+ */
 const labelled = computed(() => {
-  const out = new Set((nodes.value ?? []).slice(0, LABELS).map((_, i) => i));
-  if (selected.value !== null) out.add(selected.value);
-  for (const i of neighbours.value) out.add(i);
-  return [...out];
+  const s = selected.value;
+  const top = s !== null ? 0 : narrow.value ? 5 : LABELS;
+  const want = s === null ? [] : [s, ...[...neighbours.value].sort((a, b) => a - b)];
+  want.push(...(nodes.value ?? []).slice(0, top).map((_, i) => i));
+  const placed: { x0: number; x1: number; y0: number; y1: number }[] = [];
+  return want.filter((i) => {
+    const at = labelAt(i);
+    const wide = label(i).length * fontSize.value * 0.55;
+    const x0 = at.anchor === 'end' ? at.x - wide : at.x;
+    const b = { x0, x1: x0 + wide, y0: at.y - fontSize.value, y1: at.y + fontSize.value * 0.3 };
+    if (placed.some((o) => b.x0 < o.x1 && o.x0 < b.x1 && b.y0 < o.y1 && o.y0 < b.y1)) return false;
+    placed.push(b);
+    return true;
+  });
 });
 const fontSize = computed(() => (narrow.value ? 30 : 13));
 function label(i: number) {
   const t = visible(nodes.value![i].title);
-  return t.length > 32 ? `${t.slice(0, 31)}…` : t;
+  const max = narrow.value ? 22 : 32;
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 function labelAt(i: number) {
   const p = pts.value[i];
   const r = radius(nodes.value![i]) + 4;
-  const left = p.x > W * 0.7;
+  const left = p.x > W / 2;
   return { x: left ? p.x - r : p.x + r, y: p.y + fontSize.value / 3, anchor: left ? 'end' : 'start' };
 }
 function diamond(i: number) {
@@ -88,7 +104,12 @@ onMounted(async () => {
       return i === undefined || j === undefined ? [] : [[i, j]];
     });
     narrow.value = matchMedia('(max-width: 639.98px)').matches;
-    pts.value = layout(g.nodes.length, kept, W, h.value);
+    // room for the phone's bigger nodes inside the layout's margin
+    const pad = narrow.value ? 16 : 0;
+    pts.value = layout(g.nodes.length, kept, W - 2 * pad, h.value - 2 * pad).map((p) => ({
+      x: p.x + pad,
+      y: p.y + pad,
+    }));
     edges.value = kept;
     total.value = g.total;
     nodes.value = g.nodes;
@@ -114,9 +135,9 @@ onMounted(async () => {
 
     <p v-if="!nodes" class="adm-muted">Loading…</p>
     <template v-else>
-      <p v-if="!edges.length">No links yet. Link notes with [[ ]] and they show here.</p>
-      <p v-else>
-        {{ nodes.length }} notes, {{ edges.length }} links.
+      <p>
+        <template v-if="!edges.length">No links yet. Link notes with [[ ]] and they show here.</template>
+        <template v-else>{{ plural(nodes.length, 'note') }}, {{ plural(edges.length, 'link') }}.</template>
         <template v-if="total > nodes.length">
           Showing the {{ nodes.length }} most-linked of {{ total }} notes.
         </template>
@@ -151,7 +172,7 @@ onMounted(async () => {
               `adm-graph-${nodes[i].kind}`,
               { 'adm-graph-on': i === selected || neighbours.has(i), 'adm-graph-selected': i === selected },
             ]"
-            :aria-label="`${visible(nodes[i].title)}, ${kindName(nodes[i])}, ${nodes[i].links} links`"
+            :aria-label="`${visible(nodes[i].title)}, ${kindName(nodes[i])}, ${plural(nodes[i].links, 'link')}`"
             @focus="selected = i"
             @mouseenter="selected = i"
           >
@@ -164,6 +185,12 @@ onMounted(async () => {
               :height="radius(nodes[i]) * 2"
             />
             <polygon v-else :points="diamond(i)" />
+            <circle
+              class="adm-graph-ring"
+              :cx="pts[i].x"
+              :cy="pts[i].y"
+              :r="radius(nodes[i]) * 1.25 + (narrow ? 10 : 4)"
+            />
           </a>
           <g class="adm-graph-labels" aria-hidden="true" :font-size="fontSize">
             <text
@@ -172,7 +199,6 @@ onMounted(async () => {
               :x="labelAt(i).x"
               :y="labelAt(i).y"
               :text-anchor="labelAt(i).anchor"
-              :class="{ 'adm-graph-on': i === selected || neighbours.has(i) }"
             >
               {{ label(i) }}
             </text>
@@ -185,7 +211,7 @@ onMounted(async () => {
             <p>
               <a :href="open(nodes[selected].id)">{{ visible(nodes[selected].title) }}</a>
               <span class="adm-muted">
-                · {{ KIND_NAMES[nodes[selected].kind] }} · {{ nodes[selected].links }} links</span
+                · {{ KIND_NAMES[nodes[selected].kind] }} · {{ plural(nodes[selected].links, 'link') }}</span
               >
             </p>
             <ul v-if="neighbourRows.length" class="adm-graph-neighbours">

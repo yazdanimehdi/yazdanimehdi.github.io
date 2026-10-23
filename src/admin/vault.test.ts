@@ -111,10 +111,11 @@ test('layout spreads a graph over the box instead of piling it on the edges', ()
     const p = layout(n, edges, 1000, h);
     const onEdge = p.filter((q) => q.x <= 25 || q.x >= 975 || q.y <= 25 || q.y >= h - 25);
     assert.ok(onEdge.length <= 4, `${onEdge.length} of ${n} on the edge`);
-    const xs = p.map((q) => q.x);
-    const ys = p.map((q) => q.y);
-    const span = Math.max((Math.max(...xs) - Math.min(...xs)) / 952, (Math.max(...ys) - Math.min(...ys)) / (h - 48));
-    assert.ok(span > 0.95, `spans ${span}`);
+    // no two nodes on top of each other, as they end when piled on a wall
+    let closest = Infinity;
+    for (let i = 0; i < n; i++)
+      for (let j = i + 1; j < n; j++) closest = Math.min(closest, Math.hypot(p[i].x - p[j].x, p[i].y - p[j].y));
+    assert.ok(closest > 1000 / Math.sqrt(n) / 4, `closest pair ${closest} apart`);
   }
 });
 

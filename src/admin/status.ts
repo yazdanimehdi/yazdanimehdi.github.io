@@ -79,7 +79,7 @@ const RETRY_FEEDS: Action = { kind: 'sync-feeds', label: 'Retry' };
 const CHECK_SCHOLAR: Action = { kind: 'sync-papers', label: 'Check now' };
 const RETRY_SCHOLAR: Action = { kind: 'sync-papers', label: 'Retry' };
 const NEW_NEWS = screen('New news item', 'content/announcements?new');
-const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
+export const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 const latest = (...times: (string | null | undefined)[]) =>
   times.filter((t): t is string => !!t).sort((a, b) => Date.parse(b) - Date.parse(a))[0] ?? null;
 const skipped = (run?: Run) => run?.detail?.startsWith('skipped:') ?? false;
