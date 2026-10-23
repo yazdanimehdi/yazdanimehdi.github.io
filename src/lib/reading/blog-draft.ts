@@ -183,12 +183,13 @@ export async function draftPost(
   const now = o.now ?? new Date();
   const day = now.toISOString().slice(0, 10);
   const { paperIds, noteIds } = await draftSources(sql, from);
-  // With no papers this still reads the prefs and the profile (readReading, readProfile + profileText).
-  const g = await loadGrounding(sql, store, paperIds);
+  // With no papers this still reads the prefs and the profile (readReading, readProfile + profileText). A scan goes as
+  // its abstract, so the copy check sees everything the model does.
+  const g = await loadGrounding(sql, store, paperIds, { pdf: false });
   if (g.unread.length)
     throw new HttpError(
       409,
-      `${paperIds.length > 1 ? 'A' : 'The'} paper’s text is still being fetched. Try again in a minute.`,
+      `${'paper' in from ? 'The' : 'A'} paper’s text is still being fetched. Try again in a minute.`,
     );
   const [{ notes, aids, quotes }, examples, meta] = await Promise.all([
     draftNotes(sql, paperIds, noteIds),

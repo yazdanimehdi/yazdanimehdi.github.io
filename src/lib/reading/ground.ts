@@ -24,7 +24,13 @@ export interface Grounding {
   unread: { id: number; title: string; error: string | null }[];
 }
 
-export async function loadGrounding(sql: Sql, store: PostgresStore, paperIds: number[]): Promise<Grounding> {
+/** `pdf: false`: a lone scan goes as its abstract too, never its PDF (a draft's copy check can't read a PDF). */
+export async function loadGrounding(
+  sql: Sql,
+  store: PostgresStore,
+  paperIds: number[],
+  o: { pdf?: boolean } = {},
+): Promise<Grounding> {
   const [papers, passages, texts, reading, owner] = await Promise.all([
     getPapers(sql, paperIds),
     getPassages(sql, paperIds),
@@ -45,7 +51,7 @@ export async function loadGrounding(sql: Sql, store: PostgresStore, paperIds: nu
     const t = text.get(p.id)!;
     const own = passages.filter((q) => q.paperId === p.id).map(({ pid, kind, body }) => ({ pid, kind, body }));
     if (t.source === 'scan' && t.pdf && !own.length) {
-      if (papers.length === 1) scan = { paper: p.id, pages: t.pages ?? 1, pdf: t.pdf };
+      if (papers.length === 1 && o.pdf !== false) scan = { paper: p.id, pages: t.pages ?? 1, pdf: t.pdf };
       else if (p.abstract) own.push({ pid: 'abs.1', kind: 'p', body: p.abstract });
     } else if (!own.length && (t.source === null || t.error !== null)) {
       unread.push({ id: p.id, title: p.title, error: t.error });

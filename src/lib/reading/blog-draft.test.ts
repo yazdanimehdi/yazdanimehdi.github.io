@@ -3,12 +3,13 @@ import test, { afterEach, beforeEach, mock } from 'node:test';
 import { HttpError } from '../admin/http';
 import { PostgresStore } from '../admin/postgres-store';
 import { listEntries, readEntry } from '../admin/content';
+import { ConflictError } from '../admin/store';
 import { setSqlForTests, type Sql } from '../db';
 import { migrate } from '../db-migrate';
 import { pgliteSql } from '../pglite-sql';
 import { isPublished } from '../utils';
 import { draftNotes, draftPost, draftSources, voiceExamples } from './blog-draft';
-import { upsertPapers, writeReading } from './db';
+import { saveText, upsertPapers, writeReading } from './db';
 import {
   addChat,
   addHighlight,
@@ -24,7 +25,7 @@ import { createNote, ensureChatNote, ensurePaperNote, saveRoomNote, setBody, wit
 
 let sql: Sql;
 let store: PostgresStore;
-let requests: { system: string; prompt: string }[];
+let requests: { system: string; prompt: string; documents: number }[];
 let reply: string;
 let providerError: string | null;
 const savedKey = process.env.ANTHROPIC_API_KEY;
@@ -50,7 +51,11 @@ beforeEach(async () => {
     const body = JSON.parse(String(init!.body));
     const content = body.messages[0].content;
     const blocks = typeof content === 'string' ? [{ text: content }] : content;
-    requests.push({ system: body.system, prompt: blocks.map((b: { text?: string }) => b.text ?? '').join('\n') });
+    requests.push({
+      system: body.system,
+      prompt: blocks.map((b: { text?: string }) => b.text ?? '').join('\n'),
+      documents: blocks.filter((b: { type?: string }) => b.type === 'document').length,
+    });
     if (providerError)
       return Response.json(
         { type: 'error', error: { type: 'invalid_request_error', message: providerError } },
@@ -378,6 +383,13 @@ test('unfetched text is refused before any AI call', async () => {
     draftPost(sql, store, { papers: [b, a] }),
     refused(409, 'A paper’s text is still being fetched. Try again in a minute.'),
   );
+  // Worded by the kind of source, as chat words it: a notebook of one paper says "A".
+  const nb = await createNotebook(sql, 'One');
+  await updateNotebook(sql, nb, { add: a });
+  await assert.rejects(
+    draftPost(sql, store, { notebook: nb }),
+    refused(409, 'A paper’s text is still being fetched. Try again in a minute.'),
+  );
   assert.equal(requests.length, 0);
   assert.equal(await aiUse(sql, day()), 0);
 });
@@ -423,4 +435,40 @@ test('a provider error writes no post, and a refused draft writes no post', asyn
   reply = draftReply({ body: `They wrote ${quote}.` });
   await assert.rejects(draftPost(sql, store, { paper: b }), refused(502, /copied a long passage/));
   assert.deepEqual(await slugs(), before);
+  assert.equal(requests.length, 3, 'one request per attempt, no retry');
+  assert.equal(await aiUse(sql, day()), 3, 'one counted call per attempt');
+});
+
+test('a scan is drafted from its abstract, never its PDF, and the abstract is copy-checked', async () => {
+  const abstract = Array.from({ length: 45 }, (_, i) => `a${i}`).join(' ');
+  const [{ id }] = await upsertPapers(sql, [
+    {
+      key: 'doi:10.1/scan',
+      doi: '10.1/scan',
+      source: 'doi',
+      title: 'A scan',
+      authors: ['Ann Scan'],
+      url: 'https://x.test/scan',
+      categories: [],
+      abstract: `${abstract}.`,
+    },
+  ]);
+  await saveText(sql, id, { source: 'scan', pdf: new Uint8Array([37, 80, 68, 70]), pages: 3 });
+  await draftPost(sql, store, { paper: id });
+  assert.equal(requests[0].documents, 0, 'no PDF is sent');
+  assert.ok(requests[0].prompt.includes(abstract));
+  const before = await slugs();
+  reply = draftReply({ body: `In short, ${abstract}.` });
+  await assert.rejects(draftPost(sql, store, { paper: id }), refused(502, /copied a long passage/));
+  assert.deepEqual(await slugs(), before);
+});
+
+test('a post created under the slug meanwhile is a conflict, and nothing is overwritten', async () => {
+  const a = await ready('A');
+  await post('my-post', 'title: Mine\ndate: 2026-01-01');
+  // The listing misses it, as if it was created after the listing.
+  const list = store.list.bind(store);
+  mock.method(store, 'list', async (dir: string) => (await list(dir)).filter((f) => !f.path.endsWith('/my-post.md')));
+  await assert.rejects(draftPost(sql, store, { paper: a }), ConflictError);
+  assert.equal((await readEntry(store, 'posts', 'my-post'))!.data.title, 'Mine');
 });
