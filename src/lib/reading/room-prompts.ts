@@ -106,11 +106,11 @@ export const SUMMARY_HEADINGS = [
 
 export type Scan = { paper: number; pages: number; pdf: Uint8Array };
 
-const scanRule = (scan?: Scan) =>
+export const scanRule = (scan?: Scan) =>
   scan
     ? [`Paper ${scan.paper} is the attached PDF of ${scan.pages} pages: cite it by page, like [${scan.paper}:page3].`]
     : [];
-const scanPdf = (scan?: Scan) => (scan ? { pdf: { name: `paper-${scan.paper}.pdf`, bytes: scan.pdf } } : {});
+export const scanPdf = (scan?: Scan) => (scan ? { pdf: { name: `paper-${scan.paper}.pdf`, bytes: scan.pdf } } : {});
 
 const TASK: Record<OutputKind, string[]> = {
   summary: [

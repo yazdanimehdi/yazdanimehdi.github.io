@@ -2,7 +2,7 @@
 import type { ImageOutput, TextInput } from '../ai/providers';
 import { resolveAiConfig, type PapersSchedule } from '../ai/providers';
 import { imagePrompt, paperPostPrompt, parsePaperPost, type PaperInput, type PaperPost } from '../ai/prompts';
-import { suggestSlug } from '../utils';
+import { suggestSlug, uniqueSlug } from '../utils';
 import { generateImage, generateText, readAiConfig, saveImage } from './ai';
 import { entryChange, listEntries, readConfig } from './content';
 import { commitChanges } from './http';
@@ -120,13 +120,6 @@ function toArticle(raw: any): Article | null {
   };
 }
 
-const unique = (base: string, taken: Set<string>) => {
-  let slug = base;
-  for (let n = 2; taken.has(slug); n++) slug = `${base.slice(0, 76)}-${n}`;
-  taken.add(slug);
-  return slug;
-};
-
 const message = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 export function parseState(text: string | undefined): ScholarState {
@@ -201,7 +194,7 @@ export async function syncPapers(store: ContentStore, deps: PapersDeps, now = ne
     if (writePost) drafted++;
     titles.add(normalizeTitle(a.title));
     newlySeen.push(a.citationId);
-    planned.push({ a, pubSlug: unique(generateId(a.authors, a.year, a.title), pubSlugs), writePost });
+    planned.push({ a, pubSlug: uniqueSlug(generateId(a.authors, a.year, a.title), pubSlugs), writePost });
   }
 
   // The completed fields win over Scholar's: its scholar.google.com link stays only when no url was found.
@@ -294,7 +287,7 @@ export async function syncPapers(store: ContentStore, deps: PapersDeps, now = ne
       continue;
     }
     const { post, image } = draft;
-    const postSlug = unique(suggestSlug(post.title) || `${pubSlug}-post`, postSlugs);
+    const postSlug = uniqueSlug(suggestSlug(post.title) || `${pubSlug}-post`, postSlugs);
     const cover =
       'error' in image ? image : await saveImage(store, postSlug, image).catch((e: unknown) => ({ error: message(e) }));
     if ('error' in cover) result.failed.push({ item: `cover image for ${postSlug}`, error: cover.error });

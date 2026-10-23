@@ -11,7 +11,7 @@ const MARKDOWN_RULES =
   'Reply with the Markdown body only: no front matter, no title heading, no code fence around the whole reply, ' +
   'no preamble. Keep inline math ($…$), display math ($$…$$), links, images and code blocks exactly as written.';
 
-const SYSTEM =
+export const EDITOR_SYSTEM =
   'You are a careful academic editor. You write clear, plain, accurate prose and never invent results, ' +
   'numbers, citations or quotes that the material does not support.';
 
@@ -25,7 +25,7 @@ export function writePrompt(input: {
   body?: string;
 }): TextInput {
   return {
-    system: `${SYSTEM} ${MARKDOWN_RULES}`,
+    system: `${EDITOR_SYSTEM} ${MARKDOWN_RULES}`,
     prompt: lines(
       `Draft the body of ${KIND[input.collection]}.`,
       input.title && `Title: ${input.title}`,
@@ -44,7 +44,7 @@ export function rewritePrompt(input: {
   body: string;
 }): TextInput {
   return {
-    system: `${SYSTEM} ${MARKDOWN_RULES}`,
+    system: `${EDITOR_SYSTEM} ${MARKDOWN_RULES}`,
     prompt: lines(
       `Rewrite the body of ${KIND[input.collection]}.`,
       input.title && `Title: ${input.title}`,
@@ -97,9 +97,14 @@ export interface PaperInput {
   abstract?: string;
 }
 
+/** The JSON post a model is asked for; `bodyNote` says what the body holds. */
+export const postJson = (bodyNote: string) =>
+  'Reply with one JSON object and nothing else: {"title": string, "subtitle": string, "excerpt": string ' +
+  `(one sentence), "tags": string[] (at most 5, lowercase), "body": string ${bodyNote}}.`;
+
 export function paperPostPrompt(paper: PaperInput): TextInput {
   return {
-    system: SYSTEM,
+    system: EDITOR_SYSTEM,
     prompt: lines(
       'One of the site owner’s papers was just published. Write a blog post about it for a general technical ' +
         'audience: what problem it tackles, the key idea, and why it matters. 400 to 700 words, first person ' +
@@ -109,9 +114,7 @@ export function paperPostPrompt(paper: PaperInput): TextInput {
       `Venue: ${paper.venue} (${paper.year})`,
       paper.url && `Link: ${paper.url}`,
       paper.abstract ? `Abstract: ${paper.abstract}` : 'No abstract is available: stay close to the title.',
-      'Reply with one JSON object and nothing else: {"title": string, "subtitle": string, "excerpt": string ' +
-        '(one sentence), "tags": string[] (at most 5, lowercase), "body": string (Markdown, no front matter, no ' +
-        'title heading)}.',
+      postJson('(Markdown, no front matter, no title heading)'),
     ),
     maxTokens: 8000,
   };

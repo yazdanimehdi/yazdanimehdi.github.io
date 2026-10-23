@@ -40,6 +40,14 @@ export function suggestSlug(title: string): string {
   return slugify(title).slice(0, 80).replace(/-+$/, '');
 }
 
+/** `base`, or `base-2`, `base-3`… (kept within 80 characters), whichever is free; the slug returned joins `taken`. */
+export function uniqueSlug(base: string, taken: Set<string>): string {
+  let slug = base;
+  for (let n = 2; taken.has(slug); n++) slug = `${base.slice(0, 76)}-${n}`;
+  taken.add(slug);
+  return slug;
+}
+
 /** The URL when it is http(s), else undefined: feed links come from third-party XML and could be `javascript:`. */
 export function safeHref(url: string | undefined): string | undefined {
   return url && /^https?:\/\//i.test(url.trim()) ? url : undefined;

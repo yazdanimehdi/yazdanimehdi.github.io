@@ -113,6 +113,9 @@ export interface Output {
 
 export type Target = { paper: number } | { notebook: number };
 
+/** What a blog draft is written from. */
+export type DraftFrom = { paper: number } | { notebook: number } | { note: number } | { papers: number[] };
+
 export interface ChatMessage {
   id: number;
   role: 'user' | 'assistant';

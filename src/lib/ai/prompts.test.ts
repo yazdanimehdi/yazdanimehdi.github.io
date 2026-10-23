@@ -2,10 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   cleanMarkdown,
+  EDITOR_SYSTEM,
   figurePrompt,
   imagePrompt,
   paperPostPrompt,
   parsePaperPost,
+  postJson,
   rewritePrompt,
   writePrompt,
 } from './prompts';
@@ -89,4 +91,31 @@ test('parsePaperPost: JSON inside prose or a fence parses; bad JSON or a missing
   });
   assert.throws(() => parsePaperPost('no json here'), /did not return the JSON/);
   assert.throws(() => parsePaperPost('{"title": "x"}'), /no title or body/);
+});
+
+test('paperPostPrompt: its text is unchanged by the shared system line and JSON format', () => {
+  const p = paperPostPrompt({
+    title: 'P',
+    authors: ['A Chen', 'J Smith'],
+    venue: 'NeurIPS',
+    year: 2026,
+    url: 'https://x.test/p',
+    abstract: 'We show X.',
+  });
+  const json =
+    'Reply with one JSON object and nothing else: {"title": string, "subtitle": string, "excerpt": string (one ' +
+    'sentence), "tags": string[] (at most 5, lowercase), "body": string (Markdown, no front matter, no title heading)}.';
+  assert.deepEqual(p, {
+    system:
+      'You are a careful academic editor. You write clear, plain, accurate prose and never invent results, numbers, ' +
+      'citations or quotes that the material does not support.',
+    prompt:
+      'One of the site owner’s papers was just published. Write a blog post about it for a general technical ' +
+      'audience: what problem it tackles, the key idea, and why it matters. 400 to 700 words, first person plural ' +
+      '("we"). Use only what the paper details below say.\n\nTitle: P\n\nAuthors: A Chen, J Smith\n\nVenue: ' +
+      `NeurIPS (2026)\n\nLink: https://x.test/p\n\nAbstract: We show X.\n\n${json}`,
+    maxTokens: 8000,
+  });
+  assert.equal(p.system, EDITOR_SYSTEM);
+  assert.equal(postJson('(Markdown, no front matter, no title heading)'), json);
 });
