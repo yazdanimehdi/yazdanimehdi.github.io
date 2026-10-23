@@ -96,7 +96,14 @@ export function draftPrompt(o: {
   };
 }
 
-type Node = { type: string; value?: string; children?: Node[]; position?: { start: { offset?: number } } };
+type Node = {
+  type: string;
+  value?: string;
+  lang?: string | null;
+  meta?: string | null;
+  children?: Node[];
+  position?: { start: { offset?: number } };
+};
 
 const PARSE = { extensions: [gfm(), math()], mdastExtensions: [gfmFromMarkdown(), mathFromMarkdown()] };
 // `cite` nodes are code's own Markdown, written as is.
@@ -107,6 +114,52 @@ const WRITE = {
   handlers: { cite: (n: Node) => n.value },
 } as unknown as Options;
 const GONE = new Set(['html', 'image', 'imageReference', 'definition']);
+
+// The site's MathJax loads TeX packages on demand, `html` among them (\href, \style, \class…), so math in a draft may
+// use only these commands and control symbols, with balanced braces so MathJax can't read past its end; anything else
+// is shown as code.
+const TEX = new Set(
+  (
+    'alpha beta gamma delta epsilon varepsilon zeta eta theta vartheta iota kappa lambda mu nu xi pi varpi rho ' +
+    'varrho sigma varsigma tau upsilon phi varphi chi psi omega Gamma Delta Theta Lambda Xi Pi Sigma Upsilon Phi Psi ' +
+    'Omega frac dfrac tfrac sqrt binom dbinom tbinom sum prod coprod int iint iiint oint bigcup bigcap bigoplus ' +
+    'bigotimes bigvee bigwedge lim liminf limsup sup inf max min arg det exp log ln lg sin cos tan cot sec csc arcsin ' +
+    'arccos arctan sinh cosh tanh dim ker hom deg gcd Pr mod bmod pmod le leq ge geq ne neq approx sim simeq cong ' +
+    'equiv propto in notin ni subset subseteq supset supseteq subsetneq ll gg prec succ preceq succeq perp parallel ' +
+    'mid models vdash pm mp times div cdot ast star circ bullet oplus ominus otimes odot cup cap setminus wedge vee ' +
+    'land lor lnot neg forall exists nexists partial nabla infty emptyset varnothing aleph hbar ell Re Im top bot ' +
+    'angle triangle to gets leftarrow rightarrow Leftarrow Rightarrow leftrightarrow Leftrightarrow mapsto implies ' +
+    'iff longrightarrow longleftarrow Longrightarrow uparrow downarrow ldots cdots vdots ddots dots hat widehat tilde ' +
+    'widetilde bar overline underline vec dot ddot overbrace underbrace mathbb mathcal mathrm mathbf mathit mathsf ' +
+    'mathtt mathfrak boldsymbol operatorname text left right big Big bigg Bigg bigl bigr Bigl Bigr langle rangle ' +
+    'lfloor rfloor lceil rceil lvert rvert lVert rVert vert Vert quad qquad begin end hline limits nolimits ' +
+    'displaystyle textstyle overset underset stackrel substack not prime top intercal'
+  ).split(' '),
+);
+const SYMBOLS = ',;:! \\{}|#$%&_';
+function plainTex(tex: string): boolean {
+  let depth = 0;
+  for (const m of tex.matchAll(/\\([A-Za-z]+|[\s\S]?)|[{}]/g)) {
+    if (m[0] === '{') depth++;
+    else if (m[0] === '}') depth--;
+    else if (!TEX.has(m[1]) && !(m[1].length === 1 && SYMBOLS.includes(m[1]))) return false;
+    if (depth < 0) return false;
+  }
+  return depth === 0;
+}
+// MathJax also typesets \(…\), \[…\] and \begin{…} in plain text, so text shows a backslash as a lookalike.
+const noTex = (s: string) => s.replace(/\\/g, '＼');
+// Code blocks the site turns into diagrams or charts in the browser (ProseEnhancements.astro).
+const CLIENT = /mermaid|chart|tikz/i;
+
+/** A node made safe to render: risky math becomes code, text can't start math, and a diagram or chart block is plain. */
+function inert(n: Node): Node {
+  if (n.type === 'text') return { ...n, value: noTex(n.value!) };
+  if (n.type === 'inlineMath' && !plainTex(n.value!)) return { type: 'inlineCode', value: n.value };
+  if (n.type === 'math' && !plainTex(n.value!)) return { type: 'code', lang: 'text', value: n.value };
+  if (n.type === 'code' && CLIENT.test(n.lang ?? '')) return { ...n, lang: 'text', meta: null };
+  return n;
+}
 
 /**
  * The model's Markdown as a tree with every HTML node, image and definition removed, every `[text](…)` and
@@ -129,7 +182,7 @@ function sanitize(md: string): Node[] {
         const children = n.children && unlink(n.children);
         const unwrap = n.type === 'link' || n.type === 'linkReference';
         changed ||= unwrap;
-        for (const k of unwrap ? children! : [{ ...n, children }]) {
+        for (const k of unwrap ? children! : [inert({ ...n, children })]) {
           const last = out.at(-1);
           if (k.type === 'text' && last?.type === 'text')
             out[out.length - 1] = { ...last, value: last.value! + k.value };
@@ -142,7 +195,7 @@ function sanitize(md: string): Node[] {
     if (!changed) return children;
     md = toMarkdown({ type: 'root', children } as never, WRITE);
   }
-  throw new Error('The draft was empty once its links were checked. Draft again.');
+  throw new Error('The draft’s links could not be checked, so it was dropped. Draft again.');
 }
 
 /** Each kept citation in a text node as a `cite` node holding its links. */
@@ -161,17 +214,29 @@ function cite(nodes: Node[], links: (ids: string) => string): Node[] {
   });
 }
 
-/** The text a reader sees, a citation counting as a space. */
+const INLINE = new Set(['emphasis', 'strong', 'delete']);
+/** The text a reader sees: a citation, a line break and the edge of a block count as a space. */
 const plain = (nodes: Node[]): string =>
-  nodes.map((n) => (n.type === 'cite' ? ' ' : n.children ? plain(n.children) : (n.value ?? ''))).join('');
+  nodes
+    .map((n) =>
+      n.type === 'cite' || n.type === 'break'
+        ? ' '
+        : !n.children
+          ? (n.value ?? '')
+          : INLINE.has(n.type)
+            ? plain(n.children)
+            : ` ${plain(n.children)} `,
+    )
+    .join('');
 
 // What GFM turns into a link even when escaped: a URL, `www.…` or an email address.
 const LITERAL = /(?:https?:\/\/|www\.)[^\s`]*|[-.\w+]+@[-\w]+(?:\.[-\w]+)+/gi;
-const backslash = (s: string) => s.replace(/[\\[\]<>*_`]/g, '\\$&');
+// `&` so metadata can't spell an entity, `$` so it can't open math, `|` so it can't end a table cell.
+const backslash = (s: string) => s.replace(/[[\]<>*_`&$|]/g, '\\$&');
 
 /** Third-party text on one line that can't become a link, HTML or emphasis: what GFM would link goes in code. */
 function esc(s: string): string {
-  const t = visible(s).replace(/\s+/g, ' ').trim();
+  const t = noTex(visible(s).replace(/\s+/g, ' ').trim());
   let out = '';
   let at = 0;
   for (const m of t.matchAll(LITERAL)) {

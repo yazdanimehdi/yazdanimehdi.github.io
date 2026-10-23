@@ -36,13 +36,19 @@ const ctx = (o: Partial<Parameters<typeof parseDraft>[1]> = {}) => ({
 });
 const draft = (body: string, o: Partial<Parameters<typeof parseDraft>[1]> = {}) => parseDraft(reply(body), ctx(o)).body;
 
-/** Every link, image, definition and HTML node a renderer with GFM and math would find in `md`. */
+/** Every link, image, definition, HTML node, math and code language a renderer with GFM and math would find. */
 function rendered(md: string) {
   const urls: string[] = [];
+  const maths: string[] = [];
+  const langs: (string | null)[] = [];
+  let texts = '';
   let html = 0;
-  const walk = (n: { type: string; url?: string; children?: unknown[] }) => {
+  const walk = (n: { type: string; url?: string; value?: string; lang?: string | null; children?: unknown[] }) => {
     if (n.url !== undefined) urls.push(`${n.type} ${n.url}`);
     if (n.type === 'html') html++;
+    if (n.type === 'math' || n.type === 'inlineMath') maths.push(n.value!);
+    if (n.type === 'code') langs.push(n.lang ?? null);
+    if (n.type === 'text') texts += n.value;
     for (const c of n.children ?? []) walk(c as typeof n);
   };
   walk(
@@ -51,7 +57,7 @@ function rendered(md: string) {
       mdastExtensions: [gfmFromMarkdown(), mathFromMarkdown()],
     }),
   );
-  return { urls, html };
+  return { urls, html, maths, langs, texts };
 }
 
 test('a single paper gets a post, several a roundup, none a post from the owner’s note', () => {
@@ -207,4 +213,81 @@ test('parseDraft clamps its fields; parsePaperPost does not', () => {
   const asIs = parsePaperPost(r);
   assert.equal(asIs.title.length, 300);
   assert.deepEqual(asIs.tags, ['Machine Learning', 'x'.repeat(50)]);
+});
+
+test('math that could load a link or a style is shown as code; plain math stays math', () => {
+  const risky = [
+    '\\href{javascript:alert(1)}{click}',
+    '\\frac{a}{\\mathrm{\\href{https://evil.test}{x}}}',
+    '\\text{$\\class{x}{y}$}',
+    '\\require{html}',
+    '\\unicode{x41}',
+    '\\hrefx{y}',
+    '\\url{https://evil.test}',
+    '\\newcommand{\\a}{b}',
+  ];
+  for (const tex of risky) {
+    const inline = rendered(draft(`See $${tex}$ here.`));
+    assert.deepEqual(inline.maths, [], tex);
+    assert.deepEqual(inline.urls, rendered(draft('See.')).urls, tex);
+    const block = rendered(draft(`Block:\n\n$$\n\\style{position:fixed;width:100vw}{${tex}}\n$$`));
+    assert.deepEqual(block.maths, [], tex);
+    assert.deepEqual(block.langs, ['text'], tex);
+  }
+  assert.ok(draft('See $\\href{javascript:x}{c}$.').startsWith('See `\\href{javascript:x}{c}`.'));
+  for (const v of [
+    '\\\\(\\href{javascript:alert(1)}{x}\\\\)',
+    '\\begin{align}\\href{javascript:alert(1)}{x}\\end{align}',
+    '&#92;[\\style{position:fixed}{x}&#92;]',
+    '$\\text{$ \\class{x}{y} $}$',
+  ]) {
+    const r = rendered(draft(`Text ${v} end.`));
+    assert.doesNotMatch(r.texts, /\\/, `MathJax would typeset ${v}`);
+    assert.deepEqual(r.maths, [], v);
+  }
+  const title = rendered(
+    draft('Q [13:S1.p1].', { papers: [{ ...B, title: 'Fast \\(\\href{javascript:x}{y}\\) sort' }] }),
+  );
+  assert.doesNotMatch(title.texts, /\\/);
+  const ok = '$\\frac{a}{b} + \\alpha_1 \\le \\sum_{i} x_i \\, \\{y\\}$';
+  assert.deepEqual(rendered(draft(`Fine ${ok}.`)).maths, [ok.slice(1, -1)]);
+});
+
+test('diagram and chart blocks are shown as plain code', () => {
+  for (const lang of ['mermaid', 'Mermaid', 'chartjs', 'tikz']) {
+    const body = draft(`D:\n\n\`\`\`${lang} x\nflowchart LR\n  click A href "https://evil.test"\n\`\`\`\n`);
+    assert.deepEqual(rendered(body).langs, ['text'], lang);
+    assert.match(body, /```text\nflowchart LR/);
+  }
+  assert.deepEqual(rendered(draft('Code:\n\n```py\nprint(1)\n```')).langs, ['py']);
+});
+
+test('entities and math in paper metadata stay text', () => {
+  const odd: DraftPaper = {
+    id: 13,
+    title: 'Go https&#58;//evil.test $\\href{javascript:alert(1)}{x}$ | a',
+    authors: ['x&#64;evil.test', 'www&#46;evil.test'],
+    url: 'ftp://x.test',
+    publishedAt: null,
+  };
+  const body = draft('Q [13:S1.p1].', { papers: [odd] });
+  const r = rendered(body);
+  assert.deepEqual([r.urls, r.maths, r.html], [[], [], 0], body);
+  assert.match(body, /x\\&#64;evil\.test/);
+});
+
+test('a copy split over blocks or lines is still refused', () => {
+  const words = Array.from({ length: 60 }, (_, i) => `word${i + 1}`);
+  const passages = [words.join(' ')];
+  const part = (a: number, b: number) => words.slice(a, b).join(' ');
+  for (const body of [
+    `${part(0, 30)}\n\n${part(30, 60)}`,
+    `${part(0, 30)}  \n${part(30, 60)}`,
+    `${part(0, 30)}\\\n${part(30, 60)}`,
+    `- ${part(0, 20)}\n- ${part(20, 40)}\n- ${part(40, 60)}`,
+    `## ${part(0, 10)}\n\n> ${part(10, 60)}`,
+    `| ${part(0, 25)} | ${part(25, 50)} |\n| - | - |`,
+  ])
+    assert.throws(() => draft(body, { passages }), /copied a long passage/, body);
+  assert.doesNotThrow(() => draft(`*${part(0, 20)}* other words here ${part(30, 49)}`, { passages }));
 });
