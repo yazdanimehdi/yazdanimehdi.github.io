@@ -315,35 +315,10 @@ test('a cite inside a foreign link keeps its link to the paper', () => {
   assert.equal(body.split('[Vaswani et al.](<https://arxiv.org/abs/1706.03762>)').length, 4, body);
 });
 
-test('parseDraft stays fast on replies built to be slow, and refuses the extreme ones', () => {
-  const pad = (x: string) => x + ' filler words go here'.repeat(Math.max(0, Math.floor((19_900 - x.length) / 21)));
-  const prose = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed. '.repeat(330);
-  const passages = Array.from({ length: 100 }, (_, i) => `Passage ${i} ${prose.slice(i, 3000 + i)}`);
-  const cases: [string, string, RegExp | null][] = [
-    ['emphasis soup', '*_'.repeat(2000) + 'x' + '_*'.repeat(2000), /too much formatting/],
-    ['just over the cap', '*a* '.repeat(601), /too much formatting/],
-    ['brackets just over the cap', '[a] '.repeat(301), /too much formatting/],
-    ['emphasis soup at the cap', pad('*_'.repeat(300) + 'x' + '_*'.repeat(300)), null],
-    ['images at the cap', pad('!['.repeat(400) + 'x' + '](y)'.repeat(200)), null],
-    ['brackets at the cap', pad('['.repeat(300) + 'x' + ']'.repeat(300) + '(https://e.test)'), null],
-    ['deep quotes', '>'.repeat(10_000) + ' x', /nested its quotes or lists too deeply/],
-    ['deep list on one line', '- '.repeat(5000) + 'x', /nested its quotes or lists too deeply/],
-    ['many cites', 'x [12:S2.p3] '.repeat(1500), null],
-    ['joins by removal', 'www<!-- -->.e.test x '.repeat(1000), null],
-    ['prose against 300k of passages', 'Dolor amet sit lorem ipsum elit, my own words. '.repeat(400), null],
-  ];
-  for (const [name, body, refused] of cases) {
-    const t = performance.now();
-    if (refused) assert.throws(() => draft(body, { passages }), refused, name);
-    else assert.doesNotThrow(() => draft(body, { passages }), name);
-    const ms = performance.now() - t;
-    assert.ok(ms < 1000, `${name} took ${Math.round(ms)} ms`);
-  }
-  const list16 = Array.from({ length: 16 }, (_, i) => `${'  '.repeat(i)}- level ${i}`).join('\n');
-  assert.match(draft(list16), /level 15/, '16 levels of nesting are fine');
-});
-
-const timed = (name: string, f: () => unknown, ms: number) => {
+// Timing is checked by growth, so a busy machine doesn't fail it: f(n) against f(4n), best of 3 and interleaved so
+// both see the same load. Linear work takes about 4× as long, quadratic 16×. CEILING is only a backstop.
+const CEILING = 5000;
+const took = (f: () => unknown) => {
   const t = performance.now();
   try {
     f();
@@ -351,49 +326,98 @@ const timed = (name: string, f: () => unknown, ms: number) => {
     // A refusal counts as done, since the time is what's checked; a failed assertion doesn't.
     if (e instanceof assert.AssertionError) throw e;
   }
-  const took = performance.now() - t;
-  assert.ok(took < ms, `${name} took ${Math.round(took)} ms`);
+  return performance.now() - t;
 };
+const timed = (name: string, f: () => unknown) => {
+  const ms = took(f);
+  assert.ok(ms < CEILING, `${name} took ${Math.round(ms)} ms`);
+};
+const grows = (name: string, f: (n: number) => unknown, n: number) => {
+  const [small, big] = [[] as number[], [] as number[]];
+  for (let i = 0; i < 3; i++)
+    for (const [k, times] of [
+      [n, small],
+      [4 * n, big],
+    ] as const) {
+      const ms = took(() => f(k));
+      assert.ok(ms < CEILING, `${name} took ${Math.round(ms)} ms at ${k}`);
+      times.push(ms);
+    }
+  const [a, b] = [Math.min(...small), Math.min(...big)];
+  assert.ok(b < 10 * Math.max(a, 2), `${name} took ${a.toFixed(1)} ms at ${n}, ${b.toFixed(1)} ms at ${4 * n}`);
+};
+
+test('parseDraft stays fast on replies built to be slow, and refuses the extreme ones', () => {
+  const pad = (x: string) => x + ' filler words go here'.repeat(Math.max(0, Math.floor((19_900 - x.length) / 21)));
+  const prose = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit sed. '.repeat(330);
+  const passagesOf = (k: number) => Array.from({ length: k }, (_, i) => `Passage ${i} ${prose.slice(i, 3000 + i)}`);
+  const passages = passagesOf(100);
+  const marked = /too much formatting/;
+  const deep = /nested its quotes or lists too deeply/;
+  const check = (body: string, refused: RegExp | null, o = { passages }) =>
+    refused ? assert.throws(() => draft(body, o), refused) : assert.doesNotThrow(() => draft(body, o));
+  // At a cap the parser's time is quadratic by design (that's why the caps exist), so these get only the ceiling.
+  const capped: [string, string, RegExp | null][] = [
+    ['just over the cap', '*a* '.repeat(601), marked],
+    ['brackets just over the cap', '[a] '.repeat(301), marked],
+    ['emphasis soup at the cap', pad('*_'.repeat(300) + 'x' + '_*'.repeat(300)), null],
+    ['images at the cap', pad('!['.repeat(400) + 'x' + '](y)'.repeat(200)), null],
+    ['brackets at the cap', pad('['.repeat(300) + 'x' + ']'.repeat(300) + '(https://e.test)'), null],
+  ];
+  for (const [name, body, refused] of capped) timed(name, () => check(body, refused));
+  grows('emphasis soup', (n) => check('*_'.repeat(n) + 'x' + '_*'.repeat(n), marked), 500);
+  grows('deep quotes', (n) => check('>'.repeat(n) + ' x', deep), 2500);
+  grows('deep list on one line', (n) => check('- '.repeat(n) + 'x', deep), 1250);
+  grows('many cites', (n) => check('x [12:S2.p3] '.repeat(n), null), 375);
+  grows('joins by removal', (n) => check('www<!-- -->.e.test x '.repeat(n), null), 250);
+  const own = 'Dolor amet sit lorem ipsum elit, my own words. '.repeat(400);
+  grows('prose against passages', (n) => check(own, null, { passages: passagesOf(n) }), 25);
+  const list16 = Array.from({ length: 16 }, (_, i) => `${'  '.repeat(i)}- level ${i}`).join('\n');
+  assert.match(draft(list16), /level 15/, '16 levels of nesting are fine');
+});
 
 test('nesting is checked in one pass, and only past 16 levels', () => {
   const deep = /nested its quotes or lists too deeply/;
-  timed('spaced markers', () => assert.equal(tooDeep(`${'-    '.repeat(16)}x`), false), 50);
+  // The regex this replaced took minutes on this line.
+  timed('spaced markers', () => assert.equal(tooDeep(`${'-    '.repeat(16)}x`), false));
   assert.doesNotThrow(() => draft(`${'-    '.repeat(16)}x`));
   for (const body of ['>'.repeat(17) + ' x', '- '.repeat(17) + 'x', '1. '.repeat(17) + 'x', '> - '.repeat(9) + 'x']) {
-    timed(body, () => assert.equal(tooDeep(body), true), 50);
+    timed(body, () => assert.equal(tooDeep(body), true));
     assert.throws(() => draft(body), deep, body);
   }
-  const quotes = `${'> '.repeat(16)}line\n`.repeat(500);
-  timed('500 lines 16 deep', () => assert.equal(tooDeep(quotes), false), 50);
-  timed('500 lines 16 deep, parsed', () => draft(quotes), 250);
-  assert.doesNotThrow(() => draft(quotes));
+  const quotes = (n: number) => `${'> '.repeat(16)}line\n`.repeat(n);
+  grows('lines 16 deep', (n) => assert.equal(tooDeep(quotes(n)), false), 20_000);
+  grows('lines 16 deep, parsed', (n) => draft(quotes(n)), 125);
+  assert.doesNotThrow(() => draft(quotes(500)));
 });
 
 test('a lone \\r ends a line for the nesting check, as it does for the parser', () => {
   const deep = /nested its quotes or lists too deeply/;
   assert.equal(tooDeep('x\r' + '> '.repeat(17) + 'y'), true);
   assert.throws(() => draft('x\r' + '> '.repeat(17) + 'y'), deep);
-  timed('6000 ordered after \\r', () => assert.throws(() => draft('x\r' + '1. '.repeat(6000) + 'y'), deep), 50);
+  grows('ordered after \\r', (n) => assert.throws(() => draft('x\r' + '1. '.repeat(n) + 'y'), deep), 1500);
   assert.match(draft('x\r\n' + '> '.repeat(16) + 'y'), /y/);
 });
 
 test('no pattern backtracks on a long run of what it repeats', () => {
-  const long = 80_000;
-  const cases: [string, () => unknown][] = [
-    ['defang: < then spaces', () => prompt({ notes: [`<${' '.repeat(long)}x`.repeat(3)] })],
-    ['cites: a run of spaces', () => draft(`a${' '.repeat(long)}b`)],
-    ['cites: an unclosed id', () => draft(`a [12:${'S'.repeat(long)}`)],
-    ['cites: many ids', () => draft(`a [${'12:S2.p3, '.repeat(2000)}`)],
-    ['literals: a long word in a title', () => draft('Q [13:S1.p1].', { papers: [{ ...B, title: 'a'.repeat(long) }] })],
+  // At 160,000 characters each pattern this replaced took over 5 s.
+  const long = 160_000;
+  const cases: [string, (n: number) => unknown][] = [
+    ['defang: < then spaces', (n) => prompt({ notes: [`<${' '.repeat(n)}x`.repeat(3)] })],
+    ['cites: a run of spaces', (n) => draft(`a${' '.repeat(n)}b`)],
+    ['cites: an unclosed id', (n) => draft(`a [12:${'S'.repeat(n)}`)],
+    ['literals: a long word in a title', (n) => draft('Q [13:S1.p1].', { papers: [{ ...B, title: 'a'.repeat(n) }] })],
     [
       'literals: a long dotted domain',
-      () => draft('Q [13:S1.p1].', { papers: [{ ...B, title: `a@${'b.'.repeat(5000)}` }] }),
+      (n) => draft('Q [13:S1.p1].', { papers: [{ ...B, title: `a@${'b.'.repeat(n / 16)}` }] }),
     ],
-    ['tex: backslash runs', () => draft(`$${'\\'.repeat(long)}$`)],
-    ['words: one long word', () => draft('w'.repeat(long), { passages: ['w'.repeat(long)] })],
-    ['depth: digits and spaces', () => draft(`${'123456789 '.repeat(2000)}x`)],
+    ['tex: backslash runs', (n) => draft(`$${'\\'.repeat(n)}$`)],
+    ['words: one long word', (n) => draft('w'.repeat(n), { passages: ['w'.repeat(n)] })],
+    ['depth: digits and spaces', (n) => draft(`${'123456789 '.repeat(n / 40)}x`)],
   ];
-  for (const [name, f] of cases) timed(name, f, 600);
+  for (const [name, f] of cases) grows(name, f, long / 4);
+  // GFM's own parse is a little superlinear here, and the body is cut to 20,000 characters, so only the ceiling.
+  timed('cites: many ids', () => draft(`a [${'12:S2.p3, '.repeat(2000)}`));
 });
 
 test('formatting inside code and math is not counted against the cap', () => {
