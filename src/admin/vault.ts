@@ -1,0 +1,106 @@
+// Pure helpers for the vault's editor ([[ autocomplete, out-links) and graph (layout, picking).
+import { wikiLinks } from '../lib/reading/vault-links';
+import type { NoteRow } from '../lib/reading/types';
+
+type Point = { x: number; y: number };
+
+/** The open `[[` before the caret (no `]`, `|`, `#` or newline since): `start` is just after it. */
+export function linkQuery(text: string, caret: number): { start: number; query: string } | null {
+  const before = text.slice(0, caret);
+  const open = before.lastIndexOf('[[');
+  if (open < 0) return null;
+  const query = before.slice(open + 2);
+  return /[\]|#\n]/.test(query) ? null : { start: open + 2, query };
+}
+
+/** `text[start, caret)` becomes `title]]` (reusing a `]]` already after the caret); the caret lands after the `]]`. */
+export function completeLink(
+  text: string,
+  caret: number,
+  start: number,
+  title: string,
+): { text: string; caret: number } {
+  const after = text.slice(caret);
+  const closed = after.startsWith(']]');
+  const head = `${text.slice(0, start)}${title}]]`;
+  return { text: head + (closed ? after.slice(2) : after), caret: head.length };
+}
+
+/** Titles containing the query (case ignored), those starting with it first, each by title; `self` left out. */
+export function matchTitles(notes: NoteRow[], query: string, self: number, limit = 8): NoteRow[] {
+  const q = query.toLowerCase();
+  const rank = (n: NoteRow) => (n.title.toLowerCase().startsWith(q) ? 0 : 1);
+  return notes
+    .filter((n) => n.id !== self && n.title.toLowerCase().includes(q))
+    .sort((a, b) => rank(a) - rank(b) || a.title.localeCompare(b.title))
+    .slice(0, limit);
+}
+
+/** The body's links in order, each with the id of the note it names (case ignored), or null. */
+export function outLinks(body: string, notes: NoteRow[]): { title: string; id: number | null }[] {
+  const ids = new Map(notes.map((n) => [n.title.toLowerCase(), n.id]));
+  return wikiLinks(body).map((title) => ({ title, id: ids.get(title.toLowerCase()) ?? null }));
+}
+
+const MARGIN = 24;
+const GOLDEN = Math.PI * (3 - Math.sqrt(5));
+
+/**
+ * Fruchterman–Reingold from a golden-angle spiral (deterministic). Edges are node indexes.
+ * ponytail: O(n²) per step; the 200-node cap keeps it under ~100 ms.
+ */
+export function layout(n: number, edges: [number, number][], w: number, h: number, iterations = 300): Point[] {
+  const cx = w / 2;
+  const cy = h / 2;
+  const spread = Math.max(0, Math.min(w, h) / 2 - MARGIN);
+  const pts = Array.from({ length: n }, (_, i) => {
+    const r = spread * Math.sqrt((i + 0.5) / n);
+    return { x: cx + r * Math.cos(i * GOLDEN), y: cy + r * Math.sin(i * GOLDEN) };
+  });
+  const k = Math.sqrt((w * h) / Math.max(n, 1));
+  for (let it = 0; it < iterations; it++) {
+    const t = (w / 10) * (1 - it / iterations);
+    const dx = new Array<number>(n).fill(0);
+    const dy = new Array<number>(n).fill(0);
+    for (let i = 0; i < n; i++) {
+      for (let j = i + 1; j < n; j++) {
+        const ex = pts[i].x - pts[j].x;
+        const ey = pts[i].y - pts[j].y;
+        const d = Math.hypot(ex, ey) || 0.01;
+        const f = (k * k) / d / d;
+        dx[i] += ex * f;
+        dy[i] += ey * f;
+        dx[j] -= ex * f;
+        dy[j] -= ey * f;
+      }
+    }
+    for (const [a, b] of edges) {
+      const ex = pts[a].x - pts[b].x;
+      const ey = pts[a].y - pts[b].y;
+      const f = Math.hypot(ex, ey) / k;
+      dx[a] -= ex * f;
+      dy[a] -= ey * f;
+      dx[b] += ex * f;
+      dy[b] += ey * f;
+    }
+    for (let i = 0; i < n; i++) {
+      const len = Math.hypot(dx[i], dy[i]);
+      if (!len) continue;
+      const step = Math.min(len, t) / len;
+      pts[i].x = Math.min(w - MARGIN, Math.max(MARGIN, pts[i].x + dx[i] * step));
+      pts[i].y = Math.min(h - MARGIN, Math.max(MARGIN, pts[i].y + dy[i] * step));
+    }
+  }
+  return pts;
+}
+
+/** The index of the point nearest (x, y) within `max`, or null. */
+export function nearestNode(pts: Point[], x: number, y: number, max: number): number | null {
+  let best: number | null = null;
+  let bestD = max;
+  pts.forEach((p, i) => {
+    const d = Math.hypot(p.x - x, p.y - y);
+    if (d <= bestD) [best, bestD] = [i, d];
+  });
+  return best;
+}
