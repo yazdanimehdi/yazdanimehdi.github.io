@@ -25,16 +25,20 @@ export interface PublicNote {
 
 export const COPY_DIRS = { paper: 'src/content/readings', free: 'src/content/notes' } as const;
 
-/** A link to a note not in `targets` keeps only its alias, else reads "(private note)". */
+/**
+ * A link to a note not in `targets` keeps only its alias, else reads "(private note)". A public link whose alias or
+ * heading holds `[[` loses both: `[[Public|[[Secret]]]]` is one link to Public, shown as "[[Secret".
+ */
 export function stripPrivateLinks(body: string, targets: Map<string, string>): string {
   // An alias can hold the pieces of another link (`[[A|[[Secret]]]]`), so repeat until nothing changes. It ends: each
   // private link removed takes a `]` with it, and a public one rebuilt is stable.
   for (;;) {
-    const out = mapLinks(body, ({ target, alias, heading, embed }) =>
-      targets.has(linkKey(target))
-        ? `${embed ? '!' : ''}[[${target}${heading !== null ? `#${heading}` : ''}${alias !== null ? `|${alias}` : ''}]]`
-        : alias?.trim() || '(private note)',
-    );
+    const out = mapLinks(body, ({ target, alias, heading, embed }) => {
+      if (!targets.has(linkKey(target))) return alias?.trim() || '(private note)';
+      const bang = embed ? '!' : '';
+      if (heading?.includes('[[') || alias?.includes('[[')) return `${bang}[[${target}]]`;
+      return `${bang}[[${target}${heading !== null ? `#${heading}` : ''}${alias !== null ? `|${alias}` : ''}]]`;
+    });
     if (out === body) return out;
     body = out;
   }

@@ -43,7 +43,17 @@ test('links to public notes stay; private ones lose their target', () => {
   assert.equal(stripPrivateLinks('[[Secret#Part|shown]] [[Secret|]]', targets), 'shown (private note)');
 });
 test('stripping never leaves a new link to a private note behind', () => {
-  for (const input of ['[[A|[[Other Secret]]]]', '[[A|x[]][Other Secret]]', '[[[[Secret]]]]']) {
+  for (const input of [
+    '[[A|[[Other Secret]]]]',
+    '[[A|x[]][Other Secret]]',
+    '[[[[Secret]]]]',
+    // A public link whose alias or heading holds `[[`: the private title would be its visible text.
+    '[[Public Idea|[[Secret]]]]',
+    '[[Public Idea|x [[Secret]] y]]',
+    '[[Public Idea#[[Secret]]]]',
+    '[[Public Idea#h|[[Secret|alias]]]]',
+    '![[Public Idea|[[Secret]]]]',
+  ]) {
     const out = stripPrivateLinks(input, targets);
     assert.ok(
       wikiLinks(out).every((t) => targets.has(linkKey(t))),
@@ -58,6 +68,7 @@ test('case and whitespace variants of a private title are stripped too', () => {
 });
 test('a link to a public note keeps its alias and heading', () => {
   assert.equal(stripPrivateLinks('[[public idea#Why|why]]', targets), '[[public idea#Why|why]]');
+  assert.equal(stripPrivateLinks('![[Public Idea#Why [x]|why (y)]]', targets), '![[Public Idea#Why [x]|why (y)]]');
 });
 test('a free note copy: path, front matter, links', () => {
   const { path, content } = publishedCopy(freeNote({ body: 'x [[Public Idea]] [[Public Idea]] [[Secret]]' }), targets);
