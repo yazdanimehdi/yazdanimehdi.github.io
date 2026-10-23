@@ -197,6 +197,9 @@ export async function draftPost(
     voiceExamples(store, now),
     getPapers(sql, paperIds),
   ]);
+  // A lone scan with no abstract has only its title: nothing to draft from but the owner's notes.
+  if (g.papers.length === 1 && !g.papers[0].passages.length && !notes.length)
+    throw new HttpError(409, 'This paper has only a scan and no abstract to draft from.');
 
   const ai = await readAiConfig(store);
   const missing = await missingAiKey(sql, ai);

@@ -53,7 +53,7 @@ async function draft() {
     >
       {{
         busy
-          ? 'Drafting… (up to a minute)'
+          ? 'Drafting… (about a minute)'
           : from && 'papers' in from && from.papers.length > 1
             ? 'Draft a roundup'
             : 'Draft a blog post'

@@ -460,19 +460,27 @@ Project 4 shipped as planned in `docs/superpowers/plans/2026-10-22-blog-from-pap
 - **Every link is code's:** the model cites passage ids, code turns each kept cite into a link to its paper's source
   page and closes the post with a `## Papers` list (title, authors, year), and no list when a note drafts without
   papers. A link is written only from a paper's own URL, only when it parses as http(s), as `[label](<url>)` with
-  `<`, `>`, spaces, parentheses and backslashes percent-encoded and the label escaped. Everything else the model wrote
+  `<`, `>`, spaces, parentheses, backslashes and `|` percent-encoded. Paper metadata (the label, titles, authors) is
+  escaped as text by `esc()`: `[`, `]`, `<`, `>`, `*`, `_` and backticks, `&` so it can't spell an entity, `$` so it
+  can't open math, and `|` so it can't end a table cell; what GFM would link in it (`www.…`, a URL, an email address)
+  goes in a code span that stops before any `|`, since GFM splits a table cell on `|` even inside code. Everything else the model wrote
   that could make a link is removed at the Markdown level, with the parser the site renders with (micromark with GFM
   and math, promoted from transitive to direct dependencies, nothing downloaded): its links and link references become
   their text, and its images, definitions, HTML and autolinks (`<scheme:…>`, `www.…`, bare URLs, email addresses) are
   dropped, parsing again until a pass removes nothing. Math that uses a TeX command outside a short allowlist (the
   site's MathJax loads `\href`, `\style` and `\class` on demand) becomes code; a backslash in prose and paper
   metadata is shown as the lookalike ＼ so MathJax can't typeset `\(`… there (an intended backslash must be retyped);
-  and a Mermaid, chart or TikZ block becomes plain code, since the browser would draw it.
-- **Short quotes only:** a draft with 40 or more consecutive words that also appear in one passage, or in a line the
-  owner highlighted, is refused with a sentence and nothing is saved; it is never shortened. The check runs over what
+  and a Mermaid, chart or TikZ block becomes plain code, since the browser would draw it. Last, the exact body to be
+  saved is parsed once more with the same parser: the sanitized tree is written out again with code's links spliced in,
+  and GFM can read that string differently (a table cell split on `|`, an escape the writer adds joining a `www.`
+  literal), so any HTML, image, definition or link reference, or any link that isn't exactly one of the papers' own
+  written URLs, refuses the draft with a sentence (a 502) and nothing is saved. An odd draft can be refused.
+- **Short quotes only:** a draft whose body, subtitle or excerpt (all public) has 40 or more consecutive words that
+  also appear in one passage, or in a line the owner highlighted, is refused with a sentence and nothing is saved; it is never shortened. The check runs over what
   the prompt actually held (the passages picked to fit the context, and the highlighted lines), across block
   boundaries. A scan is drafted from its abstract and never sent as a PDF, so the check sees everything the model saw;
-  a scanned paper's draft rests on its abstract only.
+  a scanned paper's draft rests on its abstract only. A lone scan with no abstract and no note from the owner has only
+  its title, so it is refused before any AI call ("This paper has only a scan and no abstract to draft from.").
 - **Bounded parse time:** the Markdown parser's time grows with the square of nesting and of emphasis or bracket runs,
   so a reply with more than 16 nested quote or list openers on a line, more than 1,200 `*`, `_` or `~` or more than
   600 brackets in its text (cites, code and math not counted) is refused; emphasis deeper than 4 is unwrapped, at most

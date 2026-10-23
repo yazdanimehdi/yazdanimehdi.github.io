@@ -172,6 +172,21 @@ test('a draft that copies 40 words of a passage is refused', () => {
   assert.doesNotThrow(() => draft(`${run(1, 20)} ${run(30, 50)}`, { passages }), 'two runs of one passage');
 });
 
+test('the excerpt and subtitle are copy-checked too: they are public', () => {
+  const words = Array.from({ length: 60 }, (_, i) => `word${i + 1}`);
+  const passages = [words.join(' ')];
+  const run = words.slice(2, 44).join(' ');
+  for (const field of ['excerpt', 'subtitle'])
+    assert.throws(
+      () => parseDraft(reply('My own words.', { [field]: run }), ctx({ passages })),
+      /copied a long passage/,
+      field,
+    );
+  assert.doesNotThrow(() =>
+    parseDraft(reply('My own words.', { excerpt: words.slice(2, 40).join(' ') }), ctx({ passages })),
+  );
+});
+
 test('a draft with nothing left once its links are checked is refused', () => {
   assert.throws(() => draft('<b></b> ![x](https://e.test/i.png) https://e.test [99:S1.p1]'), /was empty/);
 });
@@ -460,4 +475,75 @@ test('a cite opening emphasis has no stray space', () => {
   const body = draft('*[12:S2.p3]* and ***[12:S2.p3](https://evil.test)*** and x*[12:S2.p3]*');
   assert.doesNotMatch(body, /&#x20;/);
   assert.match(body, /^\*\(\[Vaswani et al\.\]\(<https:\/\/arxiv\.org\/abs\/1706\.03762>\)\)\* and \*\*\*\(\[Vaswani/);
+});
+
+test('a | in a paper’s title or URL can’t split a table cell into a link', () => {
+  const titled: DraftPaper = {
+    id: 14,
+    title: 'Read www.evil.test|x now',
+    authors: [],
+    url: 'https://good.test/p',
+    publishedAt: null,
+  };
+  const piped: DraftPaper = { ...titled, id: 15, title: 'Piped', url: 'https://good.test/a|https://evil.test/' };
+  const allowed = new Set(['14:S1.p1', '15:S1.p1']);
+  for (const p of [titled, piped]) {
+    const body = draft(`| a | b |\n|---|---|\n| x [${p.id}:S1.p1] | c |`, { allowed, papers: [p] });
+    const r = rendered(body);
+    assert.equal(r.html, 0, body);
+    for (const u of r.urls) assert.equal(new URL(u.split(' ')[1]).host, 'good.test', `${u} in ${body}`);
+    assert.ok(r.urls.length >= 2, body);
+  }
+  assert.ok(
+    draft('Q [15:S1.p1].', { allowed, papers: [piped] }).includes('](<https://good.test/a%7Chttps://evil.test/>)'),
+  );
+});
+
+test('a draft whose saved body would link elsewhere is refused (an escape the writer adds joins a www. literal)', () => {
+  // `www._word` isn't a link, but it is written as `www.\_word`, which is.
+  for (const v of ['www._word', 'www._[12:S2.p3] here', 'x www._"[https://'])
+    assert.throws(() => draft(`First [12:S2.p3]. ${v}`), /links could not be checked/, v);
+});
+
+test('whatever the reply, the saved body links only to the papers and has no HTML or image', () => {
+  const vectors = [
+    'See [here](https://evil.test) and https://evil.test/x ![f](https://evil.test/i.png)',
+    'Go <javascript:alert(1)> or <ftp://evil.test/f> or <mailto:x@evil.test>.',
+    'Visit www.evil.test or write to x@evil.test.',
+    'A [t][1] and ![i][1] and [1].\n\n[1]: //evil.test',
+    '[a]<!-- -->(https://evil.test) and \\[b\\](https://evil.test)',
+    '<a href="https://evil.test">anchor</a>',
+    'Join www<!-- -->.evil.test and x@<!-- -->evil.test and [www](#).evil.test',
+    'www._word and www.\\_x and https://a|b.evil.test',
+    '[12:S2.p3](https://evil.test) and [13:S1.p1]',
+  ];
+  const odd: DraftPaper[] = [
+    { ...A, title: 'Read www.evil.test|x now', authors: [] },
+    { ...B, id: 13, title: 'x|https://evil.test|y', authors: ['a|www.evil.test'], url: 'https://ok.test/a|b\\c' },
+  ];
+  const shapes = [
+    (v: string) => v,
+    (v: string) => `| a | b |\n|---|---|\n| ${v.replace(/\n/g, ' ')} [12:S2.p3] | [13:S1.p1] |`,
+    (v: string) => `- *${v}* [12:S2.p3]`,
+    (v: string) => `> ${v} [13:S1.p1]`,
+  ];
+  const ok = new Set(['https://arxiv.org/abs/1706.03762', 'https://ok.test/a%7Cb/c']);
+  let checked = 0;
+  for (const papers of [[A, B], odd])
+    for (const shape of shapes)
+      for (const v of vectors) {
+        const md = shape(`First [12:S2.p3]. ${v}`);
+        let body: string;
+        try {
+          body = draft(md, { papers });
+        } catch (e) {
+          assert.match(String(e), /links could not be checked/, md);
+          continue;
+        }
+        const r = rendered(body);
+        assert.equal(r.html, 0, md);
+        for (const u of r.urls) assert.ok(u.startsWith('link ') && ok.has(u.slice(5)), `${u} from ${md}`);
+        checked++;
+      }
+  assert.ok(checked > 50, `${checked} drafts checked`);
 });

@@ -463,6 +463,30 @@ test('a scan is drafted from its abstract, never its PDF, and the abstract is co
   assert.deepEqual(await slugs(), before);
 });
 
+test('a lone scan with no abstract is refused before any AI call, unless the owner wrote a note on it', async () => {
+  const [{ id }] = await upsertPapers(sql, [
+    {
+      key: 'doi:10.1/bare',
+      doi: '10.1/bare',
+      source: 'doi',
+      title: 'Only a title',
+      authors: [],
+      url: 'https://x.test/bare',
+      categories: [],
+    },
+  ]);
+  await saveText(sql, id, { source: 'scan', pdf: new Uint8Array([37, 80, 68, 70]), pages: 3 });
+  await assert.rejects(
+    draftPost(sql, store, { paper: id }),
+    refused(409, 'This paper has only a scan and no abstract to draft from.'),
+  );
+  assert.equal(requests.length, 0);
+  assert.equal(await aiUse(sql, day()), 0);
+  await paperNote(id, 'What I make of it.');
+  await draftPost(sql, store, { paper: id });
+  assert.equal(requests.length, 1);
+});
+
 test('a post created under the slug meanwhile is a conflict, and nothing is overwritten', async () => {
   const a = await ready('A');
   await post('my-post', 'title: Mine\ndate: 2026-01-01');

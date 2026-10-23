@@ -317,8 +317,9 @@ const plain = (nodes: Node[]): string =>
     .join('');
 
 // What GFM turns into a link even when escaped: a URL, `www.…` or an email address. The lookbehind starts an address
-// only where its run of name characters begins, so a long word isn't rescanned from each letter.
-const LITERAL = /(?:https?:\/\/|www\.)[^\s`]*|(?<![-.\w+])[-.\w+]+@[-\w]+(?:\.[-\w]+)+/gi;
+// only where its run of name characters begins, so a long word isn't rescanned from each letter. A `|` ends one: GFM
+// splits a table cell on it even inside code.
+const LITERAL = /(?:https?:\/\/|www\.)[^\s`|]*|(?<![-.\w+])[-.\w+]+@[-\w]+(?:\.[-\w]+)+/gi;
 // `&` so metadata can't spell an entity, `$` so it can't open math, `|` so it can't end a table cell.
 const backslash = (s: string) => s.replace(/[[\]<>*_`&$|]/g, '\\$&');
 
@@ -339,7 +340,7 @@ function href(url: string): string | undefined {
   try {
     const u = new URL(url.trim());
     if (u.protocol !== 'http:' && u.protocol !== 'https:') return undefined;
-    return u.href.replace(/[<>() \\]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
+    return u.href.replace(/[<>() \\|]/g, (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`);
   } catch {
     return undefined;
   }
@@ -373,6 +374,21 @@ function copies(text: string, passages: string[]): boolean {
 }
 
 /**
+ * Parses the Markdown that will be saved, as the site will: the tree sanitize checked is written out again with code's
+ * links spliced in, and GFM may read that string differently (a table cell splits on `|`, an added escape joins a
+ * `www.` literal). Throws on any HTML, image or definition, or a link to anything but `urls`.
+ */
+function checkLinks(md: string, urls: Set<string>) {
+  const walk = (n: Node & { url?: string }): boolean =>
+    !GONE.has(n.type) &&
+    n.type !== 'linkReference' &&
+    (n.type !== 'link' || urls.has(n.url!)) &&
+    (n.children ?? []).every(walk);
+  if (!walk(fromMarkdown(md, PARSE) as Node))
+    throw new Error('The draft’s links could not be checked, so it was dropped. Draft again.');
+}
+
+/**
  * The model's post with only code's links: cites to the prompt's passages become links to their papers, and a list
  * of the papers closes it. `passages`: the passage texts that were in the prompt, for the copy check.
  */
@@ -393,10 +409,11 @@ export function parseDraft(
     return entries.length ? `(${entries.join('; ')})` : '';
   };
   // A lone \r ends a line for the parser too, so every check is made on the parser's lines.
-  const body = visible(post.body).replace(/\r\n?/g, '\n');
-  const children = cite(sanitize(parseAnswer(body, c.allowed).body), links);
+  const model = visible(post.body).replace(/\r\n?/g, '\n');
+  const children = cite(sanitize(parseAnswer(model, c.allowed).body), links);
   const text = plain(children);
-  if (copies(text, c.passages))
+  // The excerpt and subtitle are public too.
+  if (copies(`${text} ${post.subtitle ?? ''} ${post.excerpt ?? ''}`, c.passages))
     throw new Error('The draft copied a long passage from a paper, so it was dropped. Draft again.');
   if (!/[\p{L}\p{N}]/u.test(text)) throw new Error('The draft was empty once its links were checked. Draft again.');
 
@@ -407,12 +424,14 @@ export function parseDraft(
   );
   const md = toMarkdown({ type: 'root', children } as never, WRITE).trim();
   const papers = list.length ? `\n\n## Papers\n\n${list.map((l) => `- ${l}`).join('\n')}` : '';
+  const body = `${md}${papers}\n`;
+  checkLinks(body, new Set(c.papers.flatMap((p) => href(p.url) ?? [])));
   return {
     // Shown as text on the post page, which MathJax typesets too.
     title: noTex(visible(post.title)).slice(0, 200),
     subtitle: post.subtitle && noTex(visible(post.subtitle)).slice(0, 200),
     excerpt: post.excerpt && noTex(visible(post.excerpt)).slice(0, 300),
     tags: post.tags.map((t) => noTex(visible(t)).toLowerCase().slice(0, 40)),
-    body: `${md}${papers}\n`,
+    body,
   };
 }
