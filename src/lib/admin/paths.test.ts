@@ -7,6 +7,7 @@ import {
   assertConfigFile,
   assertSlug,
   collectionPath,
+  isDocumentPath,
   isThemeFolderEntry,
 } from './paths';
 import { adminSettings } from './settings';
@@ -80,4 +81,18 @@ test('isThemeFolderEntry: anything inside a valid theme folder, nothing that cli
     assert.ok(isThemeFolderEntry(p), p);
   const bad = ['cv/themes/mine', 'cv/themes/README.md', 'cv/themes/My-Theme/a.typ', 'cv/themes/mine/../x', 'cv/x'];
   for (const p of bad) assert.ok(!isThemeFolderEntry(p), p);
+});
+
+test('published copies are documents only republish writes', () => {
+  for (const p of ['src/content/notes/a-b.md', 'src/content/readings/x1.md']) {
+    assert.equal(isDocumentPath(p), true, p);
+    assert.throws(() => assertAllowed(p), PathError, p);
+  }
+  for (const p of [
+    'src/content/notes/A.md',
+    'src/content/notes/a.mdx',
+    'src/content/notes/x/a.md',
+    'src/content/note/a.md',
+  ])
+    assert.equal(isDocumentPath(p), false, p);
 });
