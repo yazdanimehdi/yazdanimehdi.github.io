@@ -2,8 +2,19 @@ import test, { mock } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { parseDocuments } from './content/documents';
-import { backlinksOf, excerpt, publicGraph, renderPublicBody, type PublicEntry } from './public-notes';
+import {
+  backlinksOf,
+  excerpt,
+  graphDocument,
+  publicGraph,
+  publicZipFiles,
+  renderPublicBody,
+  vaultZipResponse,
+  type PublicEntry,
+} from './public-notes';
 import { publishedCopy, type PublicNote } from './reading/publish';
+import { unzip } from './reading/test-unzip';
+import { zip } from './reading/vault-zip';
 
 const entry = (title: string, o: { kind?: 'note' | 'paper'; links?: string[]; body?: string } = {}): PublicEntry => {
   const slug = title.toLowerCase();
@@ -141,4 +152,83 @@ test('a published copy parses as a notes or readings document', () => {
   const unsafe = { ...paper, paper: { ...paper.paper!, url: 'javascript:alert(1)' } };
   assert.equal(parseDocuments('readings', [publishedCopy(unsafe, targets)]).length, 0, 'a Source link is http(s)');
   err.mock.restore();
+});
+
+// A paper with a highlight, and two notes: A links to B and to a uid no public entry has.
+const three = () => {
+  const p = entry('Paper', { kind: 'paper', body: 'On [[B]].' });
+  if (p.data.kind === 'paper') {
+    p.data.paper = { title: 'Deep Folds', authors: ['A. Author'], url: 'https://arxiv.org/abs/1', arxiv: '1' };
+    p.data.highlights = [{ quote: 'A quote', where: 'p. 1', comment: 'Mine' }];
+  }
+  const b = entry('B', { body: 'Plain.' });
+  const a = entry('A', { links: [b.data.id, randomUUID()], body: 'To [[B]].' });
+  p.data.links = [b.data.id];
+  return { p, a, b, all: [p, b, a] };
+};
+const site = { name: 'Jane Smith', url: 'https://jane.test', owner: 'Jane Smith' };
+
+test("graphDocument: version 1, notes by title with absolute urls, the paper's highlights, links both ends known", () => {
+  const { p, a, b, all } = three();
+  const doc = graphDocument(all, site);
+  assert.equal(doc.format, 'scholaros-notes');
+  assert.equal(doc.version, 1);
+  assert.deepEqual(doc.site, site);
+  assert.deepEqual(
+    doc.notes.map((n) => [n.title, n.kind, n.url]),
+    [
+      ['A', 'note', 'https://jane.test/notes/a/'],
+      ['B', 'note', 'https://jane.test/notes/b/'],
+      ['Paper', 'paper', 'https://jane.test/readings/paper/'],
+    ],
+  );
+  assert.deepEqual(doc.notes[0], {
+    id: a.data.id,
+    kind: 'note',
+    title: 'A',
+    url: 'https://jane.test/notes/a/',
+    shared: a.data.shared.toISOString(),
+    updated: a.data.updated.toISOString(),
+    body: 'To [[B]].',
+  });
+  assert.deepEqual(doc.notes[2].paper, {
+    title: 'Deep Folds',
+    authors: ['A. Author'],
+    url: 'https://arxiv.org/abs/1',
+    arxiv: '1',
+  });
+  assert.deepEqual(doc.notes[2].highlights, [{ quote: 'A quote', where: 'p. 1', comment: 'Mine' }]);
+  assert.deepEqual(
+    doc.links,
+    [
+      [a.data.id, b.data.id],
+      [p.data.id, b.data.id],
+    ].sort((x, y) => x[0].localeCompare(y[0])),
+  );
+  assert.equal(JSON.parse(JSON.stringify(doc)).notes[0].shared, a.data.shared.toISOString());
+});
+
+test('publicZipFiles: notes/ and readings/ by vault title, each its front matter with a source line, then its body', () => {
+  const { all } = three();
+  const files = unzip(zip(publicZipFiles(all, 'https://jane.test')));
+  assert.deepEqual(files.map((f) => f.path).sort(), ['notes/A.md', 'notes/B.md', 'readings/Paper.md']);
+  const a = files.find((f) => f.path === 'notes/A.md')!;
+  assert.match(a.text, /^---\nid: [0-9a-f-]+\nkind: note\ntitle: A\n/);
+  assert.match(a.text, /\nsource: https:\/\/jane\.test\/notes\/a\/\n---\n\nTo \[\[B\]\]\.$/);
+  const paper = files.find((f) => f.path === 'readings/Paper.md')!;
+  const [parsed] = parseDocuments('readings', [{ path: paper.path, content: paper.text }]);
+  assert.equal((parsed.data.highlights as unknown[]).length, 1);
+  assert.match(paper.text, /\nsource: https:\/\/jane\.test\/readings\/paper\/\n/);
+});
+
+test('vaultZipResponse: the zip as a download; over the cap, 413 with the reason', async () => {
+  const { all } = three();
+  const ok = vaultZipResponse(all, 'https://jane.test', 'jane-smith-notes.zip');
+  assert.equal(ok.status, 200);
+  assert.equal(ok.headers.get('Content-Type'), 'application/zip');
+  assert.equal(ok.headers.get('Content-Disposition'), 'attachment; filename="jane-smith-notes.zip"');
+  assert.equal(unzip(new Uint8Array(await ok.arrayBuffer())).length, 3);
+  const over = vaultZipResponse(all, 'https://jane.test', 'x.zip', 10);
+  assert.equal(over.status, 413);
+  assert.match(await over.text(), /^The notes’ zip is 0\.\d MB, over the 4\.4 MB one download can carry\.$/);
 });

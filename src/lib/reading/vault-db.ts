@@ -2,6 +2,7 @@ import { HttpError } from '../admin/http';
 import { suggestSlug, uniqueSlug } from '../utils';
 import type { Sql, Tx } from '../db';
 import { getPapers, type Row } from './db';
+import { EXPORT_MAX } from './limits';
 import { listHighlights } from './room-db';
 import type { ChatSnapshot, Cite, NoteKind, NoteRow, OutputBody, Target, VaultNote } from './types';
 import { noteFile, type NoteContext } from './vault-markdown';
@@ -357,9 +358,6 @@ export async function noteContexts(sql: Sql, notes: VaultNote[]): Promise<Map<nu
     }),
   );
 }
-
-/** Vercel's 4.5 MB response limit, less room for headers. */
-export const EXPORT_MAX = 4_400_000;
 
 /** Every note as an Obsidian file in one zip; refused (413) over `max`, never truncated. */
 export async function exportVault(sql: Sql, max = EXPORT_MAX): Promise<Uint8Array> {
