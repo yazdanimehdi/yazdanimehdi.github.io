@@ -306,7 +306,7 @@ export async function addChat(
   return toChat(r);
 }
 
-export async function setChatSaved(sql: Sql, id: number, saved: boolean): Promise<boolean> {
+export async function setChatSaved(sql: Tx, id: number, saved: boolean): Promise<boolean> {
   const rows = await sql`
     update reading_chats set saved_at = case when ${saved} then coalesce(saved_at, now()) end where id = ${id}
     returning id`;
@@ -331,7 +331,7 @@ export async function listHighlights(sql: Sql, paperIds: number[]): Promise<High
   return rows.map(toHighlight);
 }
 
-export async function addHighlight(sql: Sql, h: Omit<Highlight, 'id'>): Promise<Highlight> {
+export async function addHighlight(sql: Tx, h: Omit<Highlight, 'id'>): Promise<Highlight> {
   const [r] = await sql<Row>`
     insert into reading_highlights (paper_id, pid, start_at, end_at, quote, comment)
     values (${h.paperId}, ${h.pid}, ${h.start}, ${h.end}, ${h.quote}, ${h.comment})

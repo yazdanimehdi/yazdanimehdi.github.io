@@ -56,10 +56,12 @@ export const PATCH = careerRoute(async (ctx) => {
   if (typeof state !== 'string' || !STATES.has(state))
     throw new HttpError(400, '`state` must be new, saved or dismissed');
   const sql = getSql();
-  if (!(await setPaperState(sql, id, state as PaperState))) throw new HttpError(404, 'Not found');
-  if (state === 'saved') {
-    await withTitles(sql, (tx) => ensurePaperNote(tx, id));
-    await fetchMissingTexts(sql, { paper: id }, [id]);
-  }
+  const found = await withTitles(sql, async (tx) => {
+    if (!(await setPaperState(tx, id, state as PaperState))) return false;
+    if (state === 'saved') await ensurePaperNote(tx, id);
+    return true;
+  });
+  if (!found) throw new HttpError(404, 'Not found');
+  if (state === 'saved') await fetchMissingTexts(sql, { paper: id }, [id]);
   return json({ state });
 });

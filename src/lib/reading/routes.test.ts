@@ -756,6 +756,16 @@ test('unsaving an answer with writing in its note is refused', async () => {
   assert.deepEqual(await res.json(), { error: UNSAVE_REFUSED });
   assert.notEqual(await savedAt(), null);
   assert.equal((await vaultNotes()).length, 2);
+
+  await setBody(sql, note.id, 'From [[Paper arxiv 2610.1]] contradicts [[Other]]');
+  const firstLine = await call(chatMessage.PATCH, { params: { id: String(a.id) }, body: { saved: false } });
+  assert.equal(firstLine.status, 409, 'writing on the From line is the owner’s too');
+  assert.deepEqual(await firstLine.json(), { error: UNSAVE_REFUSED });
+  assert.notEqual(await savedAt(), null);
+  assert.equal(
+    (await vaultNotes()).find((n) => n.kind === 'chat')!.body,
+    'From [[Paper arxiv 2610.1]] contradicts [[Other]]',
+  );
 });
 
 test('unsaving an untouched answer removes its note', async () => {
@@ -776,13 +786,22 @@ test("a notebook's note outlives the notebook", async () => {
   const nb = await createNotebook(sql, 'Proteins');
   const params = { id: String(nb) };
   await ok(await call(notes.PUT, { body: { notebook: nb, body: 'nb' } }));
+  await addChat(sql, { notebook: nb }, { role: 'user', body: 'Why?', cites: [] });
+  const ans = await addChat(sql, { notebook: nb }, { role: 'assistant', body: 'Because.', cites: [] });
+  await ok(await call(chatMessage.PATCH, { params: { id: String(ans.id) }, body: { saved: true } }));
   const got = await ok(await call(notebook.GET, { params }));
   assert.equal(got.note, 'nb');
   const [n] = await vaultNotes();
   assert.equal(got.vaultNote, n.id);
   await ok(await call(notebook.DELETE, { params }), 204);
+  const left = await vaultNotes();
   assert.deepEqual(
-    (await vaultNotes()).map((x) => [x.kind, x.title, x.body, x.notebook_id]),
-    [['free', 'Proteins', 'nb', null]],
+    left.map((x) => [x.kind, x.title, x.body, x.notebook_id, x.chat_id]),
+    [
+      ['free', 'Proteins', 'nb', null, null],
+      ['chat', 'Why', '', null, null],
+    ],
+    'the note and the saved answer stay',
   );
+  assert.equal(left[1].chat!.answer, 'Because.');
 });

@@ -92,7 +92,7 @@ export async function getPapers(sql: Sql, ids: number[]): Promise<Paper[]> {
 }
 
 /** False when there is no such paper. */
-export async function setPaperState(sql: Sql, id: number, state: PaperState): Promise<boolean> {
+export async function setPaperState(sql: Tx, id: number, state: PaperState): Promise<boolean> {
   const rows = await sql`update reading_papers set state = ${state}, state_at = now() where id = ${id} returning id`;
   return rows.length > 0;
 }

@@ -215,18 +215,24 @@ export async function ensureChatNote(tx: Tx, chatId: number): Promise<{ id: numb
   return { id, created: true };
 }
 
-/** Unsaving an answer: its note goes, unless the owner wrote in it beyond the 'From [[…]]' line ('written'). */
-export async function dropChatNote(sql: Sql, chatId: number): Promise<'ok' | 'written'> {
-  const [n] = await sql<Row>`select id, body from vault_notes where chat_id = ${chatId}`;
+/** The first line ensureChatNote writes, exactly; anything else on it is the owner's. */
+const FROM_LINE = /^From \[\[[^\]\n]+\]\](, \[\[[^\]\n]+\]\])*$/;
+
+/**
+ * Unsaving an answer: its note goes, unless the owner wrote in it beyond the generated 'From [[…]]' line ('written').
+ * The delete only matches the body it checked, so an edit landing in between is kept.
+ */
+export async function dropChatNote(tx: Tx, chatId: number): Promise<'ok' | 'written'> {
+  const [n] = await tx<Row>`select id, body from vault_notes where chat_id = ${chatId}`;
   if (!n) return 'ok';
   const [first, ...more] = (n.body as string).split('\n');
-  const rest = first.startsWith('From [[') ? more.join('\n') : (n.body as string);
+  const rest = FROM_LINE.test(first) ? more.join('\n') : (n.body as string);
   if (rest.trim()) return 'written';
-  await sql`delete from vault_notes where id = ${n.id}`;
-  return 'ok';
+  const gone = await tx`delete from vault_notes where id = ${n.id} and body = ${n.body as string} returning id`;
+  return gone.length ? 'ok' : 'written';
 }
 
-/** The room's note: the paper's note, or the free note of the notebook; body '' when there is none. */
+/** The room's note: the paper's note, or the free note of the notebook; body '' when there is none. Sql or Tx. */
 export async function roomNote(sql: Tx, target: Target): Promise<{ id: number | null; body: string }> {
   const [r] = await sql<Row>`
     select id, body from vault_notes

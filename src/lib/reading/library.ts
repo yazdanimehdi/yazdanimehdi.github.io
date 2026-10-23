@@ -61,8 +61,10 @@ export async function addPaper(sql: Sql, store: PostgresStore, ref: string): Pro
       categories: r.primaryClass ? [r.primaryClass] : [],
     },
   ]);
-  await setPaperState(sql, saved.id, 'saved');
-  await withTitles(sql, (tx) => ensurePaperNote(tx, saved.id));
+  await withTitles(sql, async (tx) => {
+    await setPaperState(tx, saved.id, 'saved');
+    await ensurePaperNote(tx, saved.id);
+  });
   return saved;
 }
 

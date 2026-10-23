@@ -27,7 +27,10 @@ export const POST = careerRoute(async (ctx) => {
   const passage = (await getPassages(sql, [paper])).find((p) => p.pid === pid);
   if (!passage || start >= end || end > passage.body.length)
     throw new HttpError(400, 'A highlight must lie within one passage of the paper');
-  const highlight = await addHighlight(sql, { paperId: paper, pid, start, end, quote, comment });
-  await withTitles(sql, (tx) => ensurePaperNote(tx, paper));
+  const highlight = await withTitles(sql, async (tx) => {
+    const h = await addHighlight(tx, { paperId: paper, pid, start, end, quote, comment });
+    await ensurePaperNote(tx, paper);
+    return h;
+  });
   return json({ highlight });
 });
