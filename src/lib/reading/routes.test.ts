@@ -55,6 +55,8 @@ import * as vSuggest from '../../admin/routes/api/reading/vault/suggest';
 import * as vSuggestion from '../../admin/routes/api/reading/vault/suggestions/[id]';
 import * as vGraph from '../../admin/routes/api/reading/vault/graph';
 import * as vExport from '../../admin/routes/api/reading/vault/export';
+import * as draft from '../../admin/routes/api/reading/draft';
+import * as entry from '../../admin/routes/api/collections/[name]/[slug]';
 
 type User = ReturnType<typeof ownerUser>;
 type Handler = (ctx: never) => Response | Promise<Response>;
@@ -145,6 +147,7 @@ const HANDLERS: [string, Handler][] = [
   ['vault/suggestions/[id] PATCH', vSuggestion.PATCH],
   ['vault/graph GET', vGraph.GET],
   ['vault/export GET', vExport.GET],
+  ['draft POST', draft.POST],
 ];
 
 test('every reading route is 404 for a non-owner and in git mode', async () => {
@@ -970,4 +973,40 @@ test('the graph and suggest routes answer', async () => {
   assert.equal(g.total, 2);
   assert.deepEqual(g.edges, [[Math.min(a, b), Math.max(a, b)]]);
   assert.equal((await call(vSuggest.POST, { body: { note: 999 } })).status, 404);
+});
+
+test("the draft route returns the new post's slug", async () => {
+  setStoreForTests(
+    (author) =>
+      new PostgresStore(sql, author, { purge: async () => {}, put: async () => ({ url: '' }), del: async () => {} }),
+  );
+  const saved = process.env.ANTHROPIC_API_KEY;
+  process.env.ANTHROPIC_API_KEY = 'test-key';
+  const reply = { title: 'My post', subtitle: 'Sub', excerpt: 'Ex', tags: ['ml'], body: 'I read it.' };
+  mock.method(globalThis, 'fetch', async () =>
+    Response.json({ content: [{ type: 'text', text: JSON.stringify(reply) }] }),
+  );
+  try {
+    const [id] = await add(arxivPaper(1));
+    await savePassages(sql, id, [{ pid: 'S1.p1', kind: 'p', body: 'The paper shows that X works.' }]);
+    const { slug } = await ok(await call(draft.POST, { body: { paper: id } }));
+    assert.equal(slug, 'my-post');
+    const post = await ok(await call(entry.GET, { params: { name: 'posts', slug } }));
+    assert.equal(post.data.draft, true);
+    assert.equal(post.data.title, 'My post');
+  } finally {
+    mock.restoreAll();
+    if (saved === undefined) delete process.env.ANTHROPIC_API_KEY;
+    else process.env.ANTHROPIC_API_KEY = saved;
+  }
+});
+
+test('a draft body names exactly one source', async () => {
+  for (const body of [
+    { paper: 1, note: 2 },
+    {},
+    { papers: [] },
+    { papers: Array.from({ length: 11 }, (_, i) => i + 1) },
+  ])
+    assert.equal((await call(draft.POST, { body })).status, 400, JSON.stringify(body));
 });

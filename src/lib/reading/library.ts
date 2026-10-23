@@ -74,7 +74,7 @@ export function idParam(param: string | undefined): number {
   return Number(param);
 }
 
-const Id = z.number().int().min(1).max(999_999_999);
+export const Id = z.number().int().min(1).max(999_999_999);
 /** A body's `{ paper } | { notebook }`, spread into a route's strictObject; read with `targetOf`. */
 export const TARGET = { paper: Id.optional(), notebook: Id.optional() };
 

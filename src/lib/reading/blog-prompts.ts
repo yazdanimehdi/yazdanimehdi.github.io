@@ -21,8 +21,6 @@ import {
   UNTRUSTED_TEXT,
 } from './room-prompts';
 
-export const DRAFT_MAX_PAPERS = 10;
-
 export interface DraftPaper {
   id: number;
   title: string;
