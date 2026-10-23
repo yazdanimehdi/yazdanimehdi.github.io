@@ -244,6 +244,12 @@ export async function ensureChatNote(tx: Tx, chatId: number): Promise<{ id: numb
 /** The first line ensureChatNote writes, exactly; anything else on it is the owner's. */
 const FROM_LINE = /^From \[\[[^\]\n]+\]\](, \[\[[^\]\n]+\]\])*$/;
 
+/** A chat note's body without the 'From [[…]]' line ensureChatNote wrote: the owner's own writing. */
+export function ownChatText(body: string): string {
+  const [first, ...more] = body.split('\n');
+  return FROM_LINE.test(first) ? more.join('\n') : body;
+}
+
 /**
  * Unsaving an answer: its note goes, unless the owner wrote in it beyond the generated 'From [[…]]' line ('written').
  * The delete only matches the body it checked, so an edit landing in between is kept.
@@ -251,9 +257,7 @@ const FROM_LINE = /^From \[\[[^\]\n]+\]\](, \[\[[^\]\n]+\]\])*$/;
 export async function dropChatNote(tx: Tx, chatId: number): Promise<'ok' | 'written'> {
   const [n] = await tx<Row>`select id, body from vault_notes where chat_id = ${chatId}`;
   if (!n) return 'ok';
-  const [first, ...more] = (n.body as string).split('\n');
-  const rest = FROM_LINE.test(first) ? more.join('\n') : (n.body as string);
-  if (rest.trim()) return 'written';
+  if (ownChatText(n.body as string).trim()) return 'written';
   const gone = await tx`delete from vault_notes where id = ${n.id} and body = ${n.body as string} returning id`;
   return gone.length ? 'ok' : 'written';
 }

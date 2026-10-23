@@ -1,0 +1,135 @@
+// What a blog draft draws on: its papers and notes, and the owner's past posts for voice.
+import { listEntries, readEntry } from '../admin/content';
+import { HttpError } from '../admin/http';
+import type { ContentStore } from '../admin/store';
+import type { Sql } from '../db';
+import { isPublished } from '../utils';
+import { DRAFT_MAX_PAPERS } from './blog-prompts';
+import { getPapers, type Row } from './db';
+import { getNotebook } from './room-db';
+import type { DraftFrom, VaultNote } from './types';
+import { getNote, noteContexts, ownChatText } from './vault-db';
+import { wikiLinks } from './vault-links';
+import { generatedMarkdown } from './vault-markdown';
+
+const notFound = () => new HttpError(404, 'Not found');
+
+/** A note's papers: its paper, a chat's cited papers (else its chat's paper), or a free note's notebook and links. */
+async function notePapers(sql: Sql, note: VaultNote): Promise<number[]> {
+  if (note.paperId != null) return [note.paperId];
+  if (note.chat) {
+    if (note.chat.cites.length) return note.chat.cites.map((c) => c.paper);
+    const [r] = await sql<Row>`select paper_id from reading_chats where id = ${note.chatId}::bigint`;
+    return r?.paper_id != null ? [Number(r.paper_id)] : [];
+  }
+  const own = note.notebookId == null ? [] : ((await getNotebook(sql, note.notebookId))?.paperIds ?? []);
+  const linked = await sql<Row>`
+    select v.paper_id from unnest(${wikiLinks(note.body)}::text[]) with ordinality l(t, i)
+    join vault_notes v on v.kind = 'paper' and lower(v.title) = lower(l.t)
+    order by l.i`;
+  return [...own, ...linked.map((r) => Number(r.paper_id))];
+}
+
+/** The papers and notes a draft from `from` draws on; a 404 or 409 with a sentence when it can't be drafted. */
+export async function draftSources(sql: Sql, from: DraftFrom): Promise<{ paperIds: number[]; noteIds: number[] }> {
+  let ids: number[];
+  let noteIds: number[] = [];
+  let note: VaultNote | null = null;
+  if ('paper' in from) ids = [from.paper];
+  else if ('papers' in from) ids = from.papers;
+  else if ('notebook' in from) {
+    const nb = await getNotebook(sql, from.notebook);
+    if (!nb) throw notFound();
+    if (!nb.paperIds.length) throw new HttpError(409, 'This notebook has no papers yet.');
+    ids = nb.paperIds;
+    noteIds = (await sql<Row>`select id from vault_notes where notebook_id = ${nb.id}`).map((r) => Number(r.id));
+  } else {
+    note = await getNote(sql, from.note);
+    if (!note) throw notFound();
+    noteIds = [note.id];
+    ids = await notePapers(sql, note);
+  }
+  const unique = [...new Set(ids)];
+  const paperIds = (await getPapers(sql, unique)).map((p) => p.id);
+  if (('paper' in from || 'papers' in from) && paperIds.length < unique.length) throw notFound();
+  // A chat note's saved answer is content, whatever its body.
+  if (note && !paperIds.length && !note.body.trim() && !note.chat?.answer.trim())
+    throw new HttpError(409, 'This note has no text and links no paper yet.');
+  if (paperIds.length > DRAFT_MAX_PAPERS)
+    throw new HttpError(
+      409,
+      `A post can draw on up to ${DRAFT_MAX_PAPERS} papers; this has ${paperIds.length}. Pick up to ` +
+        `${DRAFT_MAX_PAPERS} in the Library.`,
+    );
+  return { paperIds, noteIds };
+}
+
+const NOTE_MAX = 4_000;
+const NOTES_MAX = 24_000;
+
+/**
+ * The notes `noteIds`, then the paper notes of `paperIds`, then the chat notes on those papers (newest first), each
+ * once. `notes` is the owner's writing (bodies, highlights and their comments); `aids` the AI-made reading aids
+ * (summaries, findings, saved answers). Each is cut to 4,000 chars, 24,000 in all, the owner's writing first.
+ */
+export async function draftNotes(
+  sql: Sql,
+  paperIds: number[],
+  noteIds: number[],
+): Promise<{ notes: string[]; aids: string[] }> {
+  const [byPaper, chats] = await Promise.all([
+    sql<Row>`
+      select id from vault_notes where paper_id = any(${paperIds}::bigint[])
+      order by array_position(${paperIds}::bigint[], paper_id)`,
+    sql<Row>`
+      select id from vault_notes v
+      where kind = 'chat' and (
+        exists (
+          select 1 from jsonb_array_elements(v.chat->'cites') c
+          where (c->>'paper')::bigint = any(${paperIds}::bigint[]))
+        or chat_id in (select id from reading_chats where paper_id = any(${paperIds}::bigint[])))
+      order by created_at desc, id desc`,
+  ]);
+  const ids = [...new Set([...noteIds, ...[...byPaper, ...chats].map((r) => Number(r.id))])];
+  const notes = (await Promise.all(ids.map((id) => getNote(sql, id)))).filter((n): n is VaultNote => n != null);
+  const ctx = await noteContexts(sql, notes);
+  const join = (...t: string[]) => t.join('\n\n').trim();
+  const own: string[] = [];
+  const aids: string[] = [];
+  for (const n of notes) {
+    const c = ctx.get(n.id)!;
+    if (n.kind === 'paper') {
+      if (n.body.trim() || c.highlights?.length) own.push(join(generatedMarkdown(n, { ...c, summary: null }), n.body));
+      if (c.summary) aids.push(generatedMarkdown(n, { ...c, highlights: [] }));
+    } else if (n.kind === 'chat') {
+      const body = ownChatText(n.body);
+      if (body.trim()) own.push(join(`# ${n.title}`, body));
+      aids.push(generatedMarkdown(n, c));
+    } else if (n.body.trim()) own.push(n.body.trim());
+  }
+  let left = NOTES_MAX;
+  const cap = (texts: string[]) =>
+    texts.flatMap((t) => {
+      const s = t.slice(0, Math.min(NOTE_MAX, left));
+      left -= s.length;
+      return s ? [s] : [];
+    });
+  return { notes: cap(own), aids: cap(aids) };
+}
+
+/** The owner's 3 newest published posts, '# <title>\n\n<body>' cut to 2,000 chars; [] on any error. */
+export async function voiceExamples(store: ContentStore, now = new Date()): Promise<string[]> {
+  try {
+    const time = (d: unknown) => new Date(d as string).getTime();
+    const posts = (await listEntries(store, 'posts'))
+      .filter((e) => isPublished({ data: e.data as { draft?: boolean; date: string } }, now))
+      .sort((a, b) => time(b.data.date) - time(a.data.date) || a.slug.localeCompare(b.slug))
+      .slice(0, 3);
+    const entries = await Promise.all(posts.map((p) => readEntry(store, 'posts', p.slug)));
+    return entries.flatMap((e) => (e ? [`# ${e.data.title}\n\n${e.body.trim()}`.slice(0, 2000)] : []));
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.error('[reading] voice', e);
+    return [];
+  }
+}
