@@ -60,12 +60,13 @@ export async function republish(
 ): Promise<{ changed: number; warning?: 'cache-purge-failed' }> {
   const store = new PostgresStore(sql, VAULT_AUTHOR, deps);
   for (let attempt = 1; ; attempt++) {
-    const notes = await publicNotes(sql);
-    const targets = new Map(notes.map((n) => [linkKey(n.title), n.uid]));
-    const want = new Map(notes.map((n) => Object.values(publishedCopy(n, targets)) as [string, string]));
+    // `have` first: a commit landing after it makes this run's commit conflict, so stale notes can't be published.
     const have = await sql<{ path: string; content: string; version: number }>`
       select path, content, version from documents
       where path like any(${DIRS.map((d) => `${d}/%`)}::text[])`;
+    const notes = await publicNotes(sql);
+    const targets = new Map(notes.map((n) => [linkKey(n.title), n.uid]));
+    const want = new Map(notes.map((n) => Object.values(publishedCopy(n, targets)) as [string, string]));
     const base: Record<string, string | null> = {};
     const changes: Change[] = [];
     for (const d of have) {

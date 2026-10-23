@@ -186,3 +186,21 @@ test('three lost races in a row throw', async () => {
   await setBody(sql, a.id, 'two');
   await assert.rejects(republish(losing('src/content/notes/alpha.md', 3), deps), ConflictError);
 });
+
+test('a note made private (and republished) between two reads of a run stays unpublished', async () => {
+  const x = await make('Secret X', 'secret words');
+  await setNotePublic(sql, x.id, true);
+  await republish(sql, deps);
+  let reads = 0;
+  const s = (async (strings: TemplateStringsArray, ...values: unknown[]) => {
+    if (++reads === 2) {
+      await setNotePublic(sql, x.id, false);
+      await republish(sql, deps);
+    }
+    return sql(strings, ...values);
+  }) as unknown as Sql;
+  s.unsafe = (q) => sql.unsafe(q);
+  s.begin = (fn) => sql.begin(fn);
+  await republish(s, deps);
+  assert.equal(await countLike('src/content/notes/%'), 0);
+});
