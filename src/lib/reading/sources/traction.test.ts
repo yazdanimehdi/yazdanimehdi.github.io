@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { SourceError } from '../../career/sources/http';
 import { parseReadingPrefs } from '../settings';
 import {
   blueskyCount,
@@ -158,6 +159,41 @@ test('fetchTraction keeps Hugging Face papers from the last 7 days only', async 
   assert.deepEqual(
     papers.map((p) => p.key),
     ['arxiv:2610.00001'],
+  );
+});
+
+test('fetchTraction skips a day Hugging Face has not published yet, and fails when it rejects every day', async () => {
+  const entry = {
+    paper: { id: '2610.00001', title: 'Paper', upvotes: 10, submittedOnDailyAt: '2026-10-22T00:00:00.000Z' },
+  };
+  // Just after UTC midnight Hugging Face answers 400 for the new day.
+  const unpublished = (url: string) => {
+    if (url.includes('date=2026-10-24')) throw new SourceError('huggingface.co answered 400', 400);
+    return JSON.stringify([entry]);
+  };
+  const papers = await fetchTraction(
+    'huggingface',
+    parseReadingPrefs({}),
+    fake([['huggingface.co', unpublished]]).get,
+    '2026-10-24',
+  );
+  assert.deepEqual(
+    papers.map((p) => p.key),
+    ['arxiv:2610.00001'],
+  );
+  const rejectAll = () => {
+    throw new SourceError('huggingface.co answered 400', 400);
+  };
+  await assert.rejects(
+    fetchTraction('huggingface', parseReadingPrefs({}), fake([['huggingface.co', rejectAll]]).get, '2026-10-24'),
+    /answered 400/,
+  );
+  const outage = () => {
+    throw new SourceError('huggingface.co answered 503', 503);
+  };
+  await assert.rejects(
+    fetchTraction('huggingface', parseReadingPrefs({}), fake([['huggingface.co', outage]]).get, '2026-10-24'),
+    /answered 503/,
   );
 });
 

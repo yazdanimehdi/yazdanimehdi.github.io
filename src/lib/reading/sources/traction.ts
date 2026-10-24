@@ -2,6 +2,7 @@
 // and Bluesky mention counts for a paper.
 import type { Lookup } from '../../admin/paper-complete';
 import { list, obj, parseOpenAlex, str } from '../../admin/paper-sources';
+import { SourceError } from '../../career/sources/http';
 import { normalizeArxiv, paperKey } from '../match';
 import type { ReadingPrefs } from '../settings';
 import type { NewPaper, Paper, Signals } from '../types';
@@ -106,8 +107,17 @@ export async function fetchTraction(
     // week's most upvoted, and `week=` rejects ISO week 53.
     const week = Array.from({ length: 7 }, (_, i) => daysBefore(day, i));
     const papers: NewPaper[] = [];
-    for (const d of week)
-      papers.push(...parseHfDaily(JSON.parse(await get(`https://huggingface.co/api/daily_papers?date=${d}&limit=50`))));
+    const rejected: unknown[] = [];
+    for (const d of week) {
+      const body = await get(`https://huggingface.co/api/daily_papers?date=${d}&limit=50`).catch((e) => {
+        // A day not yet published (just after UTC midnight) answers 400: skip that day, not the source.
+        if (!(e instanceof SourceError && e.status === 400)) throw e;
+        rejected.push(e);
+        return null;
+      });
+      if (body !== null) papers.push(...parseHfDaily(JSON.parse(body)));
+    }
+    if (rejected.length === week.length) throw rejected[0];
     const from = Date.parse(`${week[6]}T00:00:00Z`);
     return unique(papers.filter((p) => Date.parse(p.signals!.huggingface!.since) >= from));
   }
